@@ -1,6 +1,11 @@
+'use client';  
+
 import React from 'react'
 import Image from 'next/image'
 import Link from 'next/link';
+
+
+
 
 function Footer() {
   return (
@@ -16,8 +21,8 @@ function Footer() {
                     <p className='text-white text-xl font-bold'>Quick Links</p>
                     <Link href="/login" className='text-white block font-light text-sm cusrsor-pointer'>Login</Link>
                     <Link href="/register" className='text-white block font-light text-sm cusrsor-pointer'>Signup </Link>
-                    <Link href="" className='text-white block font-light text-sm cusrsor-pointer'>Terms of Service</Link>
-                    <Link href="" className='text-white block font-light text-sm cusrsor-pointer'>Privacy Policy</Link>
+                    <Link href="/term-of-service" className='text-white block font-light text-sm cusrsor-pointer'>Terms of Service</Link>
+                    <Link href="/privacy-policy" className='text-white block font-light text-sm cusrsor-pointer'>Privacy Policy</Link>
                 </div>
                 <div className='md:w-[20%] w-full md:space-y-4 space-y-2'>
                     <p className='text-white text-xl font-bold'>Follow on</p>
@@ -37,8 +42,11 @@ function Footer() {
                 <div className='md:w-[25%] w-full md:space-y-4 space-y-2'>
                     <p className='text-white text-xl font-bold'>Contact Us</p>
                     <p className='text-white font-extralight text-sm'>{`Whether you're looking for more information or ready to get started, we're here to support you with quick answers and real solutions.`}</p>
-                    <button className='bg-white hover:bg-transparent hover:text-[#fff] border border-[#fff] duration-300 px-4 py-2 text-sm text-[#000] rounded-[6px]'>Contact Us</button>
-                </div>
+                    <Link href="/contact-us" passHref>
+      <button className="bg-white hover:bg-transparent hover:text-[#fff] border border-[#fff] duration-300 px-4 py-2 text-sm text-[#000] rounded-[6px]">
+        Contact Us
+      </button>
+    </Link>                </div>
             </div>
             <div className='flex justify-between gap-8items-center max-w-[1200px] mx-auto py-6 border-t border-[#ffffff4D]'>
                 <div>

@@ -74,6 +74,57 @@ line-height: 68px;
 .service-slider .slick-slide>div{
   height: 100% !important;
 }
+.border-t{
+  border-top: 1px solid #01010117;
+}
+.oot-hd-p ul {
+  list-style: disc;
+  padding-left: 25px;
+}
+
+
+.Contact-us-box {
+  border: 1px solid #01010117;
+  max-width: 1440px;
+  margin: auto;
+  border-radius: 25px;
+  margin-top: 30px;
+  position: relative;
+}
+.Contact-us-box h2 {
+  top: -20px;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.Contact-us-box .contact-box-row > .flex.flex-col:nth-of-type(2n) {
+  position: relative;
+}
+
+.Contact-us-box .contact-box-row > .flex.flex-col:nth-of-type(2n):before {
+  position: absolute;
+  content: "";
+  left: 0;
+  top: 30%;
+  width: 1px;
+  height: 40%;
+  transform: translateX(-50%);
+  background: #0101011a;
+  /* background-position: left; */
+}
+.Contact-us-box .contact-box-row > .flex.flex-col:nth-of-type(2n):after {
+  position: absolute;
+  content: "";
+  right: 0;
+  top: 30%;
+  width: 1px;
+  height: 40%;
+  transform: translateX(-50%);
+  background: #0101011a;
+  /* background-position: left; */
+}
+
+
 @media screen and (max-width: 1499px) {
   h1{
   font-size: 36px;
@@ -112,6 +163,13 @@ line-height: 68px;
   font-size: 15px;
 }
 }
+
+@media screen and (max-width: 767px) {
+  .Contact-us-box .contact-box-row > .flex.flex-col:nth-of-type(2n):before
+  ,.Contact-us-box .contact-box-row > .flex.flex-col:nth-of-type(2n):after {
+    display: none;
+  }
+}
 @media screen and (max-width: 575px) {
   h1{
     line-height: 38px;
@@ -123,4 +181,7 @@ line-height: 68px;
   .mrg_img{
     margin-top: -40px;
   }
+  .Contact-us-box h2 {
+    white-space: nowrap;
+}
 }

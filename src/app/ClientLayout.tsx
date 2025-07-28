@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import MainHeader from "@/components/Layout/MainHeader/MainHeader";
 import Footer from "@/components/Layout/Footer/Footer";
 
-const includedPaths = ['/', '/contact-us']; 
+const includedPaths = ['/', '/contact-us','/term-of-service','/privacy-policy']; 
 
 export default function ClientLayout({
   children,

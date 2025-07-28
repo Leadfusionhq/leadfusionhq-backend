@@ -40,7 +40,7 @@ const AddNewUser = () => {
     role: Yup.string().required('Role is required'),
   });
 
-  const handleSubmit = async (values: typeof initialValues, { setSubmitting, resetForm }: { setSubmitting: (isSubmitting: boolean) => void; resetForm: () => void }) => {
+ const handleSubmit = async (values: typeof initialValues, { setSubmitting, resetForm }: { setSubmitting: (isSubmitting: boolean) => void; resetForm: () => void }) => {
     try {
       setSubmitting(true);
       const response = await axiosWrapper('post', API_URL.ADD_USER, values, token ?? undefined) as { message?: string };
