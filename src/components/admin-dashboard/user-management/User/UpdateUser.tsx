@@ -8,9 +8,18 @@ import * as Yup from 'yup';
 import { toast } from 'react-toastify';
 
 import axiosWrapper from '@/utils/api';
+import { getErrorMessage } from '@/utils/getErrorMessage';
 import { API_URL } from '@/utils/apiUrl';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/redux/store';
+type User = {
+  name: string;
+  email: string;
+  companyName: string;
+  phoneNumber: string;
+  zipCode: string;
+  role: string;
+};
 
 const EditUser = () => {
   const { userId } = useParams();
@@ -51,10 +60,17 @@ const EditUser = () => {
 
   useEffect(() => {
     const fetchUser = async () => {
+      if (!userId) return;
+
+      const id = Array.isArray(userId) ? userId[0] : userId;
+      if (!id) return;
+
       try {
-        console.log(userId);
-        const res = await axiosWrapper('get',API_URL.GET_USER_BY_ID.replace(':userId', userId),{},token ?? undefined) as { user?: string };
-        
+        console.log(id);
+        const url = API_URL.GET_USER_BY_ID.replace(':userId', id);
+        // const res = await axiosWrapper('get', url, {}, token ?? undefined) as { user?: string };
+        const res = await axiosWrapper('get', url, {}, token ?? undefined) as { user?: User };
+
         const user = res?.user;
         if (user) {
           setInitialValues({
@@ -68,9 +84,9 @@ const EditUser = () => {
             role: user.role || 'User',
           });
         }
-      } catch (err: any) {
+      } catch (err) {
+        console.log('error for failed to fetch :', err);
         toast.error('Failed to fetch user');
-        // router.push('/admin/user-management');
       } finally {
         setLoading(false);
       }
@@ -78,6 +94,7 @@ const EditUser = () => {
 
     fetchUser();
   }, [userId, token, router]);
+
 
   const handleSubmit = async (
     values: typeof initialValues,
@@ -89,16 +106,16 @@ const EditUser = () => {
       const payload = { ...values };
 
       const url = API_URL.UPDATE_USER.replace(':userId', userId as string);
-      const response = await axiosWrapper('put', url, payload, token ?? undefined);
+      const response = await axiosWrapper('put', url, payload, token ?? undefined) as { message?: string };
 
       toast.success(response?.message || 'User updated successfully!');
       router.push('/admin/user-management');
-    } catch (err: any) {
-      const errorMessage =
-        err?.response?.data?.message ||
-        err?.error ||
-        'Unable to update user. Please try again.';
-      toast.error(errorMessage);
+    } catch (err) {
+      // const errorMessage =
+      //   err?.response?.data?.message ||
+      //   err?.error ||
+      //   'Unable to update user. Please try again.';
+      toast.error(getErrorMessage(err));
     } finally {
       setSubmitting(false);
     }

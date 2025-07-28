@@ -71,7 +71,8 @@ export async function GET(req: NextRequest) {
     const isActive = true;
     console.log('isActive',isActive);
 
-    const users = await getAllUsersByRole(role, isActive);
+    // const users = await getAllUsersByRole(role, isActive);
+    const users = await getAllUsersByRole({ role, isActive });
 
     if (!users || users.length === 0) {
       return NextResponse.json({ error: 'No users found' }, { status: 404 });

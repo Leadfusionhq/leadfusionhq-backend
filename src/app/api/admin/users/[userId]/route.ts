@@ -1,66 +1,56 @@
-// app/admin/users/[userId]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAuth } from '@/middleware/check-auth';
 import { authorizedRoles } from '@/middleware/authorized-roles';
-import {
-  getUserByID,
-  updateUser,
-//   deleteUser
-} from '@/services/user-service';
+import { getUserByID, updateUser } from '@/services/user-service';
 import { validateUserUpdateSchema } from '@/request-schemas/user-schema';
 
-export async function GET(req: NextRequest, { params }: { params: { userId: string } }) {
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ userId: string }> }
+) {
+  const { userId } = await params;
   try {
-    const authResponse = await checkAuth(req);
-    if (authResponse instanceof NextResponse) return authResponse;
+    const auth = await checkAuth(req);
+    if (auth instanceof NextResponse) return auth;
 
-    const authorizedResponse = authorizedRoles(['Admin'])(req);
-    if (authorizedResponse instanceof NextResponse) return authorizedResponse;
+    const authz = authorizedRoles(['Admin'])(req);
+    if (authz instanceof NextResponse) return authz;
 
-    const user = await getUserByID(params.userId);
-    console.log(user);
+    const user = await getUserByID(userId);
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
-
     return NextResponse.json({ user }, { status: 200 });
-  } catch (error) {
-    return NextResponse.json({ error: 'Server error', details: error instanceof Error ? error.message : error }, { status: 500 });
+  } catch (err) {
+    return NextResponse.json(
+      { error: 'Server error', details: err instanceof Error ? err.message : err },
+      { status: 500 }
+    );
   }
 }
 
-export async function PUT(req: NextRequest, { params }: { params: { userId: string } }) {
+export async function PUT(
+  req: NextRequest,
+  { params }: { params: Promise<{ userId: string }> }
+) {
+  const { userId } = await params;
   try {
     const body = await req.json();
-    console.log('body',body);
-    console.log('userId',params.userId);
-    const validationResponse = validateUserUpdateSchema(body);
-    if (validationResponse instanceof NextResponse) return validationResponse;
+    const validation = validateUserUpdateSchema(body);
+    if (validation instanceof NextResponse) return validation;
 
-    const authResponse = await checkAuth(req);
-    if (authResponse instanceof NextResponse) return authResponse;
+    const auth = await checkAuth(req);
+    if (auth instanceof NextResponse) return auth;
 
-    const authorizedResponse = authorizedRoles(['Admin'])(req);
-    if (authorizedResponse instanceof NextResponse) return authorizedResponse;
+    const authz = authorizedRoles(['Admin'])(req);
+    if (authz instanceof NextResponse) return authz;
 
-    const updated = await updateUser(params.userId, body);
+    const updated = await updateUser(userId, body);
     return NextResponse.json({ message: 'User updated', user: updated }, { status: 200 });
-  } catch (error) {
-    return NextResponse.json({ error: 'Server error', details: error instanceof Error ? error.message : error }, { status: 500 });
+  } catch (err) {
+    return NextResponse.json(
+      { error: 'Server error', details: err instanceof Error ? err.message : err },
+      { status: 500 }
+    );
   }
 }
-
-// export async function DELETE(req: NextRequest, { params }: { params: { userId: string } }) {
-//   try {
-//     const authResponse = await checkAuth(req);
-//     if (authResponse instanceof NextResponse) return authResponse;
-
-//     const authorizedResponse = authorizedRoles(['Admin'])(req);
-//     if (authorizedResponse instanceof NextResponse) return authorizedResponse;
-
-//     const deleted = await deleteUser(params.userId);
-//     return NextResponse.json({ message: 'User deleted', user: deleted }, { status: 200 });
-//   } catch (error) {
-//     return NextResponse.json({ error: 'Server error', details: error instanceof Error ? error.message : error }, { status: 500 });
-//   }
-// }

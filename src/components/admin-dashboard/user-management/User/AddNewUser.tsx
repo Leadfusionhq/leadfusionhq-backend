@@ -46,12 +46,9 @@ const AddNewUser = () => {
       const response = await axiosWrapper('post', API_URL.ADD_USER, values, token ?? undefined) as { message?: string };
       toast.success(response?.message || 'User added successfully!');
       resetForm();
-    } catch (err: any) {
-      const errorMessage =
-        err?.response?.data?.message ||
-        err?.error ||
-        'Unable to add user. Please try again.';
-      toast.error(errorMessage);
+    } catch (err) {
+      console.error('Error saving user:', err);
+      toast.error('Failed to save user');
     } finally {
       setSubmitting(false);
     }

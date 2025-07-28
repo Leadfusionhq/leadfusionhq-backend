@@ -11,9 +11,11 @@ export interface UserDocument extends Document {
   isActive: boolean;
 }
 
-export interface UserModel extends mongoose.Model<UserDocument> {}
+export interface UserModel extends mongoose.Model<UserDocument> {
+  findByEmail(email: string): Promise<UserDocument | null>;
+}
 
-const userSchema = new Schema<UserDocument>(
+const userSchema = new Schema<UserDocument, UserModel>(
   {
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true, lowercase: true },
@@ -26,5 +28,10 @@ const userSchema = new Schema<UserDocument>(
   },
   { timestamps: true }
 );
+
+// Implement static method
+userSchema.statics.findByEmail = function (email: string) {
+  return this.findOne({ email });
+};
 
 export const User = models.User || model<UserDocument, UserModel>('User', userSchema);

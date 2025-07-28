@@ -1,8 +1,19 @@
 import bcrypt from 'bcrypt';
-import { User } from '@/models/User';
+import { User, UserDocument } from '@/models/User'; 
 import { connectDB } from '@/lib/mongodb';
 
-export const createUser = async (userData: any) => {
+export type CreateUserData = {
+  name: string;
+  email: string;
+  password: string;
+  role?: 'Admin' | 'User';
+  companyName?: string;
+  phoneNumber?: string;
+  zipCode?: string;
+  isActive?: boolean;
+};
+
+export const createUser = async (userData: CreateUserData): Promise<UserDocument> => {
   try {
     await connectDB();
 
@@ -28,22 +39,27 @@ export const createUser = async (userData: any) => {
   }
 };
 
-export const getAllUsersByRole = async (role?: string, isActive?: boolean) => {
-  try {
-    const filter: any = {};
+type GetAllUsersFilter = {
+  role?: 'Admin' | 'User' | string; 
+  isActive?: boolean;
+};
 
-    if (role) {
-      filter.role = role;
+export const getAllUsersByRole = async (filterParams: GetAllUsersFilter = {}): Promise<UserDocument[]> => {
+  try {
+    const filter: Record<string, unknown> = {};
+
+    if (filterParams.role) {
+      filter.role = filterParams.role;
     }
 
-    if (isActive !== undefined) {
-      filter.isActive = isActive;
+    if (filterParams.isActive !== undefined) {
+      filter.isActive = filterParams.isActive;
     }
 
     const users = await User.find(filter)
-      .select('name email role isActive companyName phoneNumber zipCode createdAt updatedAt'); 
+      .select('name email role isActive companyName phoneNumber zipCode createdAt updatedAt');
 
-      return users;
+    return users;
   } catch (error: unknown) {
     console.log(error);
     if (error instanceof Error) {
@@ -53,15 +69,11 @@ export const getAllUsersByRole = async (role?: string, isActive?: boolean) => {
   }
 };
 
-export const getUserByID = async (userId: string, includePassword: boolean = false) => {
+export const getUserByID = async (userId: string, includePassword: boolean = false): Promise<UserDocument | null> => {
   try {
     await connectDB();
 
     const user = await User.findById(userId).select(includePassword ? '+password' : '-password');
-
-    if (!user) {
-      return null;
-    }
 
     return user;
   } catch (error: unknown) {
@@ -71,7 +83,12 @@ export const getUserByID = async (userId: string, includePassword: boolean = fal
     throw new Error('Unknown error occurred');
   }
 };
-export const updateUser = async (userId: string, updateData: any) => {
+
+export type UpdateUserData = Partial<Omit<CreateUserData, 'password'>> & {
+  password?: string;
+};
+
+export const updateUser = async (userId: string, updateData: UpdateUserData): Promise<UserDocument> => {
   try {
     await connectDB();
 
