@@ -11,9 +11,10 @@ export type CreateUserData = {
   phoneNumber?: string;
   zipCode?: string;
   isActive?: boolean;
+  isSuperAdmin?: boolean;
 };
 
-export const createUser = async (userData: CreateUserData): Promise<UserDocument> => {
+export const createAdmin = async (userData: CreateUserData): Promise<UserDocument> => {
   try {
     await connectDB();
 
@@ -57,8 +58,9 @@ export const getAllUsersByRole = async (filterParams: GetAllUsersFilter = {}): P
     }
 
     const users = await User.find(filter)
-      .select('name email role isActive companyName phoneNumber zipCode createdAt updatedAt');
+      .select('name email role isActive phoneNumber createdAt updatedAt isSuperAdmin');
 
+      console.log(users);
     return users;
   } catch (error: unknown) {
     console.log(error);
@@ -94,7 +96,7 @@ export const updateUser = async (userId: string, updateData: UpdateUserData): Pr
 
     const user = await User.findById(userId);
     if (!user) {
-      throw new Error('User not found');
+      throw new Error('Admin not found');
     }
 
     if (updateData.password) {
@@ -123,6 +125,10 @@ export const deleteUser = async (userId: string): Promise<void> => {
     const user = await User.findById(userId);
     if (!user) {
       throw new Error('User not found');
+    }
+
+    if (user.isSuperAdmin) {
+      throw new Error('Cannot delete super admin');
     }
 
     await User.findByIdAndDelete(userId);

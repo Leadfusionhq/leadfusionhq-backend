@@ -9,6 +9,7 @@ export interface UserDocument extends Document {
   phoneNumber?: string;
   zipCode?: string;
   isActive: boolean;
+  isSuperAdmin: boolean;
 }
 
 export interface UserModel extends mongoose.Model<UserDocument> {
@@ -25,6 +26,7 @@ const userSchema = new Schema<UserDocument, UserModel>(
     phoneNumber: { type: String, required: false },
     zipCode: { type: String, required: false },
     isActive: { type: Boolean, default: true },
+    isSuperAdmin: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

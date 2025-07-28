@@ -9,12 +9,12 @@ import MainPanel from '@/components/Layout/Dashboard/MainPanel/MainPanel';
 import Sidebar from '@/components/Layout/Sidebar/Sidebar';
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
-  const { user } = useSelector((state: RootState) => state.auth);
+  const { isLoggedIn, user } = useSelector((state: RootState) => state.auth);
   const router = useRouter();
 
 
     useEffect(() => {
-        if (!user || user.role !== 'Admin') router.push('/login');
+        if (!isLoggedIn || !user || user.role !== 'Admin') router.push('/login');
     });
 
   return (

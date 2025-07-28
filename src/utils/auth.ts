@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server';
 
 export function saveToken(token: string) {
   if (typeof window !== 'undefined') {
-    Cookies.set('token', token, { expires: 7, secure: true, sameSite: 'Strict' });
+    Cookies.set('token', token, { expires: 1, secure: true, sameSite: 'Strict' });
   }
 }
 

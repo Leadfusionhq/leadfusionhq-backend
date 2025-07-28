@@ -19,6 +19,7 @@ function Footer() {
                 </div>
                 <div className='md:w-[20%] w-full md:space-y-4 space-y-2'>
                     <p className='text-white text-xl font-bold'>Quick Links</p>
+                    <Link href="/" className='text-white block font-light text-sm cusrsor-pointer'>Home</Link>
                     <Link href="/login" className='text-white block font-light text-sm cusrsor-pointer'>Login</Link>
                     <Link href="/register" className='text-white block font-light text-sm cusrsor-pointer'>Signup </Link>
                     <Link href="/term-of-service" className='text-white block font-light text-sm cusrsor-pointer'>Terms of Service</Link>

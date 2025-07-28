@@ -12,7 +12,7 @@ import { useSelector } from 'react-redux';
 import { RootState } from '@/redux/store';
 
 
-const AddNewUser = () => {
+const AddNewAdmin = () => {
 
   const token = useSelector((state: RootState) => state.auth.token);
 
@@ -21,10 +21,8 @@ const AddNewUser = () => {
     email: '',
     password: '',
     confirmPassword: '',
-    companyName: '',
     phoneNumber: '',
-    zipCode: '',
-    role: 'User',
+    role: 'Admin',
   };
 
   const validationSchema = Yup.object().shape({
@@ -34,21 +32,21 @@ const AddNewUser = () => {
     confirmPassword: Yup.string()
       .oneOf([Yup.ref('password')], 'Passwords must match')
       .required('Confirm Password is required'),
-    companyName: Yup.string().required('Company Name is required'),
     phoneNumber: Yup.string().required('Phone Number is required'),
-    zipCode: Yup.string().required('Zip Code is required'),
     role: Yup.string().required('Role is required'),
   });
 
  const handleSubmit = async (values: typeof initialValues, { setSubmitting, resetForm }: { setSubmitting: (isSubmitting: boolean) => void; resetForm: () => void }) => {
     try {
       setSubmitting(true);
-      const response = await axiosWrapper('post', API_URL.ADD_USER, values, token ?? undefined) as { message?: string };
-      toast.success(response?.message || 'User added successfully!');
+      const response = await axiosWrapper('post', API_URL.ADD_ADMIN, values, token ?? undefined) as { message?: string };
+      toast.success(response?.message || 'Admin added successfully!');
       resetForm();
     } catch (err) {
-      console.error('Error saving user:', err);
-      toast.error('Failed to save user');
+      console.error('Error saving admin:', err);
+    //   console.error('Error message admin:', err.message);
+
+      toast.error('Failed to save admin');
     } finally {
       setSubmitting(false);
     }
@@ -73,8 +71,8 @@ const AddNewUser = () => {
   );
 
   return (
-    <div className="container mx-auto min-h-screen flex flex-col items-center  px-4 md:px-0 py-8">
-      <h2 className="text-[24px] font-[500] text-[#1C1C1C] text-center mb-6">Add New User</h2>
+    <div className="container min-h-screen flex flex-col mx-auto items-center md:px-0 ">
+      <h2 className="text-[24px] font-[500] text-[#1C1C1C] text-center mb-6">Add New Admin</h2>
       <Formik
         initialValues={initialValues}
         validationSchema={validationSchema}
@@ -95,22 +93,18 @@ const AddNewUser = () => {
               <div className="col-span-1">
                 <FormikInput name="confirmPassword" autoComplete="off" placeholder="Confirm Password" type="password" label="Confirm Password" />
               </div>
-              <div className="col-span-1">
-                <FormikInput name="companyName" autoComplete="off" placeholder="Company Name" label="Company" />
-              </div>
+              
               <div className="col-span-1">
                 <FormikInput name="phoneNumber" autoComplete="off" placeholder="Phone Number" label="Phone Number" />
               </div>
-              <div className="col-span-1">
-                <FormikInput name="zipCode" autoComplete="off" placeholder="Zip Code" label="Zip Code" />
-              </div>
+             
             </div>
             <button
               type="submit"
               className="w-full h-[56px] bg-[#1C1C1C] text-white text-[20px] font-inter font-semibold rounded-[8px] border-none cursor-pointer transition hover:bg-[#1C1C1C]"
               disabled={isSubmitting}
             >
-              {isSubmitting ? 'Adding User...' : 'Add User'}
+              {isSubmitting ? 'Adding Admin...' : 'Add Admin'}
             </button>
           </Form>
         )}
@@ -119,4 +113,4 @@ const AddNewUser = () => {
   );
 };
 
-export default AddNewUser;
+export default AddNewAdmin;
