@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { useSelector } from 'react-redux';
 import { RootState } from '@/redux/store';
 import { useRouter } from 'next/navigation';
@@ -9,13 +9,13 @@ import Sidebar from '@/components/Layout/Sidebar/Sidebar';
 import MainPanel from '@/components/Layout/Dashboard/MainPanel/MainPanel';
 
 export default function UserLayout({ children }: { children: ReactNode }) {
-  const { user } = useSelector((state: RootState) => state.auth);
+  const { isLoggedIn, user } = useSelector((state: RootState) => state.auth);
   const router = useRouter()
 
-  if (user?.role !== 'User') {
-    router.push('/login');;
-  }
 
+  useEffect(() => {
+      if (!isLoggedIn ||!user || user.role !== 'User') router.push('/login');
+  });
   return (
     <div className="layout_user flex">
       <Sidebar />

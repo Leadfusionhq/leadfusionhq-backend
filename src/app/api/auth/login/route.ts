@@ -61,11 +61,10 @@ export async function POST(req: NextRequest) {
     // Generate JWT Token
     const token = generateToken(user)
 
-    // Send Success Response with JWT token
     return NextResponse.json({
       message: 'Login successful',
       token,
-      tokenExpiration: '1h',  // Added expiration info
+      tokenExpiration: '1d', 
       user: {
         id: user._id,
         name: user.name,

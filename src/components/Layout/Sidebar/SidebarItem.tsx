@@ -20,7 +20,7 @@ const SidebarItem: FC<SidebarItemProps> = ({ item }) => {
     <Link href={item.link}>
       <div
         className={`flex items-center gap-3 px-4 py-2 my-2 rounded-full cursor-pointer ${
-          isActive ? 'bg-[#A8906B] text-white font-semibold' : 'hover:bg-gray-700'
+          isActive ? 'bg-[#204D9D] text-white ' : 'hover:bg-gray-700'
         }`}
       >
         {typeof item.icon === 'string' ? (

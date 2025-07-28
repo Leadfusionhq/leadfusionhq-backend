@@ -20,9 +20,10 @@ type User = {
     phoneNumber?: string;
     zipCode?: string;
     image?: string;
+    isSuperAdmin?: boolean;
 };
 
-export default function UserTable() {
+export default function AdminTable() {
     const [users, setUsers] = useState<User[]>([]); 
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
@@ -33,8 +34,9 @@ export default function UserTable() {
         const fetchData = async () => {
             try {
                 setLoading(true);
-                const response = await axiosWrapper('get', API_URL.GET_ALL_REGULAR_USERS, {}, token ?? undefined) as { data: User[] };
+                const response = await axiosWrapper('get', API_URL.GET_ALL_REGULAR_ADMIN, {}, token ?? undefined) as { data: User[] };
                 setUsers(response.data);
+                console.log(response);
             } catch (err) {
                   console.error('Unable to get users:', err);
             } finally {
@@ -62,23 +64,24 @@ export default function UserTable() {
 
 
     const handleEdit = (row: User) => {
-        router.push(`/admin/user-management/user/${row._id}/edit`);
+        router.push(`/admin/user-management/admin/${row._id}/edit`);
     };
 
     const handleDelete = async (row: User) => {
     const confirmation = window.confirm(`Are you sure you want to delete ${row.name}?`);
-    if (!confirmation) return;
-        try {
-            setLoading(true);
+    console.log(row);
+    // if (!confirmation) return;
+    //     try {
+    //         setLoading(true);
 
-            const url = API_URL.DELETE_USER_BY_ID.replace(':userId', row._id);
-            await axiosWrapper('delete', url, {}, token ?? undefined);
-            setUsers((prevUsers) => prevUsers.filter((user) => user._id !== row._id));
-        } catch (err) {
-            console.error('Failed to delete user:', err);
-        } finally {
-            setLoading(false);
-        }
+    //         const url = API_URL.DELETE_USER_BY_ID.replace(':userId', row._id);
+    //         await axiosWrapper('delete', url, {}, token ?? undefined);
+    //         setUsers((prevUsers) => prevUsers.filter((user) => user._id !== row._id));
+    //     } catch (err) {
+    //         console.error('Failed to delete user:', err);
+    //     } finally {
+    //         setLoading(false);
+    //     }
     };
 
 
@@ -102,11 +105,6 @@ export default function UserTable() {
                     <span>{row.name}</span>
                 </div>
             ),
-            sortable: true,
-        },
-        {
-            name: 'Company',
-            selector: (row: User) => row.companyName || '',
             sortable: true,
         },
         {
@@ -161,14 +159,14 @@ export default function UserTable() {
 
     return (
         <>
-        <div className="">
+        <div className="mt-[32px]">
             <div className="flex justify-between items-center pb-[30px]">
-                <h3 className="text-[24px] text-[#1C1C1C] text-[Inter]">List of Users</h3>
+                <h3 className="text-[24px] text-[#1C1C1C] text-[Inter]">List of Admin</h3>
 
-                <Link href="/admin/user-management/user/add"
+                <Link href="/admin/user-management/admin/add"
                     className="w-[175px] h-[52px] bg-[#1C1C1C] text-white rounded-[5px] text-center flex justify-center items-center text-[16px] no-underline"
                 >
-                    Add New User
+                    Add New Admin
                 </Link>
             </div>
 
@@ -176,7 +174,7 @@ export default function UserTable() {
                 columns={columns}
                 data={users || []} 
                 pagination
-                paginationPerPage={6}
+                paginationPerPage={3}
                 paginationRowsPerPageOptions={[6, 10, 15, 20]}
                 progressPending={loading}
                 customStyles={customStyles}
