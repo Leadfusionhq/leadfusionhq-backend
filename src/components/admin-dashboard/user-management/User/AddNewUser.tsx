@@ -11,6 +11,7 @@ import { API_URL } from '@/utils/apiUrl';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/redux/store';
 
+
 const AddNewUser = () => {
 
   const token = useSelector((state: RootState) => state.auth.token);
@@ -39,14 +40,15 @@ const AddNewUser = () => {
     role: Yup.string().required('Role is required'),
   });
 
-  const handleSubmit = async (values: typeof initialValues, { setSubmitting, resetForm }: { setSubmitting: (isSubmitting: boolean) => void; resetForm: () => void }) => {
+ const handleSubmit = async (values: typeof initialValues, { setSubmitting, resetForm }: { setSubmitting: (isSubmitting: boolean) => void; resetForm: () => void }) => {
     try {
       setSubmitting(true);
-      const response = await axiosWrapper('post', API_URL.ADD_USER, values, token ?? undefined);
-      // toast.success(response?.message || 'User added successfully!');
+      const response = await axiosWrapper('post', API_URL.ADD_USER, values, token ?? undefined) as { message?: string };
+      toast.success(response?.message || 'User added successfully!');
       resetForm();
-    } catch (error) {
-      // toast.error(error?.error || 'Unable to add user. Please try again.')
+    } catch (err) {
+      console.error('Error saving user:', err);
+      toast.error('Failed to save user');
     } finally {
       setSubmitting(false);
     }

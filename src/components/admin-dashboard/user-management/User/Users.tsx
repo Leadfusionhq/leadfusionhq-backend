@@ -8,9 +8,10 @@ import { RootState } from '@/redux/store';
 import DataTable, { TableColumn } from 'react-data-table-component';
 import Image from 'next/image';  
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 type User = {
-    id: string;
+    _id: string;
     name: string;
     createdAt: string;
     email: string;
@@ -26,17 +27,16 @@ export default function UserTable() {
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
     const token = useSelector((state: RootState) => state.auth.token);
+    const router = useRouter();
 
     useEffect(() => {
         const fetchData = async () => {
             try {
                 setLoading(true);
                 const response = await axiosWrapper('get', API_URL.GET_ALL_REGULAR_USERS, {}, token ?? undefined) as { data: User[] };
-                console.log(response);
                 setUsers(response.data);
-            } catch (error) {
-                setError('Error fetching users');
-                console.error('Error fetching users:', error);
+            } catch (err) {
+                  console.error('Unable to get users:', err);
             } finally {
                 setLoading(false);
             }
@@ -62,8 +62,7 @@ export default function UserTable() {
 
 
     const handleEdit = (row: User) => {
-        alert(`Editing user: ${row.name}`);
-        // You can navigate to an edit page or open a modal here
+        router.push(`/admin/user-management/user/${row._id}/edit`);
     };
 
     const handleDelete = (row: User) => {
@@ -77,7 +76,7 @@ export default function UserTable() {
     const columns: TableColumn<User>[] = [
         {
             name: 'User ID',
-            selector: (row: User) => `# ${row.id}`,
+            selector: (row: User) => `# ${row._id}`,
             sortable: true,
         },
         {

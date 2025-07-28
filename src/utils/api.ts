@@ -116,7 +116,6 @@ const axiosWrapper = async (
     }
 
     const response = await axios(config);
-    console.warn('response',response)
     return response.data;
   } catch (error: unknown) {
     if (

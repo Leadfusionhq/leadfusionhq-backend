@@ -14,8 +14,11 @@ export const API_URL = {
 
     ADD_USER: `${USER_API_BASE}/add`,
 
-    UPDATE_USER: `${USER_API_BASE}/user/edit/:id`,
+    UPDATE_USER: `${USER_API_BASE}/:userId`,
 
+    GET_USER_BY_ID: `${USER_API_BASE}/:userId`,
+
+    
 
     // Auth URLs
     LOGIN_USER: `${AUTH_API_BASE}/login`,
