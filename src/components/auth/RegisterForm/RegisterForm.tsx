@@ -14,7 +14,6 @@ import { useRouter } from 'next/navigation';
 import { registerUser } from '@/redux/auth/authActions';
 import { RootState, AppDispatch } from '@/redux/store';
 import { clearError, clearSuccess } from '@/redux/auth/authSlice';
-import styles from './RegisterForm.module.css'
 
 const RegisterForm = () => {
   const dispatch: AppDispatch = useDispatch();
@@ -25,7 +24,8 @@ const RegisterForm = () => {
     if (success && message) {
       toast.dismiss();
       toast.success(message);
-      dispatch(clearSuccess()); // Clear success state after showing toast
+      dispatch(clearSuccess());
+      router.push('/login');
     }
   }, [success, message, dispatch]);
 
@@ -62,9 +62,10 @@ const RegisterForm = () => {
     terms: Yup.boolean().oneOf([true], 'You must accept the terms and conditions'),
   });
 
-  const handleSubmit = async (values: typeof initialValues, { setSubmitting }: { setSubmitting: (isSubmitting: boolean) => void }) => {
+ const handleSubmit = async (values: typeof initialValues, { setSubmitting, resetForm }: { setSubmitting: (isSubmitting: boolean) => void; resetForm: () => void }) => {
     dispatch(registerUser(values));
     setSubmitting(false);
+    resetForm();
   };
 
   // Custom Formik-compatible Input
@@ -85,7 +86,7 @@ const RegisterForm = () => {
     <div className='outer_register p-[20px] sm:p-[10px] md:p-[40px] lg:py-[50px] lg:px-[50px]'>
       <div className="register-container container sm:p-[0px] mx-auto min-h-screen flex flex-col px-4 md:px-0  ">
       {/* Centered Logo Above Grid */}
-      <div className={`flex justify-center items-center w-full   ${styles.diss}`}>
+      <div className={`flex justify-center items-center w-full `}>
         <Image
           src="/images/logo.svg"
           alt="Logo"

@@ -10,6 +10,7 @@ export interface UserDocument extends Document {
   zipCode?: string;
   isActive: boolean;
   isSuperAdmin: boolean;
+  verificationToken:string;
 }
 
 export interface UserModel extends mongoose.Model<UserDocument> {
@@ -27,6 +28,7 @@ const userSchema = new Schema<UserDocument, UserModel>(
     zipCode: { type: String, required: false },
     isActive: { type: Boolean, default: true },
     isSuperAdmin: { type: Boolean, default: false },
+    verificationToken: { type: String, required: false },
   },
   { timestamps: true }
 );

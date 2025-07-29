@@ -31,7 +31,7 @@ const generateToken = (user: UserJwtPayload) => {
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, password } = await req.json()
+    const { email, password , role} = await req.json()
 
     // Input Validation
     if (!email || !password) {
@@ -50,6 +50,11 @@ export async function POST(req: NextRequest) {
     // Check if account is deactivated
     if (!user.isActive) {
       return NextResponse.json({ error: 'Account is deactivated' }, { status: 403 })
+    }
+    
+    // Check user matched the role
+    if (user.role !== role) {
+      return NextResponse.json({ error: `Only ${role}s can log in here.` }, { status: 403 });
     }
 
     // Compare the password with the hashed one

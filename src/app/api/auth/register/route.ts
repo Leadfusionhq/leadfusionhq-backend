@@ -2,6 +2,8 @@ import { connectDB } from '@/lib/mongodb'
 import { User } from '@/models/User'
 import bcrypt from 'bcrypt'
 import { NextRequest, NextResponse } from 'next/server'
+import { sendVerificationEmail } from '@/mails/mails'
+import crypto from 'crypto'
 
 const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
@@ -43,6 +45,7 @@ export async function POST(req: NextRequest) {
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10)
+    const verificationToken = crypto.randomBytes(32).toString('hex');
 
     // Create new user
     const newUser = new User({
@@ -53,10 +56,20 @@ export async function POST(req: NextRequest) {
       zipCode,
       password: hashedPassword,
       role: role || 'User',
+      verificationToken,
+      isActive:false,
     })
 
     // Save user to DB
     await newUser.save()
+
+    console.log('About to send verification email...')
+    const emailResult = await sendVerificationEmail({
+      to: email,
+      name,
+      token: verificationToken,
+    })
+    console.log('Email send result:', emailResult)
 
     return NextResponse.json({ message: 'User registered successfully' }, { status: 201 })
   } catch (error) {

@@ -14,14 +14,24 @@ import { Formik, Form, Field, ErrorMessage } from 'formik';
 import * as Yup from 'yup';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
 import styles from './LoginForm.module.css';
+import { usePathname } from 'next/navigation';
 
 const LoginForm = () => {
   const [showPassword, setShowPassword] = useState(false);
-  const [role, setRole] = useState<'Admin' | 'Client'>('Admin');
+  const [role, setRole] = useState<'Admin' | 'User'>('Admin');
   const dispatch = useDispatch<AppDispatch>();
   const router = useRouter();
+  const pathname = usePathname();
 
   const { user, loading, error } = useSelector((state: RootState) => state.auth);
+  useEffect(() => {
+    if (pathname === '/admin-login') {
+      setRole('Admin');
+    } 
+    if (pathname === '/login') {
+      setRole('User');
+    } 
+  }, [pathname]);
 
   useEffect(() => {
     if (user) {
@@ -55,6 +65,7 @@ const LoginForm = () => {
   const initialValues = {
     email: '',
     password: '',
+    role:role,
   };
 
   return (
@@ -71,15 +82,22 @@ const LoginForm = () => {
             </div>
           </div>
           <div className="flex justify-center gap-3 mt-4.5 mb-5.5 max-[575px]:flex-wrap max-[575px]:gap-y-2 m-2">
-          <button type="button" className={` cursor-pointer px-7.5 py-3.5 rounded-full font-medium text-xs  max-[575px]:w-full	  ${role === 'Admin' ? 'bg-white black-white border-white' : 'bg-transparent border  text-white'}`}
-            onClick={() => setRole('Admin')} >
-            Login as Admin
-          </button>
-            <button type="button" className={`cursor-pointer px-7.5 py-3.5 rounded-full font-medium text-xs	 max-[575px]:w-full  ${role === 'Client' ? 'bg-white text-black  border-white' : 'bg-transparent border  text-white'}`}
-              onClick={() => setRole('Client')} >
-              Login as Client
-            </button>
-          </div>  
+            <Link href="/admin-login" passHref>
+              <button type="button"
+                className={`cursor-pointer px-7.5 py-3.5 rounded-full font-medium text-xs max-[575px]:w-full
+                  ${role === 'Admin' ? 'bg-white text-black border-white' : 'bg-transparent border text-white'}`}>
+                Login as Admin
+              </button>
+            </Link>
+            <Link href="/login" passHref>
+              <button type="button"
+                className={`cursor-pointer px-7.5 py-3.5 rounded-full font-medium text-xs max-[575px]:w-full
+                  ${role === 'User' ? 'bg-white text-black border-white' : 'bg-transparent border text-white'}`}>
+                Login as Client
+              </button>
+            </Link>
+          </div>
+
         </div>
         {/* Form Section */}
         <div className="bg-white w-full rounded-b-3xl shadow-md p-[20px] px-[22px]   sm:p-8 sm:pb-14 sm:px-12">
@@ -87,10 +105,17 @@ const LoginForm = () => {
           text-sm max-[575px]:text-xs">${styles.login_h1}`}> Welcome Back </h1>
           <p className='sign_txt text-[#1C1C1C] mb-[30px] text-[18px] leading-7 text-center m-auto max-w-[520px]'>Sign in to access your Lead Manager and stay on top of your leads—all in one place.</p>
           <Formik
-            initialValues={initialValues}
+            // initialValues={initialValues}
+            initialValues={{
+              email: '',
+              password: '',
+              role: role,
+            }}
+            enableReinitialize={true}
             validationSchema={validationSchema}
-            onSubmit={({ email, password }, { setSubmitting }) => {
-              dispatch(loginUser({ email, password })).finally(() => setSubmitting(false));
+            onSubmit={({ email, password,role }, { setSubmitting }) => {
+              // alert(role);
+              dispatch(loginUser({ email, password,role })).finally(() => setSubmitting(false));
             }}
           >
             {({ values, handleChange, handleBlur, isSubmitting }) => (

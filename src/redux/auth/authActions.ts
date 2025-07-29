@@ -16,11 +16,11 @@ interface LoginResponse {
   user: User;
 }
 
-export const loginUser = createAsyncThunk<LoginResponse, { email: string; password: string }>(
+export const loginUser = createAsyncThunk<LoginResponse, { email: string; password: string; role: string}>(
   'auth/loginUser',
-  async ({ email, password }, { rejectWithValue }) => {
+  async ({ email, password,role }, { rejectWithValue }) => {
     try {
-      const { data } = await axios.post<LoginResponse>(API_URL.LOGIN_USER, { email, password });
+      const { data } = await axios.post<LoginResponse>(API_URL.LOGIN_USER, { email, password,role });
       saveToken(data.token);
       return data;
     } catch (err: unknown) {
