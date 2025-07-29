@@ -57,19 +57,19 @@ export async function POST(req: NextRequest) {
       password: hashedPassword,
       role: role || 'User',
       verificationToken,
-      isActive:false,
+      // isActive:false,
     })
 
     // Save user to DB
     await newUser.save()
 
-    console.log('About to send verification email...')
-    const emailResult = await sendVerificationEmail({
-      to: email,
-      name,
-      token: verificationToken,
-    })
-    console.log('Email send result:', emailResult)
+    // console.log('About to send verification email...')
+    // const emailResult = await sendVerificationEmail({
+    //   to: email,
+    //   name,
+    //   token: verificationToken,
+    // })
+    // console.log('Email send result:', emailResult)
 
     return NextResponse.json({ message: 'User registered successfully' }, { status: 201 })
   } catch (error) {
