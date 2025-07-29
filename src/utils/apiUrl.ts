@@ -23,7 +23,7 @@ export const API_URL = {
     ADD_ADMIN: `${ADMIN_API_BASE}/`,
     UPDATE_ADMIN: `${ADMIN_API_BASE}/:adminId`,
     GET_ADMIN_BY_ID: `${ADMIN_API_BASE}/:adminId`,
-    DELETE_ADMIN_BY_ID: `${USER_API_BASE}/:adminId`,
+    DELETE_ADMIN_BY_ID: `${ADMIN_API_BASE}/:adminId`,
 
     GET_ALL_REGULAR_ADMIN: `${ADMIN_API_BASE}?role=Admin`,
 

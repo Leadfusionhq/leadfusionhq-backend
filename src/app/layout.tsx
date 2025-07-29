@@ -43,10 +43,10 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${inter.className}`}>
       <body>
+        <Toaster />
         <AOSInitializer/>
         <ClientComponent>
         <ClientLayout>
-          <Toaster />
             {children}
         </ClientLayout>
         </ClientComponent>

@@ -9,6 +9,8 @@ import DataTable, { TableColumn } from 'react-data-table-component';
 import Image from 'next/image';  
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { toast } from 'react-toastify';
+import { getErrorMessage } from '@/utils/getErrorMessage';
 
 type User = {
     _id: string;
@@ -68,21 +70,28 @@ export default function AdminTable() {
     };
 
     const handleDelete = async (row: User) => {
-    const confirmation = window.confirm(`Are you sure you want to delete ${row.name}?`);
-    console.log(row);
-    // if (!confirmation) return;
-    //     try {
-    //         setLoading(true);
+        const confirmation = window.confirm(`Are you sure you want to delete ${row.name}?`);
+        if (!confirmation) return;
 
-    //         const url = API_URL.DELETE_USER_BY_ID.replace(':userId', row._id);
-    //         await axiosWrapper('delete', url, {}, token ?? undefined);
-    //         setUsers((prevUsers) => prevUsers.filter((user) => user._id !== row._id));
-    //     } catch (err) {
-    //         console.error('Failed to delete user:', err);
-    //     } finally {
-    //         setLoading(false);
-    //     }
+        if (row.isSuperAdmin) {
+            // alert('Super Admin cannot be deleted.');
+            toast.error('Super Admin cannot be deleted.');
+            return; // 🚨 Prevent further execution
+        }
+
+        try {
+            setLoading(true);
+            const url = API_URL.DELETE_ADMIN_BY_ID.replace(':adminId', row._id);
+            await axiosWrapper('delete', url, {}, token ?? undefined);
+            setUsers((prevUsers) => prevUsers.filter((user) => user._id !== row._id));
+        } catch (err) {
+            console.error('Failed to delete user:', err);
+            toast.error(getErrorMessage(err));
+        } finally {
+            setLoading(false);
+        }
     };
+
 
 
     const columns: TableColumn<User>[] = [
