@@ -57,21 +57,22 @@ export async function POST(req: NextRequest) {
       password: hashedPassword,
       role: role || 'User',
       verificationToken,
-      // isActive:false,
+      verificationTokenExpires: new Date(Date.now() + 24*60*60*1000)
+
     })
 
     // Save user to DB
     await newUser.save()
 
-    // console.log('About to send verification email...')
-    // const emailResult = await sendVerificationEmail({
-    //   to: email,
-    //   name,
-    //   token: verificationToken,
-    // })
-    // console.log('Email send result:', emailResult)
+    console.log('About to send verification email...')
+    const emailResult = await sendVerificationEmail({
+      to: email,
+      name,
+      token: verificationToken,
+    })
+    console.log('Email send result:', emailResult)
 
-    return NextResponse.json({ message: 'User registered successfully' }, { status: 201 })
+    return NextResponse.json({ message: 'Success! Please verify your email to activate your account.' }, { status: 201 })
   } catch (error) {
     console.error('Error in POST /api/auth/register:', error);
     return NextResponse.json({

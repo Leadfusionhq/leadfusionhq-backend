@@ -32,4 +32,6 @@ export const API_URL = {
     REGISTER_USER: `${AUTH_API_BASE}/register`, 
     LOGOUT_USER: `${AUTH_API_BASE}/logout`, 
 
+    SEND_RESET_LINK: `${AUTH_API_BASE}/send-reset-link`,
+    RESET_PASSWORD: `${AUTH_API_BASE}/reset-password`,
 };

@@ -9,11 +9,18 @@ interface User {
   name?: string;
 }
 
+// Enhanced error interface for verification cases
+interface AuthError {
+  message?: string;
+  code?: string;
+  email?: string;
+}
+
 interface AuthState {
   loading: boolean;
   user: User | null;
   token: string | null;
-  error: string | null;
+  error: string | AuthError | null; // Updated to handle both types
   success: boolean;
   message: string | null;
   isLoggedIn: boolean;
@@ -65,7 +72,8 @@ const authSlice = createSlice({
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        // Handle both string and object errors
+        state.error = action.payload as string | AuthError;
         state.isLoggedIn = false;
       })
       .addCase(registerUser.pending, (state) => {
