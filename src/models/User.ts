@@ -11,6 +11,12 @@ export interface UserDocument extends Document {
   isActive: boolean;
   isSuperAdmin: boolean;
   verificationToken:string;
+  verificationTokenExpires:Date;
+  isEmailVerified: boolean;
+  resetPasswordToken:string;
+  resetPasswordExpires:Date;
+
+
 }
 
 export interface UserModel extends mongoose.Model<UserDocument> {
@@ -26,9 +32,21 @@ const userSchema = new Schema<UserDocument, UserModel>(
     companyName: { type: String, required: false },
     phoneNumber: { type: String, required: false },
     zipCode: { type: String, required: false },
-    isActive: { type: Boolean, default: true },
+    isActive: { type: Boolean, default: true }, // Can admin disable account?
+    isEmailVerified: { type: Boolean, default: false }, // Email confirmed?
+
     isSuperAdmin: { type: Boolean, default: false },
     verificationToken: { type: String, required: false },
+    verificationTokenExpires: { 
+      type: Date, 
+      default: () => new Date(Date.now() + 24 * 60 * 60 * 1000)
+    },
+    resetPasswordToken: { type: String, required: false },
+    resetPasswordExpires: { 
+      type: Date, 
+      default: () => new Date(Date.now() + 24 * 60 * 60 * 1000)
+    },
+
   },
   { timestamps: true }
 );

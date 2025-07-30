@@ -13,7 +13,7 @@ export const sendVerificationEmail = async ({
   name: string
   token: string
 }) => {
-  const verifyUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/verify?token=${token}`
+  const verifyUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/api/auth/verify-email?token=${token}`
 
   return resend.emails.send({
     from: FROM_EMAIL,
@@ -28,26 +28,34 @@ export const sendVerificationEmail = async ({
   })
 }
 
-export const sendForgotPasswordEmail = async ({
+// mails/mails.ts
+export const sendResetPasswordEmail = async ({
   to,
   name,
-  resetToken,
+  token,
 }: {
-  to: string
-  name: string
-  resetToken: string
+  to: string;
+  name: string;
+  token: string;
 }) => {
-  const resetUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/reset-password?token=${resetToken}`
+  const resetUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/reset-password?token=${token}`;
 
   return resend.emails.send({
     from: FROM_EMAIL,
     to,
     subject: 'Reset Your Password',
     html: `
-      <h2>Hi ${name},</h2>
-      <p>You requested to reset your password.</p>
-      <a href="${resetUrl}" style="color:#D97706;">Reset Password</a>
-      <p>This link will expire in 30 minutes.</p>
+      <h2>Hello ${name},</h2>
+      <p>You requested to reset your password. Click the button below to proceed:</p>
+      <p>
+        <a href="${resetUrl}" style="display: inline-block; padding: 12px 20px; background-color: #204D9D; color: #ffffff; border-radius: 6px; text-decoration: none;">
+          Reset Password
+        </a>
+      </p>
+      <p>This link will expire in 1 hour.</p>
+      <p>If you didn't request this, you can safely ignore this email.</p>
     `,
-  })
-}
+  });
+};
+
+
