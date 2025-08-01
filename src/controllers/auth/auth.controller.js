@@ -78,7 +78,7 @@ const sendOtpOnEmail = wrapAsync(async (req, res) => {
 
     MAIL_HANDLER.sendEmailToUserWithOTP(user, otp);
 
-    sendResponse(res, {}, 'OTP has been sent to your email');
+    sendResponse(res, {otp}, 'OTP has been sent to your email');
 });
 
 
@@ -124,7 +124,20 @@ const resetPassword = wrapAsync(async (req, res) => {
     sendResponse(res, {}, 'Password reset successful. You can now log in.');
 });
 
+const sendVerificationEmail = wrapAsync(async (req, res) => {
+    const { email } = req.body;
 
+    const user = await AuthService.userSendVerificationEmail(email);
+    
+    await MAIL_HANDLER.sendVerificationEmail({
+        to: user.email,
+        name: user.name,
+        token: user.verificationToken,
+    });
+    
+    sendResponse(res, {  }, 'Verification link has been sent to you email account', 201);
+
+});
 
 module.exports = {
     registerUser,
@@ -133,4 +146,5 @@ module.exports = {
     sendOtpOnEmail,
     verifyOTP,
     resetPassword,
+    sendVerificationEmail,
 };

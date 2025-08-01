@@ -41,6 +41,7 @@ const HTTP_ERRORS = {
     ERROR_UNKNOWN_HOST: 'Cannot establish a connection to the server, please try again.'
 };
 
+
 class ErrorHandler extends Error {
     constructor(statusCode, customMsg = '') {
         super();
@@ -52,6 +53,14 @@ class ErrorHandler extends Error {
             this.message = getErrorDesc(statusCode);
         }
     }
+}
+class ErrorHandlerWithDetails extends Error {
+  constructor(statusCode, message, code = 'ERROR', email = null) {
+    super(message);
+    this.statusCode = statusCode;
+    this.code = code;
+    this.email = email;
+  }
 }
 
 function getErrorDesc(statusCode) {
@@ -81,5 +90,6 @@ function getErrorDesc(statusCode) {
 
 module.exports = {
     HTTP_ERRORS,
-    ErrorHandler
+    ErrorHandler,
+    ErrorHandlerWithDetails,
 };
