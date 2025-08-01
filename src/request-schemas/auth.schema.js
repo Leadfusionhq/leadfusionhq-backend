@@ -43,8 +43,8 @@ const loginWithEmail = {
       'string.min': 'Password must be at least 6 characters',
       'any.required': 'Password is required',
     }),
-    role: Joi.string().valid('User', 'Admin').required().messages({
-      'any.only': 'Role must be either User or Admin',
+    role: Joi.string().valid('USER', 'ADMIN').required().messages({
+      'any.only': 'Role must be either USER or ADMIN',
       'any.required': 'Role is required',
     }),
 
@@ -93,6 +93,18 @@ const resetPassword = {
         })
     })
 };
+
+const sendVerificationEmail = {
+    [Segments.BODY]: Joi.object().keys({
+        email: Joi.string().email().required().messages({
+            'string.email': 'Email must be a valid email address',
+            'any.required': 'Email is required'
+        }),
+    })
+};
+
+
+
 module.exports = {
   registerUser,
   loginWithEmail,
@@ -100,4 +112,5 @@ module.exports = {
   sendOTPonEmail,
   verifyOTP,
   resetPassword,
+  sendVerificationEmail,
 };

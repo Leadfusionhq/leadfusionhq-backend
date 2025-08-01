@@ -62,8 +62,32 @@ const verifyEmailService = async (token) => {
 
     return user;
 };
+const userSendVerificationEmail = async (email) => {
+  if (!email) {
+    throw new ErrorHandler(400, 'Email is required');
+  }
+
+  const normalizedEmail = email.toLowerCase();
+  const user = await User.findOne({ email: normalizedEmail });
+
+  if (!user) {
+    throw new ErrorHandler(404, 'User not found');
+  }
+
+  if (user.isEmailVerified) {
+    throw new ErrorHandler(400, 'Email is already verified');
+  }
+
+  user.verificationToken = generateVerificationToken();
+  user.verificationTokenExpires = getTokenExpiration(24);
+
+  await user.save();
+
+  return user;
+};
 
 module.exports = {
   registerUser,
   verifyEmailService,
+  userSendVerificationEmail,
 };

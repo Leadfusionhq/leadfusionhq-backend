@@ -15,6 +15,10 @@ const API = {
     SEND_OTP_ON_EMAIL: '/forgot-password',
     VERIFY_OTP: '/verify-otp',
     RESET_PASSWORD: '/reset-password',
+
+    // SEND_VERIFICATION_EMAIL: '/resend-verification-link',
+
+    
 };
 
 authRouter.post(
@@ -31,7 +35,7 @@ authRouter.post(
 
 authRouter.get(
     API.VERIFY_EMAIL,
-    celebrate(AuthSchema.verifyEmailLink),
+    // celebrate(AuthSchema.verifyEmailLink),
     authController.verifyEmail
 );
 
@@ -52,6 +56,12 @@ authRouter.put(
     API.RESET_PASSWORD, 
     celebrate(AuthSchema.resetPassword), 
     authController.resetPassword
+);
+
+authRouter.put(
+    API.SEND_VERIFICATION_EMAIL, 
+    celebrate(AuthSchema.sendVerificationEmail), 
+    authController.sendVerificationEmail
 );
 
 module.exports = authRouter;
