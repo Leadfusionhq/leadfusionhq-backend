@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     if (!name || !email || !password) {
       return NextResponse.json({ error: 'All fields are required' }, { status: 400 })
     }
-    if ((role !== 'Admin') && (!companyName || !phoneNumber || !zipCode)) {
+    if ((role !== 'ADMIN') && (!companyName || !phoneNumber || !zipCode)) {
       return NextResponse.json({
         error: 'Company name, phone number, and zip code are required for users or if role is null',
       }, { status: 400 })
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
       phoneNumber,
       zipCode,
       password: hashedPassword,
-      role: role || 'User',
+      role: role || 'USER',
       verificationToken,
       verificationTokenExpires: new Date(Date.now() + 24*60*60*1000)
 

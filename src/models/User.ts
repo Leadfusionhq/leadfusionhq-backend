@@ -4,7 +4,7 @@ export interface UserDocument extends Document {
   name: string;
   email: string;
   password: string;
-  role: 'Admin' | 'User';
+  role: 'ADMIN' | 'USER';
   companyName?: string;
   phoneNumber?: string;
   zipCode?: string;
@@ -28,7 +28,7 @@ const userSchema = new Schema<UserDocument, UserModel>(
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true, lowercase: true },
     password: { type: String, required: true },
-    role: { type: String, enum: ['Admin', 'User'], default: 'User' },
+    role: { type: String, enum: ['ADMIN', 'USER'], default: 'USER' },
     companyName: { type: String, required: false },
     phoneNumber: { type: String, required: false },
     zipCode: { type: String, required: false },
@@ -56,4 +56,4 @@ userSchema.statics.findByEmail = function (email: string) {
   return this.findOne({ email });
 };
 
-export const User = models.User || model<UserDocument, UserModel>('User', userSchema);
+export const User = models.User || model<UserDocument, UserModel>('USER', userSchema);

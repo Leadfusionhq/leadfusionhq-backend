@@ -32,7 +32,7 @@ const EditAdmin = () => {
     password: '',
     confirmPassword: '',
     phoneNumber: '',
-    role: 'Admin',
+    role: 'ADMIN',
   });
 
   const [loading, setLoading] = useState(true);
@@ -75,7 +75,7 @@ const EditAdmin = () => {
             password: '',
             confirmPassword: '',
             phoneNumber: user.phoneNumber || '',
-            role: user.role || 'Admin',
+            role: user.role || 'ADMIN',
           });
         }
       } catch (err) {

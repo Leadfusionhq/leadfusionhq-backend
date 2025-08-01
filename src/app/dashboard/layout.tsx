@@ -14,7 +14,7 @@ export default function UserLayout({ children }: { children: ReactNode }) {
 
 
   useEffect(() => {
-      if (!isLoggedIn ||!user || user.role !== 'User') router.push('/login');
+      if (!isLoggedIn ||!user || user.role !== 'USER') router.push('/login');
   });
   return (
     <div className="layout_user flex">

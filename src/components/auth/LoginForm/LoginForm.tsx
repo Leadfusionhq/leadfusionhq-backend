@@ -16,13 +16,17 @@ import { FaEye, FaEyeSlash } from 'react-icons/fa';
 import styles from './LoginForm.module.css';
 import { usePathname } from 'next/navigation';
 import { useSearchParams } from 'next/navigation'; 
+import axiosWrapper from '@/utils/api';
+import { API_URL } from '@/utils/apiUrl';
+import { getErrorMessage } from '@/utils/errorHandler';
 
 const LoginForm = () => {
   const [showPassword, setShowPassword] = useState(false);
-  const [role, setRole] = useState<'Admin' | 'User'>('Admin');
+  const [role, setRole] = useState<'ADMIN' | 'USER'>('ADMIN');
   const [showResendButton, setShowResendButton] = useState(false);
   const [userEmail, setUserEmail] = useState('');
   const [resendLoading, setResendLoading] = useState(false);
+  const [resendEmail, setResendEmail] = useState(''); // New state for resend email input
   
   const dispatch = useDispatch<AppDispatch>();
   const router = useRouter();
@@ -30,7 +34,6 @@ const LoginForm = () => {
   const searchParams = useSearchParams(); 
 
   const { user, loading, error } = useSelector((state: RootState) => state.auth);
-
 
   useEffect(() => {
     const verified = searchParams.get('verified');
@@ -42,19 +45,19 @@ const LoginForm = () => {
 
   useEffect(() => {
     if (pathname === '/admin-login') {
-      setRole('Admin');
+      setRole('ADMIN');
     } 
     if (pathname === '/login') {
-      setRole('User');
+      setRole('USER');
     } 
   }, [pathname]);
 
   useEffect(() => {
     if (user) {
-      console.warn('user',user)
+      console.warn('user', user)
       toast.dismiss();
       toast.success('Login successful!');
-      if (user.role === 'Admin') {
+      if (user.role === 'ADMIN') {
         router.push('/admin/dashboard');
       } else {
         router.push('/dashboard');
@@ -62,64 +65,48 @@ const LoginForm = () => {
     }
   }, [user, router]);
 
- useEffect(() => {
-  // Handle login error - enhanced for verification cases
-  if (error) {
-    console.log('Error type:', typeof error);
-    console.log('Error value:', error);
-    console.log('Has code property?', error && typeof error === 'object' && 'code' in error);
-    
-    toast.dismiss();
-    
-    // Check if error is verification related
-    if (typeof error === 'object' && error !== null && 'code' in error) {
-      console.log('Processing verification error:', error);
-      
-      if (error.code === 'VERIFICATION_EXPIRED') {
+  useEffect(() => {
+    if (error) {
+
+      if (error.includes('Email not verified and verification link expired') || 
+          error.includes('verification link expired')) {
         setShowResendButton(true);
-        console.log('Setting user email:', error.email);
-        setUserEmail(error.email || '');
-        toast.error('Your verification link expired. Click below to get a new one.');
-      } else if (error.code === 'EMAIL_NOT_VERIFIED') {
-        toast.error('Please check your email and verify your account first.');
-      } else {
-        toast.error(error.message || 'Login failed');
+
+        const formEmail = document.querySelector('input[name="email"]') as HTMLInputElement;
+        if (formEmail && formEmail.value) {
+          setUserEmail(formEmail.value);
+          setResendEmail(formEmail.value);
+        }
       }
-    } else {
-      // Handle regular string errors
-      const errorMessage = typeof error === 'string' ? error : 'Login failed';
-      console.log('Processing string error:', errorMessage);
-      toast.error(errorMessage);
+      toast.dismiss();
+      toast.error(error);
+      setTimeout(() => {
+        dispatch(clearError());
+      }, 3000);
     }
-    
-    // Clear error state after a delay
-    setTimeout(() => {
-      dispatch(clearError());
-    }, 3000);
-  }
-}, [error, dispatch]);
+  }, [error, dispatch]);
 
   // Handle resend verification email
   const handleResendVerification = async () => {
+    if (!resendEmail || !resendEmail.includes('@')) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
+
     setResendLoading(true);
     try {
-      const response = await fetch('/api/auth/resend-verification', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: userEmail })
-      });
+      // Use the correct API endpoint for resending verification email
+      const response = await axiosWrapper('put', API_URL.SEND_VERIFICATION_EMAIL, {
+        email: resendEmail,
+      }) as { message?: string };
       
-      const data = await response.json();
-      
-      if (response.ok) {
-        toast.success('New verification email sent! Check your inbox.');
-        setShowResendButton(false);
-        setUserEmail('');
-      } else {
-        toast.error(data.error || 'Failed to resend email. Try again.');
-      }
-    } catch (error) {
-      toast.error('Failed to resend email. Try again.');
+      toast.success(response.message || 'Verification email sent successfully!');
+      setShowResendButton(false);
+      setUserEmail('');
+      setResendEmail('');
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      toast.error(errorMessage);
     } finally {
       setResendLoading(false);
     }
@@ -146,14 +133,14 @@ const LoginForm = () => {
             <Link href="/admin-login" passHref>
               <button type="button"
                 className={`cursor-pointer px-7.5 py-3.5 rounded-full font-medium text-xs max-[575px]:w-full
-                  ${role === 'Admin' ? 'bg-white text-black border-white' : 'bg-transparent border text-white'}`}>
+                  ${role === 'ADMIN' ? 'bg-white text-black border-white' : 'bg-transparent border text-white'}`}>
                 Login as Admin
               </button>
             </Link>
             <Link href="/login" passHref>
               <button type="button"
                 className={`cursor-pointer px-7.5 py-3.5 rounded-full font-medium text-xs max-[575px]:w-full
-                  ${role === 'User' ? 'bg-white text-black border-white' : 'bg-transparent border text-white'}`}>
+                  ${role === 'USER' ? 'bg-white text-black border-white' : 'bg-transparent border text-white'}`}>
                 Login as Client
               </button>
             </Link>
@@ -169,23 +156,46 @@ const LoginForm = () => {
             Sign in to access your Lead Manager and stay on top of your leads—all in one place.
           </p>
 
-          {/* Email Verification Resend Section */}
+          {/* Enhanced Email Verification Resend Section */}
           {showResendButton && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-              <div className="flex items-center justify-between">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <div className="space-y-4">
                 <div>
-                  <h3 className="text-sm font-medium text-yellow-800">Email Verification Required</h3>
-                  <p className="text-sm text-yellow-700 mt-1">
-                    Your verification link has expired. Get a new one sent to: <strong>{userEmail}</strong>
+                  <h3 className="text-sm font-medium text-blue-800 mb-2">Email Verification Required</h3>
+                  <p className="text-sm text-blue-700">
+                    Your account needs to be verified before you can log in. Enter your email below to receive a new verification link.
                   </p>
                 </div>
-                <button
-                  onClick={handleResendVerification}
-                  disabled={resendLoading}
-                  className="w-[200px] bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {resendLoading ? 'Sending...' : 'Resend Email'}
-                </button>
+                
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <input
+                    type="email"
+                    value={resendEmail}
+                    onChange={(e) => setResendEmail(e.target.value)}
+                    placeholder="Enter your email address"
+                    className="flex-1 px-3 py-2 border border-blue-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <button
+                    onClick={handleResendVerification}
+                    disabled={resendLoading || !resendEmail}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                  >
+                    {resendLoading ? 'Sending...' : 'Send Verification Email'}
+                  </button>
+                </div>
+                
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => {
+                      setShowResendButton(false);
+                      setResendEmail('');
+                      setUserEmail('');
+                    }}
+                    className="text-sm text-blue-600 hover:text-blue-800 underline"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -202,9 +212,10 @@ const LoginForm = () => {
               // Clear any previous resend states
               setShowResendButton(false);
               setUserEmail('');
+              setResendEmail('');
               
               const data = dispatch(loginUser({ email, password, role })).finally(() => setSubmitting(false));
-              console.warn('data',data)
+              console.warn('data', data)
             }}
           >
             {({ values, handleChange, handleBlur, isSubmitting }) => (

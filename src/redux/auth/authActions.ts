@@ -15,111 +15,45 @@ interface LoginResponse {
   token: string;
   user: User;
 }
-interface ApiError {
-  code?: string;
-  error?: string;
-  message?: string;
-  email?: string;
-}
-export interface LoginError {
-  message: string;
-  code?: string;
-  email?: string;
-  requiresVerification?: boolean;
-}
 
-
-export const loginUser = createAsyncThunk<
-  LoginResponse, 
-  { email: string; password: string; role: string },
-  { rejectValue: LoginError }
->(
+export const loginUser = createAsyncThunk<LoginResponse, { email: string; password: string; role: string}>(
   'auth/loginUser',
   async ({ email, password, role }, { rejectWithValue }) => {
     try {
-      const { data } = await axios.post<LoginResponse>(API_URL.LOGIN_USER, { 
-        email, 
-        password, 
-        role 
-      });
+      const { data } = await axios.post<LoginResponse>(API_URL.LOGIN_USER, { email, password, role });
       saveToken(data.token);
       return data;
     } catch (err: unknown) {
-      console.log(err);
+      console.log('err', err);
       
-      // Type guard for axios error with response
       function isAxiosErrorWithResponse(error: unknown): error is { 
         response: { 
-          data: ApiError;
-          status: number;
+          data: { 
+            error?: string;
+            message?: string;
+          } 
         } 
       } {
         return (
           typeof error === 'object' &&
           error !== null &&
           'response' in error &&
-          typeof (error as any).response === 'object' &&
-          (error as any).response !== null &&
-          'data' in (error as any).response
+          typeof (error as { response?: unknown }).response === 'object' &&
+          (error as { response?: unknown }).response !== null &&
+          'data' in (error as { response?: { data?: unknown } }).response!
         );
       }
-
+      
       if (isAxiosErrorWithResponse(err)) {
-        const errorData = err.response.data;
-        
-        // Handle specific verification error
-        if (errorData.code === 'VERIFICATION_EXPIRED') {
-          return rejectWithValue({
-            message: errorData.error || 'Email verification expired',
-            code: errorData.code,
-            email: errorData.email,
-            requiresVerification: true
-          });
-        }
-
-        // Handle other API errors
-        return rejectWithValue({
-          message: errorData.error || errorData.message || 'Login failed',
-          code: errorData.code
-        });
+        // Check for both 'message' and 'error' fields from backend
+        const errorMessage = err.response.data.message || err.response.data.error || 'Login failed';
+        return rejectWithValue(errorMessage);
       }
-
-      // Handle network errors or other unexpected errors
-      return rejectWithValue({
-        message: 'An unexpected error occurred. Please check your connection and try again.'
-      });
+      
+      return rejectWithValue('An unexpected error occurred');
     }
   }
 );
-
-
-// export const loginUser = createAsyncThunk<LoginResponse, { email: string; password: string; role: string}>(
-//   'auth/loginUser',
-//   async ({ email, password,role }, { rejectWithValue }) => {
-//     try {
-//       const { data } = await axios.post<LoginResponse>(API_URL.LOGIN_USER, { email, password,role });
-//       saveToken(data.token);
-//       return data;
-//     } catch (err: unknown) {
-//       console.log(err);
-//       function isAxiosErrorWithResponse(error: unknown): error is { response: { data: { error?: string } } } {
-//         return (
-//           typeof error === 'object' &&
-//           error !== null &&
-//           'response' in error &&
-//           typeof (error as { response?: unknown }).response === 'object' &&
-//           (error as { response?: unknown }).response !== null &&
-//           'data' in (error as { response?: { data?: unknown } }).response!
-//         );
-//       }
-//       if (isAxiosErrorWithResponse(err)) {
-//         return rejectWithValue((err.response.data as { error?: string }).error || 'Login failed');
-//       }
-//       return rejectWithValue('An unexpected error occurred');
-//     }
-//   }
-// );
-
 
 export const registerUser = createAsyncThunk<{ message: string }, { name: string; email: string; password: string; companyName: string; phoneNumber: string; zipCode: string }>(
   'auth/registerUser',
@@ -138,7 +72,14 @@ export const registerUser = createAsyncThunk<{ message: string }, { name: string
       });
       return data as { message: string };
     } catch (err: unknown) {
-      function isAxiosErrorWithResponse(error: unknown): error is { response: { data: { error?: string } } } {
+      function isAxiosErrorWithResponse(error: unknown): error is { 
+        response: { 
+          data: { 
+            error?: string;
+            message?: string;
+          } 
+        } 
+      } {
         return (
           typeof error === 'object' &&
           error !== null &&
@@ -148,6 +89,7 @@ export const registerUser = createAsyncThunk<{ message: string }, { name: string
           'data' in (error as { response?: { data?: unknown } }).response!
         );
       }
+      
       function hasErrorProp(error: unknown): error is { error: string } {
         return (
           typeof error === 'object' &&
@@ -155,11 +97,15 @@ export const registerUser = createAsyncThunk<{ message: string }, { name: string
           'error' in error
         );
       }
+      
       if (hasErrorProp(err)) {
         console.log(err.error);
       }
+      
       if (isAxiosErrorWithResponse(err)) {
-        return rejectWithValue((err.response.data as { error?: string }).error || 'Registration failed');
+        // Check for both 'message' and 'error' fields from backend
+        const errorMessage = err.response.data.message || err.response.data.error || 'Registration failed';
+        return rejectWithValue(errorMessage);
       } else if (hasErrorProp(err)) {
         return rejectWithValue(err.error);
       } else {

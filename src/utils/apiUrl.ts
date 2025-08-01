@@ -33,5 +33,15 @@ export const API_URL = {
     LOGOUT_USER: `${AUTH_API_BASE}/logout`, 
 
     SEND_RESET_LINK: `${AUTH_API_BASE}/send-reset-link`,
-    RESET_PASSWORD: `${AUTH_API_BASE}/reset-password`,
+    // RESET_PASSWORD: `${AUTH_API_BASE}/reset-password`,
+
+
+    SEND_OTP_ON_EMAIL:`${AUTH_API_BASE}/forgot-password`,
+    VERIFY_OTP:`${AUTH_API_BASE}/verify-otp`,
+    RESET_PASSWORD:`${AUTH_API_BASE}/reset-password`,
+
+    SEND_VERIFICATION_EMAIL:`${AUTH_API_BASE}/send-verification-link`,
+    VERIFY_EMAIL:`${AUTH_API_BASE}/verify-email`,
+
+    
 };

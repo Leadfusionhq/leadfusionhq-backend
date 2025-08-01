@@ -13,7 +13,7 @@ export async function GET(
     const auth = await checkAuth(req);
     if (auth instanceof NextResponse) return auth;
 
-    const authz = authorizedRoles(['Admin'])(req);
+    const authz = authorizedRoles(['ADMIN'])(req);
     if (authz instanceof NextResponse) return authz;
 
     const user = await getUserByID(userId);
@@ -42,7 +42,7 @@ export async function PUT(
     const auth = await checkAuth(req);
     if (auth instanceof NextResponse) return auth;
 
-    const authz = authorizedRoles(['Admin'])(req);
+    const authz = authorizedRoles(['ADMIN'])(req);
     if (authz instanceof NextResponse) return authz;
 
     const updated = await updateUser(userId, body);
@@ -64,7 +64,7 @@ export async function DELETE(
     const auth = await checkAuth(req);
     if (auth instanceof NextResponse) return auth;
 
-    const authz = authorizedRoles(['Admin'])(req);
+    const authz = authorizedRoles(['ADMIN'])(req);
     if (authz instanceof NextResponse) return authz;
 
     const user = await getUserByID(userId);
