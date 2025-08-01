@@ -64,12 +64,16 @@ const authSlice = createSlice({
         state.error = null;
         state.isLoggedIn = false;
       })
+      // .addCase(loginUser.fulfilled, (state, action: PayloadAction<{ token: string; user: User }>) => {
       .addCase(loginUser.fulfilled, (state, action: PayloadAction<{ token: string; user: User }>) => {
+        console.log('Login fulfilled, setting user:', action.payload.user);
         state.loading = false;
         state.token = action.payload.token;
         state.user = action.payload.user;
         state.isLoggedIn = true;
       })
+
+
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;
         // Handle both string and object errors

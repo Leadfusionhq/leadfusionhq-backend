@@ -51,6 +51,7 @@ const LoginForm = () => {
 
   useEffect(() => {
     if (user) {
+      console.warn('user',user)
       toast.dismiss();
       toast.success('Login successful!');
       if (user.role === 'Admin') {
@@ -202,7 +203,8 @@ const LoginForm = () => {
               setShowResendButton(false);
               setUserEmail('');
               
-              dispatch(loginUser({ email, password, role })).finally(() => setSubmitting(false));
+              const data = dispatch(loginUser({ email, password, role })).finally(() => setSubmitting(false));
+              console.warn('data',data)
             }}
           >
             {({ values, handleChange, handleBlur, isSubmitting }) => (
