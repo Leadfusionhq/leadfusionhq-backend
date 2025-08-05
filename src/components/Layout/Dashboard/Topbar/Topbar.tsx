@@ -15,13 +15,13 @@ const Topbar = () => {
   const { user } = useSelector((state: RootState) => state.auth);
   const [title, setTitle] = useState('');
 
-  const role = user?.role ?? 'User';
-  const name = user?.name || 'User';
+  const role = user?.role ?? 'USER';
+  const name = user?.name || 'USER';
 
   const sidebarItems =
-    role === 'Admin'
+    role === 'ADMIN'
       ? adminSidebarItems
-      : role === 'User'
+      : role === 'USER'
       ? userSidebarItems
       : [];
 

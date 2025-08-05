@@ -1,37 +1,46 @@
 'use client';
 
-import Image from 'next/image';
-import Link from 'next/link';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Formik, Form, Field, ErrorMessage } from 'formik';
 import * as Yup from 'yup';
-import { useRouter } from 'next/navigation';
 import { toast } from 'react-toastify';
 import axiosWrapper from '@/utils/api';
 import { API_URL } from '@/utils/apiUrl';
+import Link from 'next/link';
+import Image from 'next/image';
 
-const ForgetPasswordForm = () => {
+const VerifyOtpPage = () => {
+  const searchParams = useSearchParams();
   const router = useRouter();
 
-  const initialValues = { email: '' };
+  const email = searchParams.get('email') || '';
+
+  const initialValues = { otp: '', email };
 
   const validationSchema = Yup.object().shape({
-    email: Yup.string().email('Invalid email').required('Email is required'),
+    otp: Yup.string().required('OTP is required'),
+    email: Yup.string().email().required(),
   });
 
   const handleSubmit = async (
     values: typeof initialValues,
-    { setSubmitting, resetForm }: { setSubmitting: (val: boolean) => void; resetForm: () => void }
+    { setSubmitting }: { setSubmitting: (val: boolean) => void }
   ) => {
     try {
-      
-      const response = await axiosWrapper('put', API_URL.SEND_OTP_ON_EMAIL, values) as { message?: string };
-      toast.success(response?.message || 'Reset link sent to your email.');
-      router.push(`/verify-otp?email=${encodeURIComponent(values.email)}`);
-
-      resetForm();
+      const response = await axiosWrapper('put', API_URL.VERIFY_OTP, values) as {
+        resetToken?: string;
+        message?: string;
+      };
+      console.warn('response',response)
+      if (response?.resetToken) {
+        toast.success(response?.message || 'OTP verified. Please reset your password.');
+        router.push(`/reset-password?token=${response.resetToken}`);
+      } else {
+        toast.error('OTP verification failed.');
+      }
     } catch (err) {
-      console.error('Password reset error:', err);
-      toast.error('Failed to send reset link.');
+      console.error('OTP Verification Error:', err);
+      toast.error('Invalid or expired OTP.');
     } finally {
       setSubmitting(false);
     }
@@ -61,10 +70,10 @@ const ForgetPasswordForm = () => {
         {/* Form Section */}
         <div className="bg-white w-full rounded-b-3xl shadow-md p-6 sm:p-8">
           <h1 className="text-black font-semibold text-center uppercase text-sm sm:text-base mb-2">
-            Forgot Your Password?
+            Verify OTP
           </h1>
           <p className="text-[#1C1C1C] text-center mb-6 text-[18px] leading-7 max-w-[520px] mx-auto">
-            No worries. Enter your email and we’ll send you a link to reset your password securely.
+            Enter the OTP sent to <span className="font-medium">{email}</span>
           </p>
 
           <Formik
@@ -74,24 +83,22 @@ const ForgetPasswordForm = () => {
           >
             {({ isSubmitting }) => (
               <Form className="space-y-4">
-                <div className="mb-5">
-                  <Field
-                    type="email"
-                    name="email"
-                    placeholder="Email Address"
-                    autoComplete="off"
-                    className="h-[66px] border border-[#01010121] rounded-[8px] px-5 text-[18px] font-inter bg-white text-[#1C1C1C] focus:border-[#222] outline-none transition w-full"
-                  />
-                  <ErrorMessage name="email" component="div" className="text-red-500 text-xs mt-1" />
-                </div>
+                <Field
+                  type="text"
+                  name="otp"
+                  placeholder="Enter OTP"
+                  className="h-[66px] border border-[#01010121] rounded-[8px] px-5 text-[18px] font-inter bg-white text-[#1C1C1C] focus:border-[#222] outline-none transition w-full"
+                />
+                <ErrorMessage name="otp" component="div" className="text-red-500 text-sm" />
 
+            
                 <div className="w-full flex justify-center">
                   <button
                     type="submit"
                     disabled={isSubmitting}
                     className="uppercase w-full max-w-[575px] py-3 px-[50px] text-white rounded-md font-bold text-lg bg-black hover:bg-gradient-to-r from-[#306A64] via-[#204D9D] to-[#306A64] transition-all duration-600 cursor-pointer sm:w-fit sm:py-[20px] sm:px-[78px]"
                   >
-                    {isSubmitting ? 'Sending...' : 'Send Reset Code'}
+                    {isSubmitting ? 'Verifying...' : 'Verify OTP'}
                   </button>
                 </div>
               </Form>
@@ -110,4 +117,4 @@ const ForgetPasswordForm = () => {
   );
 };
 
-export default ForgetPasswordForm;
+export default VerifyOtpPage;

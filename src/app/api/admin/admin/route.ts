@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
       return authResponse;
     }
 
-    const authorizedResponse = authorizedRoles(['Admin'])(req);
+    const authorizedResponse = authorizedRoles(['ADMIN'])(req);
     if (authorizedResponse instanceof NextResponse) {
       return authorizedResponse;
     }
@@ -58,12 +58,12 @@ export async function GET(req: NextRequest) {
       return authResponse;
     }
 
-    const authorizedResponse = authorizedRoles(['Admin'])(req);
+    const authorizedResponse = authorizedRoles(['ADMIN'])(req);
     if (authorizedResponse instanceof NextResponse) {
       return authorizedResponse;
     }
 
-    const role = 'Admin';
+    const role = 'ADMIN';
     // const isActive = url.searchParams.get('isActive') === 'true';
     const isActive = true;
     console.log('isActive',isActive);

@@ -34,7 +34,7 @@ const EditUser = () => {
     companyName: '',
     phoneNumber: '',
     zipCode: '',
-    role: 'User',
+    role: 'USER',
   });
 
   const [loading, setLoading] = useState(true);
@@ -81,7 +81,7 @@ const EditUser = () => {
             companyName: user.companyName || '',
             phoneNumber: user.phoneNumber || '',
             zipCode: user.zipCode || '',
-            role: user.role || 'User',
+            role: user.role || 'USER',
           });
         }
       } catch (err) {
