@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { getToken } from '@/utils/auth';
 
-export function authMiddleware(req: NextRequest, role: 'Admin' | 'User') {
+export function authMiddleware(req: NextRequest, role: 'ADMIN' | 'USER') {
   console.log('req',req);
   const token = getToken(req); // Extract the token from cookies
   console.warn('token',token)
@@ -16,7 +16,7 @@ export function authMiddleware(req: NextRequest, role: 'Admin' | 'User') {
 
   //   // Check if the user's role matches the required role
   //   if (decoded.role !== role) {
-  //     return NextResponse.redirect(new URL(role === 'Admin' ? '/dashboard' : '/admin/dashboard', req.url));
+  //     return NextResponse.redirect(new URL(role === 'ADMIN' ? '/dashboard' : '/admin/dashboard', req.url));
   //   }
 
   //   return NextResponse.next(); // Continue if the role matches

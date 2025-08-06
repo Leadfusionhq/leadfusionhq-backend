@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
       return authResponse;
     }
 
-    const authorizedResponse = authorizedRoles(['Admin'])(req);
+    const authorizedResponse = authorizedRoles(['ADMIN'])(req);
     if (authorizedResponse instanceof NextResponse) {
       return authorizedResponse;
     }
@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
       return authResponse;
     }
 
-    const authorizedResponse = authorizedRoles(['Admin'])(req);
+    const authorizedResponse = authorizedRoles(['ADMIN'])(req);
     if (authorizedResponse instanceof NextResponse) {
       return authorizedResponse;
     }

@@ -36,11 +36,11 @@ export default function AdminTable() {
         const fetchData = async () => {
             try {
                 setLoading(true);
-                const response = await axiosWrapper('get', API_URL.GET_ALL_REGULAR_ADMIN, {}, token ?? undefined) as { data: User[] };
+                const response = await axiosWrapper('get', API_URL.GET_ALL_ADMINS, {}, token ?? undefined) as { data: User[] };
                 setUsers(response.data);
                 console.log(response);
             } catch (err) {
-                  console.error('Unable to get users:', err);
+                  console.error('Unable to get admin data:', err);
             } finally {
                 setLoading(false);
             }

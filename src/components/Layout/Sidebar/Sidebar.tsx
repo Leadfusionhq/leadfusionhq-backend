@@ -16,7 +16,7 @@ const Sidebar = () => {
   const { user } = useSelector((state: RootState) => state.auth);
   const role = user?.role;
 
-  const sidebarItems = role === 'Admin' ? adminSidebarItems : userSidebarItems;
+  const sidebarItems = role === 'ADMIN' ? adminSidebarItems : userSidebarItems;
 
   const handleLogout = async () => {
     try {

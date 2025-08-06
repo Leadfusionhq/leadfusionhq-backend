@@ -24,7 +24,7 @@ const AddNewUser = () => {
     companyName: '',
     phoneNumber: '',
     zipCode: '',
-    role: 'User',
+    role: 'USER',
   };
 
   const validationSchema = Yup.object().shape({

@@ -22,7 +22,7 @@ const AddNewAdmin = () => {
     password: '',
     confirmPassword: '',
     phoneNumber: '',
-    role: 'Admin',
+    role: 'ADMIN',
   };
 
   const validationSchema = Yup.object().shape({

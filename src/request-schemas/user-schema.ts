@@ -16,7 +16,7 @@ export const validateUserSchema = (data: { name: string, email: string, password
     return NextResponse.json({ error: 'Password must be at least 8 characters long' }, { status: 400 });
   }
 
-  if (role !== 'Admin' && (!companyName || !phoneNumber || !zipCode)) {
+  if (role !== 'ADMIN' && (!companyName || !phoneNumber || !zipCode)) {
     return NextResponse.json({
       error: 'Company name, phone number, and zip code are required for users or if role is null',
     }, { status: 400 });
@@ -50,7 +50,7 @@ export const validateUserUpdateSchema = (data: { name: string, email: string, pa
     }
   }
 
-  if (role !== 'Admin' && (!companyName || !phoneNumber || !zipCode)) {
+  if (role !== 'ADMIN' && (!companyName || !phoneNumber || !zipCode)) {
     return NextResponse.json({
       error: 'Company name, phone number, and zip code are required for users or if role is null',
     }, { status: 400 });

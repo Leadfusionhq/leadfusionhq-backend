@@ -34,7 +34,7 @@ const EditUser = () => {
     companyName: '',
     phoneNumber: '',
     zipCode: '',
-    role: 'User',
+    role: 'USER',
   });
 
   const [loading, setLoading] = useState(true);
@@ -69,9 +69,9 @@ const EditUser = () => {
         console.log(id);
         const url = API_URL.GET_USER_BY_ID.replace(':userId', id);
         // const res = await axiosWrapper('get', url, {}, token ?? undefined) as { user?: string };
-        const res = await axiosWrapper('get', url, {}, token ?? undefined) as { user?: User };
+        const res = await axiosWrapper('get', url, {}, token ?? undefined) as { data?: User };
 
-        const user = res?.user;
+        const user = res?.data;
         if (user) {
           setInitialValues({
             name: user.name || '',
@@ -81,7 +81,7 @@ const EditUser = () => {
             companyName: user.companyName || '',
             phoneNumber: user.phoneNumber || '',
             zipCode: user.zipCode || '',
-            role: user.role || 'User',
+            role: user.role || 'USER',
           });
         }
       } catch (err) {

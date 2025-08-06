@@ -6,7 +6,7 @@ export type CreateUserData = {
   name: string;
   email: string;
   password: string;
-  role?: 'Admin' | 'User';
+  role?: 'ADMIN' | 'USER';
   companyName?: string;
   phoneNumber?: string;
   zipCode?: string;
@@ -41,7 +41,7 @@ export const createAdmin = async (userData: CreateUserData): Promise<UserDocumen
 };
 
 type GetAllUsersFilter = {
-  role?: 'Admin' | 'User' | string; 
+  role?: 'ADMIN' | 'USER' | string; 
   isActive?: boolean;
 };
 

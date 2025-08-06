@@ -33,7 +33,7 @@ export default function UserTable() {
         const fetchData = async () => {
             try {
                 setLoading(true);
-                const response = await axiosWrapper('get', API_URL.GET_ALL_REGULAR_USERS, {}, token ?? undefined) as { data: User[] };
+                const response = await axiosWrapper('get', API_URL.GET_ALL_USERS, {}, token ?? undefined) as { data: User[] };
                 setUsers(response.data);
             } catch (err) {
                   console.error('Unable to get users:', err);
