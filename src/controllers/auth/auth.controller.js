@@ -1,7 +1,7 @@
 const { wrapAsync } = require('../../utils/wrap-async');
 const { sendResponse } = require('../../utils/response');
 const AuthService = require('../../services/auth/auth.service');
-const UserServices = require('../../services/auth/user.service');
+const UserServices = require('../../services/user.service');
 const MAIL_HANDLER = require('../../mail/mails');
 const TOKEN_GEN = require('../../helper/generate-token');
 const { ErrorHandler } = require('../../utils/error-handler');
@@ -24,12 +24,16 @@ const registerUser = wrapAsync(async (req, res) => {
 });
 
 const loginWithEmail = wrapAsync(async (req, res) => {
-    const { email: rawEmail, password } = req.body;
+    const { email: rawEmail, password ,role: requestedRole} = req.body;
     const email = rawEmail.toLowerCase();
 
     const user = await UserServices.getUserByEmail(email, true);
     if (!user) throw new ErrorHandler(404, 'User account not found');
     
+    if (requestedRole && user.role !== requestedRole) {
+        throw new ErrorHandler(403, `User does not have the required role: ${requestedRole}`);
+    }
+
     if (!user.isActive) throw new ErrorHandler(403, 'Your account has been deactivated. Please contact support.');
     
     UserServices.checkEmailVerification(user);
@@ -76,9 +80,20 @@ const sendOtpOnEmail = wrapAsync(async (req, res) => {
     await OTP.deleteMany({ email });
     await OTP.create({ otp, email });
 
-    MAIL_HANDLER.sendEmailToUserWithOTP(user, otp);
-
-    sendResponse(res, {otp}, 'OTP has been sent to your email');
+    try {
+        const response = await MAIL_HANDLER.sendEmailToUserWithOTP({
+                            to: user.email,
+                            email: user.email,
+                            otp,
+                        });
+        sendResponse(res, {}, 'OTP has been sent to your email');
+       
+    } catch (error) {
+        res.status(500).json({
+        message: 'Failed to send email',
+        error: error.message,
+        });
+    }
 });
 
 

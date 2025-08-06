@@ -11,6 +11,9 @@ const config = require('./src/config/config');
 const { ErrorHandler } = require('./src/utils/error-handler');
 
 const authRoutes = require('./src/routes/auth/auth.routes');
+const userRoutes = require('./src/routes/user-routes');
+const adminRoutes = require('./src/routes/admin-routes');
+const testRoutes = require('./src/routes/test/email-routes');
 
 
 app.use(cors());
@@ -25,8 +28,11 @@ app.get('/', (req, res) => {
 // Example: if config.server.route = 'api' in .env → route becomes: /api/
 app.use(`/${config.server.route}/auth`, authRoutes);
 
+app.use(`/${config.server.route}/users`, userRoutes);
+app.use(`/${config.server.route}/admins`, adminRoutes);
 
-
+// testign routes::::
+app.use(`/${config.server.route}/test`, testRoutes);
 
 
 // ✅ 404 handler (after all routes)

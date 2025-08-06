@@ -1,0 +1,37 @@
+const express = require('express');
+const userRouter = express.Router();
+const AdminController = require('../controllers/admin.controllers');
+const checkAuth = require('../middleware/check-auth');
+const authorizedRoles = require('../middleware/authorized-roles.js');
+const CONSTANT_ENUM = require('../helper/constant-enums.js');
+const AdminSchema = require('../request-schemas/admin.schema.js');
+const { celebrate } = require('celebrate');
+
+const API = {
+    GET_ALL_ADMINS: '/',
+    ADD_ADMIN: '/',
+    UPDATE_ADMIN:'/:adminId',
+    GET_ADMIN_BY_ID:'/:adminId',
+    DELETE_ADMIN_BY_ID:'/:adminId',
+};
+
+
+// Apply auth and role middleware to all admin routes
+userRouter.use(
+    checkAuth,
+    authorizedRoles([CONSTANT_ENUM.USER_ROLE.ADMIN])
+);
+
+// GET all admins
+userRouter.get(API.GET_ALL_ADMINS, AdminController.getAllAdmins);
+
+userRouter.post(API.ADD_ADMIN, celebrate(AdminSchema.createAdminByAdmin),  AdminController.addAdmin);
+
+userRouter.get(API.GET_ADMIN_BY_ID, AdminController.getAdminById);
+
+userRouter.put(API.UPDATE_ADMIN, AdminController.updateAdmin);
+
+userRouter.delete(API.DELETE_ADMIN_BY_ID, AdminController.deleteAdmin);
+
+
+module.exports = userRouter;
