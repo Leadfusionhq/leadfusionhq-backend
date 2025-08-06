@@ -1,0 +1,67 @@
+const { wrapAsync } = require('../utils/wrap-async');
+const config = require('../config/config');
+const { sendResponse } = require('../utils/response');
+const { ErrorHandler } = require('../utils/error-handler');
+const UserServices = require('../services/user.service');
+const AdminServices = require('../services/admin.service');
+
+
+const getAllAdmins = wrapAsync(async (req, res) => {
+    const data = await UserServices.getAllAdminsService(); 
+    sendResponse(res, { data }, 'Admin fetched successfully.', 200); 
+});
+
+const addAdmin = wrapAsync(async (req, res) => {
+    const userPayload = req.body;
+    const plainPassword = req.body.password;
+    const { user } = await AdminServices.addAdminService(userPayload);
+
+   
+    try {
+        await MAIL_HANDLER.sendAccountCreationEmailWithVerification({
+        to: user.email,
+        name: user.name,
+        token: user.verificationToken,
+        password: plainPassword,
+        });
+    } catch (err) {
+        console.error('Error sending account creation email:', err);
+    }
+
+    sendResponse(res, { user }, 'Admin has been created. They can log in after verifying their account.', 201);
+});
+
+
+const getAdminById = wrapAsync(async (req, res) => {
+    const { adminId } = req.params;
+    const data = await AdminServices.getAdminByID(adminId); 
+    sendResponse(res, { data }, 'Admin fetched successfully.', 200); 
+});
+
+const updateAdmin = wrapAsync(async (req, res) => {
+    const userPayload = req.body;
+    const { adminId } = req.params;
+    const plainPassword = req.body.password;
+
+    const { user } = await AdminServices.updateAdmin(adminId,userPayload);
+
+    sendResponse(res, { user }, 'Admin has been updated.', 201);
+});
+const deleteAdmin = wrapAsync(async (req, res) => {
+  const { adminId } = req.params;
+
+  const user = await AdminServices.getAdminByID(adminId);
+  if (!user) {
+    return sendResponse(res, null, 'Admin not found.', 404);
+  }
+  await AdminServices.hardDeleteAdmin(adminId);
+
+  return sendResponse(res, null, 'Admin has been deleted.', 200);
+});
+module.exports = {
+ getAllAdmins,
+ addAdmin,
+ getAdminById,
+ updateAdmin,
+ deleteAdmin,
+};

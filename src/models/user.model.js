@@ -71,7 +71,11 @@ const baseUserSchema = new mongoose.Schema({
   resetPasswordExpires: {
     type: Date,
     default: null,
-  }
+  },
+  phoneNumber: {
+    type: String,
+    trim: true,
+  },
 }, options);
 
 // Password hashing middleware
@@ -100,10 +104,6 @@ const regularUserSchema = new mongoose.Schema({
     type: String,
     trim: true,
   },
-  phoneNumber: {
-    type: String,
-    trim: true,
-  },
   region: {
     type: String,
     trim: true,
@@ -112,11 +112,19 @@ const regularUserSchema = new mongoose.Schema({
     type: String,
     trim: true,
   },
+  zipCode: {
+    type: String,
+    trim: true,
+  },
 });
 
 const RegularUser = User.discriminator(CONSTANT_ENUM.USER_ROLE.USER, regularUserSchema);
 
+const adminUserSchema = new mongoose.Schema({});
+const AdminUser = User.discriminator(CONSTANT_ENUM.USER_ROLE.ADMIN, adminUserSchema);
+
 module.exports = {
   User,
   RegularUser,
+  AdminUser,
 };

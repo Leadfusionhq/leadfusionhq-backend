@@ -2,7 +2,7 @@ const { User } = require('../../models/user.model');
 const { ErrorHandler } = require('../../utils/error-handler');
 const { generateVerificationToken , getTokenExpiration } = require('../../utils/token.utils');
 // const { generateToken } = require('../../utils/jwt');
-const UserServices = require('./user.service');
+const UserServices = require('../user.service');
 
 const registerUser = async (data) => {
   const { email, password, name, phoneNumber, companyName, region, country, zipCode } = data;
