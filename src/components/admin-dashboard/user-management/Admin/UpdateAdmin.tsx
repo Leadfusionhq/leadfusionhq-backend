@@ -65,9 +65,9 @@ const EditAdmin = () => {
         console.log(id);
         const url = API_URL.GET_ADMIN_BY_ID.replace(':adminId', id);
         // const res = await axiosWrapper('get', url, {}, token ?? undefined) as { user?: string };
-        const res = await axiosWrapper('get', url, {}, token ?? undefined) as { user?: User };
+        const res = await axiosWrapper('get', url, {}, token ?? undefined) as { data?: User };
 
-        const user = res?.user;
+        const user = res?.data;
         if (user) {
           setInitialValues({
             name: user.name || '',
