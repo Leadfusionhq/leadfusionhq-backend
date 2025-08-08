@@ -3,7 +3,6 @@ const USER_ROLE = {
   USER: 'USER',
   ADMIN: 'ADMIN',
 };
-
 const LEAD_TYPE = {
   SOLAR_RESIDENTIAL: 'SOLAR_RESIDENTIAL',
   ROOFING: 'ROOFING',
@@ -11,22 +10,34 @@ const LEAD_TYPE = {
 };
 
 const EXCLUSIVITY = {
-  EXCLUSIVE: 'EXCLUSIVE',
-  NON_EXCLUSIVE: 'NON_EXCLUSIVE',
-  SHARED: 'SHARED',
-  WARM_TRANSFER: 'WARM_TRANSFER',
-  APPOINTMENT: 'APPOINTMENT',
+  EXCLUSIVE: 'EXCLUSIVE',         // Lead sold to only 1 buyer
+  NON_EXCLUSIVE: 'NON_EXCLUSIVE', // Lead sold to multiple buyers
+  SHARED: 'SHARED',               // Shared leads (similar to non-exclusive)
+  WARM_TRANSFER: 'WARM_TRANSFER', // Lead transferred live to client
+  APPOINTMENT: 'APPOINTMENT',     // Lead with confirmed appointment
 };
+
 const STATUS = {
   PENDING: 'PENDING',
   ACTIVE: 'ACTIVE',
   PAUSED: 'PAUSED',
   REJECTED: 'REJECTED',
 };
+const DAYS_OF_WEEK = [
+  'MONDAY',
+  'TUESDAY',
+  'WEDNESDAY',
+  'THURSDAY',
+  'FRIDAY',
+  'SATURDAY',
+  'SUNDAY',
+];
+
 
 module.exports = {
   USER_ROLE,
   LEAD_TYPE,
   EXCLUSIVITY,
   STATUS,
+  DAYS_OF_WEEK,
 };
