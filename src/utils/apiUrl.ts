@@ -44,3 +44,11 @@ export const API_URL = {
 
     
 };
+
+// ========== LOCATION ROUTES ==========
+const LOCATION_API_BASE = `${API_BASE}/locations`;
+
+export const LOCATION_API = {
+  GET_ALL_LOCATIONS: `${LOCATION_API_BASE}/`,
+  UPLOAD_CSV_DATA: `${LOCATION_API_BASE}/upload-csv-data`,
+};
