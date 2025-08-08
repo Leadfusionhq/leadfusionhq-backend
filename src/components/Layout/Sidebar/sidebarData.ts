@@ -42,6 +42,6 @@ export const userSidebarItems: SidebarItem[] = [
     id: 'campaigns', 
     name: 'Campaigns', 
     icon: '/images/icons/campaigns.svg', 
-    link: '/campaigns' 
+    link: '/dashboard/campaigns' 
   },
 ];
