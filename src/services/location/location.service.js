@@ -86,6 +86,47 @@ const uploadCSVData = async (csvData) => {
   return results;
 };
 
+const getAllLocationsDetailed = async (page = 1, limit = 50) => {
+  const skip = (page - 1) * limit;
+
+  const results = await ZipCode.aggregate([
+    { $lookup: { from: 'counties', localField: 'county', foreignField: '_id', as: 'county' } },
+    { $unwind: '$county' },
+    { $lookup: { from: 'states', localField: 'county.state', foreignField: '_id', as: 'state' } },
+    { $unwind: '$state' },
+    { $sort: { 'state.name': 1, 'county.name': 1, 'zip_code': 1 } },
+    {
+      $facet: {
+        data: [{ $skip: skip }, { $limit: limit }],
+        totalCount: [{ $count: 'count' }],
+      }
+    }
+  ]);
+
+  const data = results[0].data;
+  const totalCount = results[0].totalCount[0]?.count || 0;
+  const totalPages = Math.ceil(totalCount / limit);
+
+  return {
+    data: data.map(doc => ({
+      zip_code: doc.zip_code,
+      default_city: doc.default_city,
+      population: doc.population,
+      county: doc.county.name,
+      county_fips: doc.county.fips_code,
+      state: doc.state.name,
+      state_abbr: doc.state.abbreviation,
+    })),
+    page,
+    limit,
+    totalCount,
+    totalPages,
+  };
+};
+
+
+
 module.exports = {
   uploadCSVData,
+  getAllLocationsDetailed,
 };

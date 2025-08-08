@@ -37,7 +37,7 @@ app.use(`/${config.server.route}/admins`, adminRoutes);
 /** ::::::::::::::::::campaign route::::::::::::::::: */
 app.use(`/${config.server.route}/campaign`, campaignRoutes);
 /** ::::::::::::::::::location route::::::::::::::::: */
-app.use(`/${config.server.route}/location`, locationRoutes);
+app.use(`/${config.server.route}/locations`, locationRoutes);
 
 /** testign routes:::: */
 app.use(`/${config.server.route}/test`, testRoutes);

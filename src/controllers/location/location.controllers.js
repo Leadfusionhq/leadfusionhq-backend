@@ -25,6 +25,21 @@ const uploadCSVData = wrapAsync(async (req, res) => {
       throw new ErrorHandler(500, `CSV Parsing Error: ${err.message}`);
     });
 });
+const getAllLocationsDetailed = wrapAsync(async (req, res) => {
+
+  let page = parseInt(req.query.page, 10);
+  let limit = parseInt(req.query.limit, 10);
+
+  if (isNaN(page) || page < 1) page = 1;
+  if (isNaN(limit) || limit < 1) limit = 50;
+  if (limit > 100) limit = 100;
+
+  const locationsData = await LocationServices.getAllLocationsDetailed(page, limit);
+
+  sendResponse(res, locationsData, 'Locations fetched successfully', 200);
+});
+
+
 const previewCSVData = wrapAsync(async (req, res) => {
   const file = req.file;
 
@@ -57,4 +72,5 @@ const previewCSVData = wrapAsync(async (req, res) => {
 module.exports = {
   uploadCSVData,
   previewCSVData,
+  getAllLocationsDetailed,
 };
