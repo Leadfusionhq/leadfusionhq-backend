@@ -1,4 +1,3 @@
-// index.js
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -13,6 +12,10 @@ const { ErrorHandler } = require('./src/utils/error-handler');
 const authRoutes = require('./src/routes/auth/auth.routes');
 const userRoutes = require('./src/routes/user-routes');
 const adminRoutes = require('./src/routes/admin-routes');
+const campaignRoutes = require('./src/routes/campaign/campaign.routes');
+const locationRoutes = require('./src/routes/location/location.routes');
+
+
 const testRoutes = require('./src/routes/test/email-routes');
 
 
@@ -25,17 +28,22 @@ app.get('/', (req, res) => {
 });
 
 
-// Example: if config.server.route = 'api' in .env → route becomes: /api/
+/** Example: if config.server.route = 'api' in .env → route becomes: /api/ */
 app.use(`/${config.server.route}/auth`, authRoutes);
 
 app.use(`/${config.server.route}/users`, userRoutes);
 app.use(`/${config.server.route}/admins`, adminRoutes);
 
-// testign routes::::
+/** ::::::::::::::::::campaign route::::::::::::::::: */
+app.use(`/${config.server.route}/campaign`, campaignRoutes);
+/** ::::::::::::::::::location route::::::::::::::::: */
+app.use(`/${config.server.route}/location`, locationRoutes);
+
+/** testign routes:::: */
 app.use(`/${config.server.route}/test`, testRoutes);
 
 
-// ✅ 404 handler (after all routes)
+/**  404 handler (after all routes)  */
 app.use((req, res, next) => {
   next(new ErrorHandler(404, 'Route not found'));
 });
@@ -48,7 +56,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-// ✅ Server start
+/**   Server start */
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
