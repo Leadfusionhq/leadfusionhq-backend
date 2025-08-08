@@ -32,7 +32,7 @@ const SidebarItem: FC<SidebarItemProps> = ({ item }) => {
             className="object-contain"
           />
         ) : (
-          <item.icon />
+          <item.icon size={25} />
         )}
         <span>{item.name}</span>
       </div>

@@ -1,4 +1,6 @@
 import { SidebarItem } from '@/types/sidebar';
+import { FiMapPin } from 'react-icons/fi';
+
 export const adminSidebarItems: SidebarItem[] = [
   { 
     id: 'dashboard', 
@@ -14,6 +16,16 @@ export const adminSidebarItems: SidebarItem[] = [
     pathCombinations: [
       '/admin/user-management',
       '/admin/user-management/new',
+    ]
+  },
+  {
+    id: 'locations',
+    name: 'Locations',
+    icon: FiMapPin,
+    link: '/admin/locations',
+    pathCombinations: [
+      '/admin/locations/edit',
+      '/admin/locations/add',
     ]
   },
 
