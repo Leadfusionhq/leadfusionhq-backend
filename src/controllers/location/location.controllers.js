@@ -4,6 +4,7 @@ const { ErrorHandler } = require('../../utils/error-handler');
 const csv = require('csv-parser');
 const stream = require('stream');
 const LocationServices = require('../../services/location/location.service');
+const { getPaginationParams } = require('../../utils/pagination');
 
 const uploadCSVData = wrapAsync(async (req, res) => {
   const file = req.file;
@@ -39,6 +40,28 @@ const getAllLocationsDetailed = wrapAsync(async (req, res) => {
   sendResponse(res, locationsData, 'Locations fetched successfully', 200);
 });
 
+const getAllStates = wrapAsync(async (req, res) => {
+
+  const { page, limit } = getPaginationParams(req.query);
+
+  const statesData = await LocationServices.getAllStates(page, limit);
+
+  sendResponse(res, statesData, 'States fetched successfully', 200);
+});
+
+const getCountiesByState = wrapAsync(async (req, res) => {
+  const stateId = req.params.stateId;
+
+  if (!stateId) {
+    throw new ErrorHandler(400, 'State ID is required');
+  }
+
+  const { page, limit } = getPaginationParams(req.query);
+
+  const data = await LocationServices.getCountiesByState(stateId, page, limit);
+
+  sendResponse(res, data, 'Counties fetched successfully', 200);
+});
 
 const previewCSVData = wrapAsync(async (req, res) => {
   const file = req.file;
@@ -73,4 +96,6 @@ module.exports = {
   uploadCSVData,
   previewCSVData,
   getAllLocationsDetailed,
+  getAllStates,
+  getCountiesByState,
 };

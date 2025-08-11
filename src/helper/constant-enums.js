@@ -32,6 +32,10 @@ const DAYS_OF_WEEK = [
   'SATURDAY',
   'SUNDAY',
 ];
+const LANGUAGE = {
+  ENGLISH: 'ENGLISH',
+  SPANISH: 'SPANISH',
+};
 
 
 module.exports = {
@@ -40,4 +44,5 @@ module.exports = {
   EXCLUSIVITY,
   STATUS,
   DAYS_OF_WEEK,
+  LANGUAGE,
 };
