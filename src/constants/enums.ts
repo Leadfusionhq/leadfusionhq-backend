@@ -30,6 +30,11 @@ export const LANGUAGE = {
   SPANISH: 'SPANISH',
 } as const;
 
+export const UTILITIES = {
+  INCLUDE_ALL: 'INCLUDE_ALL',
+  EXCLUDE_SOME: 'EXCLUDE_SOME',
+  INCLUDE_SOME: 'INCLUDE_SOME',
+} as const;
 
 export const DAYS_OF_WEEK = [
   'MONDAY',

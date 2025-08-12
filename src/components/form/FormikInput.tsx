@@ -1,6 +1,7 @@
+'use client'
 import { Field, ErrorMessage, FieldAttributes } from 'formik';
 
-const FormikInput = ({ label, ...props }: { label?: string } & FieldAttributes<any>) => (
+const FormikInput = ({ label, ...props }: { label?: string } & FieldAttributes<string>) => (
   <div className="w-full">
     {label && <label className="block text-[#1C1C1C] text-lg mb-2">{label}</label>}
     <Field

@@ -64,3 +64,11 @@ export const CAMPAIGNS_API = {
   GET_ALL_CAMPAIGNS: `${CAMPAIGNS_API_BASE}/`,
   CREATE_CAMPAIGN: `${CAMPAIGNS_API_BASE}/`,
 };
+
+// ========== utilities ROUTES ==========
+const UITILITIES_API_BASE = `${API_BASE}/utilities`;
+
+export const UITILITIES_API = {
+  GET_ALL_UITILITIES: `${UITILITIES_API_BASE}/`,
+  GET_UITILITIES_BY_STATE: `${UITILITIES_API_BASE}/state/:stateId?all=true`,
+};
