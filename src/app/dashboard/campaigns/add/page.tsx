@@ -1,10 +1,12 @@
 import { Metadata } from "next";
-import CampaignTable from "@/components/user-dashboard/campaigns/Campaigns";
+import AddCampaigns from "@/components/user-dashboard/campaigns/AddCampaigns";
+// import  AddCampaignPage  from '@/components/user-dashboard/campaigns/add';
 
 export default function CampaignsDashboard() {
   return (
     <div className="locations-container">
-      <CampaignTable />
+      <AddCampaigns />
+      {/* <AddCampaignPage /> */}
     </div>
   );
 }

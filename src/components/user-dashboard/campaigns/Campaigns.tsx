@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { LOCATION_API } from "@/utils/apiUrl";
+import { CAMPAIGNS_API } from "@/utils/apiUrl";
 import axiosWrapper from "@/utils/api";
 import { useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
 import DataTable, { TableColumn } from "react-data-table-component";
-import { Skeleton, Box } from "@mui/material";
+import { Skeleton, Box, Button, Typography } from "@mui/material";
+import Link from 'next/link';
 
-type Location = {
+type Campaign = {
   zip_code: string;
   default_city: string;
   population: number;
@@ -16,10 +17,13 @@ type Location = {
   county_fips: string;
   state: string;
   state_abbr: string;
+  verticals?: string;
+  bid_price?: number;
+  status?: string;
 };
 
 type ApiResponse = {
-  data: Location[];
+  data: Campaign[];
   page: number;
   limit: number;
   totalCount: number;
@@ -28,18 +32,15 @@ type ApiResponse = {
 };
 
 export default function LocationTable() {
-  const [locations, setLocations] = useState<Location[]>([]);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [pagination, setPagination] = useState<{ page: number; limit: number }>({
-    page: 1,
-    limit: 10,
-  });
+  const [pagination, setPagination] = useState({ page: 1, limit: 10 });
   const [totalRows, setTotalRows] = useState<number>(0);
 
   const token = useSelector((state: RootState) => state.auth.token);
 
-  const fetchLocations = useCallback(
+  const fetchCampaigns = useCallback(
     async (pageNumber: number, pageSize: number) => {
       try {
         setLoading(true);
@@ -52,16 +53,16 @@ export default function LocationTable() {
 
         const response = (await axiosWrapper(
           "get",
-          `${LOCATION_API.GET_ALL_LOCATIONS}?${params.toString()}`,
+          `${CAMPAIGNS_API.GET_ALL_CAMPAIGNS}?${params.toString()}`,
           {},
           token ?? undefined
         )) as ApiResponse;
 
-        setLocations(response.data);
+        setCampaigns(response.data);
         setTotalRows(response.totalCount);
       } catch (err) {
-        console.error("Failed to fetch locations:", err);
-        setError("Failed to fetch locations");
+        console.error("Failed to fetch campaigns:", err);
+        setError("Failed to fetch campaigns");
       } finally {
         setLoading(false);
       }
@@ -71,36 +72,23 @@ export default function LocationTable() {
 
   useEffect(() => {
     if (token) {
-      fetchLocations(pagination.page, pagination.limit);
+      fetchCampaigns(pagination.page, pagination.limit);
     }
-  }, [token, pagination.page, pagination.limit, fetchLocations]);
+  }, [token, pagination.page, pagination.limit, fetchCampaigns]);
 
-  // Skeleton placeholder rows (minimal to avoid unwanted values)
-  const loadingSkeletonRows: Location[] = Array.from({ length: pagination.limit }).map((_, i) => ({
+  const skeletonRows: Campaign[] = Array.from({ length: pagination.limit }).map((_, i) => ({
     zip_code: `skeleton-${i}`,
     default_city: "",
-    population: 0, // Not used in cell renderer during loading
+    population: 0,
     county: "",
     county_fips: "",
     state: "",
     state_abbr: "",
   }));
 
-  const columns: TableColumn<Location>[] = [
+  const columns: TableColumn<Campaign>[] = [
     {
-      name: "Zip Code",
-      selector: (row) => row.zip_code,
-      cell: (row) =>
-        row.zip_code.startsWith("skeleton") ? (
-          <Skeleton variant="text" width={60} animation="wave" />
-        ) : (
-          row.zip_code
-        ),
-      sortable: false,
-      width: "15%",
-    },
-    {
-      name: "City",
+      name: "Campaigns",
       selector: (row) => row.default_city,
       cell: (row) =>
         row.zip_code.startsWith("skeleton") ? (
@@ -108,46 +96,71 @@ export default function LocationTable() {
         ) : (
           row.default_city
         ),
-    //   sortable: !loading,
       sortable: false,
-      width: "25%",
     },
     {
-      name: "Population",
-      selector: (row) => row.population,
+      name: "Verticals",
+      selector: (row) => row.verticals ?? "",
       cell: (row) =>
         row.zip_code.startsWith("skeleton") ? (
           <Skeleton variant="text" width={80} animation="wave" />
         ) : (
-          row.population.toLocaleString()
+          row.verticals ?? "-"
+        ),
+      sortable: false,
+    },
+    {
+      name: "Bid Price",
+      selector: (row) => row.bid_price ?? 0,
+      cell: (row) =>
+        row.zip_code.startsWith("skeleton") ? (
+          <Skeleton variant="text" width={60} animation="wave" />
+        ) : (
+          `$${(row.bid_price ?? 0).toFixed(2)}`
         ),
       sortable: false,
       right: true,
-      width: "15%",
-    },
-    {
-      name: "County",
-      selector: (row) => row.county,
-      cell: (row) =>
-        row.zip_code.startsWith("skeleton") ? (
-          <Skeleton variant="text" width={120} animation="wave" />
-        ) : (
-          row.county
-        ),
-      sortable: false,
-      width: "25%",
     },
     {
       name: "State",
-      selector: (row) => `${row.state} (${row.state_abbr})`,
+      selector: (row) => row.state_abbr,
       cell: (row) =>
         row.zip_code.startsWith("skeleton") ? (
-          <Skeleton variant="text" width={80} animation="wave" />
+          <Skeleton variant="text" width={40} animation="wave" />
         ) : (
           `${row.state} (${row.state_abbr})`
         ),
       sortable: false,
-      width: "20%",
+    },
+    {
+      name: "Status",
+      selector: (row) => row.status ?? "",
+      cell: (row) =>
+        row.zip_code.startsWith("skeleton") ? (
+          <Skeleton variant="text" width={60} animation="wave" />
+        ) : (
+          row.status ?? "-"
+        ),
+      sortable: false,
+    },
+    {
+      name: "Action",
+      cell: (row) =>
+        row.zip_code.startsWith("skeleton") ? (
+          <Skeleton variant="rectangular" width={100} height={30} animation="wave" />
+        ) : (
+          <>
+            <Button size="small" variant="outlined" color="primary" sx={{ mr: 1 }}>
+              Edit
+            </Button>
+            <Button size="small" variant="outlined" color="secondary">
+              Summary
+            </Button>
+          </>
+        ),
+      ignoreRowClick: true,
+      allowOverflow: true,
+      button: true,
     },
   ];
 
@@ -160,55 +173,84 @@ export default function LocationTable() {
   };
 
   const customStyles = {
-    table: {
-      style: {
-        border: "1px solid #ddd",
-        borderRadius: "4px",
-        overflow: "hidden",
-      },
-    },
     headCells: {
       style: {
         fontWeight: "bold",
         backgroundColor: "#000000",
         color: "#FFFFFF",
-        padding: "24px",
+        padding: "20px",
         fontSize: "16px",
-        zIndex: 1,
       },
     },
     cells: {
       style: {
-        padding: "24px",
-        fontSize: "16px",
-        borderBottom: "1px solid rgba(1, 1, 1, 0.09)",
+        padding: "16px",
+        fontSize: "15px",
+        borderBottom: "1px solid rgba(0,0,0,0.1)",
       },
     },
   };
 
-  if (error) return <p>Error: {error}</p>;
+  const errorRow = [
+    {
+      zip_code: "error",
+      default_city: "",
+      population: 0,
+      county: "",
+      county_fips: "",
+      state: "",
+      state_abbr: "",
+      verticals: "",
+      bid_price: 0,
+      status: "",
+    },
+  ];
 
   return (
     <Box sx={{ padding: 2 }}>
-      <h3 className="text-2xl mb-4">List of Locations</h3>
+      <div className="flex justify-between items-center pb-[30px]">
+            <h3 className="text-[24px] text-[#1C1C1C] text-[Inter]">List of Campaigns</h3>
+          <Link href="/dashboard/campaigns/add"
+              className="w-[175px] h-[52px] bg-[#1C1C1C] text-white rounded-[5px] text-center flex justify-center items-center text-[16px] no-underline"
+          >
+              Add New Campaign
+          </Link>
+      </div>
 
-      <DataTable
-        columns={columns}
-        data={loading ? loadingSkeletonRows : locations}
-        pagination
-        paginationServer
-        paginationTotalRows={totalRows}
-        paginationDefaultPage={pagination.page}
-        paginationPerPage={pagination.limit}
-        paginationRowsPerPageOptions={[10, 50, 100]}
-        onChangePage={handlePageChange}
-        onChangeRowsPerPage={handlePerRowsChange}
-        customStyles={customStyles}
-        highlightOnHover
-        striped
-        dense
-        progressPending={false}
-      />
+    <DataTable
+      columns={columns}
+      data={[]}
+      customStyles={customStyles}
+      pagination
+      paginationServer
+      paginationTotalRows={totalRows}
+      paginationDefaultPage={pagination.page}
+      paginationPerPage={pagination.limit}
+      paginationRowsPerPageOptions={[10, 50, 100]}
+      onChangePage={handlePageChange}
+      onChangeRowsPerPage={handlePerRowsChange}
+      highlightOnHover
+      striped
+      dense
+      persistTableHead
+      progressPending={loading} 
+      progressComponent={ 
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto my-4"></div>
+      }
+      noDataComponent={
+        error ? (
+          <Typography color="error" sx={{ py: 2 }}>
+            ⚠️ {error}
+          </Typography>
+        ) : (
+          <Typography sx={{ py: 2 }}>No data available</Typography>
+        )
+      }
+    />
+
+
+
+
     </Box>
   );
 }

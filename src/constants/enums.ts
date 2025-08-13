@@ -1,0 +1,47 @@
+export const USER_ROLE = {
+  SUPER_ADMIN: 'SUPER_ADMIN',
+  USER: 'USER',
+  ADMIN: 'ADMIN',
+} as const;
+
+export const LEAD_TYPE = {
+  SOLAR_RESIDENTIAL: 'SOLAR_RESIDENTIAL',
+  ROOFING: 'ROOFING',
+  SOLAR_COMMERCIAL: 'SOLAR_COMMERCIAL',
+} as const;
+
+export const EXCLUSIVITY = {
+  EXCLUSIVE: 'EXCLUSIVE',
+  NON_EXCLUSIVE: 'NON_EXCLUSIVE',
+  SHARED: 'SHARED',
+  WARM_TRANSFER: 'WARM_TRANSFER',
+  APPOINTMENT: 'APPOINTMENT',
+} as const;
+
+export const STATUS = {
+  PENDING: 'PENDING',
+  ACTIVE: 'ACTIVE',
+//   PAUSED: 'PAUSED',
+//   REJECTED: 'REJECTED',
+} as const;
+
+export const LANGUAGE = {
+  ENGLISH: 'ENGLISH',
+  SPANISH: 'SPANISH',
+} as const;
+
+export const UTILITIES = {
+  INCLUDE_ALL: 'INCLUDE_ALL',
+  EXCLUDE_SOME: 'EXCLUDE_SOME',
+  INCLUDE_SOME: 'INCLUDE_SOME',
+} as const;
+
+export const DAYS_OF_WEEK = [
+  'MONDAY',
+  'TUESDAY',
+  'WEDNESDAY',
+  'THURSDAY',
+  'FRIDAY',
+  'SATURDAY',
+  'SUNDAY',
+] as const;
