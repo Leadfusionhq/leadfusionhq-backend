@@ -4,6 +4,7 @@ const { sendResponse } = require('../utils/response');
 const { ErrorHandler } = require('../utils/error-handler');
 const UserServices = require('../services/user.service');
 const AdminServices = require('../services/admin.service');
+const MAIL_HANDLER = require('../mail/mails');
 
 
 const getAllAdmins = wrapAsync(async (req, res) => {
