@@ -1,10 +1,9 @@
-// utils/debounce.ts
-// import { debounce, DebouncedFunc } from 'lodash';
+import { debounce, DebouncedFunc } from 'lodash';
+import { SafeValue } from '@/types/types';
 
-
-// export function createDebouncedFn<T extends (...args: any[]) => any>(
-//   fn: T,
-//   wait = 300
-// ): DebouncedFunc<T> {
-//   return debounce(fn, wait);
-// }
+export function createDebouncedFn<T extends (...args: SafeValue[]) => unknown>(
+  fn: T,
+  wait = 300
+): DebouncedFunc<T> {
+  return debounce(fn, wait);
+}

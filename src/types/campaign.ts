@@ -1,47 +1,45 @@
+"use client";
 import { DAYS_OF_WEEK, LEAD_TYPE, EXCLUSIVITY, STATUS, LANGUAGE, UTILITIES } from "@/constants/enums";
 
-// Types for day schedules
-export type DaySchedule = {
+export interface DaySchedule {
   day: typeof DAYS_OF_WEEK[number];
   active: boolean;
   start_time: string;
   end_time: string;
   cap: number;
-};
+}
 
-// API response types
-interface State {
+export type State = {
   name: string;
   abbreviation: string;
   _id: string;
-}
-
-interface County {
-  name: string;
-  _id: string;
-}
-
-interface Utility {
-  _id: string;
-  name: string;
-}
-
-// Form option types
-export type StateOption = { 
-  value: string; 
-  label: string; 
-  name: string; 
-  abbreviation: string 
 };
 
-export type CountyOption = { 
-  value: string; 
-  label: string 
+export type County = {
+  name: string;
+  _id: string;
 };
+
+export interface StateOption {
+  value: string;
+  label: string;
+  name: string;
+  abbreviation: string;
+}
+
+export interface CountyOption {
+  value: string;
+  label: string;
+}
+
+export interface Utility {
+  _id: string;
+  name: string;
+}
 
 export type UtilityMode = keyof typeof UTILITIES;
 
-// Complete form values type
+// ✅ Complete form values type
 export interface CampaignFormValues {
   name: string;
   status: keyof typeof STATUS;
@@ -80,5 +78,3 @@ export interface CampaignFormValues {
   };
   note: string;
 }
-
-export type { State, County, Utility };
