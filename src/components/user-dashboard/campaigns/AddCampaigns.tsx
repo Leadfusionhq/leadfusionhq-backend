@@ -14,6 +14,7 @@ import { LEAD_TYPE, EXCLUSIVITY, STATUS, DAYS_OF_WEEK, LANGUAGE, UTILITIES } fro
 
 import CustomFormikAsyncSelect from "@/components/form/CustomFormikAsyncSelect";
 import { FormikInput, FormikSelect, FormikCheckbox, FormikRadio, FormikTextarea } from "@/components/form";
+import { SafeValue } from '@/types/types';
 
 interface DaySchedule {
   day: typeof DAYS_OF_WEEK[number];
@@ -53,12 +54,79 @@ interface Utility {
 
 type UtilityMode = keyof typeof UTILITIES;
 
-interface FormikStateSnapshot {
-  geography: {
-    state: StateOption | null;
-  };
-}
-let formikState: { geography?: { state?: StateOption | null } } | null = null;
+// Component to handle state-dependent effects
+const StateEffectsHandler = ({ 
+  selectedState, 
+  coverageType, 
+  token,
+  setCountiesList,
+  setIsLoadingCounties,
+  setUtilitiesList,
+  setIsLoadingUtilities 
+}: {
+  selectedState: StateOption | null;
+  coverageType: string | undefined;
+  token: string | null;
+  setCountiesList: (counties: County[]) => void;
+  setIsLoadingCounties: (loading: boolean) => void;
+  setUtilitiesList: (utilities: Utility[]) => void;
+  setIsLoadingUtilities: (loading: boolean) => void;
+}) => {
+  // Effect for loading counties when state changes and coverage is partial
+  useEffect(() => {
+    if (selectedState && coverageType === "PARTIAL") {
+      const fetchCounties = async () => {
+        setIsLoadingCounties(true);
+        setCountiesList([]);
+        try {
+          const url = LOCATION_API.GET_COUNTIES_BY_STATE.replace(":stateId", selectedState.value);
+          const response = (await axiosWrapper("get", url, {}, token ?? undefined)) as { data: County[] };
+          setCountiesList(response.data);
+        } catch (err) {
+          console.error("Failed to load County:", err);
+          toast.error("Could not load County list");
+        } finally {
+          setIsLoadingCounties(false);
+        }
+      };
+
+      fetchCounties();
+    } else {
+      // Clear counties if not partial coverage or no state selected
+      setCountiesList([]);
+      setIsLoadingCounties(false);
+    }
+  }, [selectedState?.value, coverageType, token, setCountiesList, setIsLoadingCounties]);
+
+  // Effect for loading utilities when state changes
+  useEffect(() => {
+    if (selectedState) {
+      console.warn(selectedState);
+      const fetchUtilities = async () => {
+        setIsLoadingUtilities(true);
+        setUtilitiesList([]);
+        try {
+          const url = UITILITIES_API.GET_UITILITIES_BY_STATE.replace(":stateId", selectedState.value);
+          const response = (await axiosWrapper("get", url, {}, token ?? undefined)) as { data: Utility[] };
+          setUtilitiesList(response.data);
+        } catch (err) {
+          console.error("Failed to load utilities:", err);
+          toast.error("Could not load utility list");
+        } finally {
+          setIsLoadingUtilities(false);
+        }
+      };
+
+      fetchUtilities();
+    } else {
+      // Clear utilities if no state selected
+      setUtilitiesList([]);
+      setIsLoadingUtilities(false);
+    }
+  }, [selectedState?.value, token, setUtilitiesList, setIsLoadingUtilities]);
+
+  return null; // This component doesn't render anything
+};
 
 const AddNewCampaign = () => {
   const token = useSelector((state: RootState) => state.auth.token);
@@ -69,8 +137,6 @@ const AddNewCampaign = () => {
   const [utilitiesList, setUtilitiesList] = useState<Utility[]>([]);
   const [isLoadingUtilities, setIsLoadingUtilities] = useState(false);
   const [activeDeliveryTab, setActiveDeliveryTab] = useState<"method" | "schedule" | "other">("method");
-
-  
 
   useEffect(() => {
     const fetchStates = async () => {
@@ -284,7 +350,7 @@ const AddNewCampaign = () => {
       };
 
       console.log("Cleaned Values:", cleanedValues);
-      toast.warning("We're still working on this feature. It’s not available yet.");
+      toast.warning("We're still working on this feature. It's not available yet.");
 
       // Remove this return false when ready to submit
       return false;
@@ -302,7 +368,8 @@ const AddNewCampaign = () => {
     }
   };
 
-  const renderTabContent = (values: typeof initialValues) => {
+  const renderTabContent = (values: typeof initialValues, setFieldValue: (field: string, value: SafeValue ) => void) => {
+  
     switch (activeTab) {
       case "basic":
         return (
@@ -379,12 +446,43 @@ const AddNewCampaign = () => {
                 label="State *"
                 loadOptions={loadStates}
                 placeholder="Search and select a state"
+                // onChange={(selectedOption: StateOption | null) => {
+                //   setFieldValue("geography.state", selectedOption);
+                //   setFieldValue("geography.coverage.partial.counties", []);
+                //   setFieldValue("utilities.include_some", []);
+                //   setFieldValue("utilities.exclude_some", []);
+                // }}
+                onChange={() => {
+                  setFieldValue("geography.coverage.partial.counties", []);
+                  setFieldValue("utilities.include_some", []);
+                  setFieldValue("utilities.exclude_some", []);
+                }}
+
               />
               <div>
                 <label className="block text-[#1C1C1C] text-lg mb-2">Coverage *</label>
                 <div className="flex items-center space-x-6">
-                  <FormikRadio name="geography.coverage.type" value="FULL_STATE" label="Full State" />
-                  <FormikRadio name="geography.coverage.type" value="PARTIAL" label="Partial" />
+                  <FormikRadio 
+                    name="geography.coverage.type" 
+                    value="FULL_STATE" 
+                    label="Full State" 
+                    onChange={() => {
+                      setFieldValue("geography.coverage.type", "FULL_STATE");
+                      // Clear partial coverage fields when switching to full state
+                      setFieldValue("geography.coverage.partial.counties", []);
+                      setFieldValue("geography.coverage.partial.radius", "");
+                      setFieldValue("geography.coverage.partial.zipcode", "");
+                      setFieldValue("geography.coverage.partial.zip_codes", "");
+                    }}
+                  />
+                  <FormikRadio 
+                    name="geography.coverage.type" 
+                    value="PARTIAL" 
+                    label="Partial" 
+                    onChange={() => {
+                      setFieldValue("geography.coverage.type", "PARTIAL");
+                    }}
+                  />
                 </div>
                 <ErrorMessage name="geography.coverage.type" component="div" className="text-red-500 text-xs mt-1" />
               </div>
@@ -708,83 +806,26 @@ const AddNewCampaign = () => {
         return null;
     }
   };
-useEffect(() => {
-  if (formikState?.geography?.state) {
-    const stateValue = formikState.geography.state as StateOption;
-    const stateId = stateValue.value;
-    console.warn(stateId);
-    // Your fetch logic here
-  }
-}, [formikState?.geography?.state]);
+
   return (
     <div className="container min-h-screen flex flex-col mx-auto items-center md:px-0 py-8">
       <h2 className="text-[24px] font-[500] text-[#1C1C1C] text-center mb-6">Add New Campaign</h2>
 
-      <Formik 
-      innerRef={(formik) => {
-        formikState = formik ? {
-          geography: {
-            state: formik.values.geography.state
-          }
-        } : null;
-      }}
-      initialValues={initialValues} validationSchema={validationSchema} onSubmit={handleSubmit}>
+      <Formik initialValues={initialValues} validationSchema={validationSchema} onSubmit={handleSubmit}>
         {({ isSubmitting, values, setFieldValue }) => {
-          useEffect(() => {
-            const fetchCounties = async () => {
-              if (values.geography.state && values.geography.coverage.type === "PARTIAL") {
-                setIsLoadingCounties(true);
-                setFieldValue("geography.coverage.partial.counties", []);
-
-                try {
-                  const stateId = values.geography.state.value;
-                  const url = LOCATION_API.GET_COUNTIES_BY_STATE.replace(":stateId", stateId as string);
-                  const response = (await axiosWrapper("get", url, {}, token ?? undefined)) as { data: County[] };
-
-                  setCountiesList(response.data);
-                } catch (err) {
-                  console.error("Failed to load counties:", err);
-                  toast.error("Could not load county list");
-                } finally {
-                  setIsLoadingCounties(false);
-                }
-              } else {
-                setCountiesList([]);
-              }
-            };
-
-            fetchCounties();
-          }, [values.geography.state, values.geography.coverage.type, token, setFieldValue]);
-
-          useEffect(() => {
-            const fetchUtilities = async () => {
-              if (values.geography.state) {
-                setIsLoadingUtilities(true);
-                setFieldValue("utilities.include_some", []);
-                setFieldValue("utilities.exclude_some", []);
-
-                try {
-                  const stateId = values.geography.state.value;
-                  const url = UITILITIES_API.GET_UITILITIES_BY_STATE.replace(":stateId", stateId as string);
-                  const response = (await axiosWrapper("get", url, {}, token ?? undefined)) as { data: Utility[] };
-
-                  setUtilitiesList(response.data);
-                } catch (err) {
-                  console.error("Failed to load utilities:", err);
-                  toast.error("Could not load utility list");
-                } finally {
-                  setIsLoadingUtilities(false);
-                }
-              } else {
-                setUtilitiesList([]);
-              }
-            };
-
-            fetchUtilities();
-          }, [values.geography.state, token, setFieldValue]);
-
           return (
             <div className="w-full max-w-[1200px]">
+              {/* State Effects Handler Component */}
+              <StateEffectsHandler
+                selectedState={values.geography.state}
+                coverageType={values.geography.coverage?.type}
+                token={token}
+                setCountiesList={setCountiesList}
+                setIsLoadingCounties={setIsLoadingCounties}
+                setUtilitiesList={setUtilitiesList}
+                setIsLoadingUtilities={setIsLoadingUtilities}
+              />
+
               <div className="flex flex-wrap justify-center gap-2 mb-8 bg-gray-50 p-2 rounded-lg">
                 {tabs.map((tab) => (
                   <button
@@ -805,7 +846,7 @@ useEffect(() => {
 
               <Form className="space-y-8">
                 <div className="bg-white p-8 rounded-lg border border-[#E0E0E0] min-h-[500px]">
-                  {renderTabContent(values)}
+                  {renderTabContent(values, setFieldValue)}
                 </div>
 
                 <div className="flex justify-between items-center">

@@ -14,6 +14,7 @@ interface FormikAsyncSelectProps {
   loadOptions: (inputValue: string, callback: (options: Option[]) => void) => void;
   placeholder?: string;
   isMulti?: boolean;
+  onChange?: (option: Option | Option[] | null) => void;
 }
 
 const CustomFormikAsyncSelect = ({
@@ -22,6 +23,7 @@ const CustomFormikAsyncSelect = ({
   loadOptions,
   placeholder,
   isMulti = false,
+  onChange,
 }: FormikAsyncSelectProps) => {
   const [field, meta, helpers] = useField(name);
   const { setValue } = helpers;
@@ -33,6 +35,9 @@ const CustomFormikAsyncSelect = ({
       setValue(option ? (option as Option[]) : []);
     } else {
       setValue(option ? (option as Option) : null);
+    }
+    if (onChange) {
+      onChange(option);
     }
   };
 
