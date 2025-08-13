@@ -14,6 +14,7 @@ const userRoutes = require('./src/routes/user-routes');
 const adminRoutes = require('./src/routes/admin-routes');
 const campaignRoutes = require('./src/routes/campaign/campaign.routes');
 const locationRoutes = require('./src/routes/location/location.routes');
+const utilityRoutes = require('./src/routes/utility/utility.routes');
 
 
 const testRoutes = require('./src/routes/test/email-routes');
@@ -38,8 +39,10 @@ app.use(`/${config.server.route}/admins`, adminRoutes);
 app.use(`/${config.server.route}/campaign`, campaignRoutes);
 /** ::::::::::::::::::location route::::::::::::::::: */
 app.use(`/${config.server.route}/locations`, locationRoutes);
+/** ::::::::::::::::::utilities route::::::::::::::::: */
+app.use(`/${config.server.route}/utilities`, utilityRoutes);
 
-/** testign routes:::: */
+/** ::::::::::::::::::testign routes:::::::::::::::::: */
 app.use(`/${config.server.route}/test`, testRoutes);
 
 

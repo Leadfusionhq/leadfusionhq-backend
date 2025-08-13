@@ -124,9 +124,59 @@ const getAllLocationsDetailed = async (page = 1, limit = 50) => {
   };
 };
 
+const getAllStates = async (page = 1, limit = 50) => {
+  const skip = (page - 1) * limit;
+
+  const [states, totalCount] = await Promise.all([
+    State.find({}, { name: 1, abbreviation: 1, _id: 1 })
+      .sort({ name: 1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+
+    State.countDocuments()
+  ]);
+
+  const totalPages = Math.ceil(totalCount / limit);
+
+  return {
+    data: states,
+    page,
+    limit,
+    totalCount,
+    totalPages,
+  };
+};
+
+
+const getCountiesByState = async (stateId, page = 1, limit = 50) => {
+  const skip = (page - 1) * limit;
+
+  const [counties, totalCount] = await Promise.all([
+    County.find({ state: stateId }) // Assuming `state` is the FK
+      .sort({ name: 1 }) // optional sorting
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+
+    County.countDocuments({ state: stateId }),
+  ]);
+
+  const totalPages = Math.ceil(totalCount / limit);
+
+  return {
+    data: counties,
+    page,
+    limit,
+    totalCount,
+    totalPages,
+  };
+};
 
 
 module.exports = {
   uploadCSVData,
   getAllLocationsDetailed,
+  getAllStates,
+  getCountiesByState,
 };
