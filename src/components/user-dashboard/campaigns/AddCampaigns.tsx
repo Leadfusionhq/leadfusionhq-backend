@@ -23,79 +23,83 @@ import CampaignNote from "@/components/campaign/tabs/CampaignNote";
 import CampaignGeography from "@/components/campaign/tabs/CampaignGeography";
 import CampaignDelivery from "@/components/campaign/tabs/CampaignDelivery";
 import CampaignUtility from "@/components/campaign/tabs/CampaignUtility";
+import { renderTabContent } from "@/components/campaign/TabContentRenderer";
+import { tabs } from "@/components/campaign/tab";
+import { StateEffectsHandler } from "@/hooks/useCampaignStateEffects";
+import { TabsNavigation } from "@/components/campaign/TabsNavigation";
 
-const StateEffectsHandler = ({ 
-  selectedState, 
-  coverageType, 
-  token,
-  setCountiesList,
-  setIsLoadingCounties,
-  setUtilitiesList,
-  setIsLoadingUtilities 
-}: {
-  selectedState: StateOption | null;
-  coverageType: string | undefined;
-  token: string | null;
-  setCountiesList: (counties: County[]) => void;
-  setIsLoadingCounties: (loading: boolean) => void;
-  setUtilitiesList: (utilities: Utility[]) => void;
-  setIsLoadingUtilities: (loading: boolean) => void;
-}) => {
-  // Effect for loading counties when state changes and coverage is partial
-  useEffect(() => {
-    if (selectedState && coverageType === "PARTIAL") {
-      const fetchCounties = async () => {
-        setIsLoadingCounties(true);
-        setCountiesList([]);
-        try {
-          const url = LOCATION_API.GET_COUNTIES_BY_STATE.replace(":stateId", selectedState.value);
-          const response = (await axiosWrapper("get", url, {}, token ?? undefined)) as { data: County[] };
-          setCountiesList(response.data);
-        } catch (err) {
-          console.error("Failed to load County:", err);
-          toast.error("Could not load County list");
-        } finally {
-          setIsLoadingCounties(false);
-        }
-      };
+// const StateEffectsHandler = ({ 
+//   selectedState, 
+//   coverageType, 
+//   token,
+//   setCountiesList,
+//   setIsLoadingCounties,
+//   setUtilitiesList,
+//   setIsLoadingUtilities 
+// }: {
+//   selectedState: StateOption | null;
+//   coverageType: string | undefined;
+//   token: string | null;
+//   setCountiesList: (counties: County[]) => void;
+//   setIsLoadingCounties: (loading: boolean) => void;
+//   setUtilitiesList: (utilities: Utility[]) => void;
+//   setIsLoadingUtilities: (loading: boolean) => void;
+// }) => {
+//   // Effect for loading counties when state changes and coverage is partial
+//   useEffect(() => {
+//     if (selectedState && coverageType === "PARTIAL") {
+//       const fetchCounties = async () => {
+//         setIsLoadingCounties(true);
+//         setCountiesList([]);
+//         try {
+//           const url = LOCATION_API.GET_COUNTIES_BY_STATE.replace(":stateId", selectedState.value);
+//           const response = (await axiosWrapper("get", url, {}, token ?? undefined)) as { data: County[] };
+//           setCountiesList(response.data);
+//         } catch (err) {
+//           console.error("Failed to load County:", err);
+//           toast.error("Could not load County list");
+//         } finally {
+//           setIsLoadingCounties(false);
+//         }
+//       };
 
-      fetchCounties();
-    } else {
-      // Clear counties if not partial coverage or no state selected
-      setCountiesList([]);
-      setIsLoadingCounties(false);
-    }
-  }, [selectedState?.value, coverageType, token, setCountiesList, setIsLoadingCounties]);
+//       fetchCounties();
+//     } else {
+//       // Clear counties if not partial coverage or no state selected
+//       setCountiesList([]);
+//       setIsLoadingCounties(false);
+//     }
+//   }, [selectedState?.value, coverageType, token, setCountiesList, setIsLoadingCounties]);
 
-  // Effect for loading utilities when state changes
-  useEffect(() => {
-    if (selectedState) {
-      console.warn(selectedState);
-      const fetchUtilities = async () => {
-        setIsLoadingUtilities(true);
-        setUtilitiesList([]);
-        try {
-          const url = UITILITIES_API.GET_UITILITIES_BY_STATE.replace(":stateId", selectedState.value);
-          const response = (await axiosWrapper("get", url, {}, token ?? undefined)) as { data: Utility[] };
-          setUtilitiesList(response.data);
-        } catch (err) {
-          console.error("Failed to load utilities:", err);
-          toast.error("Could not load utility list");
-        } finally {
-          setIsLoadingUtilities(false);
-        }
-      };
+//   // Effect for loading utilities when state changes
+//   useEffect(() => {
+//     if (selectedState) {
+//       console.warn(selectedState);
+//       const fetchUtilities = async () => {
+//         setIsLoadingUtilities(true);
+//         setUtilitiesList([]);
+//         try {
+//           const url = UITILITIES_API.GET_UITILITIES_BY_STATE.replace(":stateId", selectedState.value);
+//           const response = (await axiosWrapper("get", url, {}, token ?? undefined)) as { data: Utility[] };
+//           setUtilitiesList(response.data);
+//         } catch (err) {
+//           console.error("Failed to load utilities:", err);
+//           toast.error("Could not load utility list");
+//         } finally {
+//           setIsLoadingUtilities(false);
+//         }
+//       };
 
-      fetchUtilities();
-    } else {
-      // Clear utilities if no state selected
-      setUtilitiesList([]);
-      setIsLoadingUtilities(false);
-    }
-  }, [selectedState?.value, token, setUtilitiesList, setIsLoadingUtilities]);
+//       fetchUtilities();
+//     } else {
+//       // Clear utilities if no state selected
+//       setUtilitiesList([]);
+//       setIsLoadingUtilities(false);
+//     }
+//   }, [selectedState?.value, token, setUtilitiesList, setIsLoadingUtilities]);
 
-  return null; // This component doesn't render anything
-};
+//   return null; // This component doesn't render anything
+// };
 
 const AddNewCampaign = () => {
   const token = useSelector((state: RootState) => state.auth.token);
@@ -142,13 +146,13 @@ const AddNewCampaign = () => {
     callback(filteredOptions);
   };
 
-  const tabs = [
-    { id: "basic", label: "Basic Info", icon: "📋" },
-    { id: "geography", label: "Geography", icon: "🌍" },
-    { id: "utilities", label: "Utilities", icon: "⚡" },
-    { id: "delivery", label: "Delivery", icon: "📧" },
-    { id: "notes", label: "Notes", icon: "📝" },
-  ];
+  // const tabs = [
+  //   { id: "basic", label: "Basic Info", icon: "📋" },
+  //   { id: "geography", label: "Geography", icon: "🌍" },
+  //   { id: "utilities", label: "Utilities", icon: "⚡" },
+  //   { id: "delivery", label: "Delivery", icon: "📧" },
+  //   { id: "notes", label: "Notes", icon: "📝" },
+  // ];
 
 
   const handleSubmit = async (
@@ -203,462 +207,43 @@ const AddNewCampaign = () => {
     }
   };
 
-  const renderTabContent = (values: typeof initialValues, setFieldValue: (field: string, value: SafeValue ) => void) => {
   
-    switch (activeTab) {
-      case "basic":
-        return <CampaignBasicInfo values={values} setFieldValue={setFieldValue} />;
 
-        // return (
-        //   <div className="space-y-6">
-        //     <h3 className="text-[20px] font-[500] text-[#1C1C1C] mb-4">Basic Information</h3>
-        //     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        //       <FormikInput name="name" placeholder="Campaign Name" label="Campaign Name *" />
-        //       <FormikSelect
-        //         name="status"
-        //         label="Status *"
-        //         options={Object.entries(STATUS).map(([key, value]) => ({ value, label: key.replace("_", " ") }))}
-        //       />
-        //       <FormikSelect
-        //         name="lead_type"
-        //         label="Lead Type *"
-        //         options={Object.entries(LEAD_TYPE).map(([key, value]) => ({ value, label: key.replace("_", " ") }))}
-        //       />
-        //       <FormikSelect
-        //         name="exclusivity"
-        //         label="Exclusivity *"
-        //         options={Object.entries(EXCLUSIVITY).map(([key, value]) => ({ value, label: key.replace("_", " ") }))}
-        //       />
-        //       <FormikInput name="bid_price" min="0" type="number" placeholder="0" label="Bid Price ($) *" />
-        //       <FormikSelect
-        //         name="language"
-        //         label="Language *"
-        //         options={Object.entries(LANGUAGE).map(([key, value]) => ({ value, label: key.replace("_", " ") }))}
-        //       />
-        //       {values.exclusivity === "WARM_TRANSFER" && (
-        //         <FormikInput
-        //           name="poc_phone"
-        //           type="text"
-        //           placeholder="123-456-7890"
-        //           label="POC Phone *"
-        //         />
-        //       )}
-        //       {values.exclusivity === "APPOINTMENT" && (
-        //         <>
-        //           <div className="col-span-2">
-        //             <h4 className="text-lg font-medium mb-4">Your Company Contact Info for Homeowners</h4>
-        //           </div>
-        //           <FormikInput
-        //             name="company_contact_phone"
-        //             type="text"
-        //             placeholder="123-456-7890"
-        //             label="Company Contact Phone *"
-        //           />
-        //           <FormikInput
-        //             name="company_contact_email"
-        //             type="email"
-        //             placeholder="contact@company.com"
-        //             label="Company Contact Email *"
-        //           />
-        //         </>
-        //       )}
-        //     </div>
-        //   </div>
-        // );
-
-      case "geography":
+  // const renderTabContent = (values: typeof initialValues, setFieldValue: (field: string, value: SafeValue ) => void) => {
+  
+  //   switch (activeTab) {
+  //     case "basic":
+  //       return <CampaignBasicInfo values={values} setFieldValue={setFieldValue} />;
+  //     case "geography":
    
-        return <CampaignGeography
-                values={values}
-                setFieldValue={setFieldValue}
-                countiesList={countiesList}
-                isLoadingCounties={isLoadingCounties}
-                loadStates={loadStates}
-              />;
-        // const loadCounties = (inputValue: string, callback: (options: CountyOption[]) => void) => {
-        //   const filtered = countiesList
-        //     .filter((county) => county.name.toLowerCase().includes(inputValue.toLowerCase()))
-        //     .map((county) => ({ label: county.name, value: county._id }));
-        //   callback(filtered);
-        // };
-        // return (
-        //   <div className="space-y-6">
-        //     <h3 className="text-[20px] font-[500] text-[#1C1C1C] mb-4">Geography Settings</h3>
-        //     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        //       <CustomFormikAsyncSelect
-        //         name="geography.state"
-        //         label="State *"
-        //         loadOptions={loadStates}
-        //         placeholder="Search and select a state"
-        //         onChange={() => {
-        //           setFieldValue("geography.coverage.partial.counties", []);
-        //           setFieldValue("utilities.include_some", []);
-        //           setFieldValue("utilities.exclude_some", []);
-        //         }}
-
-        //       />
-        //       <div>
-        //         <label className="block text-[#1C1C1C] text-lg mb-2">Coverage *</label>
-        //         <div className="flex items-center space-x-6">
-        //           <FormikRadio 
-        //             name="geography.coverage.type" 
-        //             value="FULL_STATE" 
-        //             label="Full State" 
-        //             onChange={() => {
-        //               setFieldValue("geography.coverage.type", "FULL_STATE");
-        //               // Clear partial coverage fields when switching to full state
-        //               setFieldValue("geography.coverage.partial.counties", []);
-        //               setFieldValue("geography.coverage.partial.radius", "");
-        //               setFieldValue("geography.coverage.partial.zipcode", "");
-        //               setFieldValue("geography.coverage.partial.zip_codes", "");
-        //             }}
-        //           />
-        //           <FormikRadio 
-        //             name="geography.coverage.type" 
-        //             value="PARTIAL" 
-        //             label="Partial" 
-        //             onChange={() => {
-        //               setFieldValue("geography.coverage.type", "PARTIAL");
-        //             }}
-        //           />
-        //         </div>
-        //         <ErrorMessage name="geography.coverage.type" component="div" className="text-red-500 text-xs mt-1" />
-        //       </div>
-        //     </div>
-
-        //     {values.geography.coverage.type === "PARTIAL" && (
-        //       <>
-        //         <p className="text-center text-[#666666] text-sm italic">
-        //           Please enter a Radius & Zip, a list of Zip codes, a selection of Counties, or any combination of these
-        //         </p>
-
-        //         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        //           <FormikInput
-        //             name="geography.coverage.partial.radius"
-        //             type="number"
-        //             placeholder="25"
-        //             label="Radius (miles)"
-        //           />
-        //           <FormikInput
-        //             name="geography.coverage.partial.zipcode"
-        //             type="text"
-        //             placeholder="90210"
-        //             label="Center Zip Code"
-        //           />
-
-        //           {isLoadingCounties ? (
-        //             <div className="flex items-center justify-center">
-        //               <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-blue-500"></div>
-        //               <span className="ml-2">Loading counties...</span>
-        //             </div>
-        //           ) : (
-        //             <div className="w-full">
-        //               <CustomFormikAsyncSelect
-        //                 isMulti
-        //                 name="geography.coverage.partial.counties"
-        //                 label="Counties"
-        //                 loadOptions={loadCounties}
-        //                 placeholder="Search and select counties"
-        //               />
-        //             </div>
-        //           )}
-
-        //           <FormikTextarea
-        //             name="geography.coverage.partial.zip_codes"
-        //             label="ZIP Codes (separated by |)"
-        //             placeholder="#####|#####|#####..."
-        //             rows={3}
-        //           />
-        //         </div>
-        //       </>
-        //     )}
-        //   </div>
-        // );
-
-      case "utilities":
-        return <CampaignUtility
-                  values={values}
-                  utilitiesList={utilitiesList}
-                  isLoadingUtilities={isLoadingUtilities}
-                />;
-        // return (
-        //   <div className="space-y-6">
-        //     <h3 className="text-[20px] font-[500] text-[#1C1C1C] mb-4">Utility Settings</h3>
-
-        //     <div className="flex flex-col gap-4 mb-6">
-        //       <FormikRadio name="utilities.mode" value="INCLUDE_ALL" label="Include All Utilities" />
-        //       <FormikRadio name="utilities.mode" value="EXCLUDE_SOME" label="Exclude Some Utilities" />
-        //       <FormikRadio name="utilities.mode" value="INCLUDE_SOME" label="Include Some Utilities" />
-        //     </div>
-        //     {values.utilities.mode === "INCLUDE_ALL" && (
-        //       <div className="border border-[#E0E0E0] rounded-lg p-4">
-        //         All utilities will be included.
-        //       </div>
-        //     )}
-        //     {values.utilities.mode === "EXCLUDE_SOME" && (
-        //       <div className="border border-[#E0E0E0] rounded-lg p-4">
-        //         <h4 className="text-lg font-medium mb-3">Select Utilities to Exclude</h4>
-        //         {isLoadingUtilities ? (
-        //           <div className="flex justify-center py-4">
-        //             <span className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-blue-500"></span>
-        //           </div>
-        //         ) : utilitiesList.length > 0 ? (
-        //           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-        //             {utilitiesList.map((utility) => (
-        //               <div key={utility._id} className="flex items-center">
-        //                 <Field
-        //                   type="checkbox"
-        //                   name="utilities.exclude_some"
-        //                   value={utility._id}
-        //                   id={`exclude-${utility._id}`}
-        //                   className="h-4 w-4 text-blue-600 rounded"
-        //                 />
-        //                 <label htmlFor={`exclude-${utility._id}`} className="ml-2 text-[#333333]">
-        //                   {utility.name}
-        //                 </label>
-        //               </div>
-        //             ))}
-        //           </div>
-        //         ) : (
-        //           <p className="text-gray-500 italic">
-        //             {values.geography.state ? "No utilities found for this state" : "Select a state first"}
-        //           </p>
-        //         )}
-        //         <ErrorMessage name="utilities.exclude_some" component="div" className="text-red-500 text-xs mt-1" />
-        //       </div>
-        //     )}
-
-        //     {values.utilities.mode === "INCLUDE_SOME" && (
-        //       <div className="border border-[#E0E0E0] rounded-lg p-4">
-        //         <h4 className="text-lg font-medium mb-3">Select Utilities to Include</h4>
-        //         {isLoadingUtilities ? (
-        //           <div className="flex justify-center py-4">
-        //             <span className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-blue-500"></span>
-        //           </div>
-        //         ) : utilitiesList.length > 0 ? (
-        //           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-        //             {utilitiesList.map((utility) => (
-        //               <div key={utility._id} className="flex items-center">
-        //                 <Field
-        //                   type="checkbox"
-        //                   name="utilities.include_some"
-        //                   value={utility._id}
-        //                   id={`include-${utility._id}`}
-        //                   className="h-4 w-4 text-blue-600 rounded"
-        //                 />
-        //                 <label htmlFor={`include-${utility._id}`} className="ml-2 text-[#333333]">
-        //                   {utility.name}
-        //                 </label>
-        //               </div>
-        //             ))}
-        //           </div>
-        //         ) : (
-        //           <p className="text-gray-500 italic">
-        //             {values.geography.state ? "No utilities found for this state" : "Select a state first"}
-        //           </p>
-        //         )}
-        //         <ErrorMessage name="utilities.include_some" component="div" className="text-red-500 text-xs mt-1" />
-        //       </div>
-        //     )}
-        //   </div>
-        // );
-
-      case "delivery":
-        return <CampaignDelivery
-                  values={values}
-                  setFieldValue={setFieldValue}
-                  activeDeliveryTab={activeDeliveryTab}
-                  setActiveDeliveryTab={setActiveDeliveryTab}
-                />
-                ;
+  //       return <CampaignGeography
+  //               values={values}
+  //               setFieldValue={setFieldValue}
+  //               countiesList={countiesList}
+  //               isLoadingCounties={isLoadingCounties}
+  //               loadStates={loadStates}
+  //             />;
+  //     case "utilities":
+  //       return <CampaignUtility
+  //                 values={values}
+  //                 utilitiesList={utilitiesList}
+  //                 isLoadingUtilities={isLoadingUtilities}
+  //               />;
+  //     case "delivery":
+  //       return <CampaignDelivery
+  //                 values={values}
+  //                 setFieldValue={setFieldValue}
+  //                 activeDeliveryTab={activeDeliveryTab}
+  //                 setActiveDeliveryTab={setActiveDeliveryTab}
+  //               />
+  //               ;
+  //     case "notes":
+  //       return <CampaignNote values={values} setFieldValue={setFieldValue} />;
+  //     default:
+  //       return null;
+  //   }
+  // };
  
-        // return (
-        //   <div className="space-y-6">
-        //     <h3 className="text-[20px] font-[500] text-[#1C1C1C] mb-4">Delivery Settings</h3>
-
-        //     <div className="flex border-b border-gray-200 mb-6">
-        //       <button
-        //         type="button"
-        //         onClick={() => setActiveDeliveryTab("method")}
-        //         className={`py-2 px-4 font-medium text-sm ${
-        //           activeDeliveryTab === "method"
-        //             ? "border-b-2 border-blue-500 text-blue-600"
-        //             : "text-gray-500 hover:text-gray-700"
-        //         }`}
-        //       >
-        //         Method
-        //       </button>
-        //       <button
-        //         type="button"
-        //         onClick={() => setActiveDeliveryTab("schedule")}
-        //         className={`py-2 px-4 font-medium text-sm ${
-        //           activeDeliveryTab === "schedule"
-        //             ? "border-b-2 border-blue-500 text-blue-600"
-        //             : "text-gray-500 hover:text-gray-700"
-        //         }`}
-        //       >
-        //         Schedule
-        //       </button>
-        //       <button
-        //         type="button"
-        //         onClick={() => setActiveDeliveryTab("other")}
-        //         className={`py-2 px-4 font-medium text-sm ${
-        //           activeDeliveryTab === "other"
-        //             ? "border-b-2 border-blue-500 text-blue-600"
-        //             : "text-gray-500 hover:text-gray-700"
-        //         }`}
-        //       >
-        //         Other
-        //       </button>
-        //     </div>
-
-        //     {activeDeliveryTab === "method" && (
-        //       <div className="space-y-8">
-        //         <div className="border border-[#E0E0E0] rounded-lg p-6">
-        //           <h4 className="text-lg font-medium mb-4">Delivery Method</h4>
-        //           <div className="flex flex-col gap-3">
-        //             <FormikRadio name="delivery.method" value="email" label="Email Delivery" />
-        //             <FormikRadio name="delivery.method" value="phone" label="Phone Delivery" />
-        //             <FormikRadio name="delivery.method" value="crm" label="CRM Integration" />
-        //           </div>
-        //         </div>
-
-        //         <div className="border border-[#E0E0E0] rounded-lg p-6">
-        //           <h4 className="text-lg font-medium mb-4 flex items-center gap-2">
-        //             <svg
-        //               xmlns="http://www.w3.org/2000/svg"
-        //               className="h-5 w-5"
-        //               viewBox="0 0 20 20"
-        //               fill="currentColor"
-        //             >
-        //               <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
-        //               <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
-        //             </svg>
-        //             Email Configuration
-        //           </h4>
-        //           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        //             <FormikInput
-        //               name="delivery.email.addresses"
-        //               label="Email Address(es)"
-        //               placeholder="recipient1@example.com, recipient2@example.com"
-        //             />
-        //             <FormikInput
-        //               name="delivery.email.subject"
-        //               label="Subject Line"
-        //               placeholder="New leads available"
-        //             />
-        //           </div>
-        //         </div>
-
-        //         <div className="border border-[#E0E0E0] rounded-lg p-6">
-        //           <h4 className="text-lg font-medium mb-4 flex items-center gap-2">
-        //             <svg
-        //               xmlns="http://www.w3.org/2000/svg"
-        //               className="h-5 w-5"
-        //               viewBox="0 0 20 20"
-        //               fill="currentColor"
-        //             >
-        //               <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
-        //             </svg>
-        //             Phone Configuration
-        //           </h4>
-        //           <div className="grid grid-cols-1 gap-6">
-        //             <FormikInput
-        //               name="delivery.phone.numbers"
-        //               label="Phone Number(s)"
-        //               placeholder="123-456-7890, 987-654-3210"
-        //             />
-        //           </div>
-        //         </div>
-
-        //         <div className="border border-[#E0E0E0] rounded-lg p-6">
-        //           <h4 className="text-lg font-medium mb-4 flex items-center gap-2">
-        //             <svg
-        //               xmlns="http://www.w3.org/2000/svg"
-        //               className="h-5 w-5"
-        //               viewBox="0 0 20 20"
-        //               fill="currentColor"
-        //             >
-        //               <path
-        //                 fillRule="evenodd"
-        //                 d="M3 5a2 2 0 012-2h10a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V5zm11 1H6v8l4-2 4 2V6z"
-        //                 clipRule="evenodd"
-        //               />
-        //             </svg>
-        //             CRM Configuration
-        //           </h4>
-        //           <div>
-        //             <FormikTextarea
-        //               name="delivery.crm.instructions"
-        //               label="CRM Post Instructions"
-        //               rows={4}
-        //               placeholder="Enter detailed CRM integration instructions..."
-        //             />
-        //           </div>
-        //         </div>
-        //       </div>
-        //     )}
-
-        //     {activeDeliveryTab === "schedule" && (
-        //       <div className="space-y-6">
-        //         <h4 className="text-lg font-medium">Weekly Schedule</h4>
-        //         <div className="space-y-4">
-        //           {values.delivery.schedule.days.map((day, index) => (
-        //             <div
-        //               key={day.day}
-        //               className="grid grid-cols-1 md:grid-cols-6 gap-4 items-center p-4 border border-[#E0E0E0] rounded-lg"
-        //             >
-        //               <div className="font-medium text-[#1C1C1C]">{day.day}</div>
-        //               <FormikCheckbox name={`delivery.schedule.days.${index}.active`} label="Active" />
-        //               <FormikInput name={`delivery.schedule.days.${index}.start_time`} type="time" label="Start" />
-        //               <FormikInput name={`delivery.schedule.days.${index}.end_time`} type="time" label="End" />
-        //               <FormikInput name={`delivery.schedule.days.${index}.cap`} type="number" label="Cap" />
-        //             </div>
-        //           ))}
-        //         </div>
-        //       </div>
-        //     )}
-
-        //     {activeDeliveryTab === "other" && (
-        //       <div className="space-y-6">
-        //         <h4 className="text-lg font-medium">Other Settings</h4>
-        //         <div className="border border-[#E0E0E0] rounded-lg p-6">
-        //           <div className="grid grid-cols-1 gap-6">
-        //             <FormikInput
-        //               name="delivery.other.homeowner_count"
-        //               type="number"
-        //               min="0"
-        //               placeholder="0"
-        //               label="Homeowner 2nd Proposal Request (days)"
-        //             />
-        //           </div>
-        //         </div>
-        //       </div>
-        //     )}
-        //   </div>
-        // );
-
-      case "notes":
-        return <CampaignNote values={values} setFieldValue={setFieldValue} />;
-        // return (
-        //   <div className="space-y-6">
-        //     <h3 className="text-[20px] font-[500] text-[#1C1C1C] mb-4">Campaign Notes</h3>
-        //     <Field
-        //       name="note"
-        //       as="textarea"
-        //       rows={8}
-        //       placeholder="High-quality solar leads for residential customers in premium California zip codes"
-        //       className="w-full border border-[#E0E0E0] rounded-[8px] px-5 py-3 text-[16px] font-inter bg-[#FFFFFF] text-[#333333] focus:border-[#000] outline-none transition resize-vertical"
-        //     />
-        //     <ErrorMessage name="note" component="div" className="text-red-500 text-xs mt-1" />
-        //   </div>
-        // );
-
-      default:
-        return null;
-    }
-  };
-
   return (
     <div className="container min-h-screen flex flex-col mx-auto items-center md:px-0 py-8">
       <h2 className="text-[24px] font-[500] text-[#1C1C1C] text-center mb-6">Add New Campaign</h2>
@@ -698,10 +283,22 @@ const AddNewCampaign = () => {
 
               <Form className="space-y-8">
                 <div className="bg-white p-8 rounded-lg border border-[#E0E0E0] min-h-[500px]">
-                  {renderTabContent(values, setFieldValue)}
+                  {renderTabContent(
+                    activeTab,
+                    values,
+                    setFieldValue,
+                    countiesList,
+                    isLoadingCounties,
+                    loadStates,
+                    utilitiesList,
+                    isLoadingUtilities,
+                    activeDeliveryTab,
+                    setActiveDeliveryTab
+                  )}
+                  {/* {renderTabContent(values, setFieldValue)} */}
                 </div>
 
-                <div className="flex justify-between items-center">
+                {/* <div className="flex justify-between items-center">
                   <button
                     type="button"
                     onClick={() => {
@@ -744,7 +341,13 @@ const AddNewCampaign = () => {
                       </button>
                     )}
                   </div>
-                </div>
+                </div> */}
+                <TabsNavigation
+                  activeTab={activeTab}
+                  setActiveTab={setActiveTab}
+                  isSubmitting={isSubmitting}
+                />
+
               </Form>
             </div>
           );
