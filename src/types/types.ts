@@ -6,5 +6,7 @@ export type SafeValue =
   | undefined
   | string[]
   | number[]
+  | null
+  | undefined
   | Record<string, unknown>
   | Record<string, unknown>[];

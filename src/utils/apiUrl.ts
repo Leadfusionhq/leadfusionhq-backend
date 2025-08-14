@@ -58,7 +58,7 @@ export const LOCATION_API = {
 };
 
 // ========== CAMPAIGNS ROUTES ==========
-const CAMPAIGNS_API_BASE = `${API_BASE}/locations`;
+const CAMPAIGNS_API_BASE = `${API_BASE}/campaigns`;
 
 export const CAMPAIGNS_API = {
   GET_ALL_CAMPAIGNS: `${CAMPAIGNS_API_BASE}/`,
