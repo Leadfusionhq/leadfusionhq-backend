@@ -19,6 +19,7 @@ import { StateEffectsHandler } from "@/hooks/useCampaignStateEffects";
 import { TabsNavigation } from "@/components/campaign/TabsNavigation";
 import { TabsHeader } from "@/components/campaign/TabsHeader";
 import { cleanCampaignValues } from "@/utils/cleanCampaignValues";
+import { getErrorMessage } from '@/utils/getErrorMessage';
 
 const AddNewCampaign = () => {
   const token = useSelector((state: RootState) => state.auth.token);
@@ -77,13 +78,17 @@ const AddNewCampaign = () => {
 
       const response = (await axiosWrapper("post", CAMPAIGNS_API.CREATE_CAMPAIGN, cleanedValues, token ?? undefined)) as {
         message?: string;
+        details?: { message: string }[];
+
       };
       console.warn(response);
       toast.success(response?.message || "Campaign added successfully!");
       resetForm();
     } catch (err) {
       console.error("Error saving campaign:", err);
-      toast.error("Failed to save campaign");
+      // toast.error("Failed to save campaign");
+      toast.error(getErrorMessage(err));
+
     } finally {
       setSubmitting(false);
     }
