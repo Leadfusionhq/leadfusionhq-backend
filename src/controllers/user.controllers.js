@@ -3,6 +3,8 @@ const config = require('../config/config');
 const { sendResponse } = require('../utils/response');
 const { ErrorHandler } = require('../utils/error-handler');
 const UserServices = require('../services/user.service');
+const N8nServices = require('../services/n8n.service');
+
 const MAIL_HANDLER = require('../mail/mails');
 
 
@@ -42,7 +44,7 @@ const getUserById = wrapAsync(async (req, res) => {
 
 const updateUser = wrapAsync(async (req, res) => {
     const userPayload = req.body;
-    console.log('userPayload',userPayload)
+    // console.log('userPayload',userPayload)
     const { userId } = req.params;
     const plainPassword = req.body.password;
     const { user } = await UserServices.updateUser(userId,userPayload);
@@ -50,6 +52,7 @@ const updateUser = wrapAsync(async (req, res) => {
 
     sendResponse(res, { user }, 'User has been updated.', 201);
 });
+
 const deleteUser = wrapAsync(async (req, res) => {
   const { userId } = req.params;
 
@@ -57,6 +60,16 @@ const deleteUser = wrapAsync(async (req, res) => {
   if (!user) {
     return sendResponse(res, null, 'User not found.', 404);
   }
+
+  if (user.n8nUserId) {
+    try {
+      await N8nServices.deleteSubAccountById(user.n8nUserId);
+      console.log(`n8n user ${user.n8nUserId} deleted successfully.`);
+    } catch (err) {
+      console.error(`Failed to delete n8n user ${user.n8nUserId}:`, err.message);
+    }
+  }
+
   await UserServices.hardDeleteUser(userId);
 
   return sendResponse(res, null, 'User has been deleted.', 200);

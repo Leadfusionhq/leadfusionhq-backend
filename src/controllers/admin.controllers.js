@@ -3,6 +3,8 @@ const config = require('../config/config');
 const { sendResponse } = require('../utils/response');
 const { ErrorHandler } = require('../utils/error-handler');
 const UserServices = require('../services/user.service');
+const N8nServices = require('../services/n8n.service');
+
 const AdminServices = require('../services/admin.service');
 const MAIL_HANDLER = require('../mail/mails');
 
@@ -55,10 +57,19 @@ const deleteAdmin = wrapAsync(async (req, res) => {
   if (!user) {
     return sendResponse(res, null, 'Admin not found.', 404);
   }
+  if (user.n8nUserId) {
+    try {
+      await N8nServices.deleteSubAccountById(user.n8nUserId);
+      console.log(`n8n user ${user.n8nUserId} deleted successfully.`);
+    } catch (err) {
+      console.error(`Failed to delete n8n user ${user.n8nUserId}:`, err.message);
+    }
+  }
   await AdminServices.hardDeleteAdmin(adminId);
 
   return sendResponse(res, null, 'Admin has been deleted.', 200);
 });
+
 module.exports = {
  getAllAdmins,
  addAdmin,

@@ -38,7 +38,17 @@ const getCampaigns = async (page = 1, limit = 10, user_id) => {
   }
 };
 
+const getCampaignById = async (campaignId, userId) => {
+  const campaign = await Campaign.findOne({ _id: campaignId, user_id: userId }).lean();
+  if (!campaign) {
+    throw new ErrorHandler(404, 'Campaign not found or access denied');
+  }
+
+  return campaign;
+};
+
 module.exports = {
   createCampaign,
   getCampaigns,
+  getCampaignById,
 };

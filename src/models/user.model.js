@@ -11,6 +11,12 @@ const options = {
 
 // Base user schema
 const baseUserSchema = new mongoose.Schema({
+  n8nUserId: {
+    type: String,
+    trim: true,
+    unique: true, 
+    sparse: true
+  },
   name: {
     type: String,
     required: [true, 'Name is required'],

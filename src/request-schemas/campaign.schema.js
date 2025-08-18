@@ -48,7 +48,7 @@ const createCampaign = {
 
     // Delivery validation - FIXED structure
     delivery: Joi.object({
-      method: Joi.string().valid('email', 'phone', 'crm_post').required(),
+      method: Joi.string().valid('email', 'phone', 'crm').required(),
       email: Joi.when('method', {
         is: 'email',
         then: Joi.object({
@@ -66,7 +66,7 @@ const createCampaign = {
       }),
 
       crm: Joi.when('method', {
-        is: 'crm_post',
+        is: 'crm',
         then: Joi.object({
           instructions: Joi.string().allow('').optional(),
         }).required(),
@@ -96,6 +96,14 @@ const createCampaign = {
   })
 };
 
+const getCampaign = {
+  [Segments.BODY]: Joi.object().keys({
+      campaignId: Joi.string().required().messages({
+            'any.required': 'campaign Id is required'
+        })
+    }),
+};
 module.exports = {
   createCampaign,
+  getCampaign,
 };
