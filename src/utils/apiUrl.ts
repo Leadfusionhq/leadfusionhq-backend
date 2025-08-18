@@ -63,6 +63,9 @@ const CAMPAIGNS_API_BASE = `${API_BASE}/campaigns`;
 export const CAMPAIGNS_API = {
   GET_ALL_CAMPAIGNS: `${CAMPAIGNS_API_BASE}/`,
   CREATE_CAMPAIGN: `${CAMPAIGNS_API_BASE}/`,
+  GET_CAMPAIGN: `${CAMPAIGNS_API_BASE}/:campaignId`,
+  UPDATE_CAMPAIGN: `${CAMPAIGNS_API_BASE}/:campaignId`,
+  
 };
 
 // ========== utilities ROUTES ==========

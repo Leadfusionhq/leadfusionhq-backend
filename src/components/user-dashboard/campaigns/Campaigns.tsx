@@ -8,6 +8,7 @@ import { RootState } from "@/redux/store";
 import DataTable, { TableColumn } from "react-data-table-component";
 import { Skeleton, Box, Button, Typography } from "@mui/material";
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 type Campaign = {
   _id: string;
@@ -48,6 +49,7 @@ export default function CampaignTable() {
   const [error, setError] = useState<string | null>(null);
   const [pagination, setPagination] = useState({ page: 1, limit: 10 });
   const [totalRows, setTotalRows] = useState<number>(0);
+  const router = useRouter();
 
   const token = useSelector((state: RootState) => state.auth.token);
 
@@ -132,6 +134,9 @@ export default function CampaignTable() {
         {formatStatus(status)}
       </span>
     );
+  };
+  const handleEdit = (row: Campaign) => {
+    router.push(`/dashboard/campaigns/${row._id}/edit`);
   };
 
   const columns: TableColumn<Campaign>[] = [
@@ -226,44 +231,52 @@ export default function CampaignTable() {
       sortable: true,
       minWidth: "110px",
     },
-    // {
-    //   name: "Actions",
-    //   cell: (row) =>
-    //     row._id.startsWith("skeleton") ? (
-    //       <Skeleton variant="rectangular" width={120} height={30} animation="wave" />
-    //     ) : (
-    //       <div className="flex gap-2">
-    //         <Button 
-    //           size="small" 
-    //           variant="outlined" 
-    //           color="primary" 
-    //           sx={{ 
-    //             fontSize: '12px',
-    //             minWidth: '60px',
-    //             height: '28px'
-    //           }}
-    //         >
-    //           Edit
-    //         </Button>
-    //         <Button 
-    //           size="small" 
-    //           variant="outlined" 
-    //           color="secondary"
-    //           sx={{ 
-    //             fontSize: '12px',
-    //             minWidth: '70px',
-    //             height: '28px'
-    //           }}
-    //         >
-    //           View
-    //         </Button>
-    //       </div>
-    //     ),
-    //   ignoreRowClick: true,
-    //   allowOverflow: true,
-    //   button: true,
-    //   minWidth: "140px",
-    // },
+    {
+  name: "Actions",
+  cell: (row) =>
+    row._id.startsWith("skeleton") ? (
+      <Skeleton
+        variant="rectangular"
+        width={120}
+        height={30}
+        animation="wave"
+      />
+    ) : (
+      <div className="flex gap-2">
+        <Button
+          className="!bg-[#838383] !text-white hover:!bg-[#6b6b6b]"
+          size="small"
+          sx={{
+            fontSize: "12px",
+            minWidth: "60px",
+            height: "28px",
+            textTransform: "capitalize",
+          }}
+          onClick={() => handleEdit(row)}
+        >
+          Edit
+        </Button>
+        <Button
+          className="!bg-white !text-[#838383] border border-[#838383] hover:!bg-[#f4f4f4]"
+          size="small"
+          sx={{
+            fontSize: "12px",
+            minWidth: "70px",
+            height: "28px",
+            textTransform: "capitalize",
+          }}
+          // onClick={() => handleView(row)} // ✳️ Add this function if needed
+        >
+          View
+        </Button>
+      </div>
+    ),
+  ignoreRowClick: true,
+  allowOverflow: true,
+  button: true,
+  minWidth: "140px",
+}
+
   ];
 
   const handlePageChange = (page: number) => {
