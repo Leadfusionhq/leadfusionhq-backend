@@ -1,6 +1,6 @@
 const fetchWrapper = require('../utils/fetchWrapper');
 const { ErrorHandler } = require('../utils/error-handler');
-const GHL_API_KEY = process.env.GHL_AGENCY_API_KEY;
+const GHL_AGENCY_API_KEY = process.env.GHL_AGENCY_API_KEY;
 const BASE_URL = 'https://rest.gohighlevel.com/v1';
 
 const createSubAccount = async ({
@@ -73,7 +73,7 @@ const createSubAccount = async ({
 
 const getSubAccounts = async () => {
   const url = `${BASE_URL}/locations/`;
-  return await fetchWrapper('GET', url, null, GHL_API_KEY);
+  return await fetchWrapper('GET', url, null, GHL_AGENCY_API_KEY);
 };
 module.exports = {
   createSubAccount,

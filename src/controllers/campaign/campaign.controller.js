@@ -6,25 +6,33 @@ const { randomNumberGenerate, isEmpty } = require('../../utils/utils');
 const { getPaginationParams } = require('../../utils/pagination');
 
 const createCampaign = wrapAsync(async (req, res) => {
-    const data = req.body;
     const user_id = req.user._id;
-
-    const campaignData = { ...data, user_id };
-    const  campaign  = await CampaignServices.createCampaign(campaignData);
-    sendResponse(res, { data }, 'campaign has been create succefully', 201);
+    const campaignData = { ...req.body, user_id };
+    const  result  = await CampaignServices.createCampaign(campaignData);
+    sendResponse(res, { result }, 'campaign has been create succefully', 201);
 });
 
 const getCampaigns = wrapAsync(async (req, res) => {
   const user_id = req.user._id;
   const { page, limit } = getPaginationParams(req.query);
 
-  const campaignsData = await CampaignServices.getCampaigns(page, limit,user_id);
+  const data = await CampaignServices.getCampaigns(page, limit,user_id);
 
-  sendResponse(res, campaignsData, 'Campaign fetched successfully', 200);
+  sendResponse(res, data, 'Campaign fetched successfully', 200);
+});
+
+const getCampaignById = wrapAsync(async (req, res) => {
+  const user_id = req.user._id;
+  const { campaignId } = req.params;
+
+  const data = await CampaignServices.getCampaignById(campaignId, user_id);
+
+  sendResponse(res, {data}, 'Campaign fetched successfully', 200);
 });
 
 module.exports = {
     createCampaign,
     getCampaigns,
+    getCampaignById,
      
 };

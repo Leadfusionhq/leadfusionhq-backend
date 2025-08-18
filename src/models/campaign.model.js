@@ -73,7 +73,7 @@ const campaignSchema = new mongoose.Schema({
   delivery: {
     method: {
       type: String,
-      enum: ['email', 'phone', 'crm_post'],
+      enum: ['email', 'phone', 'crm'],
       required: true,
     },
     email: {

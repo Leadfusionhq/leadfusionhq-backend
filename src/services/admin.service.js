@@ -25,10 +25,10 @@ const getAllAdminsService = async (filter = {}, options = {}) => {
 };
 
 const getAdminByID = async (userId, includePassword = false) => {
-  console.log('userId',userId)
+  // console.log('userId',userId)
   const projection = includePassword ? {} : { password: 0 };
   const user = await User.findById(userId, projection).exec();
-  console.log(user);
+  // console.log(user);
   if (!user) throw new ErrorHandler(404, 'User not found');
   return user;
 };

@@ -1,15 +1,18 @@
 const fetch = require('node-fetch');
 
-const fetchWrapper = async (method = 'GET', url, data = null, token = null) => {
+const fetchWrapper = async (method = 'GET', url, data = null, token = null,useN8NHeader = false) => {
   const headers = {
     'Content-Type': 'application/json',
     Accept: 'application/json',
   };
 
   if (token) {
-    headers.Authorization = `Bearer ${token}`;
+    if (useN8NHeader) {
+      headers['X-N8N-API-KEY'] = token;
+    } else {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
   }
-
   const options = {
     method,
     headers,

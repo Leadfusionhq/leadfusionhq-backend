@@ -2,6 +2,7 @@ const { wrapAsync } = require('../../utils/wrap-async');
 const { sendResponse } = require('../../utils/response');
 const AuthService = require('../../services/auth/auth.service');
 const UserServices = require('../../services/user.service');
+const N8nServices = require('../../services/n8n.service');
 const MAIL_HANDLER = require('../../mail/mails');
 const TOKEN_GEN = require('../../helper/generate-token');
 const { ErrorHandler } = require('../../utils/error-handler');
@@ -56,6 +57,19 @@ const loginWithEmail = wrapAsync(async (req, res) => {
 
 
 
+// const verifyEmail = wrapAsync(async (req, res) => {
+//     const { token } = req.query;
+//     if (!token) {
+//         throw new ErrorHandler(400, 'Verification token is required');
+//     }
+    
+//     const user = await AuthService.verifyEmailService(token);
+    
+//     const n8nAccount = await N8nServices.createSubAccount(user);
+
+//     sendResponse(res, {}, 'Email successfully verified');
+
+// });
 const verifyEmail = wrapAsync(async (req, res) => {
     const { token } = req.query;
     if (!token) {
@@ -63,11 +77,25 @@ const verifyEmail = wrapAsync(async (req, res) => {
     }
     
     const user = await AuthService.verifyEmailService(token);
+    
+    try {
+        const n8nAccount = await N8nServices.createSubAccount(user);
+        console.log('n8nAccount',n8nAccount)
+        if (n8nAccount?.user?.id) {
+            user.n8nUserId = n8nAccount.user.id;
+            await user.save();
+        } else {
+            console.warn(`No n8n user ID returned for email ${user.email}`);
+        }
 
+    } catch (err) {
+        console.error(`Failed to create n8n sub-account for ${user.email}`, err.message);
+    }
+
+    console.warn('user',user)
     sendResponse(res, {}, 'Email successfully verified');
 
 });
-
 
 const sendOtpOnEmail = wrapAsync(async (req, res) => {
     const { email } = req.body;
