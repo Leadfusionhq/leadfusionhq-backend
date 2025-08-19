@@ -7,9 +7,10 @@ import { SafeValue } from '@/types/types';
 interface Props {
   values: any;
   setFieldValue: (field: string, value: any) => void;
+  isEditMode?: boolean;
 }
 
-const CampaignBasicInfo: React.FC<Props> = ({ values, setFieldValue }) => {
+const CampaignBasicInfo: React.FC<Props> = ({ values, setFieldValue ,isEditMode = false}) => {
   return (
     <div className="space-y-6">
       <h3 className="text-[20px] font-[500] text-[#1C1C1C] mb-4">Basic Information</h3>
@@ -30,6 +31,7 @@ const CampaignBasicInfo: React.FC<Props> = ({ values, setFieldValue }) => {
             value,
             label: key.replace("_", " "),
           }))}
+          isDisabled={isEditMode}
         />
         <FormikSelect
           name="exclusivity"
@@ -39,7 +41,7 @@ const CampaignBasicInfo: React.FC<Props> = ({ values, setFieldValue }) => {
             label: key.replace("_", " "),
           }))}
         />
-        <FormikInput name="bid_price" type="number" min="0" label="Bid Price *" placeholder="0" />
+        {/* <FormikInput name="bid_price" type="number" min="0" label="Bid Price *" placeholder="0" /> */}
         <FormikSelect
           name="language"
           label="Language *"

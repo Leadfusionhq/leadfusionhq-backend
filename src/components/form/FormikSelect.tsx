@@ -1,11 +1,12 @@
 'use client'
 import { Field, ErrorMessage, FieldAttributes } from 'formik';
 
-const FormikSelect = ({ label, options, ...props }: { label?: string; options: { value: string; label: string }[] } & FieldAttributes<string | number>) => (
+const FormikSelect = ({ label, options, isDisabled = false, ...props }: { isDisabled?: boolean; label?: string; options: { value: string; label: string }[] } & FieldAttributes<string | number>) => (
     <div className="w-full">
       {label && <label className="block text-[#1C1C1C] text-lg mb-2">{label}</label>}
       <Field
         {...props}
+        disabled={isDisabled}
         as="select"
         className="h-[48px] border border-[#E0E0E0] rounded-[8px] px-5 text-[16px] font-inter bg-[#FFFFFF] text-[#333333] focus:border-[#000] outline-none transition w-full"
       >

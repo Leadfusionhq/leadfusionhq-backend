@@ -42,7 +42,9 @@ export const cleanCampaignValues = (values: typeof initialValues) => {
     exclusivity: values.exclusivity,
     bid_price: values.bid_price,
     language: values.language,
-
+    poc_phone: values.poc_phone || '',
+    company_contact_phone: values.company_contact_phone || '',
+    company_contact_email: values.company_contact_email || '',
     geography: {
       ...values.geography,
       state: values.geography.state ? values.geography.state.value : "",

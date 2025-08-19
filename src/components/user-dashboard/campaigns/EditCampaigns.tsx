@@ -61,12 +61,19 @@ const transformBackendDataToFormData = (backendData: any, statesList: State[]) =
         if (backendData.geography.coverage.partial) {
           const partial = backendData.geography.coverage.partial;
           formData.geography.coverage.partial = {
-            counties: partial.counties || [],
+            // counties: partial.countyDetails || [],
+            counties: Array.isArray(partial.countyDetails)
+            ? partial.countyDetails.map((county: County) => ({
+                label: `${county.name}`,
+                value: county._id,
+              }))
+            : [],
             radius: partial.radius || "",
             zipcode: partial.zipcode || "",
             zip_codes: Array.isArray(partial.zip_codes) ? partial.zip_codes.join("|") : (partial.zip_codes || ""),
             countries: partial.countries || ["US"],
           };
+          console.warn('partial',partial)
         }
       }
     }
@@ -110,7 +117,6 @@ const transformBackendDataToFormData = (backendData: any, statesList: State[]) =
       }
     }
 
-    console.log("Transformed form data:", formData);
     return formData;
 
   } catch (error) {
@@ -245,6 +251,18 @@ const EditCampaign = () => {
       setSubmitting(false);
     }
   };
+  const loadCounties = (inputValue: string, callback: (options: { label: string; value: string }[]) => void) => {
+    const filteredOptions = countiesList
+      .filter((county) =>
+        county.name.toLowerCase().includes(inputValue.toLowerCase())
+      )
+      .map((county) => ({
+        label: `${county.name}`,
+        value: county._id,
+      }));
+
+    callback(filteredOptions);
+  };
 
   // Show loading until both states and campaign data are ready
   if (loading || !dataReady) {
@@ -297,7 +315,8 @@ const EditCampaign = () => {
                     utilitiesList,
                     isLoadingUtilities,
                     activeDeliveryTab,
-                    setActiveDeliveryTab
+                    setActiveDeliveryTab,
+                    true
                   )}
                 </div>
 
@@ -305,6 +324,7 @@ const EditCampaign = () => {
                   activeTab={activeTab}
                   setActiveTab={setActiveTab}
                   isSubmitting={isSubmitting}
+                  isEditMode={true}
                 />
               </Form>
             </div>

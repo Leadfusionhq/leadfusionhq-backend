@@ -17,11 +17,12 @@ export const renderTabContent = (
   utilitiesList: Utility[],
   isLoadingUtilities: boolean,
   activeDeliveryTab: "method" | "schedule" | "other",
-  setActiveDeliveryTab: (tab: "method" | "schedule" | "other") => void
+  setActiveDeliveryTab: (tab: "method" | "schedule" | "other") => void,
+  isEditMode: boolean,
 ) => {
   switch (activeTab) {
     case "basic":
-      return <CampaignBasicInfo values={values} setFieldValue={setFieldValue} />;
+      return <CampaignBasicInfo values={values} setFieldValue={setFieldValue} isEditMode={isEditMode}/>;
     case "geography":
       return (
         <CampaignGeography
@@ -32,8 +33,8 @@ export const renderTabContent = (
           loadStates={loadStates}
         />
       );
-    case "utilities":
-      return <CampaignUtility values={values} utilitiesList={utilitiesList} isLoadingUtilities={isLoadingUtilities} />;
+    // case "utilities":
+    //   return <CampaignUtility values={values} utilitiesList={utilitiesList} isLoadingUtilities={isLoadingUtilities} />;
     case "delivery":
       return (
         <CampaignDelivery

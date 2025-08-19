@@ -129,7 +129,8 @@ const AddNewCampaign = () => {
                     utilitiesList,
                     isLoadingUtilities,
                     activeDeliveryTab,
-                    setActiveDeliveryTab
+                    setActiveDeliveryTab,
+                    false
                   )}
                 </div>
 
@@ -137,6 +138,7 @@ const AddNewCampaign = () => {
                   activeTab={activeTab}
                   setActiveTab={setActiveTab}
                   isSubmitting={isSubmitting}
+                  isEditMode={false}
                 />
 
               </Form>

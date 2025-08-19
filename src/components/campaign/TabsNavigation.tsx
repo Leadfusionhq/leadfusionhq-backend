@@ -5,21 +5,13 @@ interface TabsNavigationProps {
   activeTab: string;
   setActiveTab: (tabId: string) => void;
   isSubmitting: boolean;
+  isEditMode?: boolean;
 }
 
-export const TabsNavigation = ({ activeTab, setActiveTab, isSubmitting }: TabsNavigationProps) => {
+export const TabsNavigation = ({ activeTab, setActiveTab, isSubmitting, isEditMode = false }: TabsNavigationProps) => {
   const currentIndex = tabs.findIndex((tab) => tab.id === activeTab);
   const isLastTab = currentIndex === tabs.length - 1;
   
-  // Debug logging
-  // console.log("Debug TabsNavigation:", {
-  //   activeTab,
-  //   currentIndex,
-  //   tabsLength: tabs.length,
-  //   isLastTab,
-  //   condition: currentIndex < tabs.length - 1
-  // });
-
   return (
     <div className="flex justify-between items-center">
       <button
@@ -45,8 +37,8 @@ export const TabsNavigation = ({ activeTab, setActiveTab, isSubmitting }: TabsNa
           <button
             type="button"
             onClick={(e) => {
-              e.preventDefault(); // Prevent any form submission
-              e.stopPropagation(); // Stop event bubbling
+              e.preventDefault(); 
+              e.stopPropagation();
               console.log("Next button clicked, going to:", tabs[currentIndex + 1].id);
               setActiveTab(tabs[currentIndex + 1].id);
             }}
@@ -57,11 +49,13 @@ export const TabsNavigation = ({ activeTab, setActiveTab, isSubmitting }: TabsNa
         ) : (
           <button
             type="submit"
-            onClick={() => console.log("Submit button clicked")}
+            // onClick={() => console.log("Submit button clicked")}
             className="px-8 py-3 bg-[#1C1C1C] text-white text-[18px] font-semibold rounded-lg border-none cursor-pointer transition hover:bg-[#333333]"
             disabled={isSubmitting}
           >
-            {isSubmitting ? "Creating Campaign..." : "Create Campaign"}
+            {isSubmitting
+              ? (isEditMode ? "Updating Campaign..." : "Creating Campaign...")
+              : (isEditMode ? "Edit Campaign" : "Create Campaign")}
           </button>
         )}
       </div>

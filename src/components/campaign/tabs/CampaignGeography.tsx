@@ -26,6 +26,8 @@ const CampaignGeography: React.FC<GeographyProps> = ({
   loadStates,
 }) => {
   const loadCounties = (inputValue: string, callback: (options: CountyOption[]) => void) => {
+    console.warn('countiesList',countiesList)
+    console.warn('values',values.geography.coverage.partial.counties)
     const filtered = countiesList
       .filter((county) => county.name.toLowerCase().includes(inputValue.toLowerCase()))
       .map((county) => ({ label: county.name, value: county._id }));
@@ -78,16 +80,16 @@ const CampaignGeography: React.FC<GeographyProps> = ({
       {values.geography.coverage.type === "PARTIAL" && (
         <>
           <p className="text-center text-[#666666] text-sm italic">
-            Please enter a Radius & Zip, a list of Zip codes, a selection of Counties, or any combination of these
+            Please enter a Zip, a list of Zip codes, a selection of Counties, or any combination of these
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <FormikInput
+            {/* <FormikInput
               name="geography.coverage.partial.radius"
               type="number"
               placeholder="25"
               label="Radius (miles)"
-            />
+            /> */}
             <FormikInput
               name="geography.coverage.partial.zipcode"
               type="text"
