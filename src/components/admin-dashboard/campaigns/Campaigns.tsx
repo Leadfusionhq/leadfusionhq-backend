@@ -12,11 +12,12 @@ import { useRouter } from 'next/navigation';
 
 type Campaign = {
   _id: string;
+  campaign_id: string;
   name: string;
   status: string;
   lead_type: string;
   exclusivity: string;
-  // bid_price: number;
+//   bid_price: number;
   language: string;
   geography: {
     state: string;
@@ -92,6 +93,7 @@ export default function CampaignTable() {
 
   const skeletonRows: Campaign[] = Array.from({ length: pagination.limit }).map((_, i) => ({
     _id: `skeleton-${i}`,
+    campaign_id:"",
     name: "",
     status: "",
     lead_type: "",
@@ -140,6 +142,18 @@ export default function CampaignTable() {
   };
 
   const columns: TableColumn<Campaign>[] = [
+    {
+      name: "Campaign ID",
+      selector: (row) => row.campaign_id,
+      cell: (row) =>
+        row._id.startsWith("skeleton") ? (
+          <Skeleton variant="text" width={120} animation="wave" />
+        ) : (
+          <div className="font-medium text-gray-900">{row.campaign_id}</div>
+        ),
+      sortable: true,
+      minWidth: "150px",
+    },
     {
       name: "Campaign Name",
       selector: (row) => row.name,
@@ -243,7 +257,7 @@ export default function CampaignTable() {
       />
     ) : (
       <div className="flex gap-2">
-        <Button
+        {/* <Button
           className="!bg-[#838383] !text-white hover:!bg-[#6b6b6b]"
           size="small"
           sx={{
@@ -255,7 +269,7 @@ export default function CampaignTable() {
           onClick={() => handleEdit(row)}
         >
           Edit
-        </Button>
+        </Button> */}
         <Button
           className="!bg-white !text-[#838383] border border-[#838383] hover:!bg-[#f4f4f4]"
           size="small"
@@ -318,11 +332,7 @@ export default function CampaignTable() {
     <Box sx={{ padding: 2 }}>
       <div className="flex justify-between items-center pb-[30px]">
         <h3 className="text-[24px] text-[#1C1C1C] text-[Inter] font-semibold">List of Campaigns</h3>
-        <Link href="/dashboard/campaigns/add"
-          className="w-[175px] h-[52px] bg-[#1C1C1C] text-white rounded-[5px] text-center flex justify-center items-center text-[16px] no-underline hover:bg-[#333333] transition-colors"
-        >
-          Add New Campaign
-        </Link>
+       
       </div>
 
       <DataTable

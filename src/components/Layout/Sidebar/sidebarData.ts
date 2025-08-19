@@ -28,6 +28,16 @@ export const adminSidebarItems: SidebarItem[] = [
       '/admin/locations/add',
     ]
   },
+  {
+    id: 'campaigns',
+    name: 'Campaigns',
+    icon: '/images/icons/campaigns.svg',
+    link: '/admin/campaigns',
+    pathCombinations: [
+      '/admin/campaigns/edit',
+      '/admin/campaigns/add',
+    ]
+  },
 
 ];
 
