@@ -2,6 +2,9 @@ const mongoose = require('mongoose');
 const { LEAD_TYPE, STATUS, EXCLUSIVITY, DAYS_OF_WEEK } = require('../helper/constant-enums');
 
 const campaignSchema = new mongoose.Schema({
+  campaign_id: { 
+    type: String, 
+  },
   user_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -38,7 +41,15 @@ const campaignSchema = new mongoose.Schema({
     default: 'en',
     minlength: 2,
   },
-
+  poc_phone: { 
+    type: String, 
+  },
+  company_contact_phone: { 
+    type: String, 
+  },
+  company_contact_email: { 
+    type: String, 
+  },
   geography: {
     state: { 
       type: String,

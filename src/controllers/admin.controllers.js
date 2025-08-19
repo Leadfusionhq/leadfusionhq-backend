@@ -3,7 +3,7 @@ const config = require('../config/config');
 const { sendResponse } = require('../utils/response');
 const { ErrorHandler } = require('../utils/error-handler');
 const UserServices = require('../services/user.service');
-const N8nServices = require('../services/n8n.service');
+const N8nServices = require('../services/n8n/n8n.automation.service');
 
 const AdminServices = require('../services/admin.service');
 const MAIL_HANDLER = require('../mail/mails');
