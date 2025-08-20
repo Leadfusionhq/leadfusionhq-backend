@@ -66,16 +66,44 @@ const getCampaignsByUserId = async (page = 1, limit = 10, user_id) => {
     throw new ErrorHandler(500, error.message || 'Failed to fetch campaigns');
   }
 };
+// const getCampaigns = async (page = 1, limit = 10, user_id) => {
+//   try {
+//     const skip = (page - 1) * limit;
+
+//     const [campaigns, total] = await Promise.all([
+//       Campaign.find()
+//         .skip(skip)
+//         .limit(limit)
+//         .sort({ createdAt: -1 }),
+//       Campaign.countDocuments(),
+//     ]);
+
+//     return {
+//       data: campaigns,
+//       meta: {
+//         total,
+//         page,
+//         limit,
+//         totalPages: Math.ceil(total / limit),
+//       },
+//     };
+//   } catch (error) {
+//     throw new ErrorHandler(500, error.message || 'Failed to fetch campaigns');
+//   }
+// };
 const getCampaigns = async (page = 1, limit = 10, user_id) => {
   try {
     const skip = (page - 1) * limit;
+    const query = user_id ? { user_id } : {};
 
     const [campaigns, total] = await Promise.all([
-      Campaign.find()
+      Campaign.find(query)
+        .populate('geography.state', 'name abbreviation')
+        .populate('user_id', 'name email')
         .skip(skip)
         .limit(limit)
         .sort({ createdAt: -1 }),
-      Campaign.countDocuments(),
+      Campaign.countDocuments(query),
     ]);
 
     return {
@@ -111,6 +139,41 @@ const getCampaignById = async (campaignId, userId) => {
 
   return campaign;
 };
+// const getCampaignByIdForAdmin = async (campaignId) => {
+//   const campaign = await Campaign.findById(campaignId)
+//                                   .populate('geography.state', 'name abbreviation')
+//                                   .populate('user_id', 'name email')
+//                                   .lean();
+
+//   if (!campaign) {
+//     throw new ErrorHandler(404, 'Campaign not found');
+//   }
+
+//   if (campaign.geography?.coverage?.type === 'PARTIAL') {
+//     const countyIds = campaign.geography.coverage.partial.counties || [];
+
+//     const counties = await County.find({ _id: { $in: countyIds } })
+//       .select('_id name fips_code state')
+//       .lean();
+
+//     campaign.geography.coverage.partial.countyDetails = counties;
+//   }
+
+//   return campaign;
+// };
+const getCampaignByIdForAdmin = async (campaignId) => {
+  const campaign = await Campaign.findById(campaignId)
+    .populate('geography.state', 'name abbreviation')
+    .populate('user_id', 'name email')
+    .populate('geography.coverage.partial.counties', 'name code fips_code state')
+    .lean();
+
+  if (!campaign) {
+    throw new ErrorHandler(404, 'Campaign not found');
+  }
+
+  return campaign;
+};
 
 module.exports = {
   createCampaign,
@@ -118,4 +181,5 @@ module.exports = {
   getCampaignById,
   updateCampaign,
   getCampaignsByUserId,
+  getCampaignByIdForAdmin,
 };

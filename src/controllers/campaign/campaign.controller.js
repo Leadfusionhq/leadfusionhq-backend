@@ -48,15 +48,29 @@ const getCampaigns = wrapAsync(async (req, res) => {
   sendResponse(res, data, "Campaigns fetched successfully", 200);
 });
 
+// const getCampaignById = wrapAsync(async (req, res) => {
+//   const user_id = req.user._id;
+//   const { campaignId } = req.params;
+
+//   const data = await CampaignServices.getCampaignById(campaignId, user_id);
+
+//   sendResponse(res, {data}, 'Campaign fetched successfully', 200);
+// });
+
 const getCampaignById = wrapAsync(async (req, res) => {
   const user_id = req.user._id;
   const { campaignId } = req.params;
+  const isAdmin = req.user.role === CONSTANT_ENUM.USER_ROLE.ADMIN;
 
-  const data = await CampaignServices.getCampaignById(campaignId, user_id);
+  let data;
+  if (isAdmin) {
+    data = await CampaignServices.getCampaignByIdForAdmin(campaignId);
+  } else {
+    data = await CampaignServices.getCampaignById(campaignId, user_id);
+  }
 
-  sendResponse(res, {data}, 'Campaign fetched successfully', 200);
+  sendResponse(res, { data }, 'Campaign fetched successfully', 200);
 });
-
 
 
 module.exports = {
