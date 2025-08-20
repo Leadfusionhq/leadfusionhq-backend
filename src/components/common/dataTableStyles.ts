@@ -1,35 +1,27 @@
-const commonDataTableStyles = {
-  table: {
-    style: {
-      border: "1px solid #ddd",
-      borderRadius: "4px",
-      overflow: "hidden",
-    },
-  },
-  headCells: {
-    style: {
-      fontWeight: "bold",
-      backgroundColor: "#000000",
-      color: "#FFFFFF",
-      padding: "24px",
-      fontSize: "16px",
-      zIndex: 1,
-    },
-  },
-  cells: {
-    style: {
-      padding: "24px",
-      fontSize: "16px",
-      borderBottom: "1px solid rgba(1, 1, 1, 0.09)",
-    },
-  },
-  rows: {
-    style: {
-      '&:hover': {
-        backgroundColor: "#F9F9F9",
+const customStyles = {
+    headCells: {
+      style: {
+        fontWeight: "bold",
+        backgroundColor: "#1C1C1C",
+        color: "#FFFFFF",
+        padding: "16px",
+        fontSize: "14px",
+        borderBottom: "2px solid #E0E0E0",
       },
     },
-  },
-};
-
-export default commonDataTableStyles;
+    cells: {
+      style: {
+        padding: "12px 16px",
+        fontSize: "14px",
+        borderBottom: "1px solid #E0E0E0",
+      },
+    },
+    rows: {
+      style: {
+        '&:hover': {
+          backgroundColor: "#F9F9F9",
+        },
+      },
+    },
+  };
+export default customStyles;
