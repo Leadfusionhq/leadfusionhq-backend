@@ -32,10 +32,12 @@ import {
   CalendarToday,
   Edit,
   Share,
+  Add,
   MoreVert
 } from "@mui/icons-material";
 import { toast } from "react-toastify";
 import { getErrorMessage } from "@/utils/getErrorMessage";
+import { useRouter } from 'next/navigation';
 
 type Campaign = {
   _id: string;
@@ -82,6 +84,15 @@ type Campaign = {
     };
     crm: {
         instructions: string;
+    };
+    schedule: {
+      days: {
+        day: string;            
+        active: boolean;        
+        start_time: string | null; 
+        end_time: string | null;  
+        cap: number | null;    
+      }[];
     };
   };
   note?: string;
@@ -132,6 +143,7 @@ export default function CampaignDetailPage() {
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     const fetchCampaign = async () => {
@@ -169,6 +181,9 @@ export default function CampaignDetailPage() {
     }
   }, [campaignId, token]);
 
+  const handleEdit = (id:any) => {
+    router.push(`/admin/campaigns/${id}/edit`);
+  };
   if (loading) {
     return (
       <Box sx={{ p: { xs: 2, sm: 3, md: 4 } }}>
@@ -228,17 +243,15 @@ export default function CampaignDetailPage() {
               Created: {formatDate(campaign.createdAt)}
             </Typography>
           </Box>
-          {/* <Stack direction="row" spacing={1}>
+          <Stack direction="row" spacing={1}>
             <IconButton sx={{ color: 'white' }}>
-              <Edit />
+              <Edit onClick={() => handleEdit(campaign._id)}/>
             </IconButton>
             <IconButton sx={{ color: 'white' }}>
-              <Share />
+              <Add />
             </IconButton>
-            <IconButton sx={{ color: 'white' }}>
-              <MoreVert />
-            </IconButton>
-          </Stack> */}
+            
+          </Stack>
         </Stack>
       </Paper>
 
@@ -382,6 +395,53 @@ export default function CampaignDetailPage() {
                 </Typography>
               </CardContent>
             </Card>
+          </div>
+        )}
+
+        {campaign.delivery?.schedule?.days?.length > 0 && (
+          <div className="col-span-12">
+            <InfoCard title="Delivery Schedule" icon={<CalendarToday fontSize="small" />}>
+              <Box sx={{ overflowX: 'auto' }}>
+                <Box
+                  component="table"
+                  sx={{
+                    width: '100%',
+                    borderCollapse: 'collapse',
+                    fontSize: '0.875rem',
+                    '& th, & td': {
+                      border: '1px solid #e0e0e0',
+                      padding: '8px 12px',
+                      textAlign: 'center',
+                    },
+                    '& th': {
+                      backgroundColor: '#f5f5f5',
+                      fontWeight: 600,
+                    },
+                  }}
+                >
+                  <thead>
+                    <tr>
+                      <th>Day</th>
+                      <th>Active</th>
+                      <th>Start Time</th>
+                      <th>End Time</th>
+                      <th>Cap</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {campaign.delivery.schedule.days.map((day, idx) => (
+                      <tr key={idx}>
+                        <td>{day.day}</td>
+                        <td>{day.active ? "✅" : "❌"}</td>
+                        <td>{day.active ? day.start_time || '-' : '-'}</td>
+                        <td>{day.active ? day.end_time || '-' : '-'}</td>
+                        <td>{day.active ? day.cap ?? 0 : '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Box>
+              </Box>
+            </InfoCard>
           </div>
         )}
 
