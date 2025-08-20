@@ -20,7 +20,11 @@ type Campaign = {
 //   bid_price: number;
   language: string;
   geography: {
-    state: string;
+    state: {
+      abbreviation: string;
+      _id: string;
+      name: string;
+    };
     coverage: {
       type: string;
     };
@@ -101,7 +105,12 @@ export default function CampaignTable() {
     // bid_price: 0,
     language: "",
     geography: {
-      state: "",
+      // state: "",
+      state: {
+        abbreviation: "" ,
+        name: "" ,
+        _id: "" 
+      },
       coverage: { type: "" }
     },
     delivery: { method: "" },
@@ -140,7 +149,9 @@ export default function CampaignTable() {
   const handleEdit = (row: Campaign) => {
     router.push(`/dashboard/campaigns/${row._id}/edit`);
   };
-
+  const handleView = (row: Campaign) => {
+    router.push(`/admin/campaigns/${row._id}`);
+  };
   const columns: TableColumn<Campaign>[] = [
     {
       name: "Campaign ID",
@@ -167,18 +178,6 @@ export default function CampaignTable() {
       minWidth: "150px",
     },
     {
-      name: "Status",
-      selector: (row) => row.status,
-      cell: (row) =>
-        row._id.startsWith("skeleton") ? (
-          <Skeleton variant="text" width={80} animation="wave" />
-        ) : (
-          getStatusBadge(row.status)
-        ),
-      sortable: true,
-      minWidth: "100px",
-    },
-    {
       name: "Lead Type",
       selector: (row) => row.lead_type,
       cell: (row) =>
@@ -191,17 +190,41 @@ export default function CampaignTable() {
       minWidth: "130px",
     },
     {
-      name: "Exclusivity",
-      selector: (row) => row.exclusivity,
+      name: "State",
+      selector: (row) => row.geography.state.abbreviation,
+      cell: (row) =>
+        row._id.startsWith("skeleton") ? (
+          <Skeleton variant="text" width={100} animation="wave" />
+        ) : (
+          <div className="text-sm text-gray-600 uppercase">{formatLeadType(row.geography.state.abbreviation)}</div>
+        ),
+      sortable: true,
+      minWidth: "130px",
+    },
+    {
+      name: "Status",
+      selector: (row) => row.status,
       cell: (row) =>
         row._id.startsWith("skeleton") ? (
           <Skeleton variant="text" width={80} animation="wave" />
         ) : (
-          <div className="text-sm">{formatExclusivity(row.exclusivity)}</div>
+          getStatusBadge(row.status)
         ),
       sortable: true,
-      minWidth: "110px",
+      minWidth: "100px",
     },
+    // {
+    //   name: "Exclusivity",
+    //   selector: (row) => row.exclusivity,
+    //   cell: (row) =>
+    //     row._id.startsWith("skeleton") ? (
+    //       <Skeleton variant="text" width={80} animation="wave" />
+    //     ) : (
+    //       <div className="text-sm">{formatExclusivity(row.exclusivity)}</div>
+    //     ),
+    //   sortable: true,
+    //   minWidth: "110px",
+    // },
     // {
     //   name: "Bid Price",
     //   selector: (row) => row.bid_price,
@@ -215,36 +238,36 @@ export default function CampaignTable() {
     //   right: true,
     //   minWidth: "100px",
     // },
-    {
-      name: "Delivery Method",
-      selector: (row) => row.delivery.method,
-      cell: (row) =>
-        row._id.startsWith("skeleton") ? (
-          <Skeleton variant="text" width={70} animation="wave" />
-        ) : (
-          <div className="capitalize text-sm">{row.delivery.method}</div>
-        ),
-      sortable: true,
-      minWidth: "120px",
-    },
-    {
-      name: "Created Date",
-      selector: (row) => row.createdAt,
-      cell: (row) =>
-        row._id.startsWith("skeleton") ? (
-          <Skeleton variant="text" width={90} animation="wave" />
-        ) : (
-          <div className="text-sm text-gray-500">
-            {new Date(row.createdAt).toLocaleDateString('en-US', {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric'
-            })}
-          </div>
-        ),
-      sortable: true,
-      minWidth: "110px",
-    },
+    // {
+    //   name: "Delivery Method",
+    //   selector: (row) => row.delivery.method,
+    //   cell: (row) =>
+    //     row._id.startsWith("skeleton") ? (
+    //       <Skeleton variant="text" width={70} animation="wave" />
+    //     ) : (
+    //       <div className="capitalize text-sm">{row.delivery.method}</div>
+    //     ),
+    //   sortable: true,
+    //   minWidth: "120px",
+    // },
+    // {
+    //   name: "Created Date",
+    //   selector: (row) => row.createdAt,
+    //   cell: (row) =>
+    //     row._id.startsWith("skeleton") ? (
+    //       <Skeleton variant="text" width={90} animation="wave" />
+    //     ) : (
+    //       <div className="text-sm text-gray-500">
+    //         {new Date(row.createdAt).toLocaleDateString('en-US', {
+    //           year: 'numeric',
+    //           month: 'short',
+    //           day: 'numeric'
+    //         })}
+    //       </div>
+    //     ),
+    //   sortable: true,
+    //   minWidth: "110px",
+    // },
     {
   name: "Actions",
   cell: (row) =>
@@ -279,7 +302,7 @@ export default function CampaignTable() {
             height: "28px",
             textTransform: "capitalize",
           }}
-          // onClick={() => handleView(row)} // ✳️ Add this function if needed
+          onClick={() => handleView(row)}
         >
           View
         </Button>
