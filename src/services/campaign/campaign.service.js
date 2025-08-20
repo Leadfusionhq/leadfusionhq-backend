@@ -1,6 +1,8 @@
 const  Campaign  = require('../../models/campaign.model');
+const  State  = require('../../models/state.model');
 const  County  = require('../../models/county.model');
 const { ErrorHandler } = require('../../utils/error-handler');
+const CONSTANT_ENUM = require('../../helper/constant-enums.js');
 
 const createCampaign = async (data) => {
   try {
@@ -10,10 +12,44 @@ const createCampaign = async (data) => {
     throw new ErrorHandler(500, error.message || 'Failed to create campaign');
   }
 };
-const updateCampaign = async (campaignId, userId, updateData) => {
+// const updateCampaign = async (campaignId, userId, updateData) => {
+//   try {
+//     const updatedCampaign = await Campaign.findOneAndUpdate(
+//       { _id: campaignId, user_id: userId },
+//       updateData,
+//       { new: true, runValidators: true }
+//     ).lean();
+
+//     if (!updatedCampaign) {
+//       throw new ErrorHandler(404, 'Campaign not found or access denied');
+//     }
+
+//     if (updatedCampaign.geography?.coverage?.type === 'PARTIAL') {
+//       const countyIds = updatedCampaign.geography.coverage.partial.counties || [];
+
+//       const counties = await County.find({ _id: { $in: countyIds } })
+//         .select('_id name fips_code state')
+//         .lean();
+
+//       updatedCampaign.geography.coverage.partial.countyDetails = counties;
+//     }
+
+//     return updatedCampaign;
+
+//   } catch (error) {
+//     throw new ErrorHandler(error.statusCode || 500, error.message || 'Failed to update campaign');
+//   }
+// };
+const updateCampaign = async (campaignId, userId, role, updateData) => {
   try {
+    const filter = { _id: campaignId };
+
+    if (role !== CONSTANT_ENUM.USER_ROLE.ADMIN) {
+      filter.user_id = userId;
+    }
+
     const updatedCampaign = await Campaign.findOneAndUpdate(
-      { _id: campaignId, user_id: userId },
+      filter,
       updateData,
       { new: true, runValidators: true }
     ).lean();
@@ -33,7 +69,6 @@ const updateCampaign = async (campaignId, userId, updateData) => {
     }
 
     return updatedCampaign;
-
   } catch (error) {
     throw new ErrorHandler(error.statusCode || 500, error.message || 'Failed to update campaign');
   }
@@ -66,16 +101,20 @@ const getCampaignsByUserId = async (page = 1, limit = 10, user_id) => {
     throw new ErrorHandler(500, error.message || 'Failed to fetch campaigns');
   }
 };
+
 // const getCampaigns = async (page = 1, limit = 10, user_id) => {
 //   try {
 //     const skip = (page - 1) * limit;
+//     const query = user_id ? { user_id } : {};
 
 //     const [campaigns, total] = await Promise.all([
-//       Campaign.find()
+//       Campaign.find(query)
+//         .populate('geography.state', 'name abbreviation')
+//         .populate('user_id', 'name email')
 //         .skip(skip)
 //         .limit(limit)
 //         .sort({ createdAt: -1 }),
-//       Campaign.countDocuments(),
+//       Campaign.countDocuments(query),
 //     ]);
 
 //     return {
@@ -91,18 +130,56 @@ const getCampaignsByUserId = async (page = 1, limit = 10, user_id) => {
 //     throw new ErrorHandler(500, error.message || 'Failed to fetch campaigns');
 //   }
 // };
-const getCampaigns = async (page = 1, limit = 10, user_id) => {
+// Admin usage: filters is an object
+
+const stateCache = {};
+const getCampaigns = async (page = 1, limit = 10, filters = {}) => {
   try {
     const skip = (page - 1) * limit;
-    const query = user_id ? { user_id } : {};
+
+    const query = {
+      ...(filters.user_id && { user_id: filters.user_id }),
+      ...(filters.status && { status: filters.status }),
+      ...(filters.lead_type && { lead_type: filters.lead_type }),
+    };
+
+    if (filters.state) {
+      const stateAbbr = filters.state.toUpperCase();
+
+      if (!stateCache[stateAbbr]) {
+        const stateDoc = await State.findOne({ abbreviation: stateAbbr })
+          .select('_id')
+          .lean();
+
+        if (stateDoc) {
+          stateCache[stateAbbr] = stateDoc._id.toString();
+        } else {
+          return {
+            data: [],
+            meta: {
+              total: 0,
+              page,
+              limit,
+              totalPages: 0,
+            },
+          };
+        }
+      }
+
+      query['geography.state'] = stateCache[stateAbbr];
+    }
+
+    const projection = 'campaign_id name status lead_type exclusivity language geography delivery user_id note createdAt updatedAt';
 
     const [campaigns, total] = await Promise.all([
       Campaign.find(query)
+        .select(projection)
         .populate('geography.state', 'name abbreviation')
         .populate('user_id', 'name email')
+        .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .sort({ createdAt: -1 }),
+        .lean(),
       Campaign.countDocuments(query),
     ]);
 
@@ -116,10 +193,10 @@ const getCampaigns = async (page = 1, limit = 10, user_id) => {
       },
     };
   } catch (error) {
+    console.error('Error in getCampaigns:', error);
     throw new ErrorHandler(500, error.message || 'Failed to fetch campaigns');
   }
 };
-
 const getCampaignById = async (campaignId, userId) => {
   const campaign = await Campaign.findOne({ _id: campaignId, user_id: userId }).lean();
 

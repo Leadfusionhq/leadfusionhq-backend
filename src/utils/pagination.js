@@ -14,8 +14,22 @@ function getFinalPagination(query, fetchAllOverride = false) {
   }
   return getPaginationParams(query);
 }
+function extractFilters(query, allowedFilters, additionalFilters = {}) {
+  const filters = {};
+
+  allowedFilters.forEach((key) => {
+    const value = query[key];
+    if (value !== undefined && value !== null && value !== '') {
+      filters[key] = value;
+    }
+  });
+
+  // Merge additional filters like user_id for non-admins
+  return Object.assign({}, filters, additionalFilters);
+}
 
 module.exports = {
   getPaginationParams,
   getFinalPagination,
+  extractFilters,
 };
