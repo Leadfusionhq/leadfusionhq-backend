@@ -3,6 +3,7 @@ const { sendResponse } = require('../../utils/response');
 const LeadServices = require('../../services/lead/lead.service.js');
 const { ErrorHandler } = require('../../utils/error-handler');
 const Lead = require('../../models/lead.model.js'); 
+const CONSTANT_ENUM = require('../../helper/constant-enums.js');
 
 const { randomNumberGenerate, isEmpty } = require('../../utils/utils');
 const { getPaginationParams , extractFilters} = require('../../utils/pagination');
@@ -19,14 +20,19 @@ const createLead = wrapAsync(async (req, res) => {
 const getLeads = wrapAsync(async (req, res) => {
     const { page, limit } = getPaginationParams(req.query);
     const user = req.user;
+    const isAdmin = req.user.role === CONSTANT_ENUM.USER_ROLE.ADMIN;
 
+
+    // data = await LeadServices.getLeads(page, limit, filters);
     let data;
+    if (isAdmin) {
+      const allowedFilterKeys = ['campaign_id'];
+      const filters = extractFilters(req.query, allowedFilterKeys);
 
-    const allowedFilterKeys = ['campaign_id'];
-    const filters = extractFilters(req.query, allowedFilterKeys);
-
-    data = await LeadServices.getLeads(page, limit, filters);
-  
+      data = await LeadServices.getLeads(page, limit, filters);
+    } else {
+      data = await LeadServices.getLeadByUserId(page, limit, user._id);
+    }
 
     sendResponse(res, data, "Leads fetched successfully", 200);
 });
