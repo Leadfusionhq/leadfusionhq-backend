@@ -2,6 +2,7 @@ import Image from 'next/image';
 import { FC } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { AppDispatch, RootState } from '@/redux/store';
 
 interface SidebarItemProps {
   item: {
@@ -14,7 +15,7 @@ interface SidebarItemProps {
 
 const SidebarItem: FC<SidebarItemProps> = ({ item }) => {
   const pathname = usePathname();
-
+  const { collapsed}=useSelector((state:RootState)=>state.theme)
   const isActive =
     pathname === item.link ||
     (item.link !== '/dashboard' && pathname?.startsWith(item.link + '/'));

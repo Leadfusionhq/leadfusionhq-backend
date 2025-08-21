@@ -113,7 +113,7 @@ const LeadForm = ({ campaignId }: { campaignId: string }) => {
             <button
               type="submit"
               disabled={isSubmitting}
-              className={`px-6 py-3 bg-blue-600 text-white rounded-md shadow-md hover:bg-blue-700 transition-all transform active:scale-95 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              className={`px-6 py-3 bg-[#1C1C1C]  text-white rounded-md shadow-md hover:bg-blue-700 transition-all transform active:scale-95 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 isSubmitting ? "bg-gray-400 cursor-not-allowed" : ""
               }`}
             >

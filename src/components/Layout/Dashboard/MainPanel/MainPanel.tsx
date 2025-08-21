@@ -25,11 +25,16 @@ const MainPanel = ({ children }: PropsWithChildren) => {
   }, [dispatch]);
 
   return (
-    <div className={`main-panel ${collapsed || autoCollapsed ? 'full-width-panel' : ''}`}>
-        <Topbar />
-      <div className="main-content-wrapper">
-        {children}
-      </div>
+    <div className={`main-panel sticky top-0 z-50  ${collapsed || autoCollapsed ? 'full-width-panel' : ''}`}>
+      {/* Sticky Topbar */}
+  <div className="">
+    <Topbar />
+  </div>
+
+  {/* Scrollable Content */}
+  <div className="main-content-wrapper flex-1 overflow-y-auto">
+    {children}
+  </div>
     </div>
   );
 };

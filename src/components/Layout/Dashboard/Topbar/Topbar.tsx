@@ -47,8 +47,8 @@ const Topbar = () => {
   }, [pathname]);
 
   return (
-    <div className="bg-white w-full flex items-center gap-[45px] lg:pt-[41px] lg:pb-[41px] pt-[21px] pb-[21px] pl-[28px] shadow-sm">
-      <div className="menue-toggler-wrapper text-black">
+    <div className="bg-white w-full flex items-center gap-[45px] lg:pt-[38px] lg:pb-[43px] pt-[38px] pb-[21px] sm:pb-[44px] pl-[28px] shadow-sm">
+      <div className="menue-toggler-wrapper text-black ">
         <button
           onClick={() => dispatch(toggleSidebar())}
           className="menu-toggler"

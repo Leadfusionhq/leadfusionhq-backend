@@ -2,6 +2,7 @@
 import { useSelector, useDispatch } from 'react-redux';
 import { logout } from '@/redux/auth/authSlice';
 import { removeToken } from '@/utils/auth';
+import { UseSelector } from 'react-redux';
 // import { usePathname, useRouter } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -14,6 +15,7 @@ const Sidebar = () => {
   // const pathname = usePathname();
 
   const { user } = useSelector((state: RootState) => state.auth);
+  const { collapsed}=useSelector((state:RootState)=>state.theme)
   const role = user?.role;
 
   const sidebarItems = role === 'ADMIN' ? adminSidebarItems : userSidebarItems;
@@ -32,7 +34,7 @@ const Sidebar = () => {
 
   return (
 <aside className="bg-black text-white w-64 h-screen fixed left-0 top-0 flex flex-col justify-between">
-      <div className="logo-container p-6 border-b border-white/20">
+      <div className="logo-container p-[24px] sm:p-[12px] border-b border-white/20">
         <Image
           src="/images/logo.svg"
           alt="Logo"
