@@ -61,7 +61,7 @@ const Topbar = () => {
   return (
     <div>
   
-    <div className={`bg-white transition-all h-[102px] lg:h-[101px] xl:h-[101px] duration-300 justify-between w-full flex items-center gap-[45px] lg:pt-[38px] ${!collapsed?" lg:pb-[39px] ":" lg:pb-[43px] "} pt-[38px] pb-[21px] sm:pb-[44px] pl-[28px] shadow-sm`}>
+    <div className={`bg-white transition-all h-[102px] lg:h-[101px] ${collapsed?"xl:h-[105px]":"xl:h-[101px]"}  duration-300 justify-between w-full flex items-center gap-[45px] lg:pt-[38px] ${!collapsed?" lg:pb-[39px] ":" lg:pb-[43px] "} pt-[38px] pb-[21px] sm:pb-[44px] pl-[28px] shadow-sm`}>
       <div className="flex gap-[45px]">
               <div className="menue-toggler-wrapper text-black ">
         <button
@@ -88,13 +88,13 @@ const Topbar = () => {
         )}
       </div>
       </div>
-   <div className="pr-[28px] flex justify-between w-[150px] items-center cursor-pointer">
+   <div className="pr-[28px] flex  gap-[20px]  items-center cursor-pointer">
     <Image 
-    src="/images/group_notification.png" width={20} height={20} alt="notification_icon" 
-    className="w-[40px] h-auto"
+    src="/images/group_notification.png" width={16} height={20} alt="notification_icon" 
+    
     onClick={toggleNotificationCard}
     />
-    <Image src="/images/icons/User.svg" width={60} height={60} alt="profile_image_icon"  onClick={toggleProfileCard}/>
+    <Image src="/images/icons/User.svg" width={20} height={20} alt="profile_image_icon"  onClick={toggleProfileCard}/>
    </div>
    {/* Notification Card */}
    {openNotification && <NotificationCard/>}
