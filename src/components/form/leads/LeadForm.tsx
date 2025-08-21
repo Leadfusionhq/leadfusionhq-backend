@@ -6,7 +6,7 @@ import { initialLeadValues } from "@/constants/initialLeadValues";
 import axiosWrapper from "@/utils/api";
 import { useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
-import { CAMPAIGNS_API } from "@/utils/apiUrl";
+import { LEADS_API } from "@/utils/apiUrl";
 import { FormikInput, FormikTextarea } from "@/components/form";  // Import custom FormikInput and FormikTextarea
 
 const LeadForm = ({ campaignId }: { campaignId: string }) => {
@@ -18,10 +18,10 @@ const LeadForm = ({ campaignId }: { campaignId: string }) => {
       
       const response = await axiosWrapper(
         "post",
-        `${CAMPAIGNS_API.ADD_LEAD.replace(":campaignId", campaignId)}`,
+        `${LEADS_API.CREATE_LEAD}`,
         values,
         token ?? undefined
-      );
+      ) ;
 
       toast.success(response?.message || "Lead added successfully!");
     } catch (err) {
@@ -40,7 +40,7 @@ const LeadForm = ({ campaignId }: { campaignId: string }) => {
     >
       {({ isSubmitting, errors, touched }) => (
         <Form className="space-y-6 bg-white p-8 rounded-lg border border-gray-300 shadow-lg max-w-4xl mx-auto">
-          <h2 className="text-3xl font-semibold text-center mb-8 text-gray-800">Add New Lead</h2>
+        
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <FormikInput
