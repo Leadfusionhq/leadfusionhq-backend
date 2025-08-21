@@ -1,4 +1,6 @@
 "use client";
+import { useEffect, useState } from "react";
+
 import { Formik, Form } from "formik";
 import { toast } from "react-toastify";
 import { LeadValidationSchema } from "@/request-schemas/lead-schema";
@@ -6,12 +8,48 @@ import { initialLeadValues } from "@/constants/initialLeadValues";
 import axiosWrapper from "@/utils/api";
 import { useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
-import { LEADS_API } from "@/utils/apiUrl";
-import { FormikInput, FormikTextarea } from "@/components/form";
+import { LEADS_API, LOCATION_API } from "@/utils/apiUrl";
+import { FormikInput, FormikTextarea, CustomFormikAsyncSelect } from "@/components/form";
+import {  State ,StateOption } from "@/types/campaign";
 
 const LeadForm = ({ campaignId }: { campaignId: string }) => {
   const token = useSelector((state: RootState) => state.auth.token);
+  const [statesList, setStatesList] = useState<State[]>([]);
 
+  useEffect(() => {
+    const fetchStates = async () => {
+      try {
+        const response = (await axiosWrapper("get", LOCATION_API.GET_STATES, {}, token ?? undefined)) as {
+          data: State[];
+        };
+        if (response?.data) {
+          setStatesList(response.data);
+        }
+      } catch (err) {
+        console.error("Failed to load states:", err);
+        toast.error("Could not load state list");
+      }
+    };
+
+    fetchStates();
+  }, [token]);
+  const loadStates = (inputValue: string, callback: (options: StateOption[]) => void) => {
+    const filteredOptions = statesList
+      .filter(
+        (state) =>
+          state.name.toLowerCase().includes(inputValue.toLowerCase()) ||
+          state.abbreviation.toLowerCase().includes(inputValue.toLowerCase())
+      )
+      .map((state) => ({
+        label: `${state.name} (${state.abbreviation})`,
+        value: state._id,
+        name: state.name,
+        abbreviation: state.abbreviation,
+      }));
+
+    callback(filteredOptions);
+  };
+  // Submit handler for the form
   const handleSubmit = async (values: typeof initialLeadValues, { setSubmitting, resetForm }: { setSubmitting: (isSubmitting: boolean) => void; resetForm: () => void }) => {
     try {
       setSubmitting(true);
@@ -88,11 +126,13 @@ const LeadForm = ({ campaignId }: { campaignId: string }) => {
           />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <FormikInput
+            {/* Custom async select for states */}
+            <CustomFormikAsyncSelect
               name="address.state"
-              label="State"
-              placeholder="Enter state"
-              errorMessage={touched?.address?.state && errors?.address?.state}
+              label="State *"
+              loadOptions={loadStates}
+              placeholder="Search and select a state"
+              // errorMessage={touched?.address?.state && errors?.address?.state}
             />
             <FormikInput
               name="address.zip_code"

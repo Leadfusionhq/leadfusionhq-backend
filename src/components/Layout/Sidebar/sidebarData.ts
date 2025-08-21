@@ -64,4 +64,14 @@ export const userSidebarItems: SidebarItem[] = [
     icon: '/images/icons/campaigns.svg', 
     link: '/dashboard/campaigns' 
   },
+  {
+    id: 'leads',
+    name: 'Leads',
+    icon: '/images/icons/lead-management.svg',
+    link: '/dashboard/leads',
+    pathCombinations: [
+      '/dashboard/leads/edit',
+      '/dashboard/leads/add',
+    ]
+  },
 ];
