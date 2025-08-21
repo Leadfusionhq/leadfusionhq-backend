@@ -1,4 +1,4 @@
-// components/form/leads/LeadForm.tsx
+"use client";
 import { Formik, Form } from "formik";
 import { toast } from "react-toastify";
 import { LeadValidationSchema } from "@/request-schemas/lead-schema";
@@ -6,24 +6,27 @@ import { initialLeadValues } from "@/constants/initialLeadValues";
 import axiosWrapper from "@/utils/api";
 import { useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
-import { CAMPAIGNS_API } from "@/utils/apiUrl";
-import { FormikInput, FormikTextarea } from "@/components/form";  // Import custom FormikInput and FormikTextarea
+import { LEADS_API } from "@/utils/apiUrl";
+import { FormikInput, FormikTextarea } from "@/components/form";
 
 const LeadForm = ({ campaignId }: { campaignId: string }) => {
   const token = useSelector((state: RootState) => state.auth.token);
 
-  const handleSubmit = async (values: typeof initialLeadValues, { setSubmitting }: { setSubmitting: (isSubmitting: boolean) => void }) => {
+  const handleSubmit = async (values: typeof initialLeadValues, { setSubmitting, resetForm }: { setSubmitting: (isSubmitting: boolean) => void; resetForm: () => void }) => {
     try {
       setSubmitting(true);
-      
+
       const response = await axiosWrapper(
         "post",
-        `${CAMPAIGNS_API.ADD_LEAD.replace(":campaignId", campaignId)}`,
+        LEADS_API.CREATE_LEAD,
         values,
         token ?? undefined
-      );
+      ) as { message?: string };
 
       toast.success(response?.message || "Lead added successfully!");
+
+      // Reset the form after successful submission
+      resetForm();
     } catch (err) {
       console.error("Error adding lead:", err);
       toast.error("An error occurred while adding the lead.");
@@ -34,26 +37,24 @@ const LeadForm = ({ campaignId }: { campaignId: string }) => {
 
   return (
     <Formik
-      initialValues={initialLeadValues}
+      initialValues={{ ...initialLeadValues, campaign_id: campaignId }}
       validationSchema={LeadValidationSchema}
       onSubmit={handleSubmit}
     >
       {({ isSubmitting, errors, touched }) => (
         <Form className="space-y-6 bg-white p-8 rounded-lg border border-gray-300 shadow-lg max-w-4xl mx-auto">
-          <h2 className="text-3xl font-semibold text-center mb-8 text-gray-800">Add New Lead</h2>
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <FormikInput
-              name="firstName"
+              name="first_name"
               label="First Name"
               placeholder="Enter first name"
-              errorMessage={touched.firstName && errors.firstName}
+              errorMessage={touched.first_name && errors.first_name}
             />
             <FormikInput
-              name="lastName"
+              name="last_name"
               label="Last Name"
               placeholder="Enter last name"
-              errorMessage={touched.lastName && errors.lastName}
+              errorMessage={touched.last_name && errors.last_name}
             />
           </div>
 
@@ -66,31 +67,38 @@ const LeadForm = ({ campaignId }: { campaignId: string }) => {
           />
 
           <FormikInput
-            name="street"
-            label="Street Address"
-            placeholder="Enter street address"
-            errorMessage={touched.street && errors.street}
+            name="phone"
+            label="Phone"
+            placeholder="Enter phone number"
+            errorMessage={touched.phone && errors.phone}
           />
 
           <FormikInput
-            name="city"
+            name="address.street"
+            label="Street Address"
+            placeholder="Enter street address"
+            errorMessage={touched?.address?.street && errors?.address?.street}
+          />
+
+          <FormikInput
+            name="address.city"
             label="City"
             placeholder="Enter city"
-            errorMessage={touched.city && errors.city}
+            errorMessage={touched?.address?.city && errors?.address?.city}
           />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <FormikInput
-              name="state"
+              name="address.state"
               label="State"
               placeholder="Enter state"
-              errorMessage={touched.state && errors.state}
+              errorMessage={touched?.address?.state && errors?.address?.state}
             />
             <FormikInput
-              name="zipCode"
+              name="address.zip_code"
               label="Zip Code"
               placeholder="Enter zip code"
-              errorMessage={touched.zipCode && errors.zipCode}
+              errorMessage={touched?.address?.zip_code && errors?.address?.zip_code}
             />
           </div>
 
@@ -101,19 +109,11 @@ const LeadForm = ({ campaignId }: { campaignId: string }) => {
             errorMessage={touched.note && errors.note}
           />
 
-          <FormikInput
-            name="cost"
-            type="number"
-            label="Cost"
-            placeholder="Enter lead cost"
-            errorMessage={touched.cost && errors.cost}
-          />
-
           <div className="flex justify-end">
             <button
               type="submit"
               disabled={isSubmitting}
-              className={`px-6 py-3 bg-blue-600 text-white rounded-md shadow-md hover:bg-blue-700 transition-all transform active:scale-95 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              className={`px-8 py-3 bg-[#1C1C1C] text-white text-[18px] font-semibold rounded-lg border-none cursor-pointer transition hover:bg-[#333333] ${
                 isSubmitting ? "bg-gray-400 cursor-not-allowed" : ""
               }`}
             >
