@@ -14,6 +14,7 @@ const authRoutes = require('./src/routes/auth/auth.routes');
 const userRoutes = require('./src/routes/user-routes');
 const adminRoutes = require('./src/routes/admin-routes');
 const campaignRoutes = require('./src/routes/campaign/campaign.routes');
+const leadRoutes = require('./src/routes/lead/lead.route');
 const locationRoutes = require('./src/routes/location/location.routes');
 const utilityRoutes = require('./src/routes/utility/utility.routes');
 const ghlRoutes = require('./src/routes/ghl.route');
@@ -39,6 +40,8 @@ app.use(`/${config.server.route}/admins`, adminRoutes);
 
 /** ::::::::::::::::::campaign route::::::::::::::::: */
 app.use(`/${config.server.route}/campaigns`, campaignRoutes);
+/** ::::::::::::::::::lead route::::::::::::::::: */
+app.use(`/${config.server.route}/leads`, leadRoutes);
 /** ::::::::::::::::::location route::::::::::::::::: */
 app.use(`/${config.server.route}/locations`, locationRoutes);
 /** ::::::::::::::::::utilities route::::::::::::::::: */
