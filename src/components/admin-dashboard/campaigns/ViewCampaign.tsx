@@ -184,6 +184,9 @@ export default function CampaignDetailPage() {
   const handleEdit = (id:any) => {
     router.push(`/admin/campaigns/${id}/edit`);
   };
+  const handleAddLead = (id:any) => {
+    router.push(`/admin/campaigns/${id}/leads/add`);
+  };
   if (loading) {
     return (
       <Box sx={{ p: { xs: 2, sm: 3, md: 4 } }}>
@@ -248,7 +251,7 @@ export default function CampaignDetailPage() {
               <Edit onClick={() => handleEdit(campaign._id)}/>
             </IconButton>
             <IconButton sx={{ color: 'white' }}>
-              <Add />
+              <Add onClick={() => handleAddLead(campaign._id)} />
             </IconButton>
             
           </Stack>

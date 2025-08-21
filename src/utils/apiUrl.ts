@@ -67,7 +67,16 @@ export const CAMPAIGNS_API = {
   UPDATE_CAMPAIGN: `${CAMPAIGNS_API_BASE}/:campaignId`,
   
 };
+// ========== LEADS ROUTES ==========
+const LEADS_API_BASE = `${API_BASE}/leads`;
 
+export const LEADS_API = {
+  GET_ALL_LEADS: `${LEADS_API_BASE}/`,
+  CREATE_LEAD: `${LEADS_API_BASE}/`,
+  GET_LEAD: `${LEADS_API_BASE}/:leadId`,
+  UPDATE_LEAD: `${LEADS_API_BASE}/:leadId`,
+  
+};
 // ========== utilities ROUTES ==========
 const UITILITIES_API_BASE = `${API_BASE}/utilities`;
 
