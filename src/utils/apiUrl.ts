@@ -44,3 +44,45 @@ export const API_URL = {
 
     
 };
+
+// ========== LOCATION ROUTES ==========
+const LOCATION_API_BASE = `${API_BASE}/locations`;
+
+export const LOCATION_API = {
+  GET_ALL_LOCATIONS: `${LOCATION_API_BASE}/`,
+  UPLOAD_CSV_DATA: `${LOCATION_API_BASE}/upload-csv-data`,
+
+  GET_STATES: `${LOCATION_API_BASE}/states?limit=100&page=1`,
+  GET_COUNTIES_BY_STATE: `${LOCATION_API_BASE}/states/:stateId/counties?limit=100&page=1`,
+
+};
+
+// ========== CAMPAIGNS ROUTES ==========
+const CAMPAIGNS_API_BASE = `${API_BASE}/campaigns`;
+
+export const CAMPAIGNS_API = {
+  GET_ALL_CAMPAIGNS: `${CAMPAIGNS_API_BASE}/`,
+  CREATE_CAMPAIGN: `${CAMPAIGNS_API_BASE}/`,
+  GET_CAMPAIGN: `${CAMPAIGNS_API_BASE}/:campaignId`,
+  UPDATE_CAMPAIGN: `${CAMPAIGNS_API_BASE}/:campaignId`,
+  
+};
+// ========== LEADS ROUTES ==========
+const LEADS_API_BASE = `${API_BASE}/leads`;
+
+export const LEADS_API = {
+  GET_ALL_LEADS: `${LEADS_API_BASE}/`,
+  CREATE_LEAD: `${LEADS_API_BASE}/`,
+  GET_LEAD: `${LEADS_API_BASE}/:leadId`,
+  UPDATE_LEAD: `${LEADS_API_BASE}/:leadId`,
+  GET_LEADS_BY_CAMPAIGN:`${LEADS_API_BASE}/`,
+  
+  GET_LEADS_BY_CLIENT:`${LEADS_API_BASE}/client`,
+};
+// ========== utilities ROUTES ==========
+const UITILITIES_API_BASE = `${API_BASE}/utilities`;
+
+export const UITILITIES_API = {
+  GET_ALL_UITILITIES: `${UITILITIES_API_BASE}/`,
+  GET_UITILITIES_BY_STATE: `${UITILITIES_API_BASE}/state/:stateId?all=true`,
+};

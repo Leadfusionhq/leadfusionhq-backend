@@ -7,14 +7,17 @@ interface SidebarItemProps {
   item: {
     id: string;
     name: string;
-    icon: React.ElementType | string; // icon can be a component or a path
+    icon: React.ElementType | string;
     link: string;
   };
 }
 
 const SidebarItem: FC<SidebarItemProps> = ({ item }) => {
   const pathname = usePathname();
-  const isActive = pathname === item.link || pathname?.startsWith(item.link + '/');
+
+  const isActive =
+    pathname === item.link ||
+    (item.link !== '/dashboard' && pathname?.startsWith(item.link + '/'));
 
   return (
     <Link href={item.link}>
@@ -32,7 +35,7 @@ const SidebarItem: FC<SidebarItemProps> = ({ item }) => {
             className="object-contain"
           />
         ) : (
-          <item.icon />
+          <item.icon size={25} />
         )}
         <span>{item.name}</span>
       </div>

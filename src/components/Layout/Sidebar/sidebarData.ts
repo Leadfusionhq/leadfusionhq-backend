@@ -1,4 +1,6 @@
 import { SidebarItem } from '@/types/sidebar';
+import { FiMapPin } from 'react-icons/fi';
+
 export const adminSidebarItems: SidebarItem[] = [
   { 
     id: 'dashboard', 
@@ -16,6 +18,36 @@ export const adminSidebarItems: SidebarItem[] = [
       '/admin/user-management/new',
     ]
   },
+  {
+    id: 'locations',
+    name: 'Locations',
+    icon: FiMapPin,
+    link: '/admin/locations',
+    pathCombinations: [
+      '/admin/locations/edit',
+      '/admin/locations/add',
+    ]
+  },
+  {
+    id: 'campaigns',
+    name: 'Campaigns',
+    icon: '/images/icons/campaigns.svg',
+    link: '/admin/campaigns',
+    pathCombinations: [
+      '/admin/campaigns/edit',
+      '/admin/campaigns/add',
+    ]
+  },
+  {
+    id: 'leads',
+    name: 'Leads',
+    icon: '/images/icons/lead-management.svg',
+    link: '/admin/leads',
+    pathCombinations: [
+      '/admin/leads/edit',
+      '/admin/leads/add',
+    ]
+  },
 
 ];
 
@@ -30,6 +62,16 @@ export const userSidebarItems: SidebarItem[] = [
     id: 'campaigns', 
     name: 'Campaigns', 
     icon: '/images/icons/campaigns.svg', 
-    link: '/campaigns' 
+    link: '/dashboard/campaigns' 
+  },
+  {
+    id: 'leads',
+    name: 'Leads',
+    icon: '/images/icons/lead-management.svg',
+    link: '/dashboard/leads',
+    pathCombinations: [
+      '/dashboard/leads/edit',
+      '/dashboard/leads/add',
+    ]
   },
 ];

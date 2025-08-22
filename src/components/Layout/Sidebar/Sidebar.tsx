@@ -48,7 +48,8 @@ const Sidebar = () => {
       </nav>
       <div className="logout-container px-6 py-4">
         <button
-          className="w-full bg-[#E5D6990D] text-[#A8906B] font-semibold rounded-full py-2 px-4"
+          className="w-full bg-transparent text-[#204D9D] font-semibold rounded-full py-2 px-4 border border-[#204D9D]"
+
           onClick={handleLogout}
         >
           Log Out
