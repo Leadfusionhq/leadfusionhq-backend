@@ -1,4 +1,6 @@
 "use client";
+import { StateOption } from "@/types/campaign";
+
 export const initialLeadValues = {
   campaign_id: "",    
   first_name: "",      
@@ -8,7 +10,7 @@ export const initialLeadValues = {
   address: {
     street: "",       
     city: "",          
-    state: "",       
+     state: null as StateOption | null,      
     zip_code: "",   
   },
   note: "",           

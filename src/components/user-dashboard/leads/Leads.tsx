@@ -25,7 +25,7 @@ type Lead = {
       abbreviation: string;
       _id: string;
       name: string;
-    }| any;
+    };
     zip_code: string;
   };
   campaign_id: {
@@ -165,11 +165,11 @@ export default function LeadTable() {
   };
 
   const handleEdit = (row: Lead) => {
-    router.push(`/admin/leads/${row._id}/edit`);
+    router.push(`/dashboard/leads/${row._id}/edit`);
   };
 
   const handleView = (row: Lead) => {
-    router.push(`/admin/leads/${row._id}`);
+    router.push(`/dashboard/leads/${row._id}`);
   };
 
   // Columns for the lead table
@@ -308,7 +308,7 @@ export default function LeadTable() {
     //         >
     //           Edit
     //         </Button>
-    //         {/* <Button
+    //         <Button
     //           className="!bg-white !text-[#838383] border border-[#838383] hover:!bg-[#f4f4f4]"
     //           size="small"
     //           sx={{
@@ -320,7 +320,7 @@ export default function LeadTable() {
     //           onClick={() => handleView(row)}
     //         >
     //           View
-    //         </Button> */}
+    //         </Button>
     //       </div>
     //     ),
     //   ignoreRowClick: true,
