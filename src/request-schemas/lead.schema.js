@@ -66,6 +66,9 @@ const updateLead = {
     }),
   }),
   [Segments.BODY]: Joi.object({
+    campaign_id: Joi.string().hex().length(24).required().messages({
+      'any.required': 'Campaign ID is required',
+    }),
     first_name: Joi.string().min(2).max(50).optional().messages({
       'string.base': 'First Name must be a string',
     }),

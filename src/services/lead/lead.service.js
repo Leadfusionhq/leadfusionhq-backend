@@ -94,7 +94,7 @@ const getLeadById = async (leadId, userId) => {
 };
 const getLeadByIdForAdmin = async (leadId) => {
   const lead = await Lead.findById(leadId)
-    .populate('campaign_id', 'campaign_id name status lead_type exclusivity language geography delivery user_id note')
+    // .populate('campaign_id', 'campaign_id name status lead_type exclusivity language geography delivery user_id note')
     .populate('user_id', 'name email')
     .populate('address.state', 'name abbreviation')
     .lean();
@@ -105,11 +105,34 @@ const getLeadByIdForAdmin = async (leadId) => {
 
   return lead;
 };
+const updateLead = async (leadId, userId, role, updateData) => {
+  try {
+    const filter = { _id: leadId };
 
+    if (role !== CONSTANT_ENUM.USER_ROLE.ADMIN) {
+      filter.user_id = userId;
+    }
+
+    const updatedLead = await Lead.findOneAndUpdate(
+      filter,
+      updateData,
+      { new: true, runValidators: true }
+    ).lean();
+
+    if (!updatedLead) {
+      throw new ErrorHandler(404, 'lead not found or access denied');
+    }
+
+    return updatedLead;
+  } catch (error) {
+    throw new ErrorHandler(error.statusCode || 500, error.message || 'Failed to update lead');
+  }
+};
 module.exports = {
   createLead,
   getLeads,
   getLeadByUserId,
   getLeadByIdForAdmin,
   getLeadById,
+  updateLead,
 };

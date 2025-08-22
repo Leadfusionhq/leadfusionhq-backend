@@ -52,8 +52,18 @@ const getLeadById = wrapAsync(async (req, res) => {
   sendResponse(res, { data }, 'Lead fetched successfully', 200);
 });
 
+const updateLead = wrapAsync(async (req, res) => {
+  const { _id: user_id, role } = req.user;
+  const { leadId } = req.params;
+  const leadData = { ...req.body };
+
+  const result = await LeadServices.updateLead(leadId, user_id, role, leadData);
+
+  sendResponse(res, { result }, 'Lead has been updated successfully', 200);
+});
 module.exports = {
     createLead,
     getLeads,
     getLeadById,
+    updateLead
 };
