@@ -41,11 +41,10 @@ export const LeadValidationSchema = Yup.object().shape({
       .max(100, "City must be less than 100 characters")
       .required("City is required"),
 
-    state: Yup.string()
-      .min(2, "State must be at least 2 characters")
-      .max(50, "State must be less than 50 characters")
-      .required("State is required"),
-
+    state: Yup.mixed()
+        .test("is-object", "State is required", (value) => value !== null)
+        .required("State is required"),
+        
     zip_code: Yup.string()
       .matches(
         /^[0-9]{5}(-[0-9]{4})?$/,

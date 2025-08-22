@@ -21,7 +21,11 @@ type Lead = {
   address: {
     street: string;
     city: string;
-    state: string;
+    state: {
+      abbreviation: string;
+      _id: string;
+      name: string;
+    };
     zip_code: string;
   };
   campaign_id: {
@@ -109,7 +113,11 @@ export default function LeadTable() {
     address: {
       street: "",
       city: "",
-      state: "",
+      state: {
+        abbreviation: "",
+        name: "",
+        _id: ""
+      },
       zip_code: "",
     },
     campaign_id: "", // Set this to empty string as skeleton data
@@ -216,12 +224,12 @@ export default function LeadTable() {
     },
     {
       name: "State",
-      selector: (row) => row.address.state,
+      selector: (row) => row.address.state._id ?? '',
       cell: (row) =>
         row._id.startsWith("skeleton") ? (
           <Skeleton variant="text" width={80} animation="wave" />
         ) : (
-          <div className="text-sm text-gray-600">{row.address.state}</div>
+          <div className="text-sm text-gray-600">{row.address.state.abbreviation ?? ''}</div>
         ),
       sortable: true,
       minWidth: "100px",

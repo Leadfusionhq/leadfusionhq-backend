@@ -54,8 +54,8 @@ export const TabsNavigation = ({ activeTab, setActiveTab, isSubmitting, isEditMo
             disabled={isSubmitting}
           >
             {isSubmitting
-              ? (isEditMode ? "Updating Campaign..." : "Creating Campaign...")
-              : (isEditMode ? "Edit Campaign" : "Create Campaign")}
+              ? (isEditMode ? "Save Campaign..." : "Save Campaign...")
+              : (isEditMode ? "Save Campaign" : "Save Campaign")}
           </button>
         )}
       </div>

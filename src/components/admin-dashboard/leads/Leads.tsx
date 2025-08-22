@@ -21,7 +21,11 @@ type Lead = {
   address: {
     street: string;
     city: string;
-    state: string;
+    state: {
+      abbreviation: string;
+      _id: string;
+      name: string;
+    }| any;
     zip_code: string;
   };
   campaign_id: {
@@ -109,7 +113,11 @@ export default function LeadTable() {
     address: {
       street: "",
       city: "",
-      state: "",
+      state: {
+        abbreviation: "",
+        name: "",
+        _id: ""
+      },
       zip_code: "",
     },
     campaign_id: "", // Set this to empty string as skeleton data
@@ -157,11 +165,11 @@ export default function LeadTable() {
   };
 
   const handleEdit = (row: Lead) => {
-    router.push(`/dashboard/leads/${row._id}/edit`);
+    router.push(`/admin/leads/${row._id}/edit`);
   };
 
   const handleView = (row: Lead) => {
-    router.push(`/dashboard/leads/${row._id}`);
+    router.push(`/admin/leads/${row._id}`);
   };
 
   // Columns for the lead table
@@ -216,12 +224,12 @@ export default function LeadTable() {
     },
     {
       name: "State",
-      selector: (row) => row.address.state,
+      selector: (row) => row.address.state._id ?? '',
       cell: (row) =>
         row._id.startsWith("skeleton") ? (
           <Skeleton variant="text" width={80} animation="wave" />
         ) : (
-          <div className="text-sm text-gray-600">{row.address.state}</div>
+          <div className="text-sm text-gray-600">{row.address.state.abbreviation ?? ''}</div>
         ),
       sortable: true,
       minWidth: "100px",
@@ -300,7 +308,7 @@ export default function LeadTable() {
     //         >
     //           Edit
     //         </Button>
-    //         <Button
+    //         {/* <Button
     //           className="!bg-white !text-[#838383] border border-[#838383] hover:!bg-[#f4f4f4]"
     //           size="small"
     //           sx={{
@@ -312,7 +320,7 @@ export default function LeadTable() {
     //           onClick={() => handleView(row)}
     //         >
     //           View
-    //         </Button>
+    //         </Button> */}
     //       </div>
     //     ),
     //   ignoreRowClick: true,

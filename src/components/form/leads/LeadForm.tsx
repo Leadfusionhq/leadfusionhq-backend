@@ -1,83 +1,52 @@
 "use client";
-import { useEffect, useState } from "react";
-
 import { Formik, Form } from "formik";
-import { toast } from "react-toastify";
-import { LeadValidationSchema } from "@/request-schemas/lead-schema";
-import { initialLeadValues } from "@/constants/initialLeadValues";
-import axiosWrapper from "@/utils/api";
-import { useSelector } from "react-redux";
-import { RootState } from "@/redux/store";
-import { LEADS_API, LOCATION_API } from "@/utils/apiUrl";
 import { FormikInput, FormikTextarea, CustomFormikAsyncSelect } from "@/components/form";
-import {  State ,StateOption } from "@/types/campaign";
+import { LeadValidationSchema } from "@/request-schemas/lead-schema";
+import { StateOption } from "@/types/campaign";
+import { initialLeadValues } from "@/constants/initialLeadValues";
 
-const LeadForm = ({ campaignId }: { campaignId: string }) => {
-  const token = useSelector((state: RootState) => state.auth.token);
-  const [statesList, setStatesList] = useState<State[]>([]);
+type LeadFormProps = {
+  campaignId: string;
+  initialValues: typeof initialLeadValues;
+  onSubmit: (
+    values: typeof initialLeadValues,
+    formikHelpers: {
+      setSubmitting: (isSubmitting: boolean) => void;
+      resetForm: () => void;
+    }
+  ) => void;
+  stateOptions: StateOption[];
+  isLoadingStates: boolean;
+};
 
-  useEffect(() => {
-    const fetchStates = async () => {
-      try {
-        const response = (await axiosWrapper("get", LOCATION_API.GET_STATES, {}, token ?? undefined)) as {
-          data: State[];
-        };
-        if (response?.data) {
-          setStatesList(response.data);
-        }
-      } catch (err) {
-        console.error("Failed to load states:", err);
-        toast.error("Could not load state list");
-      }
-    };
-
-    fetchStates();
-  }, [token]);
+const LeadForm = ({
+  campaignId,
+  initialValues,
+  onSubmit,
+  stateOptions,
+  isLoadingStates,
+}: LeadFormProps) => {
+  // Async filter function for states dropdown
   const loadStates = (inputValue: string, callback: (options: StateOption[]) => void) => {
-    const filteredOptions = statesList
-      .filter(
-        (state) =>
-          state.name.toLowerCase().includes(inputValue.toLowerCase()) ||
-          state.abbreviation.toLowerCase().includes(inputValue.toLowerCase())
-      )
-      .map((state) => ({
-        label: `${state.name} (${state.abbreviation})`,
-        value: state._id,
-        name: state.name,
-        abbreviation: state.abbreviation,
-      }));
+    if (!inputValue || inputValue.trim() === "") {
+      callback(stateOptions.slice(0, 50));
+      return;
+    }
+
+    const filteredOptions = stateOptions.filter(
+      (option) =>
+        option.name.toLowerCase().includes(inputValue.toLowerCase()) ||
+        option.abbreviation.toLowerCase().includes(inputValue.toLowerCase())
+    );
 
     callback(filteredOptions);
-  };
-  // Submit handler for the form
-  const handleSubmit = async (values: typeof initialLeadValues, { setSubmitting, resetForm }: { setSubmitting: (isSubmitting: boolean) => void; resetForm: () => void }) => {
-    try {
-      setSubmitting(true);
-
-      const response = await axiosWrapper(
-        "post",
-        LEADS_API.CREATE_LEAD,
-        values,
-        token ?? undefined
-      ) as { message?: string };
-
-      toast.success(response?.message || "Lead added successfully!");
-
-      // Reset the form after successful submission
-      resetForm();
-    } catch (err) {
-      console.error("Error adding lead:", err);
-      toast.error("An error occurred while adding the lead.");
-    } finally {
-      setSubmitting(false);
-    }
   };
 
   return (
     <Formik
-      initialValues={{ ...initialLeadValues, campaign_id: campaignId }}
+      initialValues={initialValues}
       validationSchema={LeadValidationSchema}
-      onSubmit={handleSubmit}
+      onSubmit={onSubmit}
     >
       {({ isSubmitting, errors, touched }) => (
         <Form className="space-y-6 bg-white p-8 rounded-lg border border-gray-300 shadow-lg max-w-4xl mx-auto">
@@ -126,14 +95,24 @@ const LeadForm = ({ campaignId }: { campaignId: string }) => {
           />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Custom async select for states */}
-            <CustomFormikAsyncSelect
-              name="address.state"
-              label="State *"
-              loadOptions={loadStates}
-              placeholder="Search and select a state"
-              // errorMessage={touched?.address?.state && errors?.address?.state}
-            />
+            <div>
+              {isLoadingStates ? (
+                <div className="flex items-center justify-center p-4">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-600"></div>
+                  <span className="ml-2">Loading states...</span>
+                </div>
+              ) : (
+                <CustomFormikAsyncSelect
+                  name="address.state"
+                  label="State *"
+                  loadOptions={loadStates}
+                  defaultOptions={stateOptions.slice(0, 50)}
+                  placeholder="Search and select a state"
+                  cacheOptions={true}
+                />
+              )}
+            </div>
+
             <FormikInput
               name="address.zip_code"
               label="Zip Code"
@@ -152,15 +131,15 @@ const LeadForm = ({ campaignId }: { campaignId: string }) => {
           <div className="flex justify-end">
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isLoadingStates}
               className={`px-8 py-3 bg-[#1C1C1C] text-white text-[18px] font-semibold rounded-lg border-none cursor-pointer transition hover:bg-[#333333] ${
-                isSubmitting ? "bg-gray-400 cursor-not-allowed" : ""
+                isSubmitting || isLoadingStates ? "bg-gray-400 cursor-not-allowed" : ""
               }`}
             >
               {isSubmitting ? (
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mx-auto"></div>
               ) : (
-                "Add Lead"
+                "Save Lead"
               )}
             </button>
           </div>

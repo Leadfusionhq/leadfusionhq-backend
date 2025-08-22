@@ -15,6 +15,8 @@ interface FormikAsyncSelectProps {
   placeholder?: string;
   isMulti?: boolean;
   onChange?: (option: Option | Option[] | null) => void;
+  defaultOptions?: boolean | Option[];
+  cacheOptions?: boolean;
 }
 
 const CustomFormikAsyncSelect = ({
@@ -24,6 +26,8 @@ const CustomFormikAsyncSelect = ({
   placeholder,
   isMulti = false,
   onChange,
+  defaultOptions = true, // Default to true (shows options on focus)
+  cacheOptions = true,   // Default to true (enables caching)
 }: FormikAsyncSelectProps) => {
   const [field, meta, helpers] = useField(name);
   const { setValue } = helpers;
@@ -45,8 +49,8 @@ const CustomFormikAsyncSelect = ({
     <div className="w-full">
       {label && <label className="block text-[#1C1C1C] text-lg mb-2">{label}</label>}
       <AsyncSelect
-        cacheOptions
-        defaultOptions
+        cacheOptions={cacheOptions}
+        defaultOptions={defaultOptions}
         loadOptions={loadOptions}
         onChange={handleChange}
         value={selectedOption}
