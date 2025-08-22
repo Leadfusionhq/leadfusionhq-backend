@@ -85,7 +85,7 @@ const updateLead = {
     address: Joi.object({
       street: Joi.string().min(3).max(100).optional(),
       city: Joi.string().min(2).max(100).optional(),
-      state: Joi.string().min(2).max(50).optional(),
+      state: Joi.string().required(),
       zip_code: Joi.string().min(5).max(10).optional(),
     }).optional(),
 
