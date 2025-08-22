@@ -49,11 +49,17 @@ const leadSchema = new mongoose.Schema({
       minlength: 2,
       maxlength: 100,
     },
-    state: {
-      type: String,
+    // state: {
+    //   type: String,
+    //   required: true,
+    //   minlength: 2,
+    //   maxlength: 50,
+    // },
+    state: { 
+      type: mongoose.Schema.Types.ObjectId,
+      // type: String,
+      ref: 'State',
       required: true,
-      minlength: 2,
-      maxlength: 50,
     },
     zip_code: {
       type: String,

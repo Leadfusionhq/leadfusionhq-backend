@@ -31,5 +31,11 @@ leadRouter.post(
     leadController.createLead
 );
 leadRouter.get( API.GET_ALL_LEADS, leadController.getLeads);
+leadRouter.get( API.GET_LEAD, leadController.getLeadById);
 
+// leadRouter.put( 
+//     API.UPDATE_LEAD,
+//     celebrate(LeadSchema.updateLead), 
+//     leadController.updateLead
+// );
 module.exports = leadRouter;

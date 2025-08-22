@@ -36,7 +36,24 @@ const getLeads = wrapAsync(async (req, res) => {
 
     sendResponse(res, data, "Leads fetched successfully", 200);
 });
+
+const getLeadById = wrapAsync(async (req, res) => {
+  const user_id = req.user._id;
+  const { leadId } = req.params;
+  const isAdmin = req.user.role === CONSTANT_ENUM.USER_ROLE.ADMIN;
+
+  let data;
+  if (isAdmin) {
+    data = await LeadServices.getLeadByIdForAdmin(leadId);
+  } else {
+    data = await LeadServices.getLeadById(leadId, user_id);
+  }
+
+  sendResponse(res, { data }, 'Lead fetched successfully', 200);
+});
+
 module.exports = {
     createLead,
     getLeads,
+    getLeadById,
 };

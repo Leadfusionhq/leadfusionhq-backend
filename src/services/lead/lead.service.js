@@ -25,6 +25,7 @@ const getLeads = async (page = 1, limit = 10, filters = {}) => {
       Lead.find(query)
         .populate('campaign_id', 'campaign_id name status lead_type exclusivity language geography delivery user_id note')
         .populate('user_id', 'name email')
+        .populate('address.state', 'name abbreviation')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -60,6 +61,8 @@ const getLeadByUserId = async (page = 1, limit = 10, user_id) => {
       .skip(skip)
       .limit(limit)
       .populate('campaign_id', 'campaign_id name status lead_type exclusivity language geography delivery user_id note')
+      .populate('address.state', 'name abbreviation')
+      
       .sort({ createdAt: -1 })
       .lean();
 
@@ -80,9 +83,33 @@ const getLeadByUserId = async (page = 1, limit = 10, user_id) => {
   }
 };
 
+const getLeadById = async (leadId, userId) => {
+  const lead = await Lead.findOne({ _id: leadId, user_id: userId }).lean();
+
+  if (!lead) {
+    throw new ErrorHandler(404, 'Lead not found or access denied');
+  }
+
+  return lead;
+};
+const getLeadByIdForAdmin = async (leadId) => {
+  const lead = await Lead.findById(leadId)
+    .populate('campaign_id', 'campaign_id name status lead_type exclusivity language geography delivery user_id note')
+    .populate('user_id', 'name email')
+    .populate('address.state', 'name abbreviation')
+    .lean();
+
+  if (!lead) {
+    throw new ErrorHandler(404, 'lead not found');
+  }
+
+  return lead;
+};
 
 module.exports = {
   createLead,
   getLeads,
   getLeadByUserId,
+  getLeadByIdForAdmin,
+  getLeadById,
 };
