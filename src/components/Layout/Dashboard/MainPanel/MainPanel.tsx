@@ -1,5 +1,5 @@
 'use client';
-
+import Image from 'next/image';
 import { useEffect, PropsWithChildren } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { collapseSidebar, toggleAutoCollapse } from '@/redux/theme/theme_slice';
@@ -25,11 +25,16 @@ const MainPanel = ({ children }: PropsWithChildren) => {
   }, [dispatch]);
 
   return (
-    <div className={`main-panel ${collapsed || autoCollapsed ? 'full-width-panel' : ''}`}>
-        <Topbar />
-      <div className="main-content-wrapper">
-        {children}
-      </div>
+    <div className={`main-panel z-40 sticky top-0 lg:z-50 w-full  ${collapsed || autoCollapsed ? 'full-width-panel' : ''}`}>
+      {/* Sticky Topbar */}
+  <div className="w-full ">
+    <Topbar />
+  </div>
+
+  {/* Scrollable Content */}
+  {/* <div className="main-content-wrapper flex-1 overflow-y-auto">
+    {children}
+  </div> */}
     </div>
   );
 };

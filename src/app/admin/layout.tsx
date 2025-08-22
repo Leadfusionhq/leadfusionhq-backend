@@ -11,6 +11,7 @@ import Sidebar from '@/components/Layout/Sidebar/Sidebar';
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const { isLoggedIn, user } = useSelector((state: RootState) => state.auth);
   const router = useRouter();
+  const { collapsed}=useSelector((state:RootState)=>state.theme);
 
 
     useEffect(() => {
@@ -18,11 +19,13 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     });
 
   return (
-    <div className="layout_admin flex">
+    <div className="layout_admin flex ">
+      <div className="fixed left-0 top-0 z-60 lg:z-50">
       <Sidebar />
-      <div className="flex-1 ml-64">
+      </div>
+      <div className={`transition-all duration-300   w-full  ${collapsed?"lg:ml-[6%] lg:w-[94%]":"lg:ml-[15%] lg:w-[85%]"}`}>
         <MainPanel />
-        <main className="p-6 bg-gray-100 min-h-screen">{children}</main>
+        <main className="px-[24px] py-[24px] bg-gray-100 min-h-screen w-full">{children}</main>
       </div>
     </div>
 
