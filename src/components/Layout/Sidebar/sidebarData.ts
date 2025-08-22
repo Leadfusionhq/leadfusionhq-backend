@@ -18,16 +18,16 @@ export const adminSidebarItems: SidebarItem[] = [
       '/admin/user-management/new',
     ]
   },
-  {
-    id: 'locations',
-    name: 'Locations',
-    icon: FiMapPin,
-    link: '/admin/locations',
-    pathCombinations: [
-      '/admin/locations/edit',
-      '/admin/locations/add',
-    ]
-  },
+  // {
+  //   id: 'locations',
+  //   name: 'Locations',
+  //   icon: FiMapPin,
+  //   link: '/admin/locations',
+  //   pathCombinations: [
+  //     '/admin/locations/edit',
+  //     '/admin/locations/add',
+  //   ]
+  // },
   {
     id: 'campaigns',
     name: 'Campaigns',
