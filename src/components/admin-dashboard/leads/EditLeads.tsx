@@ -102,25 +102,24 @@ const EditLeadPage = () => {
     fetchLead();
   }, [leadIdString, token]);
 
-  // Submit handler
   const handleSubmit = async (
-    values: typeof initialLeadValues,
-    { setSubmitting, resetForm }: { setSubmitting: (isSubmitting: boolean) => void; resetForm: () => void }
-  ) => {
+      values: typeof initialLeadValues,
+      { setSubmitting, resetForm }: { setSubmitting: (isSubmitting: boolean) => void; resetForm: () => void }
+    ) => {
     const cleanedValues = cleanLeadValues(values);
-
+      console.log("Submitting cleanedValues:", cleanedValues);
+    if (!leadIdString || !token) return;
     try {
       setSubmitting(true);
 
       const response = await axiosWrapper(
         "put",
-        `${LEADS_API.UPDATE_LEAD}/${leadIdString}`,
+        `${LEADS_API.UPDATE_LEAD.replace(":leadId", leadIdString)}`,
         cleanedValues,
         token ?? undefined
       ) as { message?: string };
 
       toast.success(response?.message || "Lead updated successfully!");
-      resetForm();
     } catch (err) {
       console.error("Error updating lead:", err);
       toast.error("An error occurred while updating the lead.");
@@ -143,6 +142,8 @@ const EditLeadPage = () => {
         stateOptions={stateOptions}
         isLoadingStates={isLoadingStates}
       />
+
+
     </div>
   );
 };

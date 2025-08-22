@@ -32,7 +32,7 @@ const LeadForm = ({
       callback(stateOptions.slice(0, 50));
       return;
     }
-
+    
     const filteredOptions = stateOptions.filter(
       (option) =>
         option.name.toLowerCase().includes(inputValue.toLowerCase()) ||
@@ -41,10 +41,10 @@ const LeadForm = ({
 
     callback(filteredOptions);
   };
-
   return (
     <Formik
       initialValues={initialValues}
+      enableReinitialize={true}
       validationSchema={LeadValidationSchema}
       onSubmit={onSubmit}
     >
