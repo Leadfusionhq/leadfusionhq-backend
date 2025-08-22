@@ -45,10 +45,10 @@ const Sidebar = () => {
           alt="Logo"
           width={80}
           height={80}
-          className="mx-auto"
+          className="mx-auto h-[76px]   transition-all duration-300"
         />
       </div>
-      <nav className="sidebar-nav flex-1 px-6 py-4 space-y-4">
+      <nav className="sidebar-nav flex-1 px-[18px] py-4 space-y-4">
         {sidebarItems.map((item) => (
           <SidebarItem key={item.id} item={item} />
         ))}

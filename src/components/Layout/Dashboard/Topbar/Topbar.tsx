@@ -3,7 +3,7 @@
 import { useDispatch, useSelector } from 'react-redux';
 import { toggleSidebar } from '@/redux/theme/theme_slice';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState , useRef} from 'react';
 import { AppDispatch, RootState } from '@/redux/store';
 import Image from 'next/image';
 import { adminSidebarItems, userSidebarItems } from '../../Sidebar/sidebarData';
@@ -21,6 +21,8 @@ const Topbar = () => {
   const [openProfile,openSetProfile]=useState(false);
   const role = user?.role ?? 'USER';
   const name = user?.name || 'USER';
+    const notificationRef = useRef<HTMLDivElement>(null);
+  const profileRef = useRef<HTMLDivElement>(null);
 
   const sidebarItems =
     role === 'ADMIN'
@@ -28,6 +30,23 @@ const Topbar = () => {
       : role === 'USER'
       ? userSidebarItems
       : [];
+
+       useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        notificationRef.current &&
+        !notificationRef.current.contains(event.target as Node) &&
+        profileRef.current &&
+        !profileRef.current.contains(event.target as Node)
+      ) {
+        openSetNotification(false);
+        openSetProfile(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const getTopTitle = (path: string): string => {
     const findTitle = (items: SidebarItem[]): string | null => {
@@ -61,7 +80,7 @@ const Topbar = () => {
   return (
     <div>
   
-    <div className={`bg-white transition-all h-[102px] lg:h-[101px] ${collapsed?"xl:h-[105px]":"xl:h-[101px]"}  duration-300 justify-between w-full flex items-center gap-[45px] lg:pt-[38px] ${!collapsed?" lg:pb-[39px] ":" lg:pb-[43px] "} pt-[38px] pb-[21px] sm:pb-[44px] pl-[28px] shadow-sm`}>
+    <div className={`bg-white transition-all h-[102px] lg:h-[101px] ${collapsed?"xl:h-[101px]":"xl:h-[101px]"}  duration-300 justify-between w-full flex items-center gap-[45px] lg:pt-[38px] ${!collapsed?" lg:pb-[39px] ":" lg:pb-[43px] "} pt-[38px] pb-[21px] sm:pb-[44px] pl-[28px] shadow-sm`}>
       <div className="flex gap-[45px]">
               <div className="menue-toggler-wrapper text-black ">
         <button
@@ -88,13 +107,20 @@ const Topbar = () => {
         )}
       </div>
       </div>
-   <div className="pr-[28px] flex  gap-[20px]  items-center cursor-pointer">
+   <div className="pr-[28px] flex  gap-[26px]  items-center cursor-pointer">
+    <div ref={notificationRef}>
     <Image 
-    src="/images/group_notification.png" width={16} height={20} alt="notification_icon" 
+    src="/images/notification.png" width={20} height={20} alt="notification_icon"     className="w-[18px] h-[18px]"
     
     onClick={toggleNotificationCard}
     />
-    <Image src="/images/icons/User.svg" width={20} height={20} alt="profile_image_icon"  onClick={toggleProfileCard}/>
+    </div>
+    <div ref={profileRef}>
+    <Image src="/images/icons/User.svg" width={20} height={20} alt="profile_image_icon" 
+     className="w-[20px] h-[20px]"
+    onClick={toggleProfileCard}
+    />
+    </div>
    </div>
    {/* Notification Card */}
    {openNotification && <NotificationCard/>}
