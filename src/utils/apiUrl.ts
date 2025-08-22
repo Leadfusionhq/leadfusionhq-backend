@@ -68,7 +68,8 @@ export const CAMPAIGNS_API = {
   
 };
 
-// ========== LEAD ROUTES ==========
+// ========== LEADS ROUTES ==========
+
 const LEADS_API_BASE = `${API_BASE}/leads`;
 
 export const LEADS_API = {
@@ -76,10 +77,10 @@ export const LEADS_API = {
   CREATE_LEAD: `${LEADS_API_BASE}/`,
   GET_LEAD: `${LEADS_API_BASE}/:leadId`,
   UPDATE_LEAD: `${LEADS_API_BASE}/:leadId`,
+  GET_LEADS_BY_CAMPAIGN:`${LEADS_API_BASE}/`,
   
+  GET_LEADS_BY_CLIENT:`${LEADS_API_BASE}/client`,
 };
-
-
 
 // ========== utilities ROUTES ==========
 const UITILITIES_API_BASE = `${API_BASE}/utilities`;

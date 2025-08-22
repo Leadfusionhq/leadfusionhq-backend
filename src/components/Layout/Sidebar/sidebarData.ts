@@ -38,6 +38,16 @@ export const adminSidebarItems: SidebarItem[] = [
       '/admin/campaigns/add',
     ]
   },
+  {
+    id: 'leads',
+    name: 'Leads',
+    icon: '/images/icons/lead-management.svg',
+    link: '/admin/leads',
+    pathCombinations: [
+      '/admin/leads/edit',
+      '/admin/leads/add',
+    ]
+  },
 
 ];
 
@@ -53,5 +63,15 @@ export const userSidebarItems: SidebarItem[] = [
     name: 'Campaigns', 
     icon: '/images/icons/campaigns.svg', 
     link: '/dashboard/campaigns' 
+  },
+  {
+    id: 'leads',
+    name: 'Leads',
+    icon: '/images/icons/lead-management.svg',
+    link: '/dashboard/leads',
+    pathCombinations: [
+      '/dashboard/leads/edit',
+      '/dashboard/leads/add',
+    ]
   },
 ];
