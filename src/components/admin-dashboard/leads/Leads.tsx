@@ -283,51 +283,51 @@ export default function LeadTable() {
       sortable: true,
       minWidth: "110px",
     },
-    // {
-    //   name: "Actions",
-    //   cell: (row) =>
-    //     row._id.startsWith("skeleton") ? (
-    //       <Skeleton
-    //         variant="rectangular"
-    //         width={120}
-    //         height={30}
-    //         animation="wave"
-    //       />
-    //     ) : (
-    //       <div className="flex gap-2">
-    //         <Button
-    //           className="!bg-[#838383] !text-white hover:!bg-[#6b6b6b]"
-    //           size="small"
-    //           sx={{
-    //             fontSize: "12px",
-    //             minWidth: "60px",
-    //             height: "28px",
-    //             textTransform: "capitalize",
-    //           }}
-    //           onClick={() => handleEdit(row)}
-    //         >
-    //           Edit
-    //         </Button>
-    //         {/* <Button
-    //           className="!bg-white !text-[#838383] border border-[#838383] hover:!bg-[#f4f4f4]"
-    //           size="small"
-    //           sx={{
-    //             fontSize: "12px",
-    //             minWidth: "70px",
-    //             height: "28px",
-    //             textTransform: "capitalize",
-    //           }}
-    //           onClick={() => handleView(row)}
-    //         >
-    //           View
-    //         </Button> */}
-    //       </div>
-    //     ),
-    //   ignoreRowClick: true,
-    //   allowOverflow: true,
-    //   button: true,
-    //   minWidth: "140px",
-    // },
+    {
+      name: "Actions",
+      cell: (row) =>
+        row._id.startsWith("skeleton") ? (
+          <Skeleton
+            variant="rectangular"
+            width={120}
+            height={30}
+            animation="wave"
+          />
+        ) : (
+          <div className="flex gap-2">
+            <Button
+              className="!bg-[#838383] !text-white hover:!bg-[#6b6b6b]"
+              size="small"
+              sx={{
+                fontSize: "12px",
+                minWidth: "60px",
+                height: "28px",
+                textTransform: "capitalize",
+              }}
+              onClick={() => handleEdit(row)}
+            >
+              Edit
+            </Button>
+            {/* <Button
+              className="!bg-white !text-[#838383] border border-[#838383] hover:!bg-[#f4f4f4]"
+              size="small"
+              sx={{
+                fontSize: "12px",
+                minWidth: "70px",
+                height: "28px",
+                textTransform: "capitalize",
+              }}
+              onClick={() => handleView(row)}
+            >
+              View
+            </Button> */}
+          </div>
+        ),
+      ignoreRowClick: true,
+      allowOverflow: true,
+      button: true,
+      minWidth: "140px",
+    },
   ];
 
   const handlePageChange = (page: number) => {
