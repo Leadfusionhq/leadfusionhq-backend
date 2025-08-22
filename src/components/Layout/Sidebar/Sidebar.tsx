@@ -13,6 +13,7 @@ const Sidebar = () => {
   const dispatch = useDispatch<AppDispatch>();
   const router = useRouter();
   const { collapsed}=useSelector((state:RootState)=>state.theme);
+   console.log("inside collapsed sidebar",collapsed)
   // const pathname = usePathname();
 
   const { user } = useSelector((state: RootState) => state.auth);
@@ -35,32 +36,31 @@ const Sidebar = () => {
 
   return (
 <aside
-  className={`bg-black text-white h-screen fixed left-0 top-0 flex flex-col justify-between 
-    transition-all duration-300
-    ${!collapsed ? 'w-[100px] overflow-hidden' : 'w-64'}
+  className={`bg-black text-white flex flex-col justify-between min-h-screen
+    transition-all duration-300  ${collapsed ? 'w-[6%]' : "w-[25%]"} 
   `}
->      <div className="logo-container p-[24px] sm:p-[12px] border-b border-white/20">
+>      <div className="logo-container border-b border-[#FFFFFF17]">
         <Image
           src="/images/logo.svg"
           alt="Logo"
           width={80}
           height={80}
-          className="mx-auto h-[76px]   transition-all duration-300"
+          className="mx-auto h-[140px] lg:h-[72px]   transition-all duration-300"
         />
       </div>
-      <nav className="sidebar-nav flex-1 px-[18px] py-4 space-y-4">
+      <nav className="sidebar-nav flex-1 px-[18px] py-4 space-y-[30px]">
         {sidebarItems.map((item) => (
           <SidebarItem key={item.id} item={item} />
         ))}
       </nav>
-      <div className="logout-container px-6 py-4">
+      <div className={`logout-container ${collapsed?"px-[1px]":"px-[6px]"} py-4`}>
         <button
-          className="w-full overflow-hidden cursor-pointer transition-all duration-300  bg-transparent text-[#204D9D] font-semibold delay-[1ms] rounded-full py-2 px-4 border border-[#204D9D]"
+          className={`w-full flex items-center justify-center whitespace-nowrap overflow-hidden text-ellipsis cursor-pointer transition-all duration-300  bg-transparent text-[#204D9D] font-semibold delay-[1ms] rounded-full py-2 ${collapsed?"px-4":"px-4 border border-[#204D9D]"} `}
 
           onClick={handleLogout}
         >
-         {!collapsed ?<Image src="/images/logout.png" alt="logout-logo" width={100} height={100} className="transition-all duration-300 delay-[1ms] w-auto h-[16px] my-[5px]"/>:  
-         <span className="transition-all duration-300 delay-[1ms] whitespace-nowrap ">Log Out</span>
+         {collapsed ?<Image src="/images/logout.png" alt="logout-logo" width={100} height={100} className="transition-all duration-300  w-auto h-[16px] my-[5px]"/>:  
+         <div className="transition-all duration-300  whitespace-nowrap overflow-hidden text-ellipsis ">Log Out</div>
 } 
         </button>
       </div>

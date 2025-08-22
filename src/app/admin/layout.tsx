@@ -19,11 +19,13 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     });
 
   return (
-    <div className="layout_admin flex">
+    <div className="layout_admin flex ">
+      <div className="w-full fixed left-0 top-0">
       <Sidebar />
-      <div className={`transition-all duration-300  flex-1 ${collapsed?"ml-64":"ml-[103px]"}`}>
+      </div>
+      <div className={`transition-all duration-300   ${collapsed?"ml-[6%] w-[94%]":"ml-[25%] w-[75%]"}`}>
         <MainPanel />
-        <main className="p-6 bg-gray-100 min-h-screen">{children}</main>
+        <main className="px-[24px] py-[24px] bg-gray-100 min-h-screen w-full">{children}</main>
       </div>
     </div>
 

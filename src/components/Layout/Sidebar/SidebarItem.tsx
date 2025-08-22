@@ -24,22 +24,26 @@ const SidebarItem: FC<SidebarItemProps> = ({ item }) => {
   return (
     <Link href={item.link}>
     <div
-  className={`flex items-center gap-3 overflow-hidden  px-4 py-2 my-2 rounded-full cursor-pointer transition-all duration-300 
+  className={`flex items-center gap-3 overflow-hidden  ${collapsed?"px-[10px]":"px-[20px]"} py-[8px]  my-[8px] rounded-full cursor-pointer transition-all duration-300 
     ${isActive ? 'bg-[#204D9D] text-white' : 'hover:bg-gray-700'}
   `}
 >
         {typeof item.icon === 'string' ? (
           <Image
+          priority
+          unoptimized 
             src={item.icon}
             alt={item.name}
             width={23}
             height={24}
-            className="object-contain"
+            className="object-contain "
           />
         ) : (
           <item.icon size={25} />
         )}
-        {collapsed &&  <span >{item.name}</span>}
+        {!collapsed &&    <div className="whitespace-nowrap overflow-hidden text-ellipsis">
+
+          {item.name}</div>}
        
       </div>
     </Link>

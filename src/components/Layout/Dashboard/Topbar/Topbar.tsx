@@ -80,9 +80,9 @@ const Topbar = () => {
   return (
     <div>
   
-    <div className={`bg-white transition-all h-[102px] lg:h-[101px] ${collapsed?"xl:h-[101px]":"xl:h-[101px]"}  duration-300 justify-between w-full flex items-center gap-[45px] lg:pt-[38px] ${!collapsed?" lg:pb-[39px] ":" lg:pb-[43px] "} pt-[38px] pb-[21px] sm:pb-[44px] pl-[28px] shadow-sm`}>
-      <div className="flex gap-[45px]">
-              <div className="menue-toggler-wrapper text-black ">
+    <div className={`bg-white transition-all h-[140px] lg:h-[73px] duration-300 justify-between w-full flex items-center gap-[45px] px-[30px] shadow-sm`}>
+      <div className="flex gap-[45px] items-center">
+            
         <button
           onClick={() => dispatch(toggleSidebar())}
           className="menu-toggler cursor-pointer"
@@ -91,11 +91,12 @@ const Topbar = () => {
           <Image
             src="/images/icons/collapse.svg"
             alt="collapse icon"
+             className="min-w-[25px] max-w-[25px] object-fit min-h-[25px] max-h-[25px]"
             width={20}
             height={20}
           />
         </button>
-      </div>
+     
 
       <div className="top-nav-title">
         {title === 'Dashboard' ? (
@@ -107,24 +108,28 @@ const Topbar = () => {
         )}
       </div>
       </div>
-   <div className="pr-[28px] flex  gap-[26px]  items-center cursor-pointer">
+   <div className="flex  gap-[26px]  items-center cursor-pointer">
     <div ref={notificationRef}>
     <Image 
-    src="/images/notification.png" width={20} height={20} alt="notification_icon"     className="w-[18px] h-[18px]"
+    src="/images/bell (1).png" width={20} height={20} alt="notification_icon"    className="min-w-[25px] max-w-[25px] object-fit min-h-[25px] max-h-[25px]"
     
     onClick={toggleNotificationCard}
     />
+      {/* Notification Card */}
+   {openNotification && <NotificationCard/>}
     </div>
     <div ref={profileRef}>
     <Image src="/images/icons/User.svg" width={20} height={20} alt="profile_image_icon" 
-     className="w-[20px] h-[20px]"
+     className="min-w-[30px] max-w-[25px] object-fit min-h-[30px] max-h-[25px]"
+    
     onClick={toggleProfileCard}
     />
+        {openProfile &&<ProfileCard/>} 
     </div>
+  
    </div>
-   {/* Notification Card */}
-   {openNotification && <NotificationCard/>}
-   {openProfile &&<ProfileCard/>} 
+ 
+ 
     </div>
     </div>
   );
