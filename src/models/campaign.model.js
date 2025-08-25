@@ -52,7 +52,9 @@ const campaignSchema = new mongoose.Schema({
   },
   geography: {
     state: { 
-      type: String,
+      type: mongoose.Schema.Types.ObjectId,
+      // type: String,
+      ref: 'State',
       required: true,
     },
     coverage: {
@@ -64,7 +66,13 @@ const campaignSchema = new mongoose.Schema({
       partial: {
         radius: { type: Number, min: 0 },
         zip_codes: [String],
-        counties: [String],
+        // counties: [String],
+        counties: [
+          {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'County',
+          }
+        ],
         countries: [String],
         zipcode: { type: String }, // optional string
       },
