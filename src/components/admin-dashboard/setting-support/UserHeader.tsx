@@ -10,7 +10,7 @@ const UserHeader = ({ user, onEdit }) => {
       <div className="flex items-center">
         {/* Avatar with Camera */}
         <div className="relative w-20 h-20 rounded-full mr-4">
-          <img 
+          <img  
             src="/images/icons/User.svg"
             alt="Profile"
             className="w-full h-full object-cover rounded-full"
