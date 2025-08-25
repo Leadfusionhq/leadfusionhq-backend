@@ -122,7 +122,7 @@ export default function LocationTable() {
           row.population.toLocaleString()
         ),
       sortable: false,
-      right: true,
+      // right: true,
       width: "15%",
     },
     {
