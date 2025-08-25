@@ -24,7 +24,7 @@ const SidebarItem: FC<SidebarItemProps> = ({ item }) => {
   return (
     <Link href={item.link}>
     <div
-  className={`flex items-center ${collapsed?"justify-left":""} gap-3 overflow-hidden  ${collapsed?"px-[6px]":"px-[20px]"} py-[8px]  my-[8px] rounded-full cursor-pointer transition-all duration-300 
+  className={`flex items-center ${collapsed?"justify-left":""} gap-3 overflow-hidden  ${collapsed?"px-[18px] lg:px-[6px]":"px-[20px]"} py-[18px] lg:py-[8px]  my-[8px] rounded-full cursor-pointer transition-all duration-300 
     ${isActive ? 'bg-[#204D9D] text-white' : 'hover:bg-gray-700'}
   `}
 >
@@ -36,15 +36,20 @@ const SidebarItem: FC<SidebarItemProps> = ({ item }) => {
             alt={item.name}
             width={23}
             height={24}
-            className={`object-contain ${collapsed?"mx-auto":""} `}
+            className={`object-contain ${collapsed?"lg:mx-auto":""} `}
           />
         ) : (
           <item.icon size={25} />
         )}
+        
+              <div className="lg:hidden whitespace-nowrap overflow-hidden text-ellipsis">
+      {item.name}
+    </div>
         {!collapsed &&    <div className="whitespace-nowrap overflow-hidden text-ellipsis ">
 
           {item.name}</div>}
        
+    
       </div>
     </Link>
   );
