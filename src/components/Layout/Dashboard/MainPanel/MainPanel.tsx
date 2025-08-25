@@ -25,7 +25,7 @@ const MainPanel = ({ children }: PropsWithChildren) => {
   }, [dispatch]);
 
   return (
-    <div className={`main-panel z-40 sticky top-0 lg:z-50 w-full  ${collapsed || autoCollapsed ? 'full-width-panel' : ''}`}>
+    <div className={`main-panel sticky top-0 w-full   z-9 lg:z-9  ${collapsed || autoCollapsed ? 'full-width-panel' : ''}`}>
       {/* Sticky Topbar */}
   <div className="w-full ">
     <Topbar />

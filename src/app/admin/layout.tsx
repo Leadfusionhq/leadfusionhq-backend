@@ -20,10 +20,10 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="layout_admin flex ">
-      <div className="fixed left-0 top-0 z-60 lg:z-50">
+      <div className={``}>
       <Sidebar />
       </div>
-      <div className={`transition-all duration-300   w-full  ${collapsed?"lg:ml-[6%] lg:w-[94%]":"lg:ml-[15%] lg:w-[85%]"}`}>
+      <div className={` relative transition-all duration-300   z-9 lg:z-9  w-full  ${collapsed?"lg:ml-[6%] lg:w-[94%]":"lg:ml-[21%] lg:w-[79%]"}`}>
         <MainPanel />
         <main className="px-[24px] py-[24px] bg-gray-100 min-h-screen w-full">{children}</main>
       </div>

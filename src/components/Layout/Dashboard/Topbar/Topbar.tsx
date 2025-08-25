@@ -80,8 +80,8 @@ const Topbar = () => {
   return (
     <div>
   
-    <div className={`bg-white transition-all h-[140px] lg:h-[73px] duration-300 justify-between w-full flex items-center gap-[45px] px-[30px] shadow-sm`}>
-      <div className="flex gap-[45px] items-center">
+    <div className={`bg-white transition-all py-[10px] gap-[20px] lg:py-0 h-auto lg:h-[73px] duration-300 justify-between w-full flex items-center lg:gap-[45px] px-[30px] shadow-sm`}>
+      <div className="flex gap-[20px] lg:gap-[45px] items-center">
             
         <button
           onClick={() => dispatch(toggleSidebar())}
@@ -98,7 +98,7 @@ const Topbar = () => {
         </button>
      
 
-      <div className="top-nav-title">
+      <div className="top-nav-title  text-[14px] lg:text-[14px]">
         {title === 'Dashboard' ? (
           <h3 className="sub-title">
             Welcome to Dashboard, <strong>{name}</strong>
@@ -108,7 +108,7 @@ const Topbar = () => {
         )}
       </div>
       </div>
-   <div className="flex  gap-[26px]  items-center cursor-pointer">
+   <div className="flex  gap-[10px] lg:gap-[26px]  items-center cursor-pointer">
     <div ref={notificationRef}>
     <Image 
     src="/images/bell (1).png" width={20} height={20} alt="notification_icon"    className="min-w-[25px] max-w-[25px] object-fit min-h-[25px] max-h-[25px]"
