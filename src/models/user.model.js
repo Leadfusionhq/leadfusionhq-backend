@@ -82,6 +82,13 @@ const baseUserSchema = new mongoose.Schema({
     type: String,
     trim: true,
   },
+  dob: {
+    type: Date,
+  },
+  address: {
+    type: String,
+    trim: true,
+  },
 }, options);
 
 // Password hashing middleware

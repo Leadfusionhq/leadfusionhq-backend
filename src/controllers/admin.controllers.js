@@ -6,8 +6,10 @@ const UserServices = require('../services/user.service');
 const N8nServices = require('../services/n8n/n8n.automation.service');
 
 const AdminServices = require('../services/admin.service');
-const MAIL_HANDLER = require('../mail/mails');
 
+const MAIL_HANDLER = require('../mail/mails');
+const fs = require("fs");
+const path = require("path");
 
 const getAllAdmins = wrapAsync(async (req, res) => {
     const data = await UserServices.getAllAdminsService(); 
@@ -70,10 +72,43 @@ const deleteAdmin = wrapAsync(async (req, res) => {
   return sendResponse(res, null, 'Admin has been deleted.', 200);
 });
 
+
+const uploadAvatarAdmin = wrapAsync(async (req, res) => {
+  const { adminId } = req.params;
+
+  if (!req.file) {
+    return sendResponse(res, {}, "No file uploaded", 400);
+  }
+
+  const folder = "profile/admin";
+  const avatarPath = `/uploads/${folder}/${req.file.filename}`; // store without /public
+
+  const user = await AdminServices.getAdminByID(adminId);
+
+  // Delete previous avatar
+  if (user?.avatar) {
+    const oldAvatarPath = path.join(process.cwd(), "public", user.avatar.replace(/^\/+/, ""));
+    if (fs.existsSync(oldAvatarPath)) {
+      fs.unlinkSync(oldAvatarPath);
+    }
+  }
+
+  // Update user with new avatar
+  const updatedUser = await AdminServices.updateAdmin(adminId, { avatar: avatarPath });
+
+  sendResponse(res, { user: updatedUser }, "Avatar uploaded successfully", 200);
+});
+
+
+
+
+
+
 module.exports = {
  getAllAdmins,
  addAdmin,
  getAdminById,
  updateAdmin,
  deleteAdmin,
+ uploadAvatarAdmin,
 };
