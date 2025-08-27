@@ -6,6 +6,8 @@ require('dotenv').config();
 const app = express();
 require('./src/config/mongoose').connect(); 
 
+const path = require("path");
+
 const config = require('./src/config/config');
 const { ErrorHandler } = require('./src/utils/error-handler');
 const { errors } = require('celebrate');
@@ -30,6 +32,11 @@ app.get('/', (req, res) => {
   res.json({ message: 'Hey dev your api is running...' });
 
 });
+
+
+// serve uploads folder
+app.use("/uploads", express.static(path.join(__dirname, "public/uploads")));
+
 
 
 /** Example: if config.server.route = 'api' in .env → route becomes: /api/ */
