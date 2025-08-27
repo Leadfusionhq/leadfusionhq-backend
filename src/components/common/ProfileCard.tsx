@@ -11,6 +11,12 @@ import { logout } from '@/redux/auth/authSlice';
 
 const ProfileCard = () => {
   const { user } = useSelector((state: RootState) => state.auth);
+
+  const profileSrc = user?.avatar
+  ? `${process.env.NEXT_PUBLIC_BACKEND_API_URL}${user.avatar}`
+  : "/images/icons/User.svg";
+
+
   const dispatch = useDispatch<AppDispatch>();
   const router = useRouter();
   const dashboardLink = user?.role === 'ADMIN' ? '/admin/dashboard' : '/dashboard';
@@ -37,7 +43,7 @@ const ProfileCard = () => {
       {/* User Info */}
       <div className="flex items-center gap-3 px-2 py-3 border-b border-gray-800">
         <Image
-          src="/images/icons/User.svg"
+          src={profileSrc}
           width={60}
           height={60}
           alt="profile_image_icon"

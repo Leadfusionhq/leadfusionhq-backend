@@ -94,7 +94,7 @@ axios.interceptors.response.use(
 const axiosWrapper = async (
   method: 'get' | 'post' | 'put' | 'delete' | 'patch',
   url: string,
-  data?: Record<string, unknown>,
+  data?: Record<string, unknown> | FormData,
   token?: string,
   isFormData = false
 ): Promise<unknown> => {
