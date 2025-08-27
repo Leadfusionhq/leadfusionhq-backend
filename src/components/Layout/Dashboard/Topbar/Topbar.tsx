@@ -24,6 +24,11 @@ const Topbar = () => {
     const notificationRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
+  const profileSrc = user?.avatar
+  ? `${process.env.NEXT_PUBLIC_BACKEND_API_URL}${user.avatar}`
+  : "/images/icons/User.svg";
+
+
   const sidebarItems =
     role === 'ADMIN'
       ? adminSidebarItems
@@ -119,11 +124,21 @@ const Topbar = () => {
    {openNotification && <NotificationCard/>}
     </div>
     <div ref={profileRef}>
-    <Image src="/images/icons/User.svg" width={20} height={20} alt="profile_image_icon" 
+    {/* <Image src="/images/icons/User.svg" width={20} height={20} alt="profile_image_icon" 
      className="min-w-[30px] max-w-[25px] object-fit min-h-[30px] max-h-[25px]"
     
     onClick={toggleProfileCard}
+    /> */}
+    <Image
+      src={profileSrc}
+      width={30}
+      height={30}
+      alt="profile_image_icon"
+       className="w-[30px] h-[30px] rounded-full object-cover cursor-pointer"
+      onClick={toggleProfileCard}
     />
+     
+
         {openProfile &&<ProfileCard/>} 
     </div>
   

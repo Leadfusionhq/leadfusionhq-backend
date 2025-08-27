@@ -25,6 +25,7 @@ export const API_URL = {
     DELETE_ADMIN_BY_ID: `${ADMIN_API_BASE}/:adminId`,
 
     GET_ALL_REGULAR_ADMIN: `${ADMIN_API_BASE}?role=Admin`,
+    UPLOAD_AVATAR: `${ADMIN_API_BASE}/:adminId/avatar`,
 
     // Auth URLs
     LOGIN_USER: `${AUTH_API_BASE}/login`,
