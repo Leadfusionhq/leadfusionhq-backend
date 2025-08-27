@@ -257,13 +257,15 @@ const leadTypes = Object.values(LEAD_TYPE);
   };
 
   const handleEdit = (row: Campaign) => {
-    router.push(`/dashboard/campaigns/${row._id}/edit`);
+    router.push(`/admin/campaigns/${row._id}/edit`);
   };
 
   const handleView = (row: Campaign) => {
     router.push(`/admin/campaigns/${row._id}`);
   };
-
+  const handleAddLead = (row:Campaign) => {
+    router.push(`/admin/campaigns/${row._id}/leads/add`);
+  };
   const columns: TableColumn<Campaign>[] = [
     {
       name: "Campaign ID",
@@ -335,26 +337,23 @@ const leadTypes = Object.values(LEAD_TYPE);
           getStatusBadge(row.status)
         ),
       sortable: true,
-      minWidth: "100px",
+      minWidth: "80px",
     },
     {
       name: "Actions",
       cell: (row) =>
         row._id.startsWith("skeleton") ? (
-          <Skeleton
-            variant="rectangular"
-            width={120}
-            height={30}
-            animation="wave"
-          />
+          <Skeleton variant="rectangular" width={150} height={30} animation="wave" />
         ) : (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            {/* View Button */}
             <Button
-              className="!bg-white !text-[#838383] border border-[#838383] hover:!bg-[#f4f4f4]"
+           
+              className="!bg-white !text-[#838383] hover:!bg-[#f5f5f5] border border-[#838383]"
               size="small"
               sx={{
                 fontSize: "12px",
-                minWidth: "70px",
+                minWidth: "60px",
                 height: "28px",
                 textTransform: "capitalize",
               }}
@@ -362,13 +361,44 @@ const leadTypes = Object.values(LEAD_TYPE);
             >
               View
             </Button>
+    
+            {/* Edit Button */}
+            <Button
+              className="!bg-[#838383] !text-white hover:!bg-[#6b6b6b]"
+              size="small"
+              sx={{
+                fontSize: "12px",
+                minWidth: "60px",
+                height: "28px",
+                textTransform: "capitalize",
+              }}
+              onClick={() => handleEdit(row)}
+            >
+              Edit
+            </Button>
+    
+            {/* Add Button */}
+            <Button
+              className="!bg-gray-100 !text-gray-700 hover:!bg-gray-200"
+              size="small"
+              sx={{
+                fontSize: "12px",
+                minWidth: "60px",
+                height: "28px",
+                textTransform: "capitalize",
+              }}
+              onClick={() => handleAddLead(row)}
+            >
+              Add
+            </Button>
           </div>
         ),
       ignoreRowClick: true,
       allowOverflow: true,
       button: true,
-      minWidth: "140px",
+      minWidth: "200px", // adjust so all buttons fit without scrolling
     }
+    
   ];
 
   // Popover handlers

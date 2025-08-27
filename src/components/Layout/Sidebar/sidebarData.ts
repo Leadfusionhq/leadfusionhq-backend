@@ -58,6 +58,12 @@ export const adminSidebarItems: SidebarItem[] = [
     //   '/admin/leads/add',
     // ]
   },
+  {
+    id: 'faq',
+    name: 'FAQs',
+    icon: '/images/icons/chats.svg',
+    link: '/admin/faq',
+  },
 
 
 ];
