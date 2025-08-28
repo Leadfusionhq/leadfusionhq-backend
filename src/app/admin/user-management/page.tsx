@@ -11,7 +11,8 @@ export default function UserManagement() {
   );
 }
 
+
 export const metadata: Metadata = {
-  title: 'User Management | Lead Management Platform',
-  description: 'User Management where you manage all your leads and settings.'
+  title: 'Settings & Support | Lead Management Platform',
+  description: 'Adjust your user settings and find help with our support resources to get the most out of your account.'
 };

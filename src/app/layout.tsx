@@ -33,8 +33,8 @@ export const metadata: Metadata = {
     icon: '/favicon.png',
   },
 };
-export default function RootLayout({
 
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -46,9 +46,9 @@ export default function RootLayout({
         <Toaster />
         <AOSInitializer/>
         <ClientComponent>
-        <ClientLayout>
+          <ClientLayout>
             {children}
-        </ClientLayout>
+          </ClientLayout>
         </ClientComponent>
       </body>
     </html>

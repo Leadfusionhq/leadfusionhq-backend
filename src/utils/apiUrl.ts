@@ -29,6 +29,7 @@ export const API_URL = {
     DELETE_ADMIN_BY_ID: `${ADMIN_API_BASE}/:adminId`,
 
     GET_ALL_REGULAR_ADMIN: `${ADMIN_API_BASE}?role=Admin`,
+    UPLOAD_AVATAR: `${ADMIN_API_BASE}/:adminId/avatar`,
 
     // Auth URLs
     LOGIN_USER: `${AUTH_API_BASE}/login`,
@@ -71,7 +72,9 @@ export const CAMPAIGNS_API = {
   UPDATE_CAMPAIGN: `${CAMPAIGNS_API_BASE}/:campaignId`,
   
 };
+
 // ========== LEADS ROUTES ==========
+
 const LEADS_API_BASE = `${API_BASE}/leads`;
 
 export const LEADS_API = {
@@ -83,6 +86,7 @@ export const LEADS_API = {
   
   GET_LEADS_BY_CLIENT:`${LEADS_API_BASE}/client`,
 };
+
 // ========== utilities ROUTES ==========
 const UITILITIES_API_BASE = `${API_BASE}/utilities`;
 
@@ -90,6 +94,7 @@ export const UITILITIES_API = {
   GET_ALL_UITILITIES: `${UITILITIES_API_BASE}/`,
   GET_UITILITIES_BY_STATE: `${UITILITIES_API_BASE}/state/:stateId?all=true`,
 };
+
 
 // ========== CSV ROUTES ===========
 const CSV_API_BASE = `${API_IMPORT_BASE}/contacts`;
@@ -99,3 +104,16 @@ export const CSV_API = {
   IMPORT_MAPPED_CSV: `${CSV_API_BASE}/import-mapped`,
   IMPORT_SHEET_CSV: `${BASE_SHEET_URL}`,
 };
+=======
+
+// ========== notifications ROUTES ==========
+const NOTIFICATION_API_BASE = `${API_BASE}/notifications`;
+
+export const NOTIFICATION_API = {
+  GET_NOTIFICATIONS: `${NOTIFICATION_API_BASE}/`,
+  GET_UNREAD_COUNT: `${NOTIFICATION_API_BASE}/unread-count`,
+  MARK_AS_READ: `${NOTIFICATION_API_BASE}/:notificationId/read`,
+  MARK_ALL_AS_READ: `${NOTIFICATION_API_BASE}/mark-all-read`,
+  DELETE_NOTIFICATION: `${NOTIFICATION_API_BASE}/:notificationId`,
+};
+
