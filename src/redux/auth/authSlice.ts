@@ -8,6 +8,10 @@ interface User {
   email: string;
   role: string;
   name?: string;
+  avatar?: string;
+  phoneNumber?:string;
+  address?:string; 
+  dob?: string | null;
 }
 
 interface AuthState {
@@ -50,6 +54,17 @@ const authSlice = createSlice({
       state.success = false;
       state.message = null;
     },
+    setUser(state, action: PayloadAction<User>) {
+      state.user = action.payload; // now includes avatar
+      state.isLoggedIn = true;
+    },
+    
+    updateAvatar(state, action: PayloadAction<{ avatar: string }>) {
+      if (state.user) {
+        state.user.avatar = action.payload.avatar;
+      }
+    },
+    
   },
   extraReducers: (builder) => {
     builder
@@ -88,5 +103,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { logout, clearError, clearSuccess } = authSlice.actions;
+export const { logout, clearError, clearSuccess ,setUser,updateAvatar} = authSlice.actions;
 export default authSlice.reducer;
