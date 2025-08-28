@@ -27,6 +27,7 @@
     "mongoose": "^8.16.3",
     "multer": "^2.0.2",
     "next": "15.4.1",
+    "papaparse": "^5.5.3",
     "react": "19.1.0",
     "react-countup": "^6.5.3",
     "react-data-table-component": "^7.7.0",
