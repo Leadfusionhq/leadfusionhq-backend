@@ -33,7 +33,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       <div className={``}>
         <Sidebar />
       </div>
-      <div className={` relative transition-all duration-300   z-9 lg:z-9  w-full  ${collapsed?"lg:ml-[6%] lg:w-[94%]":"lg:ml-[21%] lg:w-[79%]"}`}>
+      <div className={` relative transition-all duration-300   z-9 lg:z-9  w-full  ${collapsed?"lg:ml-[6%] lg:w-[94%]":"lg:ml-[17%] lg:w-[83%]"}`}>
         <MainPanel />
         <main className="px-[24px] py-[24px] bg-gray-100 min-h-screen w-full">
           {/* Debug info - remove in production */}

@@ -39,7 +39,7 @@ const Sidebar = () => {
 <aside
   className={`bg-black  fixed z-10 lg:z-10 top-0 left-0   text-white flex flex-col justify-between min-h-screen
     lg:translate-x-0
-    transition-all duration-300   ${collapsed ? 'lg:w-[6%] translate-x-0 w-[85%]  ' : "lg:w-[21%]  hidden lg:flex -translate-x-full "} 
+    transition-all duration-300   ${collapsed ? 'lg:w-[6%] translate-x-0 w-[85%]  ' : "lg:w-[17%]  hidden lg:flex -translate-x-full "} 
   `}
 >   
            <button
