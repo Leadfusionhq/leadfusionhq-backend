@@ -8,7 +8,9 @@ const CONSTANT_ENUM = require('../../helper/constant-enums.js');
 const createLead = async (data) => {
   try {
     const newLead = await Lead.create(data);
-    return newLead;
+    const populatedLead = await Lead.findById(newLead._id).populate('campaign_id', 'user_id').exec();
+
+    return populatedLead;
   } catch (error) {
     throw new ErrorHandler(500, error.message || 'Failed to create lead');
   }
