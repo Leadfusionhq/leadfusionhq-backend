@@ -3,7 +3,11 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 require('dotenv').config();
 
+const http = require('http'); 
+const { initSocket } = require('./src/config/socket');
+
 const app = express();
+const server = http.createServer(app);
 require('./src/config/mongoose').connect(); 
 
 const config = require('./src/config/config');
@@ -14,7 +18,9 @@ const authRoutes = require('./src/routes/auth/auth.routes');
 const userRoutes = require('./src/routes/user-routes');
 const adminRoutes = require('./src/routes/admin-routes');
 const campaignRoutes = require('./src/routes/campaign/campaign.routes');
+const leadRoutes = require('./src/routes/lead/lead.route');
 const locationRoutes = require('./src/routes/location/location.routes');
+const notificationRoutes = require('./src/routes/notification/notification.route');
 const utilityRoutes = require('./src/routes/utility/utility.routes');
 const ghlRoutes = require('./src/routes/ghl.route');
 
@@ -33,21 +39,14 @@ app.get('/', (req, res) => {
 
 /** Example: if config.server.route = 'api' in .env → route becomes: /api/ */
 app.use(`/${config.server.route}/auth`, authRoutes);
-
 app.use(`/${config.server.route}/users`, userRoutes);
 app.use(`/${config.server.route}/admins`, adminRoutes);
-
-/** ::::::::::::::::::campaign route::::::::::::::::: */
 app.use(`/${config.server.route}/campaigns`, campaignRoutes);
-/** ::::::::::::::::::location route::::::::::::::::: */
+app.use(`/${config.server.route}/leads`, leadRoutes);
 app.use(`/${config.server.route}/locations`, locationRoutes);
-/** ::::::::::::::::::utilities route::::::::::::::::: */
+app.use(`/${config.server.route}/notifications`, notificationRoutes);
 app.use(`/${config.server.route}/utilities`, utilityRoutes);
-
-
 app.use(`/${config.server.route}/ghl`, ghlRoutes);
-
-/** ::::::::::::::::::testign routes:::::::::::::::::: */
 app.use(`/${config.server.route}/test`, testRoutes);
 
 app.use(errors());
@@ -72,8 +71,14 @@ app.use((err, req, res, next) => {
   });
 });
 
+
+// Initialize Socket.IO by passing the HTTP server
+initSocket(server);
 /**   Server start */
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => {
+// app.listen(PORT, () => {
+//   console.log(`Server running on http://localhost:${PORT}`);
+// });
+server.listen(PORT, () => { 
   console.log(`Server running on http://localhost:${PORT}`);
 });

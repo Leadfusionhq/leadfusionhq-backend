@@ -37,6 +37,17 @@ const LANGUAGE = {
   SPANISH: 'SPANISH',
 };
 
+const CONTENT_TYPE = {
+  TEXT: 'TEXT',
+  IMAGE: 'IMAGE',
+  FILE: 'FILE',
+};
+
+const CHAT_STATUS = {
+  SENT: 'SENT',
+  DELIVERED: 'DELIVERED',
+  READ: 'READ',
+}
 
 module.exports = {
   USER_ROLE,
@@ -45,4 +56,7 @@ module.exports = {
   STATUS,
   DAYS_OF_WEEK,
   LANGUAGE,
+  
+  CONTENT_TYPE,
+  CHAT_STATUS,
 };
