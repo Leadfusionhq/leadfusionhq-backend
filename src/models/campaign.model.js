@@ -136,6 +136,9 @@ const campaignSchema = new mongoose.Schema({
     default: Date.now,
   },
 });
+campaignSchema.index({ user_id: 1 });
+campaignSchema.index({ campaign_id: 1 }, { unique: true, sparse: true });
+campaignSchema.index({ status: 1, lead_type: 1 });
 
 campaignSchema.pre('save', function (next) {
   this.updatedAt = Date.now();
