@@ -91,4 +91,11 @@ export const userSidebarItems: SidebarItem[] = [
       '/dashboard/leads/add',
     ]
   },
+  {
+    id: 'faq',
+    name: 'FAQs',
+    icon: '/images/icons/chats.svg',
+    link: '/dashboard/faq',
+  },
+
 ];
