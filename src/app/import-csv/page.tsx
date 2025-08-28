@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { RootState } from "@/redux/store";
 import CSVImport from "@/components/import-csv/import-csv";
+import Sidebar from "@/components/Layout/Sidebar/Sidebar";
 
 export default function CSVImportPage() {
   const router = useRouter();
@@ -24,8 +25,13 @@ export default function CSVImportPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <CSVImport />
+    <div className="layout_user flex">
+      <Sidebar />
+      <div className="flex-1 ml-64">
+        <div className="min-h-screen flex items-center justify-center bg-gray-100">
+          <CSVImport />
+        </div>
+      </div>
     </div>
   );
 }

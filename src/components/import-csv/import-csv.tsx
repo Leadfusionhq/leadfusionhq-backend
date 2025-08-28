@@ -47,15 +47,15 @@ function UploadStep({
         type="file"
         accept=".csv"
         onChange={(e) => onFileChange(e.target.files?.[0] || null)}
-        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-black file:text-white hover:file:bg-gray-800"
       />
       <button
         onClick={onUpload}
         disabled={isLoading}
         className={`w-full px-4 py-2 text-white rounded-lg transition-colors ${
           isLoading
-            ? "bg-blue-400 cursor-not-allowed"
-            : "bg-blue-600 hover:bg-blue-700"
+            ? "bg-black/60 cursor-not-allowed"
+            : "bg-black hover:bg-black/80"
         }`}
       >
         {isLoading ? "Uploading..." : "Upload"}
@@ -138,8 +138,8 @@ function MappingStep({
         disabled={isLoading || !isMappingComplete}
         className={`w-full px-4 py-2 text-white rounded-lg transition-colors ${
           isLoading || !isMappingComplete
-            ? "bg-green-400 cursor-not-allowed"
-            : "bg-green-600 hover:bg-green-700"
+            ? "bg-black/60 cursor-not-allowed"
+            : "bg-black hover:bg-black/80"
         }`}
       >
         {isLoading ? "Submitting..." : "Submit Mapping"}
@@ -161,37 +161,36 @@ export default function CSVImport() {
   const [selectedSourceId, setSelectedSourceId] = useState<string>("");
 
   useEffect(() => {
-  async function fetchSheetData() {
-    try {
-      const csvText = (await axiosWrapper(
-        "get",
-        CSV_API.IMPORT_SHEET_CSV,
-        undefined, 
-        NEXT_PUBLIC_CSV_API_TOKEN 
-      )) as string;
+    async function fetchSheetData() {
+      try {
+        const csvText = (await axiosWrapper(
+          "get",
+          CSV_API.IMPORT_SHEET_CSV,
+          undefined,
+          NEXT_PUBLIC_CSV_API_TOKEN
+        )) as string;
 
-      const parsed = Papa.parse(csvText, {
-        header: true,
-        skipEmptyLines: true,
-      });
+        const parsed = Papa.parse(csvText, {
+          header: true,
+          skipEmptyLines: true,
+        });
 
-      const mappedSources: SourceData[] = (parsed.data as any[]).map(
-        (row, index) => ({
-          source_name: row["Source Name"],
-          source_code: `${row["Source Id"]}-${index + 1}`,
-          id: `${index + 1}`,
-        })
-      );
+        const mappedSources: SourceData[] = (parsed.data as any[]).map(
+          (row, index) => ({
+            source_name: row["Source Name"],
+            source_code: `${row["Source Id"]}-${index + 1}`,
+            id: `${index + 1}`,
+          })
+        );
 
-      setSources(mappedSources);
-    } catch (error) {
-      console.error("Error fetching Google Sheet:", error);
+        setSources(mappedSources);
+      } catch (error) {
+        console.error("Error fetching Google Sheet:", error);
+      }
     }
-  }
 
-  fetchSheetData();
-}, []);
-
+    fetchSheetData();
+  }, []);
 
   const resetState = () => {
     setStep("upload");
