@@ -60,6 +60,20 @@ export const FAQ_API = {
   GET_PUBLIC_FAQS: `${FAQ_API_BASE}/public`,
 };
 
+// ========== FEEDBACK ROUTES ==========
+const FEEDBACK_API_BASE = `${API_BASE}/feedback`;
+
+export const FEEDBACK_API = {
+  // Public endpoints
+  CREATE_FEEDBACK: `${FEEDBACK_API_BASE}/`,
+  
+  // Admin endpoints (protected)
+  GET_ALL_FEEDBACKS: `${FEEDBACK_API_BASE}/`,
+  GET_FEEDBACK_BY_ID: `${FEEDBACK_API_BASE}/:feedbackId`,
+  UPDATE_FEEDBACK: `${FEEDBACK_API_BASE}/:feedbackId`,
+  DELETE_FEEDBACK: `${FEEDBACK_API_BASE}/:feedbackId`,
+};
+
 
 // ========== LOCATION ROUTES ==========
 const LOCATION_API_BASE = `${API_BASE}/locations`;
