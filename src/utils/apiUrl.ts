@@ -121,3 +121,15 @@ export const UITILITIES_API = {
 };
 
 
+
+// ========== notifications ROUTES ==========
+const NOTIFICATION_API_BASE = `${API_BASE}/notifications`;
+
+export const NOTIFICATION_API = {
+  GET_NOTIFICATIONS: `${NOTIFICATION_API_BASE}/`,
+  GET_UNREAD_COUNT: `${NOTIFICATION_API_BASE}/unread-count`,
+  MARK_AS_READ: `${NOTIFICATION_API_BASE}/:notificationId/read`,
+  MARK_ALL_AS_READ: `${NOTIFICATION_API_BASE}/mark-all-read`,
+  DELETE_NOTIFICATION: `${NOTIFICATION_API_BASE}/:notificationId`,
+};
+
