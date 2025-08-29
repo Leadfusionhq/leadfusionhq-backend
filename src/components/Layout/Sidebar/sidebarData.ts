@@ -105,11 +105,13 @@ export const userSidebarItems: SidebarItem[] = [
     link: '/dashboard/faq',
   },
 
+
   {
     id: 'feedback',
     name: 'Feedback',
     icon: '/images/icons/feedback.svg',
     link: '/dashboard/feedback',
   },
+
 
 ];

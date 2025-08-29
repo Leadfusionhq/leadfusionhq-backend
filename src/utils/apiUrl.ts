@@ -1,5 +1,8 @@
 const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_API_URL;
+const BASE_IMPORT_URL = process.env.NEXT_PUBLIC_IMPORT_API_URL;
+
 const API_BASE = `${BASE_URL}/api`;
+const API_IMPORT_BASE = `${BASE_IMPORT_URL}/api`;
 
 // here are base api:::::
 const AUTH_API_BASE = `${API_BASE}/auth`;
@@ -75,6 +78,7 @@ export const FEEDBACK_API = {
 };
 
 
+
 // ========== LOCATION ROUTES ==========
 const LOCATION_API_BASE = `${API_BASE}/locations`;
 
@@ -120,6 +124,17 @@ export const UITILITIES_API = {
   GET_UITILITIES_BY_STATE: `${UITILITIES_API_BASE}/state/:stateId?all=true`,
 };
 
+
+
+
+// ========== CSV ROUTES ===========
+const CSV_API_BASE = `${API_IMPORT_BASE}/contacts`;
+
+export const CSV_API = {
+  IMPORT_CSV: `${CSV_API_BASE}/upload`,
+  IMPORT_MAPPED_CSV: `${CSV_API_BASE}/import-mapped`,
+  IMPORT_SHEET_CSV: `${CSV_API_BASE}/csv/google-sheet`,
+};
 
 
 // ========== notifications ROUTES ==========
