@@ -40,6 +40,7 @@ export const API_URL = {
     // RESET_PASSWORD: `${AUTH_API_BASE}/reset-password`,
 
 
+
     SEND_OTP_ON_EMAIL:`${AUTH_API_BASE}/forgot-password`,
     VERIFY_OTP:`${AUTH_API_BASE}/verify-otp`,
     RESET_PASSWORD:`${AUTH_API_BASE}/reset-password`,
@@ -49,6 +50,20 @@ export const API_URL = {
 
     
 };
+
+// ========== FAQ ROUTES ==========
+
+const FAQ_API_BASE = `${API_BASE}/faqs`;
+
+export const FAQ_API = {
+  GET_ALL_FAQS: `${FAQ_API_BASE}/`,
+  CREATE_FAQ: `${FAQ_API_BASE}/`,
+  GET_FAQ_BY_ID: `${FAQ_API_BASE}/:faqId`,
+  UPDATE_FAQ: `${FAQ_API_BASE}/:faqId`,
+  DELETE_FAQ: `${FAQ_API_BASE}/:faqId`,
+  GET_PUBLIC_FAQS: `${FAQ_API_BASE}/public`,
+};
+
 
 // ========== LOCATION ROUTES ==========
 const LOCATION_API_BASE = `${API_BASE}/locations`;
@@ -94,6 +109,7 @@ export const UITILITIES_API = {
   GET_ALL_UITILITIES: `${UITILITIES_API_BASE}/`,
   GET_UITILITIES_BY_STATE: `${UITILITIES_API_BASE}/state/:stateId?all=true`,
 };
+
 
 
 // ========== CSV ROUTES ===========
