@@ -29,6 +29,7 @@
     "mongoose": "^8.16.3",
     "multer": "^2.0.2",
     "next": "15.4.1",
+    "papaparse": "^5.5.3",
     "react": "19.1.0",
     "react-countup": "^6.5.3",
     "react-data-table-component": "^7.7.0",
@@ -43,8 +44,12 @@
     "redux-persist": "^6.0.0",
     "resend": "^4.7.0",
     "slick-carousel": "^1.8.1",
+
     "tailwind-variants": "^3.1.0",
     "tailwindcss-animate": "^1.0.7",
+
+    "socket.io-client": "^4.8.1",
+
     "yup": "^1.6.1"
   },
   "devDependencies": {

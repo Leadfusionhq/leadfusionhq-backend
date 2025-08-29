@@ -4,7 +4,7 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { loginUser, registerUser } from './authActions';
 
 interface User {
-  id: string;
+  _id: string;
   email: string;
   role: string;
   name?: string;

@@ -1,110 +1,177 @@
-import React from 'react'
-
-const testNotifications = [
-  {
-    id: 1,
-    title: "siggy-ai-main",
-    message: "failed to deploy in the Production environment",
-    time: "2d ago",
-    type: "error"
-  },
-  {
-    id: 2,
-    title: "siggy-ai-main",
-    message: "failed to deploy in the Preview environment",
-    time: "2d ago",
-    type: "error"
-  },
-  {
-    id: 3,
-    title: "payment-service",
-    message: "successfully deployed to Production",
-    time: "1d ago",
-    type: "success"
-  },
-  {
-    id: 4,
-    title: "auth-service",
-    message: "new version released",
-    time: "5h ago",
-    type: "info"
-  },
-  {
-    id: 5,
-    title: "frontend",
-    message: "build warnings detected",
-    time: "Just now",
-    type: "warning"
-  },
-   {
-    id: 6,
-    title: "frontend",
-    message: "build warnings detected",
-    time: "Just now",
-    type: "warning"
-  },
-   {
-    id: 7,
-    title: "frontend",
-    message: "build warnings detected",
-    time: "Just now",
-    type: "warning"
-  },
-   {
-    id: 8,
-    title: "frontend",
-    message: "build warnings detected",
-    time: "Just now",
-    type: "warning"
-  },
-   {
-    id: 9,
-    title: "frontend",
-    message: "build warnings detected",
-    time: "Just now",
-    type: "warning"
-  },
-
-];
+"use client";
+import React, { useState, useEffect } from 'react';
+import { useNotifications } from '@/context/NotificationContext';
+import { useSocket } from '@/context/SocketContext';
 
 const NotificationCard = () => {
-  return (
-    <div className="absolute right-10 top-[88px] w-[400px] bg-black shadow-lg rounded-lg py-4 z-50 transition-all duration-300 font-normal font-base">
- <div className="flex items-center border-b border-gray-700">
-      <button className="flex-1 px-4 py-3 text-sm font-medium text-white border-b-2 ">
-        Inbox <span className="ml-1 text-xs px-2 py-0.5 rounded-full">  {testNotifications.length}</span>
-      </button>
-      {/* <button className="flex-1 px-4 py-3 text-sm font-medium text-gray-400 hover:text-white">
-        Archive
-      </button>
-      <button className="flex-1 px-4 py-3 text-sm font-medium text-gray-400 hover:text-white">
-        Comments
-      </button>
-      <button className="px-3 py-3">
-        <Image src="/images/icons/settings.svg" width={18} height={18} alt="settings"/>
-      </button> */}
-    </div>
-        {/* Notifications list */}
-    <div className="max-h-[400px] overflow-y-auto">
-      {testNotifications.map((n) => (
-        <div key={n.id} className="flex items-start gap-3 px-4 py-3 border-b border-gray-800 hover:bg-gray-700 cursor-pointer">
-         <span>
-              {n.type === "error" && <span className="text-red-500">⚠️</span>}
-              {n.type === "success" && <span className="text-green-500">✅</span>}
-              {n.type === "info" && <span className="text-blue-400">ℹ️</span>}
-              {n.type === "warning" && <span className="text-yellow-400">⚠️</span>}
-            </span>
-          <div>
-            <p className="text-base text-white">
-            {n.title}
-            </p>
-            <span className="text-base text-white">{n.time}</span>
-          </div>
-        </div>
-      ))}
-    </div>
-   </div>
-  )
-}
+  const { 
+    notifications, 
+    unreadCount, 
+    loading,
+    removeNotification, 
+    markAsRead,
+    markAllAsRead,
+    fetchNotifications
+  } = useNotifications();
+  
+  const { connected } = useSocket();
+  const [activeTab, setActiveTab] = useState<'all' | 'unread'>('all');
 
-export default NotificationCard
+  const handleNotificationClick = async (notification: any) => {
+    if (!notification.read && notification._id) {
+      await markAsRead(notification._id);
+    }
+  };
+
+  const handleDelete = async (e: React.MouseEvent, notificationId: string | number) => {
+    e.stopPropagation();
+    removeNotification(notificationId);
+  };
+
+  const handleTabChange = (tab: 'all' | 'unread') => {
+    setActiveTab(tab);
+    fetchNotifications(tab === 'unread');
+  };
+
+  const filteredNotifications = activeTab === 'unread' 
+    ? notifications.filter(n => !n.read)
+    : notifications;
+
+  return (
+    <div className="absolute right-10 top-[88px] w-[420px] bg-white shadow-2xl rounded-lg border border-gray-200 z-50 transition-all duration-300">
+      {/* Header */}
+      <div className="border-b border-gray-200 bg-gray-50 rounded-t-lg">
+        <div className="flex">
+          <button
+            onClick={() => handleTabChange('all')}
+            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'all'
+                ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
+                : 'text-gray-600 hover:text-gray-800'
+            }`}
+          >
+            All ({notifications.length})
+          </button>
+          <button
+            onClick={() => handleTabChange('unread')}
+            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'unread'
+                ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
+                : 'text-gray-600 hover:text-gray-800'
+            }`}
+          >
+            Unread ({unreadCount})
+          </button>
+        </div>
+      </div>
+
+      {/* Actions */}
+      {unreadCount > 0 && (
+        <div className="px-4 py-2 bg-gray-50 border-b border-gray-200">
+          <button
+            onClick={markAllAsRead}
+            className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+          >
+            Mark all as read
+          </button>
+        </div>
+      )}
+
+      {/* Notifications List */}
+      <div className="max-h-[450px] overflow-y-auto">
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+          </div>
+        ) : filteredNotifications.length === 0 ? (
+          <div className="px-4 py-8 text-center text-gray-500">
+            <div className="text-gray-400 text-3xl mb-2">📭</div>
+            <p className="text-sm">
+              {activeTab === 'unread' ? 'No unread notifications' : 'No notifications yet'}
+            </p>
+          </div>
+        ) : (
+          filteredNotifications.map((notification) => (
+            <div
+              key={notification._id || notification.id}
+              onClick={() => handleNotificationClick(notification)}
+              className={`flex items-start gap-3 px-4 py-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer group transition-colors ${
+                !notification.read ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''
+              }`}
+            >
+              {/* Icon */}
+              <div className="flex-shrink-0 mt-1">
+                {notification.type === 'error' && <span className="text-red-500 text-lg">⚠️</span>}
+                {notification.type === 'success' && <span className="text-green-500 text-lg">✅</span>}
+                {notification.type === 'info' && <span className="text-blue-500 text-lg">ℹ️</span>}
+                {notification.type === 'warning' && <span className="text-yellow-500 text-lg">⚠️</span>}
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-start justify-between">
+                  <h4 className={`text-sm font-medium ${
+                    !notification.read ? 'text-gray-900' : 'text-gray-700'
+                  }`}>
+                    {notification.title}
+                  </h4>
+                  {!notification.read && (
+                    <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-1"></div>
+                  )}
+                </div>
+                
+                <p className={`text-sm mt-1 break-words ${
+                  !notification.read ? 'text-gray-800' : 'text-gray-600'
+                }`}>
+                  {notification.message}
+                </p>
+                
+                <div className="flex items-center justify-between mt-2">
+                  <span className="text-xs text-gray-500">
+                    {notification.time}
+                  </span>
+                  
+                  {notification.senderId && (
+                    <span className="text-xs text-gray-500">
+                      from {notification.senderId.name}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Delete Button */}
+              <button
+                onClick={(e) => handleDelete(e, notification._id || notification.id)}
+                className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-all p-1 rounded"
+                title="Delete notification"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="px-4 py-3 bg-gray-50 rounded-b-lg border-t border-gray-200">
+        <div className="flex items-center justify-between text-xs text-gray-500">
+          <div className="flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+            <span>{connected ? 'Connected' : 'Disconnected'}</span>
+          </div>
+          
+          <button
+            onClick={() => fetchNotifications(activeTab === 'unread')}
+            className="text-blue-600 hover:text-blue-800"
+          >
+            Refresh
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default NotificationCard;
