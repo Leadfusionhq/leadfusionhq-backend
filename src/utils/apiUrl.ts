@@ -36,6 +36,7 @@ export const API_URL = {
     // RESET_PASSWORD: `${AUTH_API_BASE}/reset-password`,
 
 
+
     SEND_OTP_ON_EMAIL:`${AUTH_API_BASE}/forgot-password`,
     VERIFY_OTP:`${AUTH_API_BASE}/verify-otp`,
     RESET_PASSWORD:`${AUTH_API_BASE}/reset-password`,
@@ -45,6 +46,34 @@ export const API_URL = {
 
     
 };
+
+// ========== FAQ ROUTES ==========
+
+const FAQ_API_BASE = `${API_BASE}/faqs`;
+
+export const FAQ_API = {
+  GET_ALL_FAQS: `${FAQ_API_BASE}/`,
+  CREATE_FAQ: `${FAQ_API_BASE}/`,
+  GET_FAQ_BY_ID: `${FAQ_API_BASE}/:faqId`,
+  UPDATE_FAQ: `${FAQ_API_BASE}/:faqId`,
+  DELETE_FAQ: `${FAQ_API_BASE}/:faqId`,
+  GET_PUBLIC_FAQS: `${FAQ_API_BASE}/public`,
+};
+
+// ========== FEEDBACK ROUTES ==========
+const FEEDBACK_API_BASE = `${API_BASE}/feedback`;
+
+export const FEEDBACK_API = {
+  // Public endpoints
+  CREATE_FEEDBACK: `${FEEDBACK_API_BASE}/`,
+  
+  // Admin endpoints (protected)
+  GET_ALL_FEEDBACKS: `${FEEDBACK_API_BASE}/`,
+  GET_FEEDBACK_BY_ID: `${FEEDBACK_API_BASE}/:feedbackId`,
+  UPDATE_FEEDBACK: `${FEEDBACK_API_BASE}/:feedbackId`,
+  DELETE_FEEDBACK: `${FEEDBACK_API_BASE}/:feedbackId`,
+};
+
 
 // ========== LOCATION ROUTES ==========
 const LOCATION_API_BASE = `${API_BASE}/locations`;
@@ -92,6 +121,7 @@ export const UITILITIES_API = {
 };
 
 
+
 // ========== notifications ROUTES ==========
 const NOTIFICATION_API_BASE = `${API_BASE}/notifications`;
 
@@ -102,3 +132,4 @@ export const NOTIFICATION_API = {
   MARK_ALL_AS_READ: `${NOTIFICATION_API_BASE}/mark-all-read`,
   DELETE_NOTIFICATION: `${NOTIFICATION_API_BASE}/:notificationId`,
 };
+
