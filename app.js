@@ -26,7 +26,7 @@ const notificationRoutes = require('./src/routes/notification/notification.route
 const utilityRoutes = require('./src/routes/utility/utility.routes');
 const ghlRoutes = require('./src/routes/ghl.route');
 const faqRoutes = require('./src/routes/faq/faq.routes');
-
+const feedbackRoutes  = require('./src/routes/feedback/feedback.routes');
 
 const testRoutes = require('./src/routes/test/email-routes');
 
@@ -59,6 +59,10 @@ app.use(`/${config.server.route}/test`, testRoutes);
 
 /** ::::::::::::::::::faq routes:::::::::::::::::: */
 app.use(`/${config.server.route}/faqs`, faqRoutes);
+
+/** ::::::::::::::::::faq routes:::::::::::::::::: */
+app.use(`/${config.server.route}/feedback`, feedbackRoutes);
+
 
 app.use(errors());
 
