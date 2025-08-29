@@ -83,10 +83,9 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
     
     try {
       const response = (await axiosWrapper("get", NOTIFICATION_API.GET_UNREAD_COUNT, {}, token ?? undefined)) as any;
-      console.warn('response unreadcount :', response);  
-      
+
       // FIXED: Based on your backend, it should return { unreadCount: number }
-      setUnreadCount(response.data.unreadCount || 0);
+      setUnreadCount(response.unreadCount || 0);
       
     } catch (error) {
       console.error('Failed to fetch unread count:', error);
