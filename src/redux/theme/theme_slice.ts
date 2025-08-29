@@ -10,6 +10,7 @@ const themeSlice = createSlice({
     initialState,
     reducers: {
         toggleSidebar: (state) => {
+            
             state.collapsed = !state.collapsed;
         },
         collapseSidebar: (state, action) => {

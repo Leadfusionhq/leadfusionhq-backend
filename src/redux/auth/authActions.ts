@@ -5,7 +5,7 @@ import axiosWrapper from '@/utils/api';
 import { API_URL } from '@/utils/apiUrl';
 
 interface User {
-  id: string;
+  _id: string;
   name: string;
   email: string;
   role: string;
