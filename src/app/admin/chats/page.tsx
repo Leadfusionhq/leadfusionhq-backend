@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 
 const AdminChats = () => {
     return (
-    <div className="w-full h-full">
+    <div className="">
      <Chats />
     </div>
     );

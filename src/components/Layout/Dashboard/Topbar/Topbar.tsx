@@ -129,14 +129,14 @@ const Topbar = () => {
     
     onClick={toggleProfileCard}
     /> */}
-    <Image
+    {/* <Image
       src={profileSrc}
       width={30}
       height={30}
       alt="profile_image_icon"
        className="w-[30px] h-[30px] rounded-full object-cover cursor-pointer"
       onClick={toggleProfileCard}
-    />
+    /> */}
      
 
         {openProfile &&<ProfileCard/>} 
