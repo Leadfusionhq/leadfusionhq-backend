@@ -167,9 +167,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onClose }) => {
   };
 
   return (
-    <div className="h-[88%] bg-[#000] flex">
+    <div className="bg-[#000] flex">
       {/* Sidebar - Chat List */}
-      <div className="w-80 bg-white border-r border-gray-200 flex flex-col shadow-lg">
+      <div className="w-80 bg-white border-r border-gray-200 flex flex-col shadow-lg min-h-[calc(80vh)] max-h-[calc(80vh)]">
         {/* Header */}
         <div className="p-4 bg-[#000] text-white">
           <div className="flex items-center justify-between mb-4">
@@ -224,7 +224,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onClose }) => {
                   <div className="flex items-center gap-3">
                     {/* Avatar */}
                     <div className="relative">
-                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
+                      <div className="w-12 h-12 bg-[#000] rounded-full flex items-center justify-center text-white font-semibold">
                         {getInitials(participant.name)}
                       </div>
                       <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
@@ -281,14 +281,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onClose }) => {
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-h-[calc(80vh)] max-h-[calc(80vh)]">
         {currentChat ? (
           <>
             {/* Chat Header */}
             <div className="bg-white border-b border-gray-200 p-4 shadow-sm">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
+                  <div className="w-10 h-10 bg-[#000] rounded-full flex items-center justify-center text-white font-semibold">
                     {getInitials(getChatParticipant(currentChat).name)}
                   </div>
                   
@@ -309,21 +309,21 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onClose }) => {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                  {/* <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
                     <Phone className="w-5 h-5 text-gray-600" />
                   </button>
                   <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
                     <Video className="w-5 h-5 text-gray-600" />
-                  </button>
+                  </button> */}
                   <button 
                     onClick={() => setShowChatDetails(!showChatDetails)}
                     className="p-2 hover:bg-gray-100 rounded-full transition-colors"
                   >
                     <Settings className="w-5 h-5 text-gray-600" />
                   </button>
-                  <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                  {/* <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
                     <MoreVertical className="w-5 h-5 text-gray-600" />
-                  </button>
+                  </button> */}
                 </div>
               </div>
             </div>
@@ -368,7 +368,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onClose }) => {
                         <div
                           className={`relative group rounded-2xl px-4 py-2 ${
                             isOwnMessage
-                              ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white'
+                              ? 'bg-[#000] text-white'
                               : 'bg-white border shadow-sm text-gray-900'
                           }`}
                         >
@@ -420,13 +420,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onClose }) => {
                                 </button>
                                 {isOwnMessage && (
                                   <>
-                                    <button
+                                    {/* <button
                                       onClick={() => setEditingMessage(message._id)}
                                       className="p-1 hover:bg-gray-100 rounded"
                                       title="Edit"
                                     >
                                       <Edit className="w-4 h-4 text-gray-600" />
-                                    </button>
+                                    </button> */}
                                     <button
                                       onClick={() => deleteMessage(message._id)}
                                       className="p-1 hover:bg-gray-100 rounded"
@@ -457,7 +457,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onClose }) => {
                       </div>
 
                       {isOwnMessage && (
-                        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
+                        <div className="w-8 h-8 bg-[#000] rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
                           {getInitials(message.senderId.name)}
                         </div>
                       )}
@@ -636,7 +636,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onClose }) => {
           <div className="space-y-6">
             {/* Participant Info */}
             <div className="text-center">
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-xl mx-auto mb-3">
+              <div className="w-16 h-16 bg-[#000] rounded-full flex items-center justify-center text-white font-semibold text-xl mx-auto mb-3">
                 {getInitials(getChatParticipant(currentChat).name)}
               </div>
               <h4 className="font-semibold text-gray-900">

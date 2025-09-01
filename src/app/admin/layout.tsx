@@ -35,7 +35,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       </div>
       <div className={` relative transition-all duration-300   z-9 lg:z-9  w-full  ${collapsed?"lg:ml-[6%] lg:w-[94%]":"lg:ml-[17%] lg:w-[83%]"}`}>
         <MainPanel />
-        <main className="px-[24px] py-[24px] bg-gray-100 min-h-screen w-full">
+        <main className="px-[24px] py-[24px] bg-gray-100 w-full min-h-[calc(100vh-97px)] pb-0">
           {/* Debug info - remove in production */}
           {/* {process.env.NODE_ENV === 'development' && (
             <div className="fixed top-20 right-4 bg-black text-white text-xs px-2 py-1 rounded z-50">

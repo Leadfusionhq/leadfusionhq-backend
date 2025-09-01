@@ -10,7 +10,8 @@ const ChatPage: React.FC = () => {
 
   return (
     <ChatProvider>
-      <div className="h-screen overflow-hidden">
+      <div className="overflow-hidden">
+
         <ChatInterface />
       </div>
     </ChatProvider>
