@@ -257,9 +257,33 @@ const sendTestMail = async (toEmail) => {
     throw err;
   }
 };
+const sendLeadAssignEmail = async ({ to, name, leadName, assignedBy, leadDetailsUrl, campaignName }) => {
+  const html = createEmailTemplate({
+    title: 'New Lead Assigned',
+    greeting: `Hello ${name},`,
+    mainText: `
+      A new lead named <strong>${leadName}</strong> has been assigned to you by <strong>${assignedBy}</strong>.
+      <br /><br />
+      <strong>Campaign:</strong> ${campaignName}
+      <br /><br />
+      Please review the lead details and take necessary action.`,
+    buttonText: 'View Lead Details',
+    buttonUrl: leadDetailsUrl,
+    footerText: 'If you have any questions or need assistance, please contact your manager or support team.',
+    warningText: 'Do not share lead or campaign information outside the organization.',
+  });
+
+  return resend.emails.send({
+    from: FROM_EMAIL,
+    to,
+    subject: `📋 New Lead Assigned in "${campaignName}"`,
+    html,
+  });
+};
+
 
 module.exports = {
-  createEmailTemplate, // Export the template function for custom use
+  createEmailTemplate,
   sendVerificationEmail,
   sendEmailToUserWithOTP,
   sendAccountCreationEmailWithVerification,
@@ -267,4 +291,5 @@ module.exports = {
   sendWelcomeEmail,
   sendNotificationEmail,
   sendTestMail,
+  sendLeadAssignEmail,
 };

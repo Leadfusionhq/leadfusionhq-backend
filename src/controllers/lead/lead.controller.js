@@ -1,6 +1,9 @@
 const { wrapAsync } = require('../../utils/wrap-async');
 const { sendResponse } = require('../../utils/response');
 const LeadServices = require('../../services/lead/lead.service.js');
+const NotificationServices = require('../../services/notification/notification.service');
+
+
 const { ErrorHandler } = require('../../utils/error-handler');
 const Lead = require('../../models/lead.model.js'); 
 const CONSTANT_ENUM = require('../../helper/constant-enums.js');
@@ -14,6 +17,21 @@ const createLead = wrapAsync(async (req, res) => {
     const lead_id = await generateUniqueLeadId();
     const leadData = { ...req.body, user_id , lead_id };
     const  result  = await LeadServices.createLead(leadData);
+    const message = 'New Lead has been assign to your campain!';
+    console.log('Campaign User ID:', result?.campaign_id?.user_id);
+
+    try{
+      await NotificationServices.createNotification(
+        user_id,        
+        result?.campaign_id?.user_id,   
+        'info',          
+        message,         
+        0,               
+        `/dashboard/leads`
+      );
+    } catch (err) {
+        console.error(`Failed to send notification`, err.message);
+    }
     sendResponse(res, { leadData }, 'lead has been create succefully', 201);
 });
 
