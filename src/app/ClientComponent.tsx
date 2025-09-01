@@ -4,6 +4,7 @@ import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 import { store, persistor } from '@/redux/store';
 import { NotificationProvider } from '@/context/NotificationContext';
+import { ChatProvider } from '@/context/ChatContext';
 import { SocketProvider } from '@/context/SocketContext';
 
 const ClientComponent = ({ children }: { children: React.ReactNode }) => {
@@ -12,7 +13,9 @@ const ClientComponent = ({ children }: { children: React.ReactNode }) => {
       <PersistGate loading={null} persistor={persistor}>
         <NotificationProvider>
           <SocketProvider>
-            {children}
+            <ChatProvider>
+              {children}
+            </ChatProvider>
           </SocketProvider>
         </NotificationProvider>
       </PersistGate>
