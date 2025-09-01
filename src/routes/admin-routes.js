@@ -21,7 +21,7 @@ const API = {
 // Apply auth and role middleware to all admin routes
 userRouter.use(
     checkAuth,
-    authorizedRoles([CONSTANT_ENUM.USER_ROLE.ADMIN])
+    // authorizedRoles([CONSTANT_ENUM.USER_ROLE.ADMIN],[CONSTANT_ENUM.USER_ROLE.ADMIN])
 );
 
 // GET all admins

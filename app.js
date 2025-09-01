@@ -23,6 +23,7 @@ const campaignRoutes = require('./src/routes/campaign/campaign.routes');
 const leadRoutes = require('./src/routes/lead/lead.route');
 const locationRoutes = require('./src/routes/location/location.routes');
 const notificationRoutes = require('./src/routes/notification/notification.route');
+const chatRoutes = require('./src/routes/chat/chat.routes');
 const utilityRoutes = require('./src/routes/utility/utility.routes');
 const ghlRoutes = require('./src/routes/ghl.route');
 const faqRoutes = require('./src/routes/faq/faq.routes');
@@ -53,6 +54,8 @@ app.use(`/${config.server.route}/campaigns`, campaignRoutes);
 app.use(`/${config.server.route}/leads`, leadRoutes);
 app.use(`/${config.server.route}/locations`, locationRoutes);
 app.use(`/${config.server.route}/notifications`, notificationRoutes);
+app.use(`/${config.server.route}/chats`, chatRoutes);
+
 app.use(`/${config.server.route}/utilities`, utilityRoutes);
 app.use(`/${config.server.route}/ghl`, ghlRoutes);
 app.use(`/${config.server.route}/test`, testRoutes);
