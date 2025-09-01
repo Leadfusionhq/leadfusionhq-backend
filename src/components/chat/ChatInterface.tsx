@@ -600,7 +600,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onClose }) => {
                   <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
                     <h4 className="font-semibold text-blue-900 mb-2">Ready to Help!</h4>
                     <p className="text-blue-700 text-sm">
-                      You'll see new conversations here as users reach out for support. 
+                      You will see new conversations here as users reach out for support. 
                       You can also check for any pending assignments.
                     </p>
                   </div>
