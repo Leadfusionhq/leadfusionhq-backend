@@ -70,7 +70,8 @@ export const adminSidebarItems: SidebarItem[] = [
     name: 'Chats',
     icon: '/images/icons/chats.svg',
     link: '/admin/chats',
-
+  },
+  {
     id: 'feedback',
     name: 'Feedback',
     icon: '/images/icons/feedback.svg',
@@ -112,6 +113,7 @@ export const userSidebarItems: SidebarItem[] = [
     icon: '/images/icons/chats.svg',
     link: '/dashboard/chats',
   },
+  {
 
     id: 'faq',
     name: 'FAQs',
