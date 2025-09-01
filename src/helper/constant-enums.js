@@ -38,15 +38,17 @@ const LANGUAGE = {
 };
 
 const CONTENT_TYPE = {
-  TEXT: 'TEXT',
-  IMAGE: 'IMAGE',
-  FILE: 'FILE',
+  TEXT: 'text',
+  IMAGE: 'image',
+  FILE: 'file',
+  AUDIO: 'audio',
+  VIDEO: 'video',
 };
 
 const CHAT_STATUS = {
-  SENT: 'SENT',
-  DELIVERED: 'DELIVERED',
-  READ: 'READ',
+  SENT: 'sent',
+  DELIVERED: 'delivered',
+  READ: 'read',
 }
 
 module.exports = {
