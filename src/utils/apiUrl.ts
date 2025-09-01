@@ -99,7 +99,6 @@ export const UITILITIES_API = {
 const CSV_API_BASE = `${API_IMPORT_BASE}/contacts`;
 
 export const CSV_API = {
-  IMPORT_CSV: `${CSV_API_BASE}/upload`,
   IMPORT_MAPPED_CSV: `${CSV_API_BASE}/import-mapped`,
   IMPORT_SHEET_CSV: `${CSV_API_BASE}/csv/google-sheet`,
 };
