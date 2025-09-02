@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useSocket } from '@/context/SocketContext';
 import Sidebar from '@/components/Layout/Sidebar/Sidebar';
 import MainPanel from '@/components/Layout/Dashboard/MainPanel/MainPanel';
+import FloatingChatWidget from '@/components/chat/FloatingChatWidget'; 
 
 export default function UserLayout({ children }: { children: ReactNode }) {
   const { isLoggedIn, user } = useSelector((state: RootState) => state.auth);
@@ -44,6 +45,8 @@ export default function UserLayout({ children }: { children: ReactNode }) {
           )}
           {children}
         </main>
+          {/* Floating Chat Widget */}
+          <FloatingChatWidget />
       </div>
     </div>
   );

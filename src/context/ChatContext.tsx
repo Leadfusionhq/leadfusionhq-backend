@@ -448,18 +448,45 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const deleteMessage = async (messageId: string) => {
+  // const deleteMessage = async (messageId: string) => {
+  //   if (!user) return;
+    
+  //   try {
+  //     const url = CHAT_API.DELETE_MESSAGE.replace(':chatId', currentChat?._id || '').replace(':messageId', messageId);
+  //     await axiosWrapper("delete", url, {}, token ?? undefined);
+  //   } catch (error) {
+  //     console.error('Failed to delete message:', error);
+  //     throw error;
+  //   }
+  // };
+
+    const deleteMessage = async (messageId: string) => {
     if (!user) return;
+    
+    // Optimistically update UI immediately
+    setMessages(prev => prev.map(msg => 
+      msg._id === messageId 
+        ? { ...msg, isDeleted: true }
+        : msg
+    ));
     
     try {
       const url = CHAT_API.DELETE_MESSAGE.replace(':chatId', currentChat?._id || '').replace(':messageId', messageId);
       await axiosWrapper("delete", url, {}, token ?? undefined);
+      console.log('✅ Message deleted successfully');
     } catch (error) {
       console.error('Failed to delete message:', error);
+      
+      // Revert optimistic update on error
+      setMessages(prev => prev.map(msg => 
+        msg._id === messageId 
+          ? { ...msg, isDeleted: false }
+          : msg
+      ));
+      
       throw error;
     }
   };
-
   const markMessagesAsRead = async (chatId: string, messageIds?: string[]) => {
     if (!user) return;
     
@@ -573,9 +600,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const response = await axiosWrapper("get", CHAT_API.GET_UNREAD_COUNT, {}, token ?? undefined) as any;
       console.log('UNREAD COUNT RESPONSE:', response);
-      
-      const count = response.data?.unreadCount || response.unreadCount || 0;
-      setUnreadCount(count);
+      setUnreadCount(response.unreadCount || 0);
     } catch (error) {
       console.error('Failed to get unread count:', error);
     }
