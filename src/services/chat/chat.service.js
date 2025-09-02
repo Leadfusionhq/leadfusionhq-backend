@@ -229,6 +229,12 @@ const assignChat = async (chatId, adminId, assignToId) => {
 const getMessages = async (chatId, userId, userRole, page = 1, limit = 50, before = null, after = null) => {
   // Verify access to chat
   await getChatById(chatId, userId, userRole);
+
+    // Verify access to chat
+    const chat = await getChatById(chatId, userId, userRole);
+  
+    // Mark all messages as read when user fetches them
+    await markMessagesAsRead(chatId, userId, userRole, [])
   
   const skip = (page - 1) * limit;
   let query = { 
@@ -303,20 +309,26 @@ const sendMessage = async (chatId, senderId, content, type = 'text', metadata = 
   await message.save();
   await message.populate('senderId replyTo');
   
-  // Update chat's last message
+
+
+  const isSenderUser = senderIdStr === getIdStr(chat.userId);
+  const recipientRole = isSenderUser ? 'admin' : 'user';
+
   await Chat.findByIdAndUpdate(chatId, {
     lastMessage: {
       messageId: message._id,
-      content: content.substring(0, 100), // Preview
+      content: content.substring(0, 100),
       sentAt: message.createdAt,
       senderId: senderId
     },
-    // Update unread counts
+    // Only increment unread count for recipient, not sender
     $inc: {
-      [`unreadCount.${senderIdStr === chat.userId?.toString() ? 'admin' : 'user'}`]: 1
+      [`unreadCount.${recipientRole}`]: 1
     },
     updatedAt: new Date()
   });
+
+
   
   // Real-time emission
   try {
@@ -429,7 +441,7 @@ const markMessagesAsRead = async (chatId, userId, userRole, messageIds = []) => 
   
   let query = { 
     chatId: new mongoose.Types.ObjectId(chatId), 
-    senderId: { $ne: userId },
+    senderId: { $ne: userId }, // Only mark others' messages as read
     isDeleted: false
   };
   
@@ -437,6 +449,9 @@ const markMessagesAsRead = async (chatId, userId, userRole, messageIds = []) => 
   if (messageIds.length > 0) {
     query._id = { $in: messageIds.map(id => new mongoose.Types.ObjectId(id)) };
   }
+  
+  // Find messages to update
+  const messagesToUpdate = await Message.find(query);
   
   // Update messages with read status
   const result = await Message.updateMany(
@@ -448,7 +463,7 @@ const markMessagesAsRead = async (chatId, userId, userRole, messageIds = []) => 
           readAt: new Date()
         }
       },
-      status: CONSTANT_ENUM.CHAT_STATUS.READ
+      status: 'read'
     }
   );
   
@@ -458,7 +473,7 @@ const markMessagesAsRead = async (chatId, userId, userRole, messageIds = []) => 
     [unreadField]: 0
   });
   
-  // Emit read receipts
+  // Emit read receipts for each updated message
   try {
     const io = getIO();
     const recipients = [chat.userId, chat.adminId, chat.assignedTo]
@@ -468,7 +483,17 @@ const markMessagesAsRead = async (chatId, userId, userRole, messageIds = []) => 
       io.to(recipientId.toString()).emit('messages-read', {
         chatId,
         readBy: userId,
-        messageIds: messageIds.length > 0 ? messageIds : 'all'
+        messageIds: messagesToUpdate.map(msg => msg._id.toString())
+      });
+    });
+    
+    // Also emit individual message updates for real-time UI updates
+    messagesToUpdate.forEach(message => {
+      io.to(message.senderId.toString()).emit('message-read', {
+        chatId,
+        messageId: message._id,
+        readBy: userId,
+        readAt: new Date()
       });
     });
   } catch (error) {
@@ -477,6 +502,7 @@ const markMessagesAsRead = async (chatId, userId, userRole, messageIds = []) => 
   
   return { modifiedCount: result.modifiedCount };
 };
+
 
 // Upload file
 const uploadFile = async (chatId, senderId, file) => {
@@ -629,7 +655,7 @@ const getUnreadCount = async (userId, userRole) => {
       : chat.unreadCount?.user || 0;
     return sum + unreadCount;
   }, 0);
-  console.warn(totalUnread);
+  
   return totalUnread;
 };
 
