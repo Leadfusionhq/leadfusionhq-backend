@@ -130,6 +130,110 @@ const updateLead = async (leadId, userId, role, updateData) => {
     throw new ErrorHandler(error.statusCode || 500, error.message || 'Failed to update lead');
   }
 };
+
+
+const processCSVUpload = async (fileBuffer, campaign_id, user_id, columnMapping) => {
+    try {
+        const results = [];
+        const errors = [];
+        let processedCount = 0;
+        let errorCount = 0;
+
+        // Required fields validation
+        const requiredFields = ['lead_id','campaign_id','first_name', 'last_name', 'email', 'street_address', 'city', 'state', 'zip_code'];
+        const mappedDbColumns = Object.values(columnMapping);
+        const missingRequired = requiredFields.filter(field => !mappedDbColumns.includes(field));
+
+        if (missingRequired.length > 0) {
+            throw new ErrorHandler(400, `Missing required column mappings: ${missingRequired.join(', ')}`);
+        }
+
+        // Parse CSV
+        const csvData = await new Promise((resolve, reject) => {
+            const rows = [];
+            const stream = Readable.from(fileBuffer.toString());
+            
+            stream
+                .pipe(csv())
+                .on('data', (data) => rows.push(data))
+                .on('end', () => resolve(rows))
+                .on('error', (error) => reject(error));
+        });
+
+        // Process each row
+        for (let i = 0; i < csvData.length; i++) {
+            try {
+                const row = csvData[i];
+                const leadData = {
+                    campaign_id,
+                    user_id,
+                    status: 'active'
+                };
+
+                // Map CSV columns to database fields
+                for (const [csvColumn, dbColumn] of Object.entries(columnMapping)) {
+                    if (row[csvColumn] !== undefined && row[csvColumn] !== '') {
+                        leadData[dbColumn] = row[csvColumn].trim();
+                    }
+                }
+
+                // Validate required fields are present
+                const missingData = requiredFields.filter(field => !leadData[field] || leadData[field] === '');
+                if (missingData.length > 0) {
+                    errors.push(`Row ${i + 2}: Missing required data for ${missingData.join(', ')}`);
+                    errorCount++;
+                    continue;
+                }
+
+                // Validate email format
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(leadData.email)) {
+                    errors.push(`Row ${i + 2}: Invalid email format`);
+                    errorCount++;
+                    continue;
+                }
+
+                // Check for duplicate email in campaign
+                const existingLead = await Lead.findOne({
+                    campaign_id,
+                    email: leadData.email
+                });
+
+                if (existingLead) {
+                    errors.push(`Row ${i + 2}: Duplicate email ${leadData.email} in campaign`);
+                    errorCount++;
+                    continue;
+                }
+
+                // Create lead
+                const newLead = await Lead.create(leadData);
+                results.push(newLead);
+                processedCount++;
+
+            } catch (error) {
+                errors.push(`Row ${i + 2}: ${error.message}`);
+                errorCount++;
+            }
+        }
+
+        // Update campaign lead count
+        await Campaign.findByIdAndUpdate(campaign_id, {
+            $inc: { lead_count: processedCount }
+        });
+
+        return {
+            success: true,
+            processed: processedCount,
+            errors: errorCount,
+            errorDetails: errors.slice(0, 50), // Limit error details to first 50
+            totalRows: csvData.length
+        };
+
+    } catch (error) {
+        throw new ErrorHandler(error.statusCode || 500, error.message || 'Failed to process CSV upload');
+    }
+};
+
 module.exports = {
   createLead,
   getLeads,
@@ -137,4 +241,5 @@ module.exports = {
   getLeadByIdForAdmin,
   getLeadById,
   updateLead,
+  processCSVUpload,
 };

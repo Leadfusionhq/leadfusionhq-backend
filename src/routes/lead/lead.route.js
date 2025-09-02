@@ -4,11 +4,13 @@ const leadController = require('../../controllers/lead/lead.controller.js');
 const LeadSchema = require('../../request-schemas/lead.schema.js');
 const { celebrate } = require('celebrate');
 const checkAuth = require('../../middleware/check-auth');
+const csvUpload = require('../../middleware/csv-upload.js');
 const authorizedRoles = require('../../middleware/authorized-roles.js');
 const CONSTANT_ENUM = require('../../helper/constant-enums.js');
 
 const API = {
     CREATE_LEAD: '/',
+    UPLOAD_CSV: '/upload-csv',  
     GET_ALL_LEADS: '/',
     GET_LEAD: '/:leadId',
     UPDATE_LEAD: '/:leadId',
@@ -16,6 +18,9 @@ const API = {
     GET_LEADS_BY_CAMPAIGN: '/campaign/:campaignId',
     GET_LEADS_BY_USER: '/user/:userId',
 };
+
+
+
 leadRouter.use(
     checkAuth,
     authorizedRoles([
@@ -23,6 +28,11 @@ leadRouter.use(
         CONSTANT_ENUM.USER_ROLE.USER
     ])
 
+);
+leadRouter.post(
+  API.UPLOAD_CSV,
+  csvUpload,
+  leadController.uploadCSV
 );
 
 leadRouter.post(

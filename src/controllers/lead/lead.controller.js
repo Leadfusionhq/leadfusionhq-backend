@@ -79,9 +79,41 @@ const updateLead = wrapAsync(async (req, res) => {
 
   sendResponse(res, { result }, 'Lead has been updated successfully', 200);
 });
+
+
+const uploadCSV = wrapAsync(async (req, res) => {
+    const role = req.user.role;
+    const user_id = req.user._id;
+    const { column_mapping } = req.body;
+
+    if (!req.file) {
+        throw new ErrorHandler(400, 'CSV file is required');
+    }
+
+    // Parse column mapping
+    let mappings;
+    try {
+        mappings = typeof column_mapping === 'string' 
+            ? JSON.parse(column_mapping) 
+            : column_mapping;
+    } catch (error) {
+        throw new ErrorHandler(400, 'Invalid column mapping format');
+    }
+
+    // const result = await LeadServices.processCSVUpload(
+    //     req.file.buffer, 
+    //     user_id, 
+    //     mappings
+    // );
+
+    sendResponse(res, { mappings }, 'CSV processed successfully', 201);
+});
+
+
 module.exports = {
     createLead,
     getLeads,
     getLeadById,
-    updateLead
+    updateLead,
+    uploadCSV
 };
