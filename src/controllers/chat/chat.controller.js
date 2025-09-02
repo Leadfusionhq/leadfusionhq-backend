@@ -231,14 +231,25 @@ const searchMessages = wrapAsync(async (req, res) => {
 });
 
 // Get unread count
+// const getUnreadCount = wrapAsync(async (req, res) => {
+//   const userId = req.user._id;
+//   const userRole = req.user.role;
+
+//   const count = await ChatServices.getUnreadCount(userId, userRole);
+//   sendResponse(res, { unreadCount: count }, "Unread count fetched successfully", 200);
+// });
 const getUnreadCount = wrapAsync(async (req, res) => {
   const userId = req.user._id;
   const userRole = req.user.role;
-
-  const count = await ChatServices.getUnreadCount(userId, userRole);
-  sendResponse(res, { unreadCount: count }, "Unread count fetched successfully", 200);
+  
+  try {
+    const count = await ChatServices.getUnreadCount(userId, userRole);
+    sendResponse(res, { unreadCount: count }, "Success", 200);
+  } catch (error) {
+    console.error('Error:', error);
+    sendResponse(res, null, "Failed", 500);
+  }
 });
-
 // Validation middleware
 const validateCreateChat = celebrate({
   [Segments.BODY]: Joi.object().keys({
