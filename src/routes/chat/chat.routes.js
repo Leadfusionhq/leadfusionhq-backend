@@ -37,6 +37,8 @@ const API = {
 // Apply authentication to all routes
 chatRouter.use(checkAuth);
 
+chatRouter.get(API.GET_UNREAD_COUNT, chatController.getUnreadCount);
+
 // Chat management routes
 chatRouter.get(API.GET_CHATS, chatController.getChats);
 chatRouter.get(API.GET_CHAT_BY_ID, chatController.getChatById);
@@ -70,6 +72,5 @@ chatRouter.post(API.TYPING_STOP, chatController.stopTyping);
 
 // Search and utilities
 chatRouter.get(API.SEARCH_MESSAGES, chatController.searchMessages);
-chatRouter.get(API.GET_UNREAD_COUNT, chatController.getUnreadCount);
 
 module.exports = chatRouter;

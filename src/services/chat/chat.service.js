@@ -629,7 +629,7 @@ const getUnreadCount = async (userId, userRole) => {
       : chat.unreadCount?.user || 0;
     return sum + unreadCount;
   }, 0);
-  
+  console.warn(totalUnread);
   return totalUnread;
 };
 
