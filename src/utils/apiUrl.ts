@@ -39,6 +39,7 @@ export const API_URL = {
     // RESET_PASSWORD: `${AUTH_API_BASE}/reset-password`,
 
 
+
     SEND_OTP_ON_EMAIL:`${AUTH_API_BASE}/forgot-password`,
     VERIFY_OTP:`${AUTH_API_BASE}/verify-otp`,
     RESET_PASSWORD:`${AUTH_API_BASE}/reset-password`,
@@ -48,6 +49,35 @@ export const API_URL = {
 
     
 };
+
+// ========== FAQ ROUTES ==========
+
+const FAQ_API_BASE = `${API_BASE}/faqs`;
+
+export const FAQ_API = {
+  GET_ALL_FAQS: `${FAQ_API_BASE}/`,
+  CREATE_FAQ: `${FAQ_API_BASE}/`,
+  GET_FAQ_BY_ID: `${FAQ_API_BASE}/:faqId`,
+  UPDATE_FAQ: `${FAQ_API_BASE}/:faqId`,
+  DELETE_FAQ: `${FAQ_API_BASE}/:faqId`,
+  GET_PUBLIC_FAQS: `${FAQ_API_BASE}/public`,
+};
+
+// ========== FEEDBACK ROUTES ==========
+const FEEDBACK_API_BASE = `${API_BASE}/feedback`;
+
+export const FEEDBACK_API = {
+  // Public endpoints
+  CREATE_FEEDBACK: `${FEEDBACK_API_BASE}/`,
+  
+  // Admin endpoints (protected)
+  GET_ALL_FEEDBACKS: `${FEEDBACK_API_BASE}/`,
+  GET_FEEDBACK_BY_ID: `${FEEDBACK_API_BASE}/:feedbackId`,
+  UPDATE_FEEDBACK: `${FEEDBACK_API_BASE}/:feedbackId`,
+  DELETE_FEEDBACK: `${FEEDBACK_API_BASE}/:feedbackId`,
+};
+
+
 
 // ========== LOCATION ROUTES ==========
 const LOCATION_API_BASE = `${API_BASE}/locations`;
@@ -95,6 +125,8 @@ export const UITILITIES_API = {
 };
 
 
+
+
 // ========== CSV ROUTES ===========
 const CSV_API_BASE = `${API_IMPORT_BASE}/contacts`;
 
@@ -113,5 +145,40 @@ export const NOTIFICATION_API = {
   MARK_AS_READ: `${NOTIFICATION_API_BASE}/:notificationId/read`,
   MARK_ALL_AS_READ: `${NOTIFICATION_API_BASE}/mark-all-read`,
   DELETE_NOTIFICATION: `${NOTIFICATION_API_BASE}/:notificationId`,
+};
+
+
+
+
+
+// ========== CHAT ROUTES ==========
+const CHAT_API_BASE = `${API_BASE}/chats`;
+
+export const CHAT_API = {
+  // Chat management
+  GET_CHATS: `${CHAT_API_BASE}/`,
+  GET_CHAT_BY_ID: `${CHAT_API_BASE}/:chatId`,
+  CREATE_OR_GET_CHAT: `${CHAT_API_BASE}/create-or-get`,
+  UPDATE_CHAT_STATUS: `${CHAT_API_BASE}/:chatId/status`,
+  ARCHIVE_CHAT: `${CHAT_API_BASE}/:chatId/archive`,
+  ASSIGN_CHAT: `${CHAT_API_BASE}/:chatId/assign`,
+  
+  // Messages
+  GET_MESSAGES: `${CHAT_API_BASE}/:chatId/messages`,
+  SEND_MESSAGE: `${CHAT_API_BASE}/:chatId/messages`,
+  EDIT_MESSAGE: `${CHAT_API_BASE}/:chatId/messages/:messageId`,
+  DELETE_MESSAGE: `${CHAT_API_BASE}/:chatId/messages/:messageId`,
+  MARK_MESSAGES_READ: `${CHAT_API_BASE}/:chatId/mark-read`,
+  
+  // File uploads
+  UPLOAD_FILE: `${CHAT_API_BASE}/:chatId/upload`,
+  
+  // Typing indicators
+  TYPING_START: `${CHAT_API_BASE}/:chatId/typing/start`,
+  TYPING_STOP: `${CHAT_API_BASE}/:chatId/typing/stop`,
+  
+  // Search and filters
+  SEARCH_MESSAGES: `${CHAT_API_BASE}/:chatId/search`,
+  GET_UNREAD_COUNT: `${CHAT_API_BASE}/unread-count`
 };
 
