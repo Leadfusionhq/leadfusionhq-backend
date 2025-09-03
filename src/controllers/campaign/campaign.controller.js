@@ -82,11 +82,43 @@ const getCampaignById = wrapAsync(async (req, res) => {
   sendResponse(res, { data }, 'Campaign fetched successfully', 200);
 });
 
+const searchCampaigns = wrapAsync(async (req, res) => {
+    const { _id: user_id, role } = req.user;
+    const { page, limit, q: searchQuery } = getPaginationParams(req.query);
+    
+    const allowedFilterKeys = ['status', 'state', 'lead_type', 'user_id'];
+    const filters = extractFilters(req.query, allowedFilterKeys);
 
+    const data = await CampaignServices.searchCampaigns(
+        page, 
+        limit, 
+        user_id, 
+        role, 
+        searchQuery, 
+        filters
+    );
+
+    sendResponse(res, data, "Campaigns searched successfully", 200);
+});
+const quickSearchCampaigns = wrapAsync(async (req, res) => {
+    const { _id: user_id, role } = req.user;
+    const { page, limit} = getPaginationParams(req.query);
+    const { q: searchQuery } = req.query;
+
+    const data = await CampaignServices.quickSearchCampaigns(
+        user_id, 
+        role, 
+        searchQuery, 
+        parseInt(limit)
+    );
+
+    sendResponse(res, { data }, "Quick search completed successfully", 200);
+});
 module.exports = {
     createCampaign,
     getCampaigns,
     getCampaignById,
     updateCampaign,
-     
+    searchCampaigns,
+    quickSearchCampaigns, 
 };
