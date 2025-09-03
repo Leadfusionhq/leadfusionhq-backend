@@ -6,6 +6,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
 import { LEADS_API } from "@/utils/apiUrl";
 import axiosWrapper from "@/utils/api";
+import { toast } from "react-toastify";
 // Types
 type Campaign = {
   _id: string;
@@ -30,20 +31,47 @@ type ApiResponse = {
   message: string;
 };
 
+// const DATABASE_COLUMNS: DatabaseColumn[] = [
+//   { key: 'lead_id', label: 'Lead ID', required: true },
+//   { key: 'campaign_id', label: 'Campaign ID', required: true },
+//   { key: 'first_name', label: 'First Name', required: true },
+//   { key: 'last_name', label: 'Last Name', required: true },
+//   { key: 'email', label: 'Email', required: true },
+//   { key: 'phone', label: 'Phone', required: false },
+//   { key: 'street_address', label: 'Street Address', required: true },
+//   { key: 'city', label: 'City', required: true },
+//   { key: 'state', label: 'State', required: true },
+//   { key: 'zip_code', label: 'Zip Code', required: true },
+//   { key: 'note', label: 'Note', required: false }
+// ];
+
 const DATABASE_COLUMNS: DatabaseColumn[] = [
   { key: 'lead_id', label: 'Lead ID', required: true },
   { key: 'campaign_id', label: 'Campaign ID', required: true },
-  { key: 'first_name', label: 'First Name', required: true },
-  { key: 'last_name', label: 'Last Name', required: true },
-  { key: 'email', label: 'Email', required: true },
-  { key: 'phone', label: 'Phone', required: false },
-  { key: 'street_address', label: 'Street Address', required: true },
-  { key: 'city', label: 'City', required: true },
-  { key: 'state', label: 'State', required: true },
-  { key: 'zip_code', label: 'Zip Code', required: true },
-  { key: 'note', label: 'Note', required: false }
-];
+  { key: 'note', label: 'Note', required: false },
 
+  // Required CSV fields
+  { key: 'phone_number', label: 'Phone Number', required: true },
+  { key: 'first_name', label: 'First Name', required: true },
+  { key: 'middle_name', label: 'Middle Name', required: false },
+  { key: 'last_name', label: 'Last Name', required: true },
+  { key: 'suffix', label: 'Suffix', required: false },
+  { key: 'homeowner_desc', label: 'Homeowner Description', required: false },
+  { key: 'gender', label: 'Gender', required: false },
+  { key: 'age', label: 'Age', required: false },
+  { key: 'dwelltype', label: 'Dwell Type', required: false },
+  { key: 'house', label: 'House', required: false },
+  { key: 'predir', label: 'Pre-direction', required: false },
+  { key: 'strtype', label: 'Street Type', required: false },
+  { key: 'postdir', label: 'Post-direction', required: false },
+  { key: 'apttype', label: 'Apt Type', required: false },
+  { key: 'aptnbr', label: 'Apt Number', required: false },
+  { key: 'address.full_address', label: 'Full Address', required: true },
+  { key: 'address.street', label: 'Street', required: true },
+  { key: 'address.city', label: 'City', required: true },
+  { key: 'address.state', label: 'State', required: true },
+  { key: 'address.zip', label: 'Zip Code', required: true }
+];
 
 
 export default function CSVUploadComponent() {
@@ -102,34 +130,58 @@ export default function CSVUploadComponent() {
   const initializeMapping = (headers: string[]) => {
     const mapping: ColumnMapping = {};
 
-    headers.forEach(header => {
-      const lowerHeader = header.toLowerCase();
+  headers.forEach(header => {
+    const lowerHeader = header.toLowerCase();
 
-      // Smart matching
-      if (lowerHeader.includes('first') && lowerHeader.includes('name')) {
-        mapping[header] = 'first_name';
-      } else if (lowerHeader.includes('last') && lowerHeader.includes('name')) {
-        mapping[header] = 'last_name';
-      } else if (lowerHeader.includes('email')) {
-        mapping[header] = 'email';
-      } else if (lowerHeader.includes('phone')) {
-        mapping[header] = 'phone';
-      } else if (lowerHeader.includes('address') || lowerHeader.includes('street')) {
-        mapping[header] = 'street_address';
-      } else if (lowerHeader.includes('city')) {
-        mapping[header] = 'city';
-      } else if (lowerHeader.includes('state')) {
-        mapping[header] = 'state';
-      } else if (lowerHeader.includes('zip')) {
-        mapping[header] = 'zip_code';
-      } else if (lowerHeader.includes('note')) {
-        mapping[header] = 'note';
-      } else if (lowerHeader.includes('campaign') && lowerHeader.includes('id')) {
-        mapping[header] = 'campaign_id';
-      } else if (lowerHeader.includes('lead') && lowerHeader.includes('id')) {
-        mapping[header] = 'lead_id';
-      }
-    });
+    if (lowerHeader.includes('lead') && lowerHeader.includes('id')) {
+      mapping[header] = 'lead_id';
+    } else if (lowerHeader.includes('campaign') && lowerHeader.includes('id')) {
+      mapping[header] = 'campaign_id';
+    } else if (lowerHeader.includes('note')) {
+      mapping[header] = 'note';
+    } else if (lowerHeader.includes('phone')) {
+      mapping[header] = 'phone_number';
+    } else if (lowerHeader.includes('first') && lowerHeader.includes('name')) {
+      mapping[header] = 'first_name';
+    } else if (lowerHeader.includes('middle') && lowerHeader.includes('name')) {
+      mapping[header] = 'middle_name';
+    } else if (lowerHeader.includes('last') && lowerHeader.includes('name')) {
+      mapping[header] = 'last_name';
+    } else if (lowerHeader.includes('suffix')) {
+      mapping[header] = 'suffix';
+    } else if (lowerHeader.includes('homeowner')) {
+      mapping[header] = 'homeowner_desc';
+    } else if (lowerHeader.includes('gender')) {
+      mapping[header] = 'gender';
+    } else if (lowerHeader.includes('age')) {
+      mapping[header] = 'age';
+    } else if (lowerHeader.includes('dwell')) {
+      mapping[header] = 'dwelltype';
+    } else if (lowerHeader === 'house') {
+      mapping[header] = 'house';
+    } else if (lowerHeader === 'predir' || lowerHeader.includes('pre') && lowerHeader.includes('dir')) {
+      mapping[header] = 'predir';
+    } else if (lowerHeader.includes('street') && !lowerHeader.includes('type')) {
+      mapping[header] = 'address.street';
+    } else if (lowerHeader.includes('street') && lowerHeader.includes('type')) {
+      mapping[header] = 'strtype';
+    } else if (lowerHeader === 'postdir' || (lowerHeader.includes('post') && lowerHeader.includes('dir'))) {
+      mapping[header] = 'postdir';
+    } else if (lowerHeader.includes('apt') && lowerHeader.includes('type')) {
+      mapping[header] = 'apttype';
+    } else if (lowerHeader.includes('apt') && (lowerHeader.includes('nbr') || lowerHeader.includes('number') || lowerHeader.includes('no'))) {
+      mapping[header] = 'aptnbr';
+    } else if (lowerHeader.includes('full') && lowerHeader.includes('address')) {
+      mapping[header] = 'address.full_address';
+    } else if (lowerHeader.includes('city')) {
+      mapping[header] = 'address.city';
+    } else if (lowerHeader.includes('state')) {
+      mapping[header] = 'address.state';
+    } else if (lowerHeader.includes('zip')) {
+      mapping[header] = 'address.zip';
+    }
+  });
+
 
     setColumnMapping(mapping);
   };
@@ -185,16 +237,19 @@ export default function CSVUploadComponent() {
       clearInterval(progressInterval);
       setUploadProgress(100);
 
-      if (response.success && response.data?.result) {
-        const result = response.data.result;
+      if (response.data) {
+        
+        const result = response.data;
         setUploadResult({
           success: true,
-          message: 'CSV uploaded successfully!',
+          message: response.message || `CSV uploaded successfully!`,
           processed: result.processed || 0,
           errors: result.errors || 0,
           errorDetails: result.errorDetails || [],
           totalRows: result.totalRows || 0
         });
+        toast.info(response.message || 'CSV uploaded successfully!');
+
       } else {
         setUploadResult({
           success: false,

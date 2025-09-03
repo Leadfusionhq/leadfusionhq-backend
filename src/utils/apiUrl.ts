@@ -112,6 +112,8 @@ const LEADS_API_BASE = `${API_BASE}/leads`;
 export const LEADS_API = {
   GET_ALL_LEADS: `${LEADS_API_BASE}/`,
   UPLOAD_CSV: `${LEADS_API_BASE}/upload-csv`,
+  VALIDATE_CSV:`${LEADS_API_BASE}/validate-csv`,
+ 
   CREATE_LEAD: `${LEADS_API_BASE}/`,
   GET_LEAD: `${LEADS_API_BASE}/:leadId`,
   UPDATE_LEAD: `${LEADS_API_BASE}/:leadId`,
