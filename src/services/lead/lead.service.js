@@ -1,9 +1,11 @@
-const  Lead  = require('../../models/lead.model.js');
-const  Campaign  = require('../../models/campaign.model.js');
-const  State  = require('../../models/state.model');
-const  County  = require('../../models/county.model');
+const Lead = require('../../models/lead.model.js');
+const Campaign = require('../../models/campaign.model.js');
+const State = require('../../models/state.model');
+const County = require('../../models/county.model');
 const { ErrorHandler } = require('../../utils/error-handler');
 const CONSTANT_ENUM = require('../../helper/constant-enums.js');
+const { addCSVProcessingJob, getJobStatus } = require('../../queue/csvProcessor');
+const mongoose = require('mongoose');
 
 const createLead = async (data) => {
   try {
@@ -15,6 +17,7 @@ const createLead = async (data) => {
     throw new ErrorHandler(500, error.message || 'Failed to create lead');
   }
 };
+
 const getLeads = async (page = 1, limit = 10, filters = {}) => {
   try {
     const skip = (page - 1) * limit;
@@ -49,6 +52,7 @@ const getLeads = async (page = 1, limit = 10, filters = {}) => {
     throw new ErrorHandler(500, error.message || 'Failed to fetch leads');
   }
 };
+
 const getLeadByUserId = async (page = 1, limit = 10, user_id) => {
   try {
     const skip = (page - 1) * limit;
@@ -64,7 +68,6 @@ const getLeadByUserId = async (page = 1, limit = 10, user_id) => {
       .limit(limit)
       .populate('campaign_id', 'campaign_id name status lead_type exclusivity language geography delivery user_id note')
       .populate('address.state', 'name abbreviation')
-      
       .sort({ createdAt: -1 })
       .lean();
 
@@ -94,9 +97,9 @@ const getLeadById = async (leadId, userId) => {
 
   return lead;
 };
+
 const getLeadByIdForAdmin = async (leadId) => {
   const lead = await Lead.findById(leadId)
-    // .populate('campaign_id', 'campaign_id name status lead_type exclusivity language geography delivery user_id note')
     .populate('user_id', 'name email')
     .populate('address.state', 'name abbreviation')
     .lean();
@@ -107,6 +110,7 @@ const getLeadByIdForAdmin = async (leadId) => {
 
   return lead;
 };
+
 const updateLead = async (leadId, userId, role, updateData) => {
   try {
     const filter = { _id: leadId };
@@ -131,107 +135,156 @@ const updateLead = async (leadId, userId, role, updateData) => {
   }
 };
 
+// Updated CSV processing function that handles campaign_id from CSV
+const processCSVUpload = async (filePath, userId, columnMapping) => {
+  try {
+    // Validate required column mappings, including campaign_id
+    const requiredFields = [
+      'first_name', 'last_name', 'phone_number', 'address.street', 'address.city', 'address.state', 'address.zip', 'campaign_id'
+    ];
+    
+    const mappedDbColumns = Object.values(columnMapping);
+    const missingRequired = requiredFields.filter(field => !mappedDbColumns.includes(field));
 
-const processCSVUpload = async (fileBuffer, campaign_id, user_id, columnMapping) => {
-    try {
-        const results = [];
-        const errors = [];
-        let processedCount = 0;
-        let errorCount = 0;
-
-        // Required fields validation
-        const requiredFields = ['lead_id','campaign_id','first_name', 'last_name', 'email', 'street_address', 'city', 'state', 'zip_code'];
-        const mappedDbColumns = Object.values(columnMapping);
-        const missingRequired = requiredFields.filter(field => !mappedDbColumns.includes(field));
-
-        if (missingRequired.length > 0) {
-            throw new ErrorHandler(400, `Missing required column mappings: ${missingRequired.join(', ')}`);
-        }
-
-        // Parse CSV
-        const csvData = await new Promise((resolve, reject) => {
-            const rows = [];
-            const stream = Readable.from(fileBuffer.toString());
-            
-            stream
-                .pipe(csv())
-                .on('data', (data) => rows.push(data))
-                .on('end', () => resolve(rows))
-                .on('error', (error) => reject(error));
-        });
-
-        // Process each row
-        for (let i = 0; i < csvData.length; i++) {
-            try {
-                const row = csvData[i];
-                const leadData = {
-                    campaign_id,
-                    user_id,
-                    status: 'active'
-                };
-
-                // Map CSV columns to database fields
-                for (const [csvColumn, dbColumn] of Object.entries(columnMapping)) {
-                    if (row[csvColumn] !== undefined && row[csvColumn] !== '') {
-                        leadData[dbColumn] = row[csvColumn].trim();
-                    }
-                }
-
-                // Validate required fields are present
-                const missingData = requiredFields.filter(field => !leadData[field] || leadData[field] === '');
-                if (missingData.length > 0) {
-                    errors.push(`Row ${i + 2}: Missing required data for ${missingData.join(', ')}`);
-                    errorCount++;
-                    continue;
-                }
-
-                // Validate email format
-                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                if (!emailRegex.test(leadData.email)) {
-                    errors.push(`Row ${i + 2}: Invalid email format`);
-                    errorCount++;
-                    continue;
-                }
-
-                // Check for duplicate email in campaign
-                const existingLead = await Lead.findOne({
-                    campaign_id,
-                    email: leadData.email
-                });
-
-                if (existingLead) {
-                    errors.push(`Row ${i + 2}: Duplicate email ${leadData.email} in campaign`);
-                    errorCount++;
-                    continue;
-                }
-
-                // Create lead
-                const newLead = await Lead.create(leadData);
-                results.push(newLead);
-                processedCount++;
-
-            } catch (error) {
-                errors.push(`Row ${i + 2}: ${error.message}`);
-                errorCount++;
-            }
-        }
-
-        // Update campaign lead count
-        await Campaign.findByIdAndUpdate(campaign_id, {
-            $inc: { lead_count: processedCount }
-        });
-
-        return {
-            success: true,
-            processed: processedCount,
-            errors: errorCount,
-            errorDetails: errors.slice(0, 50), // Limit error details to first 50
-            totalRows: csvData.length
-        };
-
-    } catch (error) {
-        throw new ErrorHandler(error.statusCode || 500, error.message || 'Failed to process CSV upload');
+    if (missingRequired.length > 0) {
+      throw new ErrorHandler(400, `Missing required column mappings: ${missingRequired.join(', ')}`);
     }
+
+    
+    // Add job to processing queue
+    const jobInfo = await addCSVProcessingJob(filePath, null, userId, columnMapping);
+    console.log('CSV processing job added:', jobInfo);
+    return {
+      success: true,
+      message: 'CSV upload queued for processing',
+      jobId: jobInfo.jobId,
+      queueJobId: jobInfo.queueJobId
+    };
+
+  } catch (error) {
+    console.log('Error in processCSVUpload:', error);
+    throw new ErrorHandler(error.statusCode || 500, error.message || 'Failed to process CSV upload');
+  }
+};
+
+// Validate CSV format and return sample data with better campaign handling
+const validateCSVFormat = async (filePath, sampleRows = 5) => {
+  try {
+    const fs = require('fs');
+    const csv = require('csv-parser');
+    
+    return new Promise((resolve, reject) => {
+      const results = [];
+      let headers = [];
+      let rowCount = 0;
+      
+      fs.createReadStream(filePath)
+        .pipe(csv({
+          mapHeaders: ({ header }) => header.trim(),
+          skipEmptyLines: true
+        }))
+        .on('headers', (headerList) => {
+          headers = headerList;
+        })
+        .on('data', async (data) => {
+          if (rowCount < sampleRows) {
+            // Validate campaign_id for each sample row
+            const campaignIdColumn = headers.find(header => columnMapping[header] === 'campaign_id');
+            if (campaignIdColumn && data[campaignIdColumn]) {
+              try {
+                const campaign = await Campaign.findOne({
+                  $or: [
+                    { campaign_id: data[campaignIdColumn] },
+                    { _id: mongoose.Types.ObjectId.isValid(data[campaignIdColumn]) ? data[campaignIdColumn] : null }
+                  ]
+                });
+                if (!campaign) {
+                  data[campaignIdColumn] = `${data[campaignIdColumn]} (Invalid Campaign ID)`;
+                }
+              } catch (error) {
+                data[campaignIdColumn] = `${data[campaignIdColumn]} (Error validating Campaign ID)`;
+              }
+            }
+            results.push(data);
+            rowCount++;
+          } else {
+            return; // Stop reading after sample rows
+          }
+        })
+        .on('end', () => {
+          // Check if campaign_id exists in the CSV
+          const hasCampaignId = headers.some(header => 
+            header.toLowerCase().includes('campaign') && header.toLowerCase().includes('id')
+          );
+
+          resolve({
+            headers,
+            sampleData: results,
+            totalSampleRows: rowCount,
+            hasCampaignId,
+            suggestions: {
+              campaignIdColumn: headers.find(header => 
+                header.toLowerCase().includes('campaign') && header.toLowerCase().includes('id')
+              ),
+              stateColumn: headers.find(header => 
+                header.toLowerCase().includes('state')
+              )
+            }
+          });
+        })
+        .on('error', (error) => {
+          reject(new ErrorHandler(400, `CSV validation error: ${error.message}`));
+        });
+    });
+  } catch (error) {
+    throw new ErrorHandler(500, error.message || 'Failed to validate CSV format');
+  }
+};
+
+// Get CSV processing status
+const getProcessingStatus = async (jobId, userId) => {
+  try {
+    const jobStatus = await getJobStatus(jobId);
+    
+    // Check if user has access to this job
+    if (jobStatus.userId.toString() !== userId.toString()) {
+      throw new ErrorHandler(403, 'Access denied to this job');
+    }
+
+    return jobStatus;
+  } catch (error) {
+    throw new ErrorHandler(error.statusCode || 500, error.message || 'Failed to get processing status');
+  }
+};
+
+// Get user's processing jobs
+const getUserProcessingJobs = async (userId, page = 1, limit = 10) => {
+  try {
+    const skip = (page - 1) * limit;
+    
+    const JobStatus = require('../../models/jobStatus.model');
+    
+    const [jobs, total] = await Promise.all([
+      JobStatus.find({ userId })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      JobStatus.countDocuments({ userId })
+    ]);
+
+    return {
+      data: jobs,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  } catch (error) {
+    throw new ErrorHandler(500, error.message || 'Failed to fetch processing jobs');
+  }
 };
 
 module.exports = {
@@ -242,4 +295,7 @@ module.exports = {
   getLeadById,
   updateLead,
   processCSVUpload,
+  getProcessingStatus,
+  getUserProcessingJobs,
+  validateCSVFormat,
 };
