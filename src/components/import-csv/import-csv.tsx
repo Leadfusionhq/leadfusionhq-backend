@@ -41,6 +41,7 @@ export const REQUIRED_COLUMNS = [
   "city",
   "state",
   "zip",
+  "not_import"
 ];
 
 function MappingStep({
@@ -160,7 +161,7 @@ export default function CSVImport() {
         const mappedSources: SourceData[] = (parsed.data as any[]).map(
           (row, index) => ({
             source_name: row["Source Name"],
-            source_code: `${row["Source Id"]}-${index + 1}`,
+            source_code: `${row["Source Id"]}`,
             id: `${index + 1}`,
           })
         );
