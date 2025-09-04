@@ -149,8 +149,14 @@ const deleteMessage = wrapAsync(async (req, res) => {
   const userId = req.user._id;
   const { chatId, messageId } = req.params;
 
-  const message = await ChatServices.deleteMessage(messageId, userId);
-  sendResponse(res, { message }, "Message deleted successfully", 200);
+  const result = await ChatServices.deleteMessage(messageId, userId);
+  
+  // Return comprehensive response with update information
+  sendResponse(res, { 
+    message: result.message,
+    chat: result.chat,
+    wasLastMessage: result.wasLastMessage
+  }, "Message deleted successfully", 200);
 });
 
 // Mark messages as read

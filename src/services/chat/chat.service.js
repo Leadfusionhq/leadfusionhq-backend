@@ -149,10 +149,9 @@ const updateChatStatus = async (chatId, adminId, status, tags = []) => {
   // Emit status update
   try {
     const io = getIO();
-    io.to(chat.userId.toString()).emit('chat-status-updated', {
+    io.to(chat.userId.toString()).emit('chat-updated', {
       chatId,
-      status,
-      tags
+      chat: chat.toObject()
     });
   } catch (error) {
     console.error('Socket error:', error.message);
@@ -230,11 +229,8 @@ const getMessages = async (chatId, userId, userRole, page = 1, limit = 50, befor
   // Verify access to chat
   await getChatById(chatId, userId, userRole);
 
-    // Verify access to chat
-    const chat = await getChatById(chatId, userId, userRole);
-  
-    // Mark all messages as read when user fetches them
-    await markMessagesAsRead(chatId, userId, userRole, [])
+  // Verify access to chat and mark messages as read
+  const chat = await getChatById(chatId, userId, userRole);
   
   const skip = (page - 1) * limit;
   let query = { 
@@ -279,11 +275,6 @@ const sendMessage = async (chatId, senderId, content, type = 'text', metadata = 
   
   // Verify sender is part of the chat
   const senderIdStr = senderId.toString();
-  // const isParticipant = [
-  //   chat.userId?.toString(),
-  //   chat.adminId?.toString(),
-  //   chat.assignedTo?.toString()
-  // ].includes(senderIdStr);
   const isParticipant = [
     getIdStr(chat.userId),
     getIdStr(chat.adminId),
@@ -309,8 +300,6 @@ const sendMessage = async (chatId, senderId, content, type = 'text', metadata = 
   await message.save();
   await message.populate('senderId replyTo');
   
-
-
   const isSenderUser = senderIdStr === getIdStr(chat.userId);
   const recipientRole = isSenderUser ? 'admin' : 'user';
 
@@ -327,8 +316,6 @@ const sendMessage = async (chatId, senderId, content, type = 'text', metadata = 
     },
     updatedAt: new Date()
   });
-
-
   
   // Real-time emission
   try {
@@ -337,8 +324,7 @@ const sendMessage = async (chatId, senderId, content, type = 'text', metadata = 
     .map(getIdStr)
     .filter(idStr => idStr && idStr !== senderIdStr);
 
-
-    console.log(`🚀 Emitting to room: ${recipients}`);
+    console.log(`🚀 Emitting to recipients: ${recipients}`);
     recipients.forEach(recipientId => {
       io.to(recipientId.toString()).emit('new-message', {
         chatId,
@@ -394,8 +380,10 @@ const editMessage = async (messageId, userId, newContent) => {
   return message;
 };
 
-// Delete message
+// FIXED: Delete message with comprehensive real-time updates
 const deleteMessage = async (messageId, userId) => {
+  console.log(`🗑️ Attempting to delete message: ${messageId} by user: ${userId}`);
+  
   const message = await Message.findOneAndUpdate(
     { 
       _id: messageId, 
@@ -413,29 +401,95 @@ const deleteMessage = async (messageId, userId) => {
   if (!message) {
     throw new ErrorHandler(404, 'Message not found or access denied');
   }
+
+  // Get the chat to check if this was the last message
+  const chat = await Chat.findById(message.chatId);
+  if (!chat) {
+    throw new ErrorHandler(404, 'Chat not found');
+  }
+
+  // Check if the deleted message was the last message in the chat
+  const isLastMessage = chat.lastMessage?.messageId?.toString() === messageId.toString();
   
-  // Emit deletion
-  try {
-    const io = getIO();
-    const chat = await Chat.findById(message.chatId);
-    const recipients = [chat.userId, chat.adminId, chat.assignedTo]
-      .filter(id => id && id.toString() !== userId.toString());
+  let updatedChat = chat;
+  
+  if (isLastMessage) {
+    console.log(`🔄 Deleted message was last message, finding new last message...`);
     
-    recipients.forEach(recipientId => {
-      io.to(recipientId.toString()).emit('message-deleted', {
-        chatId: message.chatId,
-        messageId: message._id
-      });
-    });
-  } catch (error) {
-    console.error('Socket error:', error.message);
+    // Find the new last message (most recent non-deleted message)
+    const newLastMessage = await Message.findOne({
+      chatId: message.chatId,
+      isDeleted: false,
+      _id: { $ne: messageId } // Exclude the deleted message
+    })
+    .sort({ createdAt: -1 })
+    .populate('senderId');
+
+    // Update chat with new last message or clear it if no messages left
+    const updateData = newLastMessage ? {
+      lastMessage: {
+        messageId: newLastMessage._id,
+        content: newLastMessage.content.data.substring(0, 100),
+        sentAt: newLastMessage.createdAt,
+        senderId: newLastMessage.senderId._id
+      },
+      updatedAt: new Date()
+    } : {
+      $unset: { lastMessage: 1 },
+      updatedAt: new Date()
+    };
+
+    updatedChat = await Chat.findByIdAndUpdate(
+      message.chatId,
+      updateData,
+      { new: true }
+    ).populate('userId adminId assignedTo');
+    
+    console.log(`✅ Updated chat with new last message:`, newLastMessage ? newLastMessage._id : 'none');
   }
   
-  return message;
+  // FIXED: Real-time emission with comprehensive updates
+  try {
+    const io = getIO();
+    const recipients = [chat.userId, chat.adminId, chat.assignedTo]
+      .map(getIdStr)
+      .filter(idStr => idStr && idStr !== userId.toString());
+
+    console.log(`🚀 Emitting message deletion to recipients: ${recipients}`);
+    
+    recipients.forEach(recipientId => {
+      // Emit message deletion event
+      io.to(recipientId.toString()).emit('message-deleted', {
+        chatId: message.chatId,
+        messageId: messageId,
+        isLastMessage: isLastMessage
+      });
+
+      // If this was the last message, also emit chat update
+      if (isLastMessage) {
+        io.to(recipientId.toString()).emit('chat-updated', {
+          chatId: message.chatId,
+          chat: updatedChat.toObject()
+        });
+      }
+    });
+    
+    console.log('✅ Socket emission completed for message deletion');
+  } catch (error) {
+    console.error('❌ Socket error during message deletion:', error.message);
+  }
+  
+  return { 
+    message, 
+    chat: updatedChat,
+    wasLastMessage: isLastMessage 
+  };
 };
 
-// Mark messages as read
+// FIXED: Mark messages as read with proper real-time updates
 const markMessagesAsRead = async (chatId, userId, userRole, messageIds = []) => {
+  console.log(`👁️ Marking messages as read in chat ${chatId} by user ${userId}`);
+  
   // Verify access to chat
   const chat = await getChatById(chatId, userId, userRole);
   
@@ -450,12 +504,24 @@ const markMessagesAsRead = async (chatId, userId, userRole, messageIds = []) => 
     query._id = { $in: messageIds.map(id => new mongoose.Types.ObjectId(id)) };
   }
   
-  // Find messages to update
-  const messagesToUpdate = await Message.find(query);
+  // Find messages to update (ones not already read by this user)
+  const messagesToUpdate = await Message.find({
+    ...query,
+    'readBy.userId': { $ne: userId } // Only get messages not already read by this user
+  });
+  
+  console.log(`📚 Found ${messagesToUpdate.length} messages to mark as read`);
+  
+  if (messagesToUpdate.length === 0) {
+    console.log('✅ No messages to update');
+    return { modifiedCount: 0 };
+  }
   
   // Update messages with read status
   const result = await Message.updateMany(
-    query,
+    {
+      _id: { $in: messagesToUpdate.map(msg => msg._id) }
+    },
     {
       $addToSet: {
         readBy: {
@@ -467,42 +533,43 @@ const markMessagesAsRead = async (chatId, userId, userRole, messageIds = []) => 
     }
   );
   
+  console.log(`📝 Updated ${result.modifiedCount} messages with read status`);
+  
   // Reset unread count for this user
   const unreadField = userRole === CONSTANT_ENUM.USER_ROLE.ADMIN ? 'unreadCount.admin' : 'unreadCount.user';
   await Chat.findByIdAndUpdate(chatId, {
     [unreadField]: 0
   });
   
-  // Emit read receipts for each updated message
+  console.log(`🔄 Reset unread count for ${userRole} in chat ${chatId}`);
+  
+  // FIXED: Emit read receipts with proper data structure
   try {
     const io = getIO();
     const recipients = [chat.userId, chat.adminId, chat.assignedTo]
-      .filter(id => id && id.toString() !== userId.toString());
+      .map(getIdStr)
+      .filter(idStr => idStr && idStr !== userId.toString());
     
+    console.log(`🚀 Emitting read receipts to recipients: ${recipients}`);
+    
+    // Emit comprehensive read update
     recipients.forEach(recipientId => {
       io.to(recipientId.toString()).emit('messages-read', {
         chatId,
         readBy: userId,
-        messageIds: messagesToUpdate.map(msg => msg._id.toString())
+        messageIds: messagesToUpdate.map(msg => msg._id.toString()),
+        readAt: new Date().toISOString()
       });
     });
     
-    // Also emit individual message updates for real-time UI updates
-    messagesToUpdate.forEach(message => {
-      io.to(message.senderId.toString()).emit('message-read', {
-        chatId,
-        messageId: message._id,
-        readBy: userId,
-        readAt: new Date()
-      });
-    });
+    console.log('✅ Read receipt emission completed');
+    
   } catch (error) {
-    console.error('Socket error:', error.message);
+    console.error('❌ Socket error during read receipt emission:', error.message);
   }
   
   return { modifiedCount: result.modifiedCount };
 };
-
 
 // Upload file
 const uploadFile = async (chatId, senderId, file) => {
@@ -547,7 +614,8 @@ const startTyping = async (chatId, userId) => {
   try {
     const io = getIO();
     const recipients = [chat.userId, chat.adminId, chat.assignedTo]
-      .filter(id => id && id.toString() !== userId.toString());
+      .map(getIdStr)
+      .filter(idStr => idStr && idStr !== userId.toString());
     
     recipients.forEach(recipientId => {
       io.to(recipientId.toString()).emit('user-typing', {
@@ -571,7 +639,8 @@ const stopTyping = async (chatId, userId) => {
   try {
     const io = getIO();
     const recipients = [chat.userId, chat.adminId, chat.assignedTo]
-      .filter(id => id && id.toString() !== userId.toString());
+      .map(getIdStr)
+      .filter(idStr => idStr && idStr !== userId.toString());
     
     recipients.forEach(recipientId => {
       io.to(recipientId.toString()).emit('user-typing', {
