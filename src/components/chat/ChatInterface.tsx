@@ -19,7 +19,9 @@ import {
   X,
   Users,
   Settings,
-  MessageCircle
+  MessageCircle,
+  Check,
+  CheckCheck
 } from 'lucide-react';
 
 interface ChatInterfaceProps {
@@ -58,12 +60,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onClose }) => {
   const [showAdminSelection, setShowAdminSelection] = useState(false);
   const [quickTopic, setQuickTopic] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout>(null);
 
-  // Auto scroll to bottom
+  // Auto scroll to bottom when messages change
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages]);
 
   // Filter chats based on search
@@ -96,19 +101,24 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onClose }) => {
   const handleSendMessage = async () => {
     if (!currentChat || !messageInput.trim()) return;
     
+    const messageContent = messageInput.trim();
+    setMessageInput(''); // Clear input immediately for better UX
+    setReplyToMessage(null);
+    
     try {
       await sendMessage(
         currentChat._id, 
-        messageInput.trim(), 
+        messageContent, 
         'text', 
         {}, 
         replyToMessage?._id
       );
-      setMessageInput('');
-      setReplyToMessage(null);
+      
       stopTyping(currentChat._id);
     } catch (error) {
       console.error('Error sending message:', error);
+      // Restore message input on error
+      setMessageInput(messageContent);
     }
   };
 
@@ -160,10 +170,53 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onClose }) => {
       const chat = await createOrGetChat(adminId, subject);
       console.warn('chat',chat)
       selectChat(chat._id);
-      setQuickTopic(''); // Reset quick topic
+      setQuickTopic('');
     } catch (error) {
       console.error('Error creating chat:', error);
     }
+  };
+
+  // FIXED: Handle message deletion with proper error handling
+  const handleDeleteMessage = async (messageId: string) => {
+    if (!messageId) {
+      console.warn('No message ID provided for deletion');
+      return;
+    }
+
+    // Skip temp messages
+    if (messageId.startsWith('temp_')) {
+      console.log('Skipping deletion of temporary message:', messageId);
+      return;
+    }
+
+    try {
+      await deleteMessage(messageId);
+    } catch (error: any) {
+      console.error('Error deleting message:', error);
+      // You could show a toast notification here
+      alert(error.message || 'Failed to delete message');
+    }
+  };
+
+  // FIXED: Get read receipt status for messages
+  const getReadReceiptStatus = (message: any) => {
+    if (!message || message.senderId._id !== user?._id) return null;
+
+    const otherParticipants = currentChat ? [
+      currentChat.userId._id,
+      currentChat.adminId._id,
+      currentChat.assignedTo?._id
+    ].filter(id => id && id !== user?._id) : [];
+
+    const readByOthers = message.readBy?.filter(
+      (read: any) => read.userId !== user?._id && otherParticipants.includes(read.userId)
+    ) || [];
+
+    if (readByOthers.length > 0) {
+      return { status: 'read', count: readByOthers.length };
+    }
+
+    return { status: 'sent', count: 0 };
   };
 
   return (
@@ -176,6 +229,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onClose }) => {
             <h2 className="text-xl font-semibold flex items-center gap-2">
               <Users className="w-5 h-5" />
               Messages
+              {unreadCount > 0 && (
+                <span className="bg-red-500 text-white text-xs rounded-full px-2 py-1 min-w-[20px] text-center">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
             </h2>
             {onClose && (
               <button onClick={onClose} className="p-1 hover:bg-white/20 rounded">
@@ -301,7 +359,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onClose }) => {
                       <span>Online</span>
                       {typingUsers.length > 0 && (
                         <span className="text-blue-600 animate-pulse">
-                          • Typing...
+                          • {typingUsers[0].name} is typing...
                         </span>
                       )}
                     </div>
@@ -309,27 +367,22 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onClose }) => {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {/* <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                    <Phone className="w-5 h-5 text-gray-600" />
-                  </button>
-                  <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                    <Video className="w-5 h-5 text-gray-600" />
-                  </button> */}
                   <button 
                     onClick={() => setShowChatDetails(!showChatDetails)}
                     className="p-2 hover:bg-gray-100 rounded-full transition-colors"
                   >
                     <Settings className="w-5 h-5 text-gray-600" />
                   </button>
-                  {/* <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                    <MoreVertical className="w-5 h-5 text-gray-600" />
-                  </button> */}
                 </div>
               </div>
             </div>
 
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+            <div 
+              ref={messagesContainerRef}
+              id="messagesContainer"
+              className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50"
+            >
               {messagesLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -343,6 +396,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onClose }) => {
               ) : (
                 messages.map((message) => {
                   const isOwnMessage = message.senderId._id === user?._id;
+                  const readStatus = getReadReceiptStatus(message);
                   
                   return (
                     <div
@@ -373,7 +427,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onClose }) => {
                           }`}
                         >
                           {message.isDeleted ? (
-                            <p className="italic text-gray-500">This message was deleted</p>
+                            <p className="italic text-gray-500">
+                              {message.content?.data === 'This message was deleted' 
+                                ? 'This message was deleted' 
+                                : 'This message was deleted'
+                              }
+                            </p>
                           ) : (
                             <>
                               {message.content.type === 'text' ? (
@@ -408,7 +467,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onClose }) => {
                           )}
 
                           {/* Message actions */}
-                          {!message.isDeleted && (
+                          {!message.isDeleted && !message._id.startsWith('temp_') && (
                             <div className={`absolute top-0 ${isOwnMessage ? 'left-0' : 'right-0'} -translate-y-8 opacity-0 group-hover:opacity-100 transition-opacity`}>
                               <div className="flex items-center gap-1 bg-white border shadow-lg rounded-lg p-1">
                                 <button
@@ -419,22 +478,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onClose }) => {
                                   <Reply className="w-4 h-4 text-gray-600" />
                                 </button>
                                 {isOwnMessage && (
-                                  <>
-                                    {/* <button
-                                      onClick={() => setEditingMessage(message._id)}
-                                      className="p-1 hover:bg-gray-100 rounded"
-                                      title="Edit"
-                                    >
-                                      <Edit className="w-4 h-4 text-gray-600" />
-                                    </button> */}
-                                    <button
-                                      onClick={() => deleteMessage(message._id)}
-                                      className="p-1 hover:bg-gray-100 rounded"
-                                      title="Delete"
-                                    >
-                                      <Trash2 className="w-4 h-4 text-red-600" />
-                                    </button>
-                                  </>
+                                  <button
+                                    onClick={() => handleDeleteMessage(message._id)}
+                                    className="p-1 hover:bg-gray-100 rounded"
+                                    title="Delete"
+                                  >
+                                    <Trash2 className="w-4 h-4 text-red-600" />
+                                  </button>
                                 )}
                               </div>
                             </div>
@@ -446,12 +496,16 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onClose }) => {
                         }`}>
                           <span>{formatTime(message.createdAt)}</span>
                           {message.isEdited && <span>(edited)</span>}
-                          {isOwnMessage && (
-                            <span className={
-                              message.readBy.length > 1 ? 'text-blue-600' : 'text-gray-400'
-                            }>
-                              {message.readBy.length > 1 ? '✓✓' : '✓'}
-                            </span>
+                          
+                          {/* FIXED: Read receipts with proper real-time updates */}
+                          {isOwnMessage && !message._id.startsWith('temp_') && (
+                            <div className="flex items-center">
+                              {readStatus?.status === 'read' ? (
+                                <CheckCheck className={`w-4 h-4 ${readStatus.count > 0 ? 'text-blue-600' : 'text-gray-400'}`} />
+                              ) : (
+                                <Check className="w-4 h-4 text-gray-400" />
+                              )}
+                            </div>
                           )}
                         </div>
                       </div>
@@ -464,6 +518,20 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onClose }) => {
                     </div>
                   );
                 })
+              )}
+              {typingUsers.length > 0 && (
+                <div className="flex justify-start gap-3 mb-4">
+                  <div className="w-8 h-8 bg-gradient-to-br from-gray-400 to-gray-600 rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
+                    {getInitials(typingUsers[0].name)} {/* Assuming first typer's initials */}
+                  </div>
+                  <div className="bg-white rounded-2xl px-4 py-2 shadow-sm">
+                    <div className="flex space-x-1 animate-pulse">
+                      <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                      <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                      <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                    </div>
+                  </div>
+                </div>
               )}
               <div ref={messagesEndRef} />
             </div>
@@ -537,7 +605,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onClose }) => {
                   disabled={!messageInput.trim()}
                   className={`p-3 rounded-full transition-all ${
                     messageInput.trim()
-                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:shadow-lg transform hover:scale-105'
+                      ? 'transition-all bg-[#000] text-white hover:shadow'
                       : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                   }`}
                 >
@@ -548,75 +616,75 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onClose }) => {
           </>
         ) : (
           /* No Chat Selected */
-          <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50">
-            <div className="text-center max-w-md">
-              <div className="w-24 h-24 bg-gradient-to-br from-blue-200 to-purple-200 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Users className="w-12 h-12 text-blue-600" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                {filteredChats.length === 0 ? 'No Conversations Yet' : 'Welcome to Messages'}
-              </h3>
-              <p className="text-gray-600 mb-6">
-                {filteredChats.length === 0 
-                  ? user?.role === 'USER' 
-                    ? 'Start your first conversation with our support team'
-                    : 'Waiting for users to reach out for support'
-                  : 'Select a conversation to start chatting'
-                }
-              </p>
-              
-              {/* Show different content based on user role and chat availability */}
-              {filteredChats.length === 0 ? (
-                user?.role === 'USER' ? (
-                  <div className="space-y-4">
-                    <button
-                      onClick={() => setShowAdminSelection(true)}
-                      className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-4 rounded-xl hover:shadow-lg transition-all transform hover:scale-105 flex items-center gap-3 mx-auto"
-                    >
-                      <MessageCircle className="w-5 h-5" />
-                      Get Support Now
-                    </button>
-                    
-                    {/* Quick help topics */}
-                    <div className="mt-8">
-                      <p className="text-sm text-gray-500 mb-4">Common topics:</p>
-                      <div className="flex flex-wrap gap-2 justify-center">
-                        {['Account Help', 'Billing', 'Technical Issue', 'General Question'].map((topic) => (
-                          <button
-                            key={topic}
-                            onClick={() => {
-                              setQuickTopic(topic);
-                              setShowAdminSelection(true);
-                            }}
-                            className="text-xs bg-white border border-gray-200 text-gray-600 px-3 py-2 rounded-full hover:border-blue-300 hover:text-blue-600 transition-colors"
-                          >
-                            {topic}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
-                    <h4 className="font-semibold text-blue-900 mb-2">Ready to Help!</h4>
-                    <p className="text-blue-700 text-sm">
-                      You will see new conversations here as users reach out for support. 
-                      You can also check for any pending assignments.
-                    </p>
-                  </div>
-                )
-              ) : (
-                user?.role === 'USER' && (
+          <div className="flex-1 flex items-center justify-center bg-gray-50">
+          <div className="text-center max-w-md">
+            <div className="w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Users className="w-12 h-12 text-gray-700" />
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              {filteredChats.length === 0 ? 'No Conversations Yet' : 'Welcome to Messages'}
+            </h3>
+            <p className="text-gray-600 mb-6">
+              {filteredChats.length === 0 
+                ? user?.role === 'USER' 
+                  ? 'Start your first conversation with our support team'
+                  : 'Waiting for users to reach out for support'
+                : 'Select a conversation to start chatting'
+              }
+            </p>
+        
+            {filteredChats.length === 0 ? (
+              user?.role === 'USER' ? (
+                <div className="space-y-4">
                   <button
                     onClick={() => setShowAdminSelection(true)}
-                    className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-lg hover:shadow-lg transition-all"
+                    className="bg-black text-white px-8 py-4 rounded-xl hover:bg-gray-800 transition-all flex items-center gap-3 mx-auto"
                   >
-                    Start New Conversation
+                    <MessageCircle className="w-5 h-5" />
+                    Get Support Now
                   </button>
-                )
-              )}
-            </div>
+        
+                  {/* Quick help topics */}
+                  <div className="mt-8">
+                    <p className="text-sm text-gray-500 mb-4">Common topics:</p>
+                    <div className="flex flex-wrap gap-2 justify-center">
+                      {['Account Help', 'Billing', 'Technical Issue', 'General Question'].map((topic) => (
+                        <button
+                          key={topic}
+                          onClick={() => {
+                            setQuickTopic(topic);
+                            setShowAdminSelection(true);
+                          }}
+                          className="text-xs bg-white border border-gray-200 text-gray-700 px-3 py-2 rounded-full hover:border-gray-400 hover:text-black transition-colors"
+                        >
+                          {topic}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-gray-100 border border-gray-200 rounded-xl p-6">
+                  <h4 className="font-semibold text-gray-900 mb-2">Ready to Help!</h4>
+                  <p className="text-gray-600 text-sm">
+                    You will see new conversations here as users reach out for support. 
+                    You can also check for any pending assignments.
+                  </p>
+                </div>
+              )
+            ) : (
+              user?.role === 'USER' && (
+                <button
+                  onClick={() => setShowAdminSelection(true)}
+                  className="bg-black text-white px-6 py-3 rounded-lg hover:bg-gray-800 transition-all"
+                >
+                  Start New Conversation
+                </button>
+              )
+            )}
           </div>
+        </div>
+        
         )}
       </div>
 
