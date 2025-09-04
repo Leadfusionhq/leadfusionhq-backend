@@ -1,12 +1,14 @@
 import { Metadata } from "next";
-
+import { Suspense } from "react";
 import ResetPasswordForm from '@/components/auth/ResetPassword/ResetPasswordForm'
 
 
 export default function ForgotPassword() {
   return (
     <>
+    <Suspense fallback={<div>Loading...</div>}>
     <ResetPasswordForm />
+    </Suspense>
     </>
 
   )

@@ -44,7 +44,6 @@ export default function RootLayout({
     <html lang="en" className={``}>
       <body>
         <Toaster />
-     
         <AOSInitializer/>
         <ClientComponent>
           <ClientLayout>

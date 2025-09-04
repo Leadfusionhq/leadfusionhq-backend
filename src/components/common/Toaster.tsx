@@ -2,32 +2,20 @@
 
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-
-import { useSearchParams, useRouter } from "next/navigation";
+import Cookies from "js-cookie";
 import { useEffect } from "react";
 
 
 const Toaster = () => {
-  const searchParams = useSearchParams();
-  const router = useRouter();
 
   useEffect(() => {
-    const error = searchParams.get("error");
-
-    if (error) {
-      if (error === "unauthorized") {
-        toast.error("You don’t have permission to access this page.");
-      }
-      if (error === "login-required") {
-        toast.info("Please log in to continue.");
-      }
-
-      // Clean query param after showing toast
-      const newParams = new URLSearchParams(searchParams.toString());
-      newParams.delete("error");
-      router.replace("?" + newParams.toString(), { scroll: false });
+    const msg = Cookies.get("toast");
+    if (msg) {
+      if (msg === "unauthorized") toast.error("You don’t have permission to access this page.");
+      if (msg === "login-required") toast.info("Please log in to continue.");
+      Cookies.remove("toast"); // clear after showing
     }
-  }, [searchParams, router]);
+  }, []);
 
   return (
     <ToastContainer

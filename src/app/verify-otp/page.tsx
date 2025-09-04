@@ -1,14 +1,12 @@
 import { Metadata } from "next";
-import { Suspense } from "react";
+
 import VerifyOtpForm from '@/components/auth/VerifyOtp/VerifyOtpForm'
 
 
 export default function ForgotPassword() {
   return (
     <>
-        <Suspense fallback={<div>Loading...</div>}>
-          <VerifyOtpForm />
-        </Suspense>
+    <VerifyOtpForm />
     </>
 
   )
