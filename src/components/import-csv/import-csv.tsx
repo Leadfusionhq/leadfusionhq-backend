@@ -13,6 +13,11 @@ interface UploadSuccessResponse {
   inserted?: any[];
 }
 
+interface PresignedUrlResponse {
+  url: string;
+  fileKey: string;
+}
+
 type Mapping = Record<string, string>;
 
 interface SourceData {
@@ -41,7 +46,7 @@ export const REQUIRED_COLUMNS = [
   "city",
   "state",
   "zip",
-  "not_import"
+  "not_import",
 ];
 
 function MappingStep({
@@ -187,7 +192,6 @@ export default function CSVImport() {
   };
 
   const handleSubmit = async (providedMapping?: Mapping) => {
-    console.log(providedMapping, 'Check')
     if (!file) {
       toast.warn("Please select a CSV file");
       return;
@@ -200,13 +204,11 @@ export default function CSVImport() {
     try {
       setIsLoading(true);
 
-      // Get headers from CSV
       const headersInCSV = (await getCSVHeaders(file)).map((h) =>
         h.toLowerCase()
       );
       setCsvHeaders(headersInCSV);
 
-      // Determine mapping: use provided mapping (from MappingStep) or auto-map
       const finalMapping: Mapping = providedMapping
         ? providedMapping
         : headersInCSV.reduce((acc: Mapping, csvCol) => {
@@ -216,10 +218,8 @@ export default function CSVImport() {
             if (match) acc[csvCol] = match;
             return acc;
           }, {});
-
       setMapping(finalMapping);
 
-      // If mapping is incomplete, show mapping UI
       const unmatched = headersInCSV.filter(
         (col) => !Object.keys(finalMapping).includes(col)
       );
@@ -231,22 +231,36 @@ export default function CSVImport() {
         return;
       }
 
-      // ✅ All headers matched, submit CSV
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("mapping", JSON.stringify(finalMapping));
-      formData.append("data_source_id", selectedSourceId);
+      toast.info("Requesting upload URL...");
+      const { url, fileKey } = (await axiosWrapper(
+        "get",
+        `${CSV_API.GET_PRESIGNED_URL}?fileName=${encodeURIComponent(file.name)}`,
+        undefined,
+        NEXT_PUBLIC_CSV_API_TOKEN
+      )) as PresignedUrlResponse;
 
-      toast.info("Uploading CSV...");
+      toast.info("Uploading file to S3...");
+      await fetch(url, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "text/csv",
+        },
+        body: file,
+      });
+
+      toast.info("Processing CSV in background...");
       const res = (await axiosWrapper(
         "post",
         CSV_API.IMPORT_MAPPED_CSV,
-        formData as any,
-        NEXT_PUBLIC_CSV_API_TOKEN,
-        true
+        {
+          s3Key: fileKey,
+          data_source_id: selectedSourceId,
+          mapping: finalMapping,
+        },
+        NEXT_PUBLIC_CSV_API_TOKEN
       )) as UploadSuccessResponse;
 
-      toast.success(res.message || "CSV uploaded successfully!");
+      toast.success(res.message || "CSV queued for processing!");
       resetState();
     } catch (err: any) {
       toast.error(err?.error || err?.message || "CSV upload failed");

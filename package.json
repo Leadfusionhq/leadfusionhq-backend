@@ -9,6 +9,8 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.879.0",
+    "@aws-sdk/s3-request-presigner": "^3.879.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@mui/icons-material": "^7.3.1",
@@ -44,12 +46,9 @@
     "redux-persist": "^6.0.0",
     "resend": "^4.7.0",
     "slick-carousel": "^1.8.1",
-
+    "socket.io-client": "^4.8.1",
     "tailwind-variants": "^3.1.0",
     "tailwindcss-animate": "^1.0.7",
-
-    "socket.io-client": "^4.8.1",
-
     "yup": "^1.6.1"
   },
   "devDependencies": {
