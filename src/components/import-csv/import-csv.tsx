@@ -13,14 +13,6 @@ interface UploadSuccessResponse {
   inserted?: any[];
 }
 
-interface MappingErrorResponse {
-  message: string;
-  missingColumns: string[];
-  csvHeaders?: string[];
-  dbHeaders?: string[];
-}
-
-type UploadResponse = UploadSuccessResponse | MappingErrorResponse;
 type Mapping = Record<string, string>;
 
 interface SourceData {
@@ -28,45 +20,31 @@ interface SourceData {
   source_code: string;
 }
 
-function UploadStep({
-  fileInputRef,
-  onFileChange,
-  onUpload,
-  isLoading,
-}: {
-  fileInputRef: React.RefObject<HTMLInputElement | null>;
-  onFileChange: (file: File | null) => void;
-  onUpload: () => void;
-  isLoading: boolean;
-}) {
-  return (
-    <div className="space-y-4">
-      <h2 className="text-xl font-semibold text-gray-800">Upload CSV</h2>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".csv"
-        onChange={(e) => onFileChange(e.target.files?.[0] || null)}
-        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-black file:text-white hover:file:bg-gray-800"
-      />
-      <button
-        onClick={onUpload}
-        disabled={isLoading}
-        className={`w-full px-4 py-2 text-white rounded-lg transition-colors ${
-          isLoading
-            ? "bg-black/60 cursor-not-allowed"
-            : "bg-black hover:bg-black/80"
-        }`}
-      >
-        {isLoading ? "Uploading..." : "Upload"}
-      </button>
-    </div>
-  );
-}
+export const REQUIRED_COLUMNS = [
+  "phone_number",
+  "first_name",
+  "middle_name",
+  "last_name",
+  "suffix",
+  "homeowner_desc",
+  "gender",
+  "age",
+  "dwelltype",
+  "house",
+  "predir",
+  "street",
+  "strtype",
+  "postdir",
+  "apttype",
+  "aptnbr",
+  "address",
+  "city",
+  "state",
+  "zip",
+];
 
 function MappingStep({
   message,
-  missingColumns,
   csvHeaders,
   mapping,
   onMappingChange,
@@ -74,41 +52,27 @@ function MappingStep({
   isLoading,
 }: {
   message: string;
-  missingColumns: string[];
   csvHeaders: string[];
   mapping: Mapping;
   onMappingChange: (newMapping: Mapping) => void;
   onSubmit: () => void;
   isLoading: boolean;
 }) {
-  useEffect(() => {
-    const autoMapping: Mapping = {};
-    csvHeaders.forEach((csvCol) => {
-      if (missingColumns.includes(csvCol) && !mapping[csvCol]) {
-        autoMapping[csvCol] = csvCol;
-      }
-    });
-
-    if (Object.keys(autoMapping).length > 0) {
-      onMappingChange({ ...mapping, ...autoMapping });
-    }
-  }, [csvHeaders, missingColumns, mapping, onMappingChange]);
-
-  const isMappingComplete = csvHeaders.every((col) => mapping[col]);
+  const isMappingComplete = csvHeaders.every(
+    (col) => mapping[col] && mapping[col] !== ""
+  );
 
   return (
     <div className="space-y-6">
       <h2 className="text-xl font-semibold text-gray-800">
-        Match Missing Columns
+        Map CSV Columns to DB
       </h2>
       {message && (
         <div className="text-red-600 font-semibold bg-red-50 p-3 rounded-lg">
           {message}
         </div>
       )}
-      <p className="text-gray-600">
-        These CSV columns dont match the database. Please map them:
-      </p>
+      <p className="text-gray-600">Map your CSV columns to database columns:</p>
       <div className="space-y-4">
         {csvHeaders.map((csvCol) => (
           <div key={csvCol} className="flex items-center justify-between gap-4">
@@ -124,7 +88,7 @@ function MappingStep({
               }
             >
               <option value="">-- Select DB Column --</option>
-              {missingColumns.map((dbCol) => (
+              {REQUIRED_COLUMNS.map((dbCol) => (
                 <option key={dbCol} value={dbCol}>
                   {dbCol}
                 </option>
@@ -151,14 +115,32 @@ function MappingStep({
 export default function CSVImport() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [step, setStep] = useState<"upload" | "mapping">("upload");
   const [file, setFile] = useState<File | null>(null);
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
-  const [missingColumns, setMissingColumns] = useState<string[]>([]);
   const [mapping, setMapping] = useState<Mapping>({});
   const [isLoading, setIsLoading] = useState(false);
   const [sources, setSources] = useState<SourceData[]>([]);
   const [selectedSourceId, setSelectedSourceId] = useState<string>("");
+  const [showMapping, setShowMapping] = useState(false);
+
+  const getCSVHeaders = (file: File): Promise<string[]> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const text = reader.result as string;
+          const firstLine = text.split(/\r?\n/)[0];
+          const headers = firstLine.split(",").map((h) => h.trim());
+          resolve(headers);
+        } catch (err) {
+          reject(err);
+        }
+      };
+      reader.onerror = () => reject(reader.error);
+      const blob = file.slice(0, 1024);
+      reader.readAsText(blob);
+    });
+  };
 
   useEffect(() => {
     async function fetchSheetData() {
@@ -193,80 +175,68 @@ export default function CSVImport() {
   }, []);
 
   const resetState = () => {
-    setStep("upload");
     setFile(null);
     setCsvHeaders([]);
-    setMissingColumns([]);
     setMapping({});
     setSelectedSourceId("");
+    setShowMapping(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
   };
 
-  const handleUpload = async () => {
+  const handleSubmit = async (providedMapping?: Mapping) => {
+    console.log(providedMapping, 'Check')
     if (!file) {
-      toast.warn("Please select a CSV file to upload");
+      toast.warn("Please select a CSV file");
       return;
     }
     if (!selectedSourceId) {
-      toast.warn("Please select a source before uploading");
+      toast.warn("Please select a source");
       return;
     }
 
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("data_source_id", selectedSourceId);
-
     try {
       setIsLoading(true);
-      const res = (await axiosWrapper(
-        "post",
-        CSV_API.IMPORT_CSV,
-        formData as any,
-        NEXT_PUBLIC_CSV_API_TOKEN,
-        true
-      )) as UploadResponse;
 
-      toast.success(res.message || "CSV uploaded successfully!");
-      resetState();
-    } catch (err: any) {
-      if (err?.missingColumns) {
-        setCsvHeaders(err.csvHeaders || []);
-        setMissingColumns(err.missingColumns);
-        setStep("mapping");
-        toast.info("Some CSV columns are missing. Please map them.");
-      } else {
-        toast.error(err?.error || err?.message || "Upload failed");
+      // Get headers from CSV
+      const headersInCSV = (await getCSVHeaders(file)).map((h) =>
+        h.toLowerCase()
+      );
+      setCsvHeaders(headersInCSV);
+
+      // Determine mapping: use provided mapping (from MappingStep) or auto-map
+      const finalMapping: Mapping = providedMapping
+        ? providedMapping
+        : headersInCSV.reduce((acc: Mapping, csvCol) => {
+            const match = REQUIRED_COLUMNS.find(
+              (dbCol) => dbCol.toLowerCase() === csvCol
+            );
+            if (match) acc[csvCol] = match;
+            return acc;
+          }, {});
+
+      setMapping(finalMapping);
+
+      // If mapping is incomplete, show mapping UI
+      const unmatched = headersInCSV.filter(
+        (col) => !Object.keys(finalMapping).includes(col)
+      );
+      if (unmatched.length > 0) {
+        setShowMapping(true);
+        toast.info(
+          "Some CSV columns do not match DB columns. Please map them."
+        );
+        return;
       }
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
-  const handleMappingSubmit = async () => {
-    if (!file) {
-      toast.warn("No CSV file available for mapping");
-      return;
-    }
-    if (!selectedSourceId) {
-      toast.warn("Please select a source before uploading");
-      return;
-    }
+      // ✅ All headers matched, submit CSV
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("mapping", JSON.stringify(finalMapping));
+      formData.append("data_source_id", selectedSourceId);
 
-    const isMappingComplete = csvHeaders.every((col) => mapping[col]);
-    if (!isMappingComplete) {
-      toast.warn("Please complete all column mappings");
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("mapping", JSON.stringify(mapping));
-    formData.append("data_source_id", selectedSourceId);
-
-    try {
-      setIsLoading(true);
+      toast.info("Uploading CSV...");
       const res = (await axiosWrapper(
         "post",
         CSV_API.IMPORT_MAPPED_CSV,
@@ -278,7 +248,7 @@ export default function CSVImport() {
       toast.success(res.message || "CSV uploaded successfully!");
       resetState();
     } catch (err: any) {
-      toast.error(err?.error || err?.message || "Mapping failed");
+      toast.error(err?.error || err?.message || "CSV upload failed");
     } finally {
       setIsLoading(false);
     }
@@ -286,7 +256,7 @@ export default function CSVImport() {
 
   return (
     <div className="p-6 max-w-2xl w-full bg-white rounded-lg shadow-md space-y-6">
-      {/* 👇 Source Dropdown */}
+      {/* Source Dropdown */}
       <div>
         <h2 className="text-xl font-bold mb-4">Select Source</h2>
         {sources.length > 0 ? (
@@ -307,24 +277,43 @@ export default function CSVImport() {
         )}
       </div>
 
-      {step === "upload" && (
-        <UploadStep
-          fileInputRef={fileInputRef}
-          onFileChange={setFile}
-          onUpload={handleUpload}
-          isLoading={isLoading}
+      {/* File Input */}
+      <div className="space-y-4">
+        <h2 className="text-xl font-semibold text-gray-800">Upload CSV</h2>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".csv"
+          onChange={(e) => setFile(e.target.files?.[0] || null)}
+          className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-black file:text-white hover:file:bg-gray-800"
         />
-      )}
-      {step === "mapping" && (
+      </div>
+
+      {/* Mapping Step */}
+      {showMapping && csvHeaders.length > 0 && (
         <MappingStep
-          message="Please map the missing columns"
-          missingColumns={missingColumns}
+          message="Please map unmatched CSV columns"
           csvHeaders={csvHeaders}
           mapping={mapping}
           onMappingChange={setMapping}
-          onSubmit={handleMappingSubmit}
+          onSubmit={() => handleSubmit(mapping)}
           isLoading={isLoading}
         />
+      )}
+
+      {/* Submit Button if mapping UI not needed */}
+      {!showMapping && (
+        <button
+          onClick={() => handleSubmit()}
+          disabled={isLoading || !file}
+          className={`w-full px-4 py-2 text-white rounded-lg transition-colors ${
+            isLoading || !file
+              ? "bg-black/60 cursor-not-allowed"
+              : "bg-black hover:bg-black/80"
+          }`}
+        >
+          {isLoading ? "Processing..." : "Process CSV"}
+        </button>
       )}
     </div>
   );
