@@ -52,6 +52,8 @@ const ProfileCard = () => {
           height={60}
           alt="profile_image_icon"
           className="w-12 h-12 rounded-full border border-gray-700"
+
+          
         />
         <div>
           {user?.name && <p className="text-white font-medium">{user?.name}</p>}
