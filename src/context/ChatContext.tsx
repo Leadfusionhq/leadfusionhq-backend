@@ -1,5 +1,5 @@
 "use client";
-import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
+import React, { createContext, useState, useEffect, useContext, ReactNode, useRef, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/redux/store';
 import axiosWrapper from "@/utils/api";
@@ -85,6 +85,10 @@ interface TypingUser {
   isTyping: boolean;
 }
 
+interface ChatFilters {
+  [key: string]: unknown;
+}
+
 interface ChatContextType {
   chats: Chat[];
   currentChat: Chat | null;
@@ -94,20 +98,20 @@ interface ChatContextType {
   unreadCount: number;
   typingUsers: TypingUser[];
   
-  fetchChats: (filters?: any) => Promise<void>;
+  fetchChats: (filters?: ChatFilters) => Promise<void>;
   selectChat: (chatId: string) => Promise<void>;
   createOrGetChat: (participantId: string, subject?: string) => Promise<Chat>;
   updateChatStatus: (chatId: string, status: string, tags?: string[]) => Promise<void>;
   archiveChat: (chatId: string, archive?: boolean) => Promise<void>;
   fetchMessages: (chatId: string, page?: number) => Promise<void>;
-  sendMessage: (chatId: string, content: string, type?: string, metadata?: any, replyTo?: string) => Promise<void>;
+  sendMessage: (chatId: string, content: string, type?: string, metadata?: Record<string, unknown>, replyTo?: string) => Promise<void>;
   editMessage: (messageId: string, content: string) => Promise<void>;
   deleteMessage: (messageId: string) => Promise<void>;
   markMessagesAsRead: (chatId: string, messageIds?: string[]) => Promise<void>;
   uploadFile: (chatId: string, file: File) => Promise<void>;
   startTyping: (chatId: string) => Promise<void>;
   stopTyping: (chatId: string) => Promise<void>;
-  searchMessages: (chatId: string, query: string, filters?: any) => Promise<any>;
+  searchMessages: (chatId: string, query: string, filters?: ChatFilters) => Promise<unknown>;
   getUnreadCount: () => Promise<void>;
   clearCurrentChat: () => void;
 }
@@ -125,13 +129,254 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   
   const { user } = useSelector((state: RootState) => state.auth);
   const token = useSelector((state: RootState) => state.auth.token);
+
   const { socket, connected } = useSocket();
 
   // Check user role - adapt to your backend role values
   const isAdmin = user?.role === 'ADMIN' || user?.role === 'Admin';
   const isUser = user?.role === 'USER' || user?.role === 'User';
+  const processedMessageIds = useRef(new Set<string>());
+  
+  // Stable references for socket handlers
+  const currentChatRef = useRef<Chat | null>(null);
+  const messagesRef = useRef<Message[]>([]);
+  const chatsRef = useRef<Chat[]>([]);
 
-  // Socket event listeners for real-time chat
+  // Update refs when state changes
+  useEffect(() => {
+    currentChatRef.current = currentChat;
+  }, [currentChat]);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  useEffect(() => {
+    chatsRef.current = chats;
+  }, [chats]);
+
+  // Calculate total unread count from chats
+  useEffect(() => {
+    const totalUnread = chats.reduce((sum, chat) => {
+      return sum + (chat.unreadCount?.[isAdmin ? 'admin' : 'user'] || 0);
+    }, 0);
+    
+    setUnreadCount(totalUnread);
+  }, [chats, isAdmin]);
+
+  // Stable socket event handlers
+  const handleNewMessage = useCallback((data: { chatId: string; message: Message }) => {
+    console.log('📨 NEW MESSAGE RECEIVED:', data);
+  
+    // Prevent processing the same message multiple times
+    if (processedMessageIds.current.has(data.message._id)) {
+      return;
+    }
+    processedMessageIds.current.add(data.message._id);
+  
+    const isViewingThisChat = currentChatRef.current ? data.chatId === currentChatRef.current._id : false;
+    const isMessageFromMe = data.message.senderId._id === user?._id;
+  
+    // Add message to current chat if it's the active one
+    if (isViewingThisChat) {
+      setMessages(prev => {
+        const exists = prev.find(msg => msg._id === data.message._id);
+        if (exists) return prev;
+        return [...prev, data.message];
+      });
+  
+      // Auto-mark as read if viewing the chat and message is not from me
+      if (!isMessageFromMe) {
+        markMessagesAsRead(data.chatId, [data.message._id]);
+      }
+    }
+  
+    // Update chat list with new message preview & unread count
+    setChats(prev =>
+      prev.map(chat =>
+        chat._id === data.chatId
+          ? {
+              ...chat,
+              lastMessage: {
+                messageId: data.message._id,
+                content: data.message.content.data.substring(0, 100),
+                sentAt: new Date(data.message.createdAt),
+                senderId: data.message.senderId._id,
+              },
+              unreadCount: {
+                // Only increment unread count for recipient, not sender
+                user: isMessageFromMe ? chat.unreadCount?.user || 0 : 
+                      (data.message.senderId._id === chat.adminId._id ? 
+                       (chat.unreadCount?.user || 0) + 1 : chat.unreadCount?.user || 0),
+                
+                admin: isMessageFromMe ? chat.unreadCount?.admin || 0 : 
+                       (data.message.senderId._id === chat.userId._id ? 
+                        (chat.unreadCount?.admin || 0) + 1 : chat.unreadCount?.admin || 0)
+              },
+            }
+          : chat
+      )
+    );
+  }, [user]);
+
+  const handleChatCreated = useCallback((data: { chat: Chat }) => {
+    console.log('💬 NEW CHAT CREATED:', data);
+    setChats(prev => {
+      const exists = prev.find(c => c._id === data.chat._id);
+      if (!exists) {
+        return [data.chat, ...prev];
+      }
+      return prev;
+    });
+  }, []);
+
+  const handleUserTyping = useCallback((data: { chatId: string; userId: string; isTyping: boolean }) => {
+    console.log('⌨️ TYPING INDICATOR:', data);
+    
+    if (currentChatRef.current && data.chatId === currentChatRef.current._id && data.userId !== user?._id) {
+      setTypingUsers(prev => {
+        // Filter out the user if they stop typing or update their status
+        const filtered = prev.filter(u => u.userId !== data.userId);
+        
+        if (data.isTyping) {
+          const typingUser = data.userId === currentChatRef.current!.userId._id 
+            ? currentChatRef.current!.userId 
+            : currentChatRef.current!.adminId;
+          
+          // Only add if typingUser has valid data
+          if (typingUser && typingUser.name) {
+            return [...filtered, { 
+              userId: data.userId, 
+              name: typingUser.name, 
+              isTyping: true 
+            }];
+          }
+        }
+        return filtered;
+      });
+    }
+  }, [user]);
+
+  // FIXED: Message deletion handler with proper state management
+  const handleMessageDeleted = useCallback((data: { chatId: string; messageId: string; isLastMessage: boolean }) => {
+    console.log('🗑️ MESSAGE DELETED:', data);
+    
+    // Update messages - mark as deleted
+    setMessages(prev => {
+      return prev.map(msg => 
+        msg._id === data.messageId 
+          ? { ...msg, isDeleted: true, content: { ...msg.content, data: 'This message was deleted' } }
+          : msg
+      );
+    });
+    
+    // Update chat list if this was the last message
+    if (data.isLastMessage) {
+      setChats(prev => prev.map(chat => {
+        if (chat._id === data.chatId) {
+          // Find new last non-deleted message from current messages
+          const currentMessages = messagesRef.current.filter(msg => 
+            !msg.isDeleted && msg._id !== data.messageId
+          );
+          const newLastMessage = currentMessages[currentMessages.length - 1];
+          
+          return {
+            ...chat,
+            lastMessage: newLastMessage ? {
+              messageId: newLastMessage._id,
+              content: newLastMessage.content.data.substring(0, 100),
+              sentAt: new Date(newLastMessage.createdAt),
+              senderId: newLastMessage.senderId._id
+            } : undefined
+          };
+        }
+        return chat;
+      }));
+
+      // Update current chat
+      if (currentChatRef.current && currentChatRef.current._id === data.chatId) {
+        const currentMessages = messagesRef.current.filter(msg => 
+          !msg.isDeleted && msg._id !== data.messageId
+        );
+        const newLastMessage = currentMessages[currentMessages.length - 1];
+        
+        setCurrentChat(prev => prev ? {
+          ...prev,
+          lastMessage: newLastMessage ? {
+            messageId: newLastMessage._id,
+            content: newLastMessage.content.data.substring(0, 100),
+            sentAt: new Date(newLastMessage.createdAt),
+            senderId: newLastMessage.senderId._id
+          } : undefined
+        } : null);
+      }
+    }
+  }, []);
+
+  const handleChatUpdated = useCallback((data: { chatId: string; chat: Chat }) => {
+    console.log('🔄 CHAT UPDATED:', data);
+    
+    setChats(prev => prev.map(chat => 
+      chat._id === data.chatId 
+        ? { ...chat, ...data.chat }
+        : chat
+    ));
+    
+    // Update current chat if it's the same
+    if (currentChatRef.current && currentChatRef.current._id === data.chatId) {
+      setCurrentChat(prev => prev ? { ...prev, ...data.chat } : null);
+    }
+  }, []);
+
+  // FIXED: Messages read handler with proper real-time updates
+  const handleMessagesRead = useCallback((data: { 
+    chatId: string; 
+    readBy: string; 
+    messageIds: string[] | 'all';
+    readAt?: string;
+  }) => {
+    console.log('👁️ MESSAGES READ:', data);
+    
+    // Update messages with read receipts in real-time
+    setMessages(prev => {
+      return prev.map(msg => {
+        const shouldUpdate = data.messageIds === 'all' || 
+                           (Array.isArray(data.messageIds) && data.messageIds.includes(msg._id));
+        
+        if (!shouldUpdate) return msg;
+        
+        // Check if user already marked as read
+        const alreadyRead = msg.readBy?.find(r => r.userId === data.readBy);
+        if (alreadyRead) return msg;
+        
+        // Add read status with real-time update
+        return {
+          ...msg,
+          readBy: [...(msg.readBy || []), { 
+            userId: data.readBy, 
+            readAt: new Date(data.readAt || new Date()) 
+          }],
+          status: 'read' as const
+        };
+      });
+    });
+    
+    // Update unread counts in chat list
+    setChats(prev => prev.map(chat => 
+      chat._id === data.chatId 
+        ? {
+            ...chat,
+            unreadCount: {
+              ...chat.unreadCount,
+              // Reset unread count for the user who read the messages
+              [data.readBy === chat.userId._id ? 'user' : 'admin']: 0
+            }
+          }
+        : chat
+    ));
+  }, []);
+
+  // Socket event listeners setup
   useEffect(() => {
     if (!socket || !connected || !user) {
       console.log('Socket not ready:', { socket: !!socket, connected, user: !!user });
@@ -140,139 +385,12 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     console.log('Setting up chat socket listeners for user:', user._id);
 
-    // Listen for new messages
-    const handleNewMessage = (data: { chatId: string; message: Message }) => {
-      console.log('📨 NEW MESSAGE RECEIVED:', data);
-      
-      // Add message to current chat if it's the active one
-      if (currentChat && data.chatId === currentChat._id) {
-        setMessages(prev => {
-          // Avoid duplicates
-          const exists = prev.find(msg => msg._id === data.message._id);
-          if (exists) return prev;
-          return [...prev, data.message];
-        });
-        
-        // Auto-scroll to bottom
-        setTimeout(() => {
-          const element = document.getElementById('messagesContainer');
-          if (element) {
-            element.scrollTop = element.scrollHeight;
-          }
-        }, 100);
-      }
-      
-      // Update chat list with new message preview
-      setChats(prev => prev.map(chat => 
-        chat._id === data.chatId 
-          ? {
-              ...chat,
-              lastMessage: {
-                messageId: data.message._id,
-                content: data.message.content.data.substring(0, 100),
-                sentAt: new Date(data.message.createdAt),
-                senderId: data.message.senderId._id
-              },
-              unreadCount: {
-                ...chat.unreadCount,
-                [isAdmin ? 'admin' : 'user']: (chat.unreadCount?.[isAdmin ? 'admin' : 'user'] || 0) + 1
-              }
-            }
-          : chat
-      ));
-
-      // Update global unread count
-      setUnreadCount(prev => prev + 1);
-    };
-
-    // Listen for chat created events
-    const handleChatCreated = (data: { chat: Chat }) => {
-      console.log('💬 NEW CHAT CREATED:', data);
-      setChats(prev => {
-        const exists = prev.find(c => c._id === data.chat._id);
-        if (!exists) {
-          return [data.chat, ...prev];
-        }
-        return prev;
-      });
-    };
-
-    // Listen for typing indicators
-    const handleUserTyping = (data: { chatId: string; userId: string; isTyping: boolean }) => {
-      console.log('⌨️ TYPING INDICATOR:', data);
-      
-      if (currentChat && data.chatId === currentChat._id && data.userId !== user._id) {
-        setTypingUsers(prev => {
-          const filtered = prev.filter(u => u.userId !== data.userId);
-          if (data.isTyping) {
-            // Get user info from current chat
-            const typingUser = data.userId === currentChat.userId._id 
-              ? currentChat.userId 
-              : currentChat.adminId;
-            
-            return [...filtered, { 
-              userId: data.userId, 
-              name: typingUser.name, 
-              isTyping: true 
-            }];
-          }
-          return filtered;
-        });
-      }
-    };
-
-    // Listen for message edits
-    // const handleMessageEdited = (data: { chatId: string; messageId: string; newContent: string }) => {
-    //   console.log('✏️ MESSAGE EDITED:', data);
-    //   if (currentChat && data.chatId === currentChat._id) {
-    //     setMessages(prev => prev.map(msg => 
-    //       msg._id === data.messageId 
-    //         ? { 
-    //             ...msg, 
-    //             content: { ...msg.content, data: data.newContent }, 
-    //             isEdited: true,
-    //             editedAt: new Date().toISOString()
-    //           }
-    //         : msg
-    //     ));
-    //   }
-    // };
-
-    // Listen for message deletions
-    const handleMessageDeleted = (data: { chatId: string; messageId: string }) => {
-      console.log('🗑️ MESSAGE DELETED:', data);
-      if (currentChat && data.chatId === currentChat._id) {
-        setMessages(prev => prev.map(msg => 
-          msg._id === data.messageId 
-            ? { ...msg, isDeleted: true }
-            : msg
-        ));
-      }
-    };
-
-    // Listen for messages read receipts
-    const handleMessagesRead = (data: { chatId: string; readBy: string; messageIds: string[] | 'all' }) => {
-      console.log('👁️ MESSAGES READ:', data);
-      if (currentChat && data.chatId === currentChat._id) {
-        setMessages(prev => prev.map(msg => {
-          const newReadBy = [...(msg.readBy || [])];
-          const alreadyRead = newReadBy.find(r => r.userId === data.readBy);
-          
-          if (!alreadyRead) {
-            newReadBy.push({ userId: data.readBy, readAt: new Date() });
-          }
-          
-          return { ...msg, readBy: newReadBy };
-        }));
-      }
-    };
-
-    // Register all socket listeners
+    // Register all socket listeners with stable references
     socket.on('new-message', handleNewMessage);
     socket.on('chat-created', handleChatCreated);
     socket.on('user-typing', handleUserTyping);
-    // socket.on('message-edited', handleMessageEdited);
     socket.on('message-deleted', handleMessageDeleted);
+    socket.on('chat-updated', handleChatUpdated);
     socket.on('messages-read', handleMessagesRead);
 
     // Cleanup listeners
@@ -281,13 +399,13 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       socket.off('new-message', handleNewMessage);
       socket.off('chat-created', handleChatCreated);
       socket.off('user-typing', handleUserTyping);
-    //   socket.off('message-edited', handleMessageEdited);
       socket.off('message-deleted', handleMessageDeleted);
+      socket.off('chat-updated', handleChatUpdated);
       socket.off('messages-read', handleMessagesRead);
     };
-  }, [socket, connected, user, currentChat, isAdmin]);
+  }, [socket, connected, user, handleNewMessage, handleChatCreated, handleUserTyping, handleMessageDeleted, handleChatUpdated, handleMessagesRead]);
 
-  const fetchChats = async (filters: any = {}) => {
+  const fetchChats = async (filters: ChatFilters = {}) => {
     if (!user) return;
     
     setLoading(true);
@@ -302,7 +420,6 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       console.log('FETCH CHATS RESPONSE:', response);
       
-      // Handle different response structures
       const chatsData = response.data?.data || response.data || response || [];
       setChats(Array.isArray(chatsData) ? chatsData : []);
       
@@ -323,12 +440,16 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       console.log('SELECT CHAT RESPONSE:', response);
       
-      // Handle different response structures
-      const chatData = response.data?.chat || response.chat || response.data || response;
+      // const chatData = response.data?.chat || response.chat || response.data || response;
+      const chatData = response.data?.data?.chat || response.data?.chat || response.chat || response.data?.data || response.data || response;
       setCurrentChat(chatData);
       
       await fetchMessages(chatId);
-      await markMessagesAsRead(chatId);
+      
+      // Mark messages as read when selecting a chat
+      setTimeout(() => {
+        markMessagesAsRead(chatId);
+      }, 500);
       
     } catch (error) {
       console.error('Failed to select chat:', error);
@@ -345,10 +466,9 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       console.log('CREATE/GET CHAT RESPONSE:', response);
       
-      // Handle different response structures
-      const chatData = response.data?.chat || response.chat || response.data || response;
+      // const chatData = response.data?.chat || response.chat || response.data || response;
+      const chatData = response.data?.data?.chat || response.data?.chat || response.chat || response.data?.data || response.data || response;
       
-      // Add to chats list if not exists
       setChats(prev => {
         const exists = prev.find(c => c._id === chatData._id);
         if (!exists) {
@@ -374,11 +494,12 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       console.log('FETCH MESSAGES RESPONSE:', response);
       
-      // Handle different response structures
       const messagesData = response.data?.data || response.data || response || [];
       
       if (page === 1) {
         setMessages(Array.isArray(messagesData) ? messagesData : []);
+        // Clear processed message IDs when fetching fresh messages
+        processedMessageIds.current.clear();
       } else {
         setMessages(prev => [...(Array.isArray(messagesData) ? messagesData : []), ...prev]);
       }
@@ -390,23 +511,17 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const sendMessage = async (chatId: string, content: string, type: string = 'text', metadata: any = {}, replyTo?: string) => {
+  const sendMessage = async (chatId: string, content: string, type: string = 'text', metadata: Record<string, unknown> = {}, replyTo?: string) => {
     if (!user || !content.trim()) return;
+    
+    const tempId = 'temp_' + Date.now() + '_' + Math.random();
     
     try {
       const url = CHAT_API.SEND_MESSAGE.replace(':chatId', chatId);
-      const response = await axiosWrapper("post", url, {
-        content: content.trim(),
-        type,
-        metadata,
-        replyTo
-      }, token ?? undefined) as any;
       
-      console.log('SEND MESSAGE RESPONSE:', response);
-      
-      // Optimistically add message to UI (it will be updated by socket)
+      // Optimistically add message to UI
       const optimisticMessage: Message = {
-        _id: 'temp_' + Date.now(),
+        _id: tempId,
         chatId,
         senderId: {
           _id: user._id,
@@ -430,8 +545,47 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       setMessages(prev => [...prev, optimisticMessage]);
       
+      // Update chat list with optimistic message
+      setChats(prev => prev.map(chat => 
+        chat._id === chatId 
+          ? { 
+              ...chat, 
+              lastMessage: {
+                messageId: tempId,
+                content: content.trim().substring(0, 100),
+                sentAt: new Date(),
+                senderId: user._id
+              }
+            }
+          : chat
+      ));
+      
+      // Send the actual message
+      const response = await axiosWrapper("post", url, {
+        content: content.trim(),
+        type,
+        metadata,
+        replyTo
+      }, token ?? undefined) as any;
+      
+      console.log('SEND MESSAGE RESPONSE:', response);
+      
+      // Replace optimistic message with real one when response comes back
+      // const realMessage = response.data?.message || response.message || response.data || response;
+      const realMessage = response.data?.data?.message || response.data?.message || response.message || response.data?.data || response.data || response;
+      if (realMessage && realMessage._id) {
+        setMessages(prev => prev.map(msg => 
+          msg._id === tempId ? realMessage : msg
+        ));
+        
+        // Add to processed set to prevent duplicate from socket
+        processedMessageIds.current.add(realMessage._id);
+      }
+      
     } catch (error) {
       console.error('Failed to send message:', error);
+      // Remove optimistic message on error
+      setMessages(prev => prev.filter(msg => msg._id !== tempId));
       throw error;
     }
   };
@@ -448,45 +602,95 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  // const deleteMessage = async (messageId: string) => {
-  //   if (!user) return;
+  // FIXED: Delete message with proper temp ID handling
+  const deleteMessage = async (messageId: string) => {
+    if (!user || !currentChat) return;
     
-  //   try {
-  //     const url = CHAT_API.DELETE_MESSAGE.replace(':chatId', currentChat?._id || '').replace(':messageId', messageId);
-  //     await axiosWrapper("delete", url, {}, token ?? undefined);
-  //   } catch (error) {
-  //     console.error('Failed to delete message:', error);
-  //     throw error;
-  //   }
-  // };
-
-    const deleteMessage = async (messageId: string) => {
-    if (!user) return;
+    // Skip deletion of temporary messages
+    if (messageId.startsWith('temp_')) {
+      console.log('Skipping deletion of temporary message:', messageId);
+      setMessages(prev => prev.filter(msg => msg._id !== messageId));
+      return;
+    }
+    
+    // Find the message being deleted
+    const messageToDelete = messages.find(msg => msg._id === messageId);
+    if (!messageToDelete) {
+      console.warn('Message not found for deletion:', messageId);
+      return;
+    }
     
     // Optimistically update UI immediately
     setMessages(prev => prev.map(msg => 
       msg._id === messageId 
-        ? { ...msg, isDeleted: true }
+        ? { ...msg, isDeleted: true, content: { ...msg.content, data: 'This message was deleted' } }
         : msg
     ));
     
-    try {
-      const url = CHAT_API.DELETE_MESSAGE.replace(':chatId', currentChat?._id || '').replace(':messageId', messageId);
-      await axiosWrapper("delete", url, {}, token ?? undefined);
-      console.log('✅ Message deleted successfully');
-    } catch (error) {
-      console.error('Failed to delete message:', error);
+    // Check if this is the last message
+    const isLastMessage = currentChat.lastMessage?.messageId === messageId;
+    
+    // Handle last message update optimistically
+    if (isLastMessage) {
+      const remainingMessages = messages.filter(msg => 
+        !msg.isDeleted && msg._id !== messageId
+      );
+      const newLastMessage = remainingMessages[remainingMessages.length - 1];
       
-      // Revert optimistic update on error
+      const lastMessageUpdate = newLastMessage ? {
+        messageId: newLastMessage._id,
+        content: newLastMessage.content.data.substring(0, 100),
+        sentAt: new Date(newLastMessage.createdAt),
+        senderId: newLastMessage.senderId._id
+      } : undefined;
+      
+      // Update current chat
+      setCurrentChat(prev => prev ? {
+        ...prev,
+        lastMessage: lastMessageUpdate
+      } : null);
+      
+      // Update chats list
+      setChats(prev => prev.map(chat => 
+        chat._id === currentChat._id
+          ? { ...chat, lastMessage: lastMessageUpdate }
+          : chat
+      ));
+    }
+    
+    try {
+      const url = CHAT_API.DELETE_MESSAGE.replace(':chatId', currentChat._id).replace(':messageId', messageId);
+      const response = await axiosWrapper("delete", url, {}, token ?? undefined) as any;
+      console.log('✅ Message deleted successfully', response);
+      
+    } catch (error: any) {
+      console.error('❌ Failed to delete message:', error);
+      
+      // Revert optimistic updates on error
       setMessages(prev => prev.map(msg => 
         msg._id === messageId 
-          ? { ...msg, isDeleted: false }
+          ? { ...msg, isDeleted: false, content: messageToDelete.content }
           : msg
       ));
       
-      throw error;
+      if (isLastMessage) {
+        setCurrentChat(prev => prev ? {
+          ...prev,
+          lastMessage: currentChat.lastMessage
+        } : null);
+        
+        setChats(prev => prev.map(chat => 
+          chat._id === currentChat._id
+            ? { ...chat, lastMessage: currentChat.lastMessage }
+            : chat
+        ));
+      }
+      
+      throw new Error(error.response?.data?.message || error.message || 'Failed to delete message');
     }
   };
+
+  // FIXED: Mark messages as read with proper real-time updates
   const markMessagesAsRead = async (chatId: string, messageIds?: string[]) => {
     if (!user) return;
     
@@ -506,6 +710,29 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }
           : chat
       ));
+      
+      // Update messages read status in current chat with real-time feedback
+      if (currentChat && currentChat._id === chatId) {
+        setMessages(prev => prev.map(msg => {
+          // Skip messages from current user or already read messages
+          if (msg.senderId._id === user._id) return msg;
+          
+          if (messageIds && messageIds.length > 0 && !messageIds.includes(msg._id)) {
+            return msg;
+          }
+          
+          const alreadyRead = msg.readBy.find(r => r.userId === user._id);
+          if (!alreadyRead) {
+            return {
+              ...msg,
+              readBy: [...msg.readBy, { userId: user._id, readAt: new Date() }],
+              status: 'read'
+            };
+          }
+          return msg;
+        }));
+      }
+      
     } catch (error) {
       console.error('Failed to mark messages as read:', error);
     }
@@ -569,7 +796,6 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const url = CHAT_API.ARCHIVE_CHAT.replace(':chatId', chatId);
       await axiosWrapper("patch", url, { archive }, token ?? undefined);
       
-      // Update local state
       setChats(prev => prev.map(chat => 
         chat._id === chatId ? { ...chat, isArchived: archive } : chat
       ));
@@ -579,7 +805,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const searchMessages = async (chatId: string, query: string, filters: any = {}) => {
+  const searchMessages = async (chatId: string, query: string, filters: ChatFilters = {}) => {
     if (!user) return;
     
     try {
@@ -600,7 +826,10 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const response = await axiosWrapper("get", CHAT_API.GET_UNREAD_COUNT, {}, token ?? undefined) as any;
       console.log('UNREAD COUNT RESPONSE:', response);
-      setUnreadCount(response.unreadCount || 0);
+      
+      // const count = response.data?.unreadCount || response.unreadCount || 0;
+      const count = response.data?.data?.unreadCount || response.data?.unreadCount || response.unreadCount || 0;
+      setUnreadCount(count);
     } catch (error) {
       console.error('Failed to get unread count:', error);
     }
@@ -610,55 +839,48 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setCurrentChat(null);
     setMessages([]);
     setTypingUsers([]);
+    processedMessageIds.current.clear();
   };
 
   // Fetch initial data when user changes
   useEffect(() => {
     if (user) {
-      console.log('User changed, fetching initial chat data:', user);
       fetchChats();
       getUnreadCount();
+      
+      const interval = setInterval(getUnreadCount, 30000);
+      return () => clearInterval(interval);
     }
   }, [user]);
 
-  // Debug socket connection
-  useEffect(() => {
-    console.log('CHAT CONTEXT DEBUG:', {
-      socketConnected: connected,
-      userExists: !!user,
-      userId: user?._id,
-      userRole: user?.role,
-      chatsCount: chats.length,
-      currentChatId: currentChat?._id
-    });
-  }, [socket, connected, user, chats.length, currentChat]);
+  const contextValue: ChatContextType = {
+    chats,
+    currentChat,
+    messages,
+    loading,
+    messagesLoading,
+    unreadCount,
+    typingUsers,
+    fetchChats,
+    selectChat,
+    createOrGetChat,
+    updateChatStatus,
+    archiveChat,
+    fetchMessages,
+    sendMessage,
+    editMessage,
+    deleteMessage,
+    markMessagesAsRead,
+    uploadFile,
+    startTyping,
+    stopTyping,
+    searchMessages,
+    getUnreadCount,
+    clearCurrentChat
+  };
 
   return (
-    <ChatContext.Provider value={{
-      chats,
-      currentChat,
-      messages,
-      loading,
-      messagesLoading,
-      unreadCount,
-      typingUsers,
-      fetchChats,
-      selectChat,
-      createOrGetChat,
-      updateChatStatus,
-      archiveChat,
-      fetchMessages,
-      sendMessage,
-      editMessage,
-      deleteMessage,
-      markMessagesAsRead,
-      uploadFile,
-      startTyping,
-      stopTyping,
-      searchMessages,
-      getUnreadCount,
-      clearCurrentChat
-    }}>
+    <ChatContext.Provider value={contextValue}>
       {children}
     </ChatContext.Provider>
   );

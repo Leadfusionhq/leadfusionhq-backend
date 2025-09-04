@@ -26,16 +26,21 @@ const ProfileCard = () => {
   ];
 
   const handleLogout = async () => {
-      try {
-        await fetch('/api/auth/logout', { method: 'POST' });
-      } catch (error) {
-        console.error('Logout failed', error);
-      } finally {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch (error) {
+      console.error("Logout failed", error);
+    } finally {
+      removeToken(); // clear local token first
+      router.replace("/login"); // use replace to avoid going "back" to dashboard
+  
+      // give router a microtask to run before resetting redux
+      setTimeout(() => {
         dispatch(logout());
-        removeToken();
-        router.push('/login');
-      }
+      }, 0);
+    }
   };
+  
 
   return (
     <div className="absolute right-10 top-[88px] w-[320px] bg-black shadow-lg rounded-lg pt-4 z-50 transition-all duration-300 text-base font-normal">
@@ -47,6 +52,8 @@ const ProfileCard = () => {
           height={60}
           alt="profile_image_icon"
           className="w-12 h-12 rounded-full border border-gray-700"
+
+          
         />
         <div>
           {user?.name && <p className="text-white font-medium">{user?.name}</p>}
