@@ -50,7 +50,7 @@ export const API_URL = {
     
 };
 
-// ========== FAQ ROUTES ==========
+/** ::::::::::::::::::FAQ ROUTES :::::::::::::::::: */
 
 const FAQ_API_BASE = `${API_BASE}/faqs`;
 
@@ -63,7 +63,7 @@ export const FAQ_API = {
   GET_PUBLIC_FAQS: `${FAQ_API_BASE}/public`,
 };
 
-// ========== FEEDBACK ROUTES ==========
+/** ::::::::::::::::::FEEDBACK ROUTES :::::::::::::::::: */
 const FEEDBACK_API_BASE = `${API_BASE}/feedback`;
 
 export const FEEDBACK_API = {
@@ -79,7 +79,7 @@ export const FEEDBACK_API = {
 
 
 
-// ========== LOCATION ROUTES ==========
+/** ::::::::::::::::::LOCATION ROUTES :::::::::::::::::: */
 const LOCATION_API_BASE = `${API_BASE}/locations`;
 
 export const LOCATION_API = {
@@ -91,7 +91,7 @@ export const LOCATION_API = {
 
 };
 
-// ========== CAMPAIGNS ROUTES ==========
+/** ::::::::::::::::::CAMPAIGNS ROUTES :::::::::::::::::: */
 const CAMPAIGNS_API_BASE = `${API_BASE}/campaigns`;
 
 export const CAMPAIGNS_API = {
@@ -105,7 +105,7 @@ export const CAMPAIGNS_API = {
   
 };
 
-// ========== LEADS ROUTES ==========
+/** ::::::::::::::::::LEADS ROUTES :::::::::::::::::: */
 
 const LEADS_API_BASE = `${API_BASE}/leads`;
 
@@ -122,7 +122,7 @@ export const LEADS_API = {
   GET_LEADS_BY_CLIENT:`${LEADS_API_BASE}/client`,
 };
 
-// ========== utilities ROUTES ==========
+/** ::::::::::::::::::utilities ROUTES :::::::::::::::::: */
 const UITILITIES_API_BASE = `${API_BASE}/utilities`;
 
 export const UITILITIES_API = {
@@ -133,7 +133,7 @@ export const UITILITIES_API = {
 
 
 
-// ========== CSV ROUTES ===========
+/** ::::::::::::::::::CSV ROUTES :::::::::::::::::: */
 const CSV_API_BASE = `${API_IMPORT_BASE}/contacts`;
 
 export const CSV_API = {
@@ -142,7 +142,7 @@ export const CSV_API = {
 };
 
 
-// ========== notifications ROUTES ==========
+/** ::::::::::::::::::notifications ROUTES :::::::::::::::::: */
 const NOTIFICATION_API_BASE = `${API_BASE}/notifications`;
 
 export const NOTIFICATION_API = {
@@ -157,7 +157,7 @@ export const NOTIFICATION_API = {
 
 
 
-// ========== CHAT ROUTES ==========
+/** :::::::::::::::::: CHAT ROUTES :::::::::::::::::: */
 const CHAT_API_BASE = `${API_BASE}/chats`;
 
 export const CHAT_API = {
@@ -186,5 +186,23 @@ export const CHAT_API = {
   // Search and filters
   SEARCH_MESSAGES: `${CHAT_API_BASE}/:chatId/search`,
   GET_UNREAD_COUNT: `${CHAT_API_BASE}/unread-count`
+};
+
+
+
+
+
+/** :::::::::::::::::: BILLING ROUTES :::::::::::::::::: */
+const BILLING_API_BASE = `${API_BASE}/billing`;
+
+export const BILLING_API = {
+  
+  BILLING: `${BILLING_API_BASE}/`,
+  SAVE_CARD: `${BILLING_API_BASE}/save-card`,
+  ADD_FUNDS: `${BILLING_API_BASE}/add-funds`,
+  ACCEPT_CONTRACT: `${BILLING_API_BASE}/contract/accept`,
+  ASSIGN_LEAD: `${BILLING_API_BASE}/assign-lead`,
+  CARGE_USER: `${BILLING_API_BASE}/charge-user`,
+
 };
 

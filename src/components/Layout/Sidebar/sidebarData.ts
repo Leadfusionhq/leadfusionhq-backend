@@ -85,6 +85,13 @@ export const adminSidebarItems: SidebarItem[] = [
     link: '/admin/upload-csv',
 
   },
+   {
+    id: 'billing-control',
+    name: 'Billing Control',
+    icon: '/images/icons/billing-control.svg',
+    link: '/admin/billing-control',
+
+  },
 
 
 
@@ -127,7 +134,13 @@ export const userSidebarItems: SidebarItem[] = [
     icon: '/images/icons/chats.svg',
     link: '/dashboard/faq',
   },
+   {
+    id: 'billing-control',
+    name: 'Billing Control',
+    icon: '/images/icons/billing-control.svg',
+    link: '/dashboard/billing-control',
 
+  },
 
   // {
   //   id: 'feedback',
