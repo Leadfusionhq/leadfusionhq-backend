@@ -1,5 +1,5 @@
 "use client";
-import React from 'react';
+import React, { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/redux/store';
 import Image from 'next/image';
@@ -7,9 +7,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation'; 
 import { removeToken } from '@/utils/auth';
 import { logout } from '@/redux/auth/authSlice';
+import { useLoader } from '@/context/LoaderContext';
 
 const ProfileCard = () => {
   const { user } = useSelector((state: RootState) => state.auth);
+
+  const { showLoader, hideLoader } = useLoader(); 
 
   const profileSrc = user?.avatar
   ? `${process.env.NEXT_PUBLIC_BACKEND_API_URL}${user.avatar}`
@@ -25,16 +28,27 @@ const ProfileCard = () => {
     { id: 2, label: "Settings", link: "/settings" },
   ];
 
+  
   const handleLogout = async () => {
-      try {
-        await fetch('/api/auth/logout', { method: 'POST' });
-      } catch (error) {
-        console.error('Logout failed', error);
-      } finally {
-        dispatch(logout());
-        removeToken();
-        router.push('/login');
-      }
+    showLoader("Logging out...");
+    
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+      await new Promise(resolve => setTimeout(resolve, 800));
+    } catch (error) {
+      console.error("Logout failed", error);
+      await new Promise(resolve => setTimeout(resolve, 800));
+    } finally {
+      // Always clean up and navigate
+      removeToken();
+      dispatch(logout());
+      hideLoader(); // Explicitly hide loader
+      
+      // Use setTimeout to ensure state updates complete before navigation
+      setTimeout(() => {
+        router.replace("/login");
+      }, 50);
+    }
   };
 
   return (
@@ -47,6 +61,8 @@ const ProfileCard = () => {
           height={60}
           alt="profile_image_icon"
           className="w-12 h-12 rounded-full border border-gray-700"
+
+          
         />
         <div>
           {user?.name && <p className="text-white font-medium">{user?.name}</p>}

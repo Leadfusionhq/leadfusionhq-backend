@@ -59,7 +59,7 @@ const UserChatWidget: React.FC<UserChatWidgetProps> = ({ onOpenChat, className =
     }
   };
 
-  if (user?.role !== 'User') {
+  if (user?.role !== 'USER') {
     return null;
   }
 

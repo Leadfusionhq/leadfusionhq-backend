@@ -22,7 +22,7 @@ const AdminChatWidget: React.FC<AdminChatWidgetProps> = ({ onOpenChat, className
   });
 
   useEffect(() => {
-    if (user?.role === 'Admin') {
+    if (user?.role === 'ADMIN') {
       fetchChats();
     }
   }, [user]);
@@ -43,7 +43,7 @@ const AdminChatWidget: React.FC<AdminChatWidgetProps> = ({ onOpenChat, className
     }
   }, [chats]);
 
-  if (user?.role !== 'Admin') {
+  if (user?.role !== 'ADMIN') {
     return null;
   }
 
