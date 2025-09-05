@@ -8,18 +8,22 @@ import { useSocket } from '@/context/SocketContext';
 import MainPanel from '@/components/Layout/Dashboard/MainPanel/MainPanel';
 import Sidebar from '@/components/Layout/Sidebar/Sidebar';
 import FloatingChatWidget from '@/components/chat/FloatingChatWidget'; 
+import { useLoader } from '@/context/LoaderContext';
+
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const { isLoggedIn, user } = useSelector((state: RootState) => state.auth);
   const router = useRouter();
   const { collapsed } = useSelector((state: RootState) => state.theme);
   const { setUserId, connected } = useSocket();
+  const { showLoader, hideLoader } = useLoader(); 
 
   useEffect(() => {
     if (!isLoggedIn || !user || user.role !== 'ADMIN') {
       router.push('/login');
     }
-  }, [isLoggedIn, user, router]);
+  }, [isLoggedIn, user, router,showLoader]);
+
 
   // Initialize socket with user ID when user is available
   useEffect(() => {

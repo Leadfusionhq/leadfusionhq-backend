@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation"; 
 import MainHeader from "@/components/Layout/MainHeader/MainHeader";
 import Footer from "@/components/Layout/Footer/Footer";
+import { LoaderProvider } from '@/context/LoaderContext';
 
 const includedPaths = ['/', '/contact-us','/term-of-service','/privacy-policy']; 
 
@@ -16,9 +17,12 @@ export default function ClientLayout({
 
   return (
     <>
-      {shouldShowHeaderFooter && <MainHeader />}
+     <LoaderProvider>
+     {shouldShowHeaderFooter && <MainHeader />}
       {children}
       {shouldShowHeaderFooter && <Footer />}
+     </LoaderProvider>
+      
     </>
   );
 }

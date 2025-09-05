@@ -29,7 +29,7 @@ export default function ContactSection() {
           <Image src="/images/call-icon.png" className='mb-6 max-w-[50px] max-h-[50px] object-contain' height={50} width={50} alt="Dashboard"/>
           </div>
           <p className='mb-1 font-bold md:text-[22px] text-[18px] text-[#1C1C1C]'>Call Us:</p>
-          <p className="text-[18px] text-[#1C1C1C] font-medium">(123) 456-7890</p>
+          <p className="text-[18px] text-[#1C1C1C] font-medium">6097076818</p>
         </div>
 
         {/* Location */}
