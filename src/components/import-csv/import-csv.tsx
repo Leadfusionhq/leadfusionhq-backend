@@ -13,9 +13,11 @@ interface UploadSuccessResponse {
   inserted?: any[];
 }
 
-interface PresignedUrlResponse {
-  url: string;
-  fileKey: string;
+interface StartMultipartResponse {
+  uploadId: string;
+  key: string;
+  presignedUrls: string[];
+  chunkSize: number;
 }
 
 type Mapping = Record<string, string>;
@@ -186,9 +188,48 @@ export default function CSVImport() {
     setMapping({});
     setSelectedSourceId("");
     setShowMapping(false);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+  
+  const uploadMultipart = async (
+    file: File,
+    presignedUrls: string[],
+    chunkSize: number
+  ) => {
+    const numParts = presignedUrls.length;
+    const uploadedParts: { ETag: string; PartNumber: number }[] = [];
+
+    const CONCURRENCY = 6; // tune (4-10)
+    let nextIndex = 0;
+
+    const worker = async () => {
+      while (true) {
+        const i = nextIndex++;
+        if (i >= numParts) return;
+        const start = i * chunkSize;
+        const end = Math.min(start + chunkSize, file.size);
+        const blob = file.slice(start, end);
+
+        const url = presignedUrls[i];
+        if (!url) throw new Error("Missing presigned URL for part " + (i + 1));
+
+        const res = await fetch(url, {
+          method: "PUT",
+          body: blob,
+        });
+
+        if (!res.ok) throw new Error(`Failed to upload part ${i + 1}: ${res.statusText}`);
+
+        const eTag = res.headers.get("ETag")?.replace(/"/g, "") || "";
+        uploadedParts.push({ ETag: eTag, PartNumber: i + 1 });
+      }
+    };
+
+    // start workers
+    await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
+
+    // sort by part number
+    return uploadedParts.sort((a, b) => a.PartNumber - b.PartNumber);
   };
 
   const handleSubmit = async (providedMapping?: Mapping) => {
@@ -204,50 +245,52 @@ export default function CSVImport() {
     try {
       setIsLoading(true);
 
-      const headersInCSV = (await getCSVHeaders(file)).map((h) =>
-        h.toLowerCase()
-      );
+      // headers & mapping
+      const headersInCSV = (await getCSVHeaders(file)).map((h) => h.toLowerCase());
       setCsvHeaders(headersInCSV);
 
       const finalMapping: Mapping = providedMapping
         ? providedMapping
         : headersInCSV.reduce((acc: Mapping, csvCol) => {
-            const match = REQUIRED_COLUMNS.find(
-              (dbCol) => dbCol.toLowerCase() === csvCol
-            );
+            const match = REQUIRED_COLUMNS.find((dbCol) => dbCol.toLowerCase() === csvCol);
             if (match) acc[csvCol] = match;
             return acc;
           }, {});
       setMapping(finalMapping);
 
-      const unmatched = headersInCSV.filter(
-        (col) => !Object.keys(finalMapping).includes(col)
-      );
+      const unmatched = headersInCSV.filter((col) => !Object.keys(finalMapping).includes(col));
       if (unmatched.length > 0) {
         setShowMapping(true);
-        toast.info(
-          "Some CSV columns do not match DB columns. Please map them."
-        );
+        toast.info("Some CSV columns do not match DB columns. Please map them.");
         return;
       }
 
-      toast.info("Requesting upload URL...");
-      const { url, fileKey } = (await axiosWrapper(
-        "get",
-        `${CSV_API.GET_PRESIGNED_URL}?fileName=${encodeURIComponent(file.name)}`,
-        undefined,
+      // 1) Request server to start multipart and return presignedUrls + chunkSize
+      toast.info("Requesting multipart upload...");
+      const startResp = (await axiosWrapper(
+        "post",
+        CSV_API.CREATE_MULTIPART_UPLOAD,
+        { fileName: file.name, fileSize: file.size },
         NEXT_PUBLIC_CSV_API_TOKEN
-      )) as PresignedUrlResponse;
+      )) as StartMultipartResponse;
 
-      toast.info("Uploading file to S3...");
-      await fetch(url, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "text/csv",
-        },
-        body: file,
-      });
+      const { uploadId, key: fileKey, presignedUrls, chunkSize } = startResp;
 
+      // 2) Upload parts in parallel (controlled concurrency)
+      toast.info("Uploading parts...");
+      const parts = await uploadMultipart(file, presignedUrls, chunkSize);
+
+      // parts -> [{ ETag, PartNumber }]
+      // 3) Tell backend to complete multipart upload
+      toast.info("Completing multipart upload...");
+      await axiosWrapper(
+        "post",
+        CSV_API.COMPLETE_MULTIPART_UPLOAD,
+        { key: fileKey, uploadId, parts },
+        NEXT_PUBLIC_CSV_API_TOKEN
+      );
+
+      // 4) Tell backend to process the file (S3 key)
       toast.info("Processing CSV in background...");
       const res = (await axiosWrapper(
         "post",
@@ -263,6 +306,7 @@ export default function CSVImport() {
       toast.success(res.message || "CSV queued for processing!");
       resetState();
     } catch (err: any) {
+      console.error(err);
       toast.error(err?.error || err?.message || "CSV upload failed");
     } finally {
       setIsLoading(false);

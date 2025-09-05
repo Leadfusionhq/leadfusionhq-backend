@@ -137,7 +137,8 @@ export const UITILITIES_API = {
 const CSV_API_BASE = `${API_IMPORT_BASE}/contacts`;
 
 export const CSV_API = {
-  GET_PRESIGNED_URL: `${CSV_API_BASE}/get-presigned-url`,
+  CREATE_MULTIPART_UPLOAD: `${CSV_API_BASE}/start-multipart`,
+  COMPLETE_MULTIPART_UPLOAD: `${CSV_API_BASE}/complete-multipart`,
   IMPORT_MAPPED_CSV: `${CSV_API_BASE}/import-mapped`,
   IMPORT_SHEET_CSV: `${CSV_API_BASE}/csv/google-sheet`,
 };
