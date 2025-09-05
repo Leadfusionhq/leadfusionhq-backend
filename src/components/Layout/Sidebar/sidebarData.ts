@@ -71,11 +71,18 @@ export const adminSidebarItems: SidebarItem[] = [
     icon: '/images/icons/chats.svg',
     link: '/admin/chats',
   },
+  // {
+  //   id: 'feedback',
+  //   name: 'Feedback',
+  //   icon: '/images/icons/feedback.svg',
+  //   link: '/admin/feedback',
+
+  // },
   {
-    id: 'feedback',
-    name: 'Feedback',
-    icon: '/images/icons/feedback.svg',
-    link: '/admin/feedback',
+    id: 'upload-csv',
+    name: 'Upload CSV',
+    icon: '/images/icons/upload-csv.svg',
+    link: '/admin/upload-csv',
 
   },
 
@@ -122,12 +129,12 @@ export const userSidebarItems: SidebarItem[] = [
   },
 
 
-  {
-    id: 'feedback',
-    name: 'Feedback',
-    icon: '/images/icons/feedback.svg',
-    link: '/dashboard/feedback',
-  },
+  // {
+  //   id: 'feedback',
+  //   name: 'Feedback',
+  //   icon: '/images/icons/feedback.svg',
+  //   link: '/dashboard/feedback',
+  // },
 
 
 ];

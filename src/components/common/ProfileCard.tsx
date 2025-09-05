@@ -1,5 +1,5 @@
 "use client";
-import React from 'react';
+import React, { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/redux/store';
 import Image from 'next/image';
@@ -7,9 +7,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation'; 
 import { removeToken } from '@/utils/auth';
 import { logout } from '@/redux/auth/authSlice';
+import { useLoader } from '@/context/LoaderContext';
 
 const ProfileCard = () => {
   const { user } = useSelector((state: RootState) => state.auth);
+
+  const { showLoader, hideLoader } = useLoader(); 
 
   const profileSrc = user?.avatar
   ? `${process.env.NEXT_PUBLIC_BACKEND_API_URL}${user.avatar}`
@@ -25,22 +28,28 @@ const ProfileCard = () => {
     { id: 2, label: "Settings", link: "/settings" },
   ];
 
+  
   const handleLogout = async () => {
+    showLoader("Logging out...");
+    
     try {
       await fetch("/api/auth/logout", { method: "POST" });
+      await new Promise(resolve => setTimeout(resolve, 800));
     } catch (error) {
       console.error("Logout failed", error);
+      await new Promise(resolve => setTimeout(resolve, 800));
     } finally {
-      removeToken(); // clear local token first
-      router.replace("/login"); // use replace to avoid going "back" to dashboard
-  
-      // give router a microtask to run before resetting redux
+      // Always clean up and navigate
+      removeToken();
+      dispatch(logout());
+      hideLoader(); // Explicitly hide loader
+      
+      // Use setTimeout to ensure state updates complete before navigation
       setTimeout(() => {
-        dispatch(logout());
-      }, 0);
+        router.replace("/login");
+      }, 50);
     }
   };
-  
 
   return (
     <div className="absolute right-10 top-[88px] w-[320px] bg-black shadow-lg rounded-lg pt-4 z-50 transition-all duration-300 text-base font-normal">
