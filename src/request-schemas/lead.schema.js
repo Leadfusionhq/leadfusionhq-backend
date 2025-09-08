@@ -6,46 +6,74 @@ const createLead = {
     campaign_id: Joi.string().hex().length(24).required().messages({
       'any.required': 'Campaign ID is required',
     }),
-    first_name: Joi.string().min(2).max(50).required().messages({
+    
+    // Personal information
+    first_name: Joi.string().min(1).max(50).required().messages({
       'string.base': 'First Name must be a string',
       'string.empty': 'First Name is required',
       'any.required': 'First Name is required',
     }),
 
-    last_name: Joi.string().min(2).max(50).required().messages({
+    last_name: Joi.string().min(1).max(50).required().messages({
       'string.base': 'Last Name must be a string',
       'string.empty': 'Last Name is required',
       'any.required': 'Last Name is required',
     }),
 
-    email: Joi.string().email().required().messages({
+    middle_name: Joi.string().max(50).allow('').optional(),
+    suffix: Joi.string().max(10).allow('').optional(),
+    gender: Joi.string().valid('M', 'F', 'Male', 'Female', 'Other', '').allow('').optional(),
+    age: Joi.number().min(0).max(150).allow(null).optional(),
+
+    // Contact information
+    email: Joi.string().email().allow('').optional().messages({
       'string.base': 'Email must be a valid email address',
-      'string.empty': 'Email is required',
-      'any.required': 'Email is required',
+      'string.email': 'Please provide a valid email address',
     }),
 
-    phone: Joi.string().allow('').optional().messages({
+    phone_number: Joi.string().required().messages({
       'string.base': 'Phone number must be a string',
+      'any.required': 'Phone number is required',
     }),
 
+    phone: Joi.string().allow('').optional(), // Legacy field
 
+    // Property information
+    homeowner_desc: Joi.string().allow('').optional(),
+    dwelltype: Joi.string().allow('').optional(),
+    house: Joi.string().allow('').optional(),
+
+    // Address components
+    predir: Joi.string().max(10).allow('').optional(),
+    strtype: Joi.string().max(20).allow('').optional(),
+    postdir: Joi.string().max(10).allow('').optional(),
+    apttype: Joi.string().max(20).allow('').optional(),
+    aptnbr: Joi.string().max(20).allow('').optional(),
+
+    // Address object
     address: Joi.object({
-      street: Joi.string().min(3).max(100).required().messages({
+      full_address: Joi.string().min(1).max(500).required().messages({
+        'string.base': 'Full Address must be a string',
+        'string.empty': 'Full Address is required',
+        'any.required': 'Full Address is required',
+      }),
+
+      street: Joi.string().min(1).max(200).required().messages({
         'string.base': 'Street Address must be a string',
         'string.empty': 'Street Address is required',
         'any.required': 'Street Address is required',
       }),
 
-      city: Joi.string().min(2).max(100).required().messages({
+      city: Joi.string().min(1).max(100).required().messages({
         'string.base': 'City must be a string',
         'string.empty': 'City is required',
         'any.required': 'City is required',
       }),
 
-      state: Joi.string().min(2).max(50).required().messages({
-        'string.base': 'State must be a string',
-        'string.empty': 'State is required',
+      state: Joi.string().hex().length(24).required().messages({
         'any.required': 'State is required',
+        'string.hex': 'State must be a valid ObjectId',
+        'string.length': 'State must be a valid ObjectId',
       }),
 
       zip_code: Joi.string().min(5).max(10).required().messages({
@@ -53,9 +81,14 @@ const createLead = {
         'string.empty': 'Zip Code is required',
         'any.required': 'Zip Code is required',
       }),
+
+      zip: Joi.string().min(5).max(10).allow('').optional(),
     }).required(),
 
-    note: Joi.string().allow('').max(500).optional(),
+    // Additional information
+    note: Joi.string().allow('').max(1000).optional(),
+    source: Joi.string().valid('manual', 'csv_upload', 'api', 'import').default('manual'),
+    status: Joi.string().valid('active', 'inactive', 'contacted', 'converted', 'invalid').default('active'),
   }),
 };
 
@@ -66,41 +99,68 @@ const updateLead = {
     }),
   }),
   [Segments.BODY]: Joi.object({
-    campaign_id: Joi.string().hex().length(24).required().messages({
+    campaign_id: Joi.string().hex().length(24).optional().messages({
       'any.required': 'Campaign ID is required',
     }),
-    first_name: Joi.string().min(2).max(50).optional().messages({
+    
+    // Personal information
+    first_name: Joi.string().min(1).max(50).optional().messages({
       'string.base': 'First Name must be a string',
     }),
 
-    last_name: Joi.string().min(2).max(50).optional().messages({
+    last_name: Joi.string().min(1).max(50).optional().messages({
       'string.base': 'Last Name must be a string',
     }),
 
-    email: Joi.string().email().optional().messages({
+    middle_name: Joi.string().max(50).allow('').optional(),
+    suffix: Joi.string().max(10).allow('').optional(),
+    gender: Joi.string().valid('M', 'F', 'Male', 'Female', 'Other', '').allow('').optional(),
+    age: Joi.number().min(0).max(150).allow(null).optional(),
+
+    // Contact information
+    email: Joi.string().email().allow('').optional().messages({
       'string.base': 'Email must be a valid email address',
+      'string.email': 'Please provide a valid email address',
     }),
 
-    phone: Joi.string().allow('').optional().messages({
+    phone_number: Joi.string().optional().messages({
       'string.base': 'Phone number must be a string',
     }),
 
+    phone: Joi.string().allow('').optional(),
+
+    // Property information
+    homeowner_desc: Joi.string().allow('').optional(),
+    dwelltype: Joi.string().allow('').optional(),
+    house: Joi.string().allow('').optional(),
+
+    // Address components
+    predir: Joi.string().max(10).allow('').optional(),
+    strtype: Joi.string().max(20).allow('').optional(),
+    postdir: Joi.string().max(10).allow('').optional(),
+    apttype: Joi.string().max(20).allow('').optional(),
+    aptnbr: Joi.string().max(20).allow('').optional(),
+
+    // Address object
     address: Joi.object({
-      street: Joi.string().min(3).max(100).optional(),
-      city: Joi.string().min(2).max(100).optional(),
-      state: Joi.string().required(),
+      full_address: Joi.string().min(1).max(500).optional(),
+      street: Joi.string().min(1).max(200).optional(),
+      city: Joi.string().min(1).max(100).optional(),
+      state: Joi.string().hex().length(24).optional(),
       zip_code: Joi.string().min(5).max(10).optional(),
+      zip: Joi.string().min(5).max(10).allow('').optional(),
     }).optional(),
 
-    note: Joi.string().allow('').max(500).optional(),
-
-    updated_at: Joi.date().optional(),
+    // Additional information
+    note: Joi.string().allow('').max(1000).optional(),
+    source: Joi.string().valid('manual', 'csv_upload', 'api', 'import').optional(),
+    status: Joi.string().valid('active', 'inactive', 'contacted', 'converted', 'invalid').optional(),
   }),
 };
 
 const getLead = {
-  [Segments.BODY]: Joi.object().keys({
-    leadId: Joi.string().required().messages({
+  [Segments.PARAMS]: Joi.object({
+    leadId: Joi.string().hex().length(24).required().messages({
       'any.required': 'Lead ID is required',
     }),
   }),
