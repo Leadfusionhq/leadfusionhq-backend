@@ -46,8 +46,8 @@ export const REQUIRED_COLUMNS = [
   "aptnbr",
   "address",
   "city",
-  "state",
-  "zip",
+  "State",
+  "Zip",
   "not_import",
 ];
 
