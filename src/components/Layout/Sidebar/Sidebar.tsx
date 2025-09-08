@@ -10,6 +10,8 @@ import Image from 'next/image';
 import SidebarItem from './SidebarItem';
 import { adminSidebarItems, userSidebarItems } from './sidebarData';
 import { AppDispatch, RootState } from '@/redux/store';
+import { useLoader } from '@/context/LoaderContext';
+
 const Sidebar = () => {
   const dispatch = useDispatch<AppDispatch>();
   const router = useRouter();
@@ -18,20 +20,30 @@ const Sidebar = () => {
   // const pathname = usePathname();
 
   const { user } = useSelector((state: RootState) => state.auth);
- 
+   const { showLoader, hideLoader } = useLoader(); 
   const role = user?.role;
 
   const sidebarItems = role === 'ADMIN' ? adminSidebarItems : userSidebarItems;
 
-  const handleLogout = async () => {
+ const handleLogout = async () => {
+    showLoader("Logging out...");
+    
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await fetch("/api/auth/logout", { method: "POST" });
+      await new Promise(resolve => setTimeout(resolve, 800));
     } catch (error) {
-      console.error('Logout failed', error);
+      console.error("Logout failed", error);
+      await new Promise(resolve => setTimeout(resolve, 800));
     } finally {
-      dispatch(logout());
+      // Always clean up and navigate
       removeToken();
-      router.push('/login');
+      dispatch(logout());
+      hideLoader(); // Explicitly hide loader
+      
+      // Use setTimeout to ensure state updates complete before navigation
+      setTimeout(() => {
+        router.replace("/login");
+      }, 50);
     }
   };
 
