@@ -12,6 +12,7 @@ import { RootState } from "@/redux/store";
 import { initialLeadValues } from "@/constants/initialLeadValues";
 import { cleanLeadValues } from "@/utils/cleanLeadValue";
 import { State, StateOption } from "@/types/campaign";
+import SpinnerLoader from "@/components/common/SpinnerLoader"
 
 const EditLeadPage = () => {
   const { leadId } = useParams();
@@ -129,7 +130,7 @@ const EditLeadPage = () => {
   };
 
   if (!leadIdString) return <p>Lead ID is missing!</p>;
-  if (isLoadingLead) return <p className="text-center py-6">Loading lead data...</p>;
+  if (isLoadingLead) return <SpinnerLoader variant="dots" color="gray" message="Loading lead data..." />;
   if (!leadData) return <p className="text-center py-6 text-red-600">Lead not found.</p>;
 
   return (

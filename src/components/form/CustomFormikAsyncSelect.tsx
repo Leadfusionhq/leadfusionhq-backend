@@ -26,11 +26,11 @@ const CustomFormikAsyncSelect = ({
   placeholder,
   isMulti = false,
   onChange,
-  defaultOptions = true, // Default to true (shows options on focus)
-  cacheOptions = true,   // Default to true (enables caching)
+  defaultOptions = true,
+  cacheOptions = true,
 }: FormikAsyncSelectProps) => {
   const [field, meta, helpers] = useField(name);
-  const { setValue } = helpers;
+  const { setValue, setTouched } = helpers;
 
   const selectedOption = field.value || (isMulti ? [] : null);
 
@@ -40,9 +40,18 @@ const CustomFormikAsyncSelect = ({
     } else {
       setValue(option ? (option as Option) : null);
     }
+    
+    // Mark the field as touched when a value is selected
+    setTouched(true, false);
+    
     if (onChange) {
       onChange(option);
     }
+  };
+
+  const handleBlur = () => {
+    // Mark the field as touched when it loses focus
+    setTouched(true, false);
   };
 
   return (
@@ -53,24 +62,33 @@ const CustomFormikAsyncSelect = ({
         defaultOptions={defaultOptions}
         loadOptions={loadOptions}
         onChange={handleChange}
+        onBlur={handleBlur} // Added onBlur handler
         value={selectedOption}
         placeholder={placeholder}
         classNamePrefix="react-select"
         isMulti={isMulti}
         isClearable
         styles={{
-          control: (base) => ({
+          control: (base, state) => ({
             ...base,
             minHeight: '48px',
-            border: '1px solid #E0E0E0',
+            border: meta.touched && meta.error 
+              ? '1px solid #ef4444' // Red border for error state
+              : '1px solid #E0E0E0',
             borderRadius: '8px',
             paddingLeft: '12px',
             fontSize: '16px',
             fontFamily: 'Inter',
             backgroundColor: '#FFFFFF',
             color: '#333333',
-            '&:focus': {
-              borderColor: '#000',
+            '&:hover': {
+              borderColor: meta.touched && meta.error ? '#ef4444' : '#000',
+            },
+            '&:focus-within': {
+              borderColor: meta.touched && meta.error ? '#ef4444' : '#000',
+              boxShadow: meta.touched && meta.error 
+                ? '0 0 0 1px #ef4444' 
+                : '0 0 0 1px #000',
             },
           }),
         }}

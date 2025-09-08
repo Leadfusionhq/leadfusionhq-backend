@@ -1,6 +1,6 @@
 "use client";
 import { Formik, Form } from "formik";
-import { FormikInput, FormikTextarea, CustomFormikAsyncSelect } from "@/components/form";
+import { FormikInput, FormikTextarea, CustomFormikAsyncSelect, FormikSelect } from "@/components/form";
 import { LeadValidationSchema } from "@/request-schemas/lead-schema";
 import { StateOption } from "@/types/campaign";
 import { initialLeadValues } from "@/constants/initialLeadValues";
@@ -11,6 +11,7 @@ type LeadFormProps = {
   onSubmit: (
     values: typeof initialLeadValues,
     formikHelpers: {
+
       setSubmitting: (isSubmitting: boolean) => void;
       resetForm: () => void;
     }
@@ -18,6 +19,34 @@ type LeadFormProps = {
   stateOptions: StateOption[];
   isLoadingStates: boolean;
 };
+
+// Gender options based on model enum
+const genderOptions = [
+  { value: '', label: 'Select Gender' },
+  { value: 'M', label: 'Male' },
+  { value: 'F', label: 'Female' },
+  { value: 'Male', label: 'Male' },
+  { value: 'Female', label: 'Female' },
+  { value: 'Other', label: 'Other' }
+];
+
+// Status options based on model enum
+const statusOptions = [
+  { value: 'active', label: 'Active' },
+  { value: 'inactive', label: 'Inactive' },
+  { value: 'contacted', label: 'Contacted' },
+  { value: 'converted', label: 'Converted' },
+  { value: 'invalid', label: 'Invalid' }
+];
+
+// Source options based on model enum
+const sourceOptions = [
+  { value: 'manual', label: 'Manual' },
+  { value: 'csv_upload', label: 'CSV Upload' },
+  { value: 'api', label: 'API' },
+  { value: 'import', label: 'Import' }
+];
+
 
 const LeadForm = ({
   campaignId,
@@ -41,6 +70,7 @@ const LeadForm = ({
 
     callback(filteredOptions);
   };
+
   return (
     <Formik
       initialValues={initialValues}
@@ -48,87 +78,240 @@ const LeadForm = ({
       validationSchema={LeadValidationSchema}
       onSubmit={onSubmit}
     >
-      {({ isSubmitting, errors, touched }) => (
-        <Form className="space-y-6 bg-white p-8 rounded-lg border border-gray-300 shadow-lg max-w-4xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <FormikInput
-              name="first_name"
-              label="First Name"
-              placeholder="Enter first name"
-              errorMessage={touched.first_name && errors.first_name}
-            />
-            <FormikInput
-              name="last_name"
-              label="Last Name"
-              placeholder="Enter last name"
-              errorMessage={touched.last_name && errors.last_name}
+      {({ isSubmitting, errors, touched ,values}) => (
+
+        <>
+
+        {/* <div className="bg-blue-50 p-4 rounded-md mb-6">
+          <h4 className="font-bold text-blue-800">ALL FORM VALUES:</h4>
+          <pre className="text-xs overflow-auto max-h-40">
+            {JSON.stringify(values, null, 2)}
+          </pre>
+        </div> */}
+
+
+        <Form className="space-y-6 bg-white p-8 rounded-lg border border-gray-300 shadow-lg max-w-6xl mx-auto">
+          {/* Lead Identification Section */}
+          <div className="border-b border-gray-200 pb-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Lead Information {values.lead_id ? `- ID: ${values.lead_id}` : ''}
+            </h3>
+            <FormikSelect
+              name="status"
+              label="Status"
+              options={statusOptions}
+              errorMessage={touched.status && errors.status}
             />
           </div>
 
-          <FormikInput
-            name="email"
-            type="email"
-            label="Email"
-            placeholder="Enter email address"
-            errorMessage={touched.email && errors.email}
-          />
+          {/* Personal Information Section */}
+          <div className="border-b border-gray-200 pb-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Personal Information</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <FormikInput
+                name="first_name"
+                label="First Name *"
+                placeholder="Enter first name"
+                errorMessage={touched.first_name && errors.first_name}
+              />
+              <FormikInput
+                name="middle_name"
+                label="Middle Name"
+                placeholder="Enter middle name"
+                errorMessage={touched.middle_name && errors.middle_name}
+              />
+              <FormikInput
+                name="last_name"
+                label="Last Name *"
+                placeholder="Enter last name"
+                errorMessage={touched.last_name && errors.last_name}
+              />
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+              <FormikInput
+                name="suffix"
+                label="Suffix"
+                placeholder="Jr., Sr., III, etc."
+                errorMessage={touched.suffix && errors.suffix}
+              />
+              <FormikSelect
+                name="gender"
+                label="Gender"
+                options={genderOptions}
+                errorMessage={touched.gender && errors.gender}
+              />
+              <FormikInput
+                name="age"
+                type="number"
+                label="Age"
+                placeholder="Enter age"
+                errorMessage={touched.age && errors.age}
+              />
+            </div>
+          </div>
 
-          <FormikInput
-            name="phone"
-            label="Phone"
-            placeholder="Enter phone number"
-            errorMessage={touched.phone && errors.phone}
-          />
+          {/* Contact Information Section */}
+          <div className="border-b border-gray-200 pb-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Contact Information</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <FormikInput
+                name="phone_number"
+                label="Phone Number *"
+                placeholder="Enter phone number"
+                errorMessage={touched.phone_number && errors.phone_number}
+              />
+              <FormikInput
+                name="email"
+                type="email"
+                label="Email"
+                placeholder="Enter email address"
+                errorMessage={touched.email && errors.email}
+              />
+            </div>
+          </div>
 
-          <FormikInput
-            name="address.street"
-            label="Street Address"
-            placeholder="Enter street address"
-            errorMessage={touched?.address?.street && errors?.address?.street}
-          />
+          {/* Property Information Section */}
+          <div className="border-b border-gray-200 pb-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Property Information</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <FormikInput
+                name="dwelltype"
+                label="Dwelling Type"
+                placeholder="Single Family, Condo, Apartment, etc."
+                errorMessage={touched.dwelltype && errors.dwelltype}
+              />
+              <FormikInput
+                name="house"
+                label="House Number"
+                placeholder="Enter house number"
+                errorMessage={touched.house && errors.house}
+              />
+              <FormikInput
+                name="homeowner_desc"
+                label="Homeowner Description"
+                placeholder="Owner, Renter, etc."
+                errorMessage={touched.homeowner_desc && errors.homeowner_desc}
+              />
+            </div>
+          </div>
 
-          <FormikInput
-            name="address.city"
-            label="City"
-            placeholder="Enter city"
-            errorMessage={touched?.address?.city && errors?.address?.city}
-          />
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              {isLoadingStates ? (
-                <div className="flex items-center justify-center p-4">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-600"></div>
-                  <span className="ml-2">Loading states...</span>
-                </div>
-              ) : (
-                <CustomFormikAsyncSelect
-                  name="address.state"
-                  label="State *"
-                  loadOptions={loadStates}
-                  defaultOptions={stateOptions.slice(0, 50)}
-                  placeholder="Search and select a state"
-                  cacheOptions={true}
+          {/* Address Components Section */}
+          <div className="border-b border-gray-200 pb-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Address Components</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <FormikInput
+                name="predir"
+                label="Pre-Direction"
+                placeholder="N, S, E, W, etc."
+                errorMessage={touched.predir && errors.predir}
+              />
+               <FormikInput
+                  name="strtype"
+                  label="Street Type"
+                  placeholder="St, Ave, Blvd, etc."
+                  errorMessage={touched.strtype && errors.strtype}
                 />
-              )}
+              <FormikInput
+                name="postdir"
+                label="Post-Direction"
+                placeholder="N, S, E, W, etc."
+                errorMessage={touched.postdir && errors.postdir}
+              />
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+              <FormikInput
+                name="apttype"
+                label="Apartment Type"
+                placeholder="Apt, Unit, Suite, etc."
+                errorMessage={touched.apttype && errors.apttype}
+              />
+              <FormikInput
+                name="aptnbr"
+                label="Apartment Number"
+                placeholder="Enter apartment number"
+                errorMessage={touched.aptnbr && errors.aptnbr}
+              />
+            </div>
+          </div>
+
+          {/* Main Address Section */}
+          <div className="border-b border-gray-200 pb-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Main Address</h3>
+            
+            <FormikInput
+              name="address.full_address"
+              label="Full Address *"
+              placeholder="Enter complete address"
+              errorMessage={touched?.address?.full_address && errors?.address?.full_address}
+            />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+              <FormikInput
+                name="address.street"
+                label="Street Address *"
+                placeholder="Enter street address"
+                errorMessage={touched?.address?.street && errors?.address?.street}
+              />
+              <FormikInput
+                name="address.city"
+                label="City *"
+                placeholder="Enter city"
+                errorMessage={touched?.address?.city && errors?.address?.city}
+              />
             </div>
 
-            <FormikInput
-              name="address.zip_code"
-              label="Zip Code"
-              placeholder="Enter zip code"
-              errorMessage={touched?.address?.zip_code && errors?.address?.zip_code}
-            />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+              <div>
+                {isLoadingStates ? (
+                  <div className="flex items-center justify-center p-4">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-600"></div>
+                    <span className="ml-2">Loading states...</span>
+                  </div>
+                ) : (
+                  <CustomFormikAsyncSelect
+                    name="address.state"
+                    label="State *"
+                    loadOptions={loadStates}
+                    defaultOptions={stateOptions.slice(0, 50)}
+                    placeholder="Search and select a state"
+                    cacheOptions={true}
+                  />
+                )}
+              </div>
+
+              <FormikInput
+                name="address.zip_code"
+                label="Zip Code *"
+                placeholder="Enter zip code"
+                errorMessage={touched?.address?.zip_code && errors?.address?.zip_code}
+              />
+            </div>
           </div>
 
-          <FormikTextarea
-            name="note"
-            label="Note"
-            placeholder="Enter additional details"
-            errorMessage={touched.note && errors.note}
-          />
+          {/* Additional Information Section */}
+          <div className="border-b border-gray-200 pb-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Additional Information</h3>
+            
+            <FormikTextarea
+              name="note"
+              label="Note"
+              placeholder="Enter additional details"
+              errorMessage={touched.note && errors.note}
+            />
+            
+            <div className="grid grid-cols-1 md:grid-cols-1 gap-6 mt-6">
+              <FormikSelect
+                name="source"
+                label="Source"
+                options={sourceOptions}
+                errorMessage={touched.source && errors.source}
+              />
+            </div>
+          </div>
 
-          <div className="flex justify-end">
+          <div className="flex justify-end pt-6">
             <button
               type="submit"
               disabled={isSubmitting || isLoadingStates}
@@ -144,6 +327,7 @@ const LeadForm = ({
             </button>
           </div>
         </Form>
+        </>
       )}
     </Formik>
   );
