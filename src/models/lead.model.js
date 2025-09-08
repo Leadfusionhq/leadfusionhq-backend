@@ -120,7 +120,7 @@ const leadSchema = new mongoose.Schema({
   address: {
     street: {
       type: String,
-      required: false,
+      required: true,
       minlength: 1,
       maxlength: 200,
       trim: true
@@ -148,7 +148,7 @@ const leadSchema = new mongoose.Schema({
     },
     zip_code: {
       type: String,
-      required: false,
+      required: true,
       minlength: 5,
       maxlength: 10,
       trim: true,
