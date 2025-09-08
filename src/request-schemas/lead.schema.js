@@ -12,6 +12,9 @@ const createLead = {
       'string.base': 'First Name must be a string',
       'string.empty': 'First Name is required',
       'any.required': 'First Name is required',
+
+
+      
     }),
 
     last_name: Joi.string().min(1).max(50).required().messages({
