@@ -19,6 +19,7 @@ import { useSearchParams } from 'next/navigation';
 import axiosWrapper from '@/utils/api';
 import { API_URL } from '@/utils/apiUrl';
 import { getErrorMessage } from '@/utils/errorHandler';
+import { useLoader } from '@/context/LoaderContext'; // Import the loader context
 
 const LoginForm = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -26,12 +27,13 @@ const LoginForm = () => {
   const [showResendButton, setShowResendButton] = useState(false);
   const [userEmail, setUserEmail] = useState('');
   const [resendLoading, setResendLoading] = useState(false);
-  const [resendEmail, setResendEmail] = useState(''); // New state for resend email input
+  const [resendEmail, setResendEmail] = useState('');
   
   const dispatch = useDispatch<AppDispatch>();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams(); 
+  const { showLoader, hideLoader } = useLoader(); // Get loader functions
 
   const { user, loading, error } = useSelector((state: RootState) => state.auth);
 
@@ -67,7 +69,6 @@ const LoginForm = () => {
 
   useEffect(() => {
     if (error) {
-
       if (error.includes('Email not verified and verification link expired') || 
           error.includes('verification link expired')) {
         setShowResendButton(true);
@@ -83,8 +84,11 @@ const LoginForm = () => {
       setTimeout(() => {
         dispatch(clearError());
       }, 3000);
+      
+      // Hide loader on error
+      hideLoader();
     }
-  }, [error, dispatch]);
+  }, [error, dispatch, hideLoader]);
 
   // Handle resend verification email
   const handleResendVerification = async () => {
@@ -94,8 +98,9 @@ const LoginForm = () => {
     }
 
     setResendLoading(true);
+    showLoader("Sending verification email..."); // Show loader for resend
+    
     try {
-      // Use the correct API endpoint for resending verification email
       const response = await axiosWrapper('put', API_URL.SEND_VERIFICATION_EMAIL, {
         email: resendEmail,
       }) as { message?: string };
@@ -109,6 +114,7 @@ const LoginForm = () => {
       toast.error(errorMessage);
     } finally {
       setResendLoading(false);
+      hideLoader(); // Hide loader after resend completes
     }
   };
 
@@ -208,14 +214,26 @@ const LoginForm = () => {
             }}
             enableReinitialize={true}
             validationSchema={validationSchema}
-            onSubmit={({ email, password, role }, { setSubmitting }) => {
+            onSubmit={async ({ email, password, role }, { setSubmitting }) => {
               // Clear any previous resend states
               setShowResendButton(false);
               setUserEmail('');
               setResendEmail('');
               
-              const data = dispatch(loginUser({ email, password, role })).finally(() => setSubmitting(false));
-              console.warn('data', data)
+              // Show loader
+              showLoader("Logging in...");
+              
+              try {
+                await dispatch(loginUser({ email, password, role })).unwrap();
+                // Login success - the useEffect will handle navigation
+              } catch (error) {
+                // Error is handled by the useEffect above
+                console.error('Login failed:', error);
+              } finally {
+                // Hide loader and reset form submission state
+                hideLoader();
+                setSubmitting(false);
+              }
             }}
           >
             {({ values, handleChange, handleBlur, isSubmitting }) => (

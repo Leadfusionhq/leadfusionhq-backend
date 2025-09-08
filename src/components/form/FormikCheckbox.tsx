@@ -1,8 +1,7 @@
 'use client';
-
 import { Field, ErrorMessage, FieldAttributes } from 'formik';
 
-const FormikCheckbox = ({ label, ...props }: { label?: string } & FieldAttributes<boolean>) => (
+const FormikCheckbox = ({ label, errorMessage, ...props }: { label?: string; errorMessage?: string } & FieldAttributes<boolean>) => (
   <div className="w-full flex items-center space-x-2">
     <Field
       {...props}
@@ -11,11 +10,15 @@ const FormikCheckbox = ({ label, ...props }: { label?: string } & FieldAttribute
     />
     {label && <label className="text-[#1C1C1C] text-lg">{label}</label>}
     <div className="min-h-[20px]">
-      <ErrorMessage
-        name={props.name}
-        component="div"
-        className="text-red-500 text-xs transition-opacity duration-300"
-      />
+      {errorMessage ? (
+        <div className="text-red-500 text-xs transition-opacity duration-300">{errorMessage}</div>
+      ) : (
+        <ErrorMessage
+          name={props.name}
+          component="div"
+          className="text-red-500 text-xs transition-opacity duration-300"
+        />
+      )}
     </div>
   </div>
 );
