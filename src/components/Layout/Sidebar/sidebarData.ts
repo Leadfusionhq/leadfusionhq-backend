@@ -82,7 +82,7 @@ export const adminSidebarItems: SidebarItem[] = [
     id: 'upload-csv',
     name: 'Upload CSV',
     icon: '/images/icons/upload-csv.svg',
-    link: '/admin/upload-csv',
+    link: '/import-csv',
 
   },
 
