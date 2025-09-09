@@ -1,10 +1,22 @@
 const fetch = require('node-fetch');
 
-const fetchWrapper = async (method = 'GET', url, data = null, token = null,useN8NHeader = false) => {
+const fetchWrapper = async (
+  method = 'GET',
+  url,
+  data = null,
+  token = null,
+  useN8NHeader = false,
+  formEncoded = false
+) => {
   const headers = {
-    'Content-Type': 'application/json',
     Accept: 'application/json',
   };
+
+  if (formEncoded === true) {
+    headers['Content-Type'] = 'application/x-www-form-urlencoded';
+  } else {
+    headers['Content-Type'] = 'application/json';
+  }
 
   if (token) {
     if (useN8NHeader) {
@@ -13,18 +25,22 @@ const fetchWrapper = async (method = 'GET', url, data = null, token = null,useN8
       headers['Authorization'] = `Bearer ${token}`;
     }
   }
+
   const options = {
     method,
     headers,
   };
 
   if (data && method !== 'GET') {
-    options.body = JSON.stringify(data);
+    if (formEncoded) {
+      options.body = new URLSearchParams(data).toString();
+    } else {
+      options.body = JSON.stringify(data);
+    }
   }
 
   try {
     const res = await fetch(url, options);
-
     const contentType = res.headers.get('content-type');
 
     if (!res.ok) {
@@ -35,7 +51,7 @@ const fetchWrapper = async (method = 'GET', url, data = null, token = null,useN8
     if (contentType && contentType.includes('application/json')) {
       return await res.json();
     } else {
-      return await res.text(); // fallback for plain text responses
+      return await res.text();
     }
   } catch (error) {
     console.error('fetchWrapper error:', error.message);

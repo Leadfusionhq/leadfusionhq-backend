@@ -129,6 +129,35 @@ const regularUserSchema = new mongoose.Schema({
     type: String,
     trim: true,
   },
+
+  // Add other fields specific to regular users here 
+  customerVaultId: {
+    type: String,
+    default: null,
+  },
+
+  // 💰 Billing
+  balance: {
+    type: Number,
+    default: 0,
+  },
+  autoTopUpEnabled: {
+    type: Boolean,
+    default: false,
+  },
+  lastChargedAt: {
+    type: Date,
+    default: null,
+  },
+
+  // 📄 Contract Acceptance
+  contractAcceptance: {
+    version: { type: String, default: null },
+    acceptedAt: { type: Date, default: null },
+    ipAddress: { type: String, default: null },
+  }
+
+
 });
 
 const RegularUser = User.discriminator(CONSTANT_ENUM.USER_ROLE.USER, regularUserSchema);
