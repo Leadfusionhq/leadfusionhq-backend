@@ -1,5 +1,5 @@
 const fetchWrapper = require('../../utils/fetchWrapper');
-const NMI_API_URL = 'https://secure.nmi.com/api/transact.php';
+const NMI_API_URL = process.env.NMI_API_URL;
 const SECURITY_KEY = process.env.NMI_SECURITY_KEY;
 
 const createCustomerVault = async (cardInfo) => {

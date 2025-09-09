@@ -20,72 +20,66 @@ const API = {
   CONTRACT_STATUS: '/contract/status',
 };
 
-// Apply authentication and authorization to all routes
 billingRouter.use(
     checkAuth,
-    authorizedRoles([CONSTANT_ENUM.USER_ROLE.ADMIN], [CONSTANT_ENUM.USER_ROLE.USER])
+    authorizedRoles([CONSTANT_ENUM.USER_ROLE.USER])
 );
 
-// Contract routes - must be first
-billingRouter.get(
-    API.GET_CONTRACT,
-    billingController.getCurrentContract
-);
+// billingRouter.get(
+//     API.GET_CONTRACT,
+//     billingController.getCurrentContract
+// );
 
-billingRouter.get(
-    API.CONTRACT_STATUS,
-    billingController.getContractStatus
-);
+// billingRouter.get(
+//     API.CONTRACT_STATUS,
+//     billingController.getContractStatus
+// );
 
-billingRouter.post(
-    API.ACCEPT_CONTRACT, 
-    celebrate(BillingSchema.acceptContract),
-    billingController.acceptContract
-);
+// billingRouter.post(
+//     API.ACCEPT_CONTRACT, 
+//     celebrate(BillingSchema.acceptContract),
+//     billingController.acceptContract
+// );
 
-// Card management routes
 billingRouter.post(
     API.SAVE_CARD, 
     celebrate(BillingSchema.saveCard),
     billingController.saveCard
 );
 
-// Billing operations
-billingRouter.post(
-    API.ADD_FUNDS, 
-    celebrate(BillingSchema.addFunds),
-    billingController.addFunds
-);
+// billingRouter.post(
+//     API.ADD_FUNDS, 
+//     celebrate(BillingSchema.addFunds),
+//     billingController.addFunds
+// );
 
-billingRouter.post(
-    API.ASSIGN_LEAD, 
-    celebrate(BillingSchema.assignLead),
-    billingController.assignLead
-);
+// billingRouter.post(
+//     API.ASSIGN_LEAD, 
+//     celebrate(BillingSchema.assignLead),
+//     billingController.assignLead
+// );
 
-// Admin only routes
-billingRouter.post(
-    API.CHARGE_USER,
-    authorizedRoles([CONSTANT_ENUM.USER_ROLE.ADMIN]),
-    celebrate(BillingSchema.chargeUser),
-    billingController.chargeUser
-);
+// billingRouter.post(
+//     API.CHARGE_USER,
+//     authorizedRoles([CONSTANT_ENUM.USER_ROLE.ADMIN]),
+//     celebrate(BillingSchema.chargeUser),
+//     billingController.chargeUser
+// );
 
-// Account information routes
-billingRouter.get(
-    API.BALANCE,
-    billingController.getBalance
-);
+// billingRouter.get(
+//     API.BALANCE,
+//     billingController.getBalance
+// );
 
-billingRouter.get(
-    API.TRANSACTIONS,
-    billingController.getTransactions
-);
+// billingRouter.get(
+//     API.TRANSACTIONS,
+//     billingController.getTransactions
+// );
 
-billingRouter.post(
-    API.AUTO_TOP_UP,
-    celebrate(BillingSchema.toggleAutoTopUp),
-    billingController.toggleAutoTopUp
-);
+// billingRouter.post(
+//     API.AUTO_TOP_UP,
+//     celebrate(BillingSchema.toggleAutoTopUp),
+//     billingController.toggleAutoTopUp
+// );
 
 module.exports = billingRouter;

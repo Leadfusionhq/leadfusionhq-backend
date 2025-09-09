@@ -1,66 +1,66 @@
-const { User } = require('../../models/User');
-const { Transaction } = require('../../models/Transaction');
-const { Contract } = require('../../models/Contract');
-const { ContractAcceptance } = require('../../models/ContractAcceptance');
+const { User } = require('../../models/user.model');
+const { Transaction } = require('../../models/transaction.model');
+// const { Contract } = require('../../models/user.model');
+// const { ContractAcceptance } = require('../../models/ContractAcceptance');
 const { createCustomerVault, chargeCustomerVault } = require('../nmi/nmi.service');
 const { ErrorHandler } = require('../../utils/error-handler');
 
 // Contract management
-const getCurrentContract = async () => {
-  const contract = await Contract.findOne({ isActive: true }).sort({ version: -1 });
-  if (!contract) {
-    throw new ErrorHandler(404, 'No active contract found');
-  }
-  return contract;
-};
+// const getCurrentContract = async () => {
+//   const contract = await Contract.findOne({ isActive: true }).sort({ version: -1 });
+//   if (!contract) {
+//     throw new ErrorHandler(404, 'No active contract found');
+//   }
+//   return contract;
+// };
 
-const getUserContractStatus = async (userId) => {
-  const currentContract = await getCurrentContract();
-  const acceptance = await ContractAcceptance.findOne({
-    userId,
-    contractVersion: currentContract.version
-  });
+// const getUserContractStatus = async (userId) => {
+//   const currentContract = await getCurrentContract();
+//   const acceptance = await ContractAcceptance.findOne({
+//     userId,
+//     contractVersion: currentContract.version
+//   });
 
-  return {
-    currentVersion: currentContract.version,
-    hasAcceptedLatest: !!acceptance,
-    acceptedAt: acceptance?.acceptedAt,
-    contract: currentContract
-  };
-};
+//   return {
+//     currentVersion: currentContract.version,
+//     hasAcceptedLatest: !!acceptance,
+//     acceptedAt: acceptance?.acceptedAt,
+//     contract: currentContract
+//   };
+// };
 
-const acceptContract = async (userId, version, ipAddress) => {
-  const contract = await Contract.findOne({ version, isActive: true });
-  if (!contract) {
-    throw new ErrorHandler(404, 'Contract version not found or inactive');
-  }
+// const acceptContract = async (userId, version, ipAddress) => {
+//   const contract = await Contract.findOne({ version, isActive: true });
+//   if (!contract) {
+//     throw new ErrorHandler(404, 'Contract version not found or inactive');
+//   }
 
-  // Check if already accepted
-  const existingAcceptance = await ContractAcceptance.findOne({
-    userId,
-    contractVersion: version
-  });
+//   // Check if already accepted
+//   const existingAcceptance = await ContractAcceptance.findOne({
+//     userId,
+//     contractVersion: version
+//   });
 
-  if (existingAcceptance) {
-    throw new ErrorHandler(400, 'Contract already accepted');
-  }
+//   if (existingAcceptance) {
+//     throw new ErrorHandler(400, 'Contract already accepted');
+//   }
 
-  const acceptance = new ContractAcceptance({
-    userId,
-    contractVersion: version,
-    contractId: contract._id,
-    acceptedAt: new Date(),
-    ipAddress,
-    userAgent: 'API_CALL' // You might want to pass this from the request
-  });
+//   const acceptance = new ContractAcceptance({
+//     userId,
+//     contractVersion: version,
+//     contractId: contract._id,
+//     acceptedAt: new Date(),
+//     ipAddress,
+//     userAgent: 'API_CALL' // You might want to pass this from the request
+//   });
 
-  await acceptance.save();
+//   await acceptance.save();
 
-  return {
-    contractVersion: version,
-    acceptedAt: acceptance.acceptedAt
-  };
-};
+//   return {
+//     contractVersion: version,
+//     acceptedAt: acceptance.acceptedAt
+//   };
+// };
 
 // Card management
 const saveCard = async (cardData) => {
@@ -83,9 +83,16 @@ const saveCard = async (cardData) => {
     console.error('NMI vault creation error:', err.message);
     throw new ErrorHandler(500, 'Failed to save card to payment gateway');
   }
+  console.log('vaultResponse',vaultResponse);
+  const responseText = vaultResponse?.data;
 
-  const responseText = vaultResponse.data;
+  if (!responseText || typeof responseText !== 'string') {
+    console.error('Unexpected vault response format:', responseText);
+    throw new ErrorHandler(500, 'Invalid response from payment gateway');
+  }
+
   const vaultIdMatch = responseText.match(/customer_vault_id=(\d+)/);
+
   const vaultId = vaultIdMatch ? vaultIdMatch[1] : null;
 
   if (!vaultId) {
@@ -318,9 +325,9 @@ const toggleAutoTopUp = async (userId, enabled) => {
 };
 
 module.exports = {
-  getCurrentContract,
-  getUserContractStatus,
-  acceptContract,
+  // getCurrentContract,
+  // getUserContractStatus,
+  // acceptContract,
   saveCard,
   addFunds,
   assignLead,

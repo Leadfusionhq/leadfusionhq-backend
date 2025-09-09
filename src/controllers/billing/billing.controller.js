@@ -33,11 +33,10 @@ const acceptContract = wrapAsync(async (req, res) => {
 const saveCard = wrapAsync(async (req, res) => {
     const user_id = req.user._id;
     
-    // Check if user has accepted the latest contract
-    const contractStatus = await BillingServices.getUserContractStatus(user_id);
-    if (!contractStatus.hasAcceptedLatest) {
-        throw new ErrorHandler(400, 'You must accept the latest contract before saving payment information.');
-    }
+    // const contractStatus = await BillingServices.getUserContractStatus(user_id);
+    // if (!contractStatus.hasAcceptedLatest) {
+    //     throw new ErrorHandler(400, 'You must accept the latest contract before saving payment information.');
+    // }
     
     const cardData = { ...req.body, user_id };
 
