@@ -252,6 +252,127 @@ const getCampaignByIdForAdmin = async (campaignId) => {
   return campaign;
 };
 
+const searchCampaigns = async (page = 1, limit = 10, userId, role, searchQuery = '', filters = {}) => {
+  try {
+    const skip = (page - 1) * limit;
+
+    // Build base query
+    let query = {};
+
+    // Role-based filtering
+    if (role !== CONSTANT_ENUM.USER_ROLE.ADMIN) {
+      query.user_id = userId;
+    }
+
+    // Apply additional filters
+    if (filters.status) {
+      query.status = filters.status;
+    }
+    if (filters.lead_type) {
+      query.lead_type = filters.lead_type;
+    }
+    if (filters.user_id && role === CONSTANT_ENUM.USER_ROLE.ADMIN) {
+      query.user_id = filters.user_id;
+    }
+
+    // Handle state filter
+    if (filters.state) {
+      const stateAbbr = filters.state.toUpperCase();
+      if (!stateCache[stateAbbr]) {
+        const stateDoc = await State.findOne({ abbreviation: stateAbbr })
+          .select('_id')
+          .lean();
+        if (stateDoc) {
+          stateCache[stateAbbr] = stateDoc._id.toString();
+        } else {
+          return {
+            data: [],
+            meta: { total: 0, page, limit, totalPages: 0 }
+          };
+        }
+      }
+      query['geography.state'] = stateCache[stateAbbr];
+    }
+
+    // Add search functionality
+    if (searchQuery && searchQuery.trim().length > 0) {
+      const searchRegex = new RegExp(searchQuery.trim(), 'i');
+      query.$or = [
+        { name: searchRegex },
+        { campaign_id: searchRegex },
+        { note: searchRegex }
+      ];
+    }
+
+    const projection = 'campaign_id name status lead_type exclusivity language geography delivery user_id note createdAt updatedAt';
+
+    const [campaigns, total] = await Promise.all([
+      Campaign.find(query)
+        .select(projection)
+        .populate('geography.state', 'name abbreviation')
+        .populate('user_id', 'name email')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Campaign.countDocuments(query)
+    ]);
+
+    return {
+      data: campaigns,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+        searchQuery: searchQuery || null
+      }
+    };
+
+  } catch (error) {
+    console.error('Error in searchCampaigns:', error);
+    throw new ErrorHandler(500, error.message || 'Failed to search campaigns');
+  }
+};
+
+// Quick search function for dropdowns/autocomplete
+const quickSearchCampaigns = async (userId, role, searchQuery = '', limit = 20) => {
+  try {
+    let query = {};
+
+    // Role-based filtering
+    if (role !== CONSTANT_ENUM.USER_ROLE.ADMIN) {
+      query.user_id = userId;
+    }
+
+    // Only search active campaigns for uploads
+    query.status = 'ACTIVE';
+
+    // Add search functionality only if searchQuery is non-empty
+    if (searchQuery && searchQuery.trim().length > 0) {
+      const searchRegex = new RegExp(searchQuery.trim(), 'i');
+      query.$or = [
+        { name: searchRegex },
+        { campaign_id: searchRegex }
+      ];
+    }
+
+    const campaigns = await Campaign.find(query)
+      .select('campaign_id name status user_id')
+      .populate('user_id', 'name email')
+      .sort({ name: 1 })
+      .limit(limit)
+      .lean();
+
+    return campaigns;
+
+  } catch (error) {
+    console.error('Error in quickSearchCampaigns:', error);
+    throw new ErrorHandler(500, error.message || 'Failed to quick search campaigns');
+  }
+};
+
+
 module.exports = {
   createCampaign,
   getCampaigns,
@@ -259,4 +380,6 @@ module.exports = {
   updateCampaign,
   getCampaignsByUserId,
   getCampaignByIdForAdmin,
+  searchCampaigns,      
+  quickSearchCampaigns,    
 };

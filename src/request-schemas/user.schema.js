@@ -95,6 +95,10 @@ const updateUser = {
       .messages({
         'any.only': 'Role must be USER',
       }),
+
+      address: Joi.string().optional(),
+      
+      avatar: Joi.string().optional(),
   }),
 };
 

@@ -10,8 +10,10 @@ const CONSTANT_ENUM = require('../../helper/constant-enums.js');
 const API = {
     CREATE_CAMPAIGN: '/',
     GET_ALL_CAMPAIGNS:'/',
+    QUICK_SEARCH: '/quick-search',    
     GET_CAMPAIGN:'/:campaignId',
     UPDATE_CAMPAIGN:'/:campaignId',
+    SEARCH_CAMPAIGNS: '/search',    
 };
 campaignRouter.use(
     checkAuth,
@@ -21,7 +23,22 @@ campaignRouter.use(
     ])
 
 );
+
+
 campaignRouter.get( API.GET_ALL_CAMPAIGNS, campaignController.getCampaigns);
+
+
+campaignRouter.get(
+    API.SEARCH_CAMPAIGNS,
+    // celebrate(CampaignSchema.searchCampaigns), 
+    campaignController.searchCampaigns
+);
+
+campaignRouter.get(
+    API.QUICK_SEARCH,
+    // celebrate(CampaignSchema.quickSearchCampaigns), 
+    campaignController.quickSearchCampaigns
+);
 
 campaignRouter.get( 
     API.GET_CAMPAIGN,
@@ -39,5 +56,6 @@ campaignRouter.put(
     celebrate(CampaignSchema.updateCampaign), 
     campaignController.updateCampaign
 );
+
 
 module.exports = campaignRouter;
