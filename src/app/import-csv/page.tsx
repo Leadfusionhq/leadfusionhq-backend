@@ -6,10 +6,13 @@ import { useEffect } from "react";
 import { RootState } from "@/redux/store";
 import CSVImport from "@/components/import-csv/import-csv";
 import Sidebar from "@/components/Layout/Sidebar/Sidebar";
+import MainPanel from '@/components/Layout/Dashboard/MainPanel/MainPanel';
+import FloatingChatWidget from '@/components/chat/FloatingChatWidget'; 
 
 export default function CSVImportPage() {
   const router = useRouter();
   const { user } = useSelector((state: RootState) => state.auth);
+  const { collapsed } = useSelector((state: RootState) => state.theme);
   const role = user?.role;
 
   useEffect(() => {
@@ -25,12 +28,18 @@ export default function CSVImportPage() {
   }
 
   return (
-    <div className="layout_user flex">
+    <div className="layout_admin flex">
       <Sidebar />
-      <div className="flex-1 ml-64">
-        <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div
+        className={`relative transition-all duration-300 z-9 w-full 
+          ${collapsed ? "lg:ml-[6%] lg:w-[94%]" : "lg:ml-[17%] lg:w-[83%]"}`}
+      >
+        <MainPanel />
+        <main className="bg-gray-100 w-full min-h-[calc(100vh-97px)] flex items-center justify-center px-6 py-6">
+          {/* Centered CSV Import */}
           <CSVImport />
-        </div>
+        </main>
+        <FloatingChatWidget />
       </div>
     </div>
   );
