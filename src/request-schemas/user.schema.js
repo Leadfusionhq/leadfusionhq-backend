@@ -104,7 +104,7 @@ const updateUser = {
 
 const acceptContract = {
   [Segments.BODY]: Joi.object().keys({
-    version: Joi.string().required().messages({
+    version: Joi.string().optional().messages({
       'any.required': 'Contract version is required'
     }),
     ipAddress: Joi.string().ip().optional().messages({

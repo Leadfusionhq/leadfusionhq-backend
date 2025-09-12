@@ -12,13 +12,32 @@ const transactionSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['manual', 'auto', 'deduction'],
+    enum: ['ADD_FUNDS', 'WITHDRAWAL', 'TRANSFER', 'REFUND', 'MANUAL', 'AUTO', 'DEDUCTION'],
     required: true,
   },
   status: {
     type: String,
-    enum: ['success', 'failed'],
-    default: 'success',
+    enum: ['COMPLETED', 'PENDING', 'FAILED', 'SUCCESS'],
+    default: 'PENDING',
+  },
+  description: {
+    type: String,
+    trim: true,
+  },
+  paymentMethod: {
+    type: String,
+    enum: ['CARD', 'BANK_TRANSFER', 'PAYPAL', 'OTHER'],
+  },
+  transactionId: {
+    type: String,
+  },
+  balanceAfter: {
+    type: Number,
+  },
+  paymentMethodDetails: {
+    lastFour: String,
+    brand: String,
+    customerVaultId: String
   },
   note: {
     type: String,
@@ -30,4 +49,5 @@ const transactionSchema = new mongoose.Schema({
   }
 });
 
+// Correct export statement
 module.exports = mongoose.model('Transaction', transactionSchema);

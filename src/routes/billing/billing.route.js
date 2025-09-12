@@ -74,10 +74,10 @@ billingRouter.post(
 //     billingController.getBalance
 // );
 
-// billingRouter.get(
-//     API.TRANSACTIONS,
-//     billingController.getTransactions
-// );
+billingRouter.get(
+    API.TRANSACTIONS,
+    billingController.getTransactions
+);
 
 // billingRouter.post(
 //     API.AUTO_TOP_UP,

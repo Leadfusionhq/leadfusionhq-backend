@@ -5,7 +5,7 @@ const saveCard = {
   [Segments.BODY]: Joi.object().keys({
     card_number: Joi.string().required().length(16),
     expiry_month: Joi.string().required().length(2),
-    expiry_year: Joi.string().required().length(2),
+    expiry_year: Joi.string().required().length(4),
     cvv: Joi.string().required().length(3),
     billing_address: Joi.string().optional(),
     zip: Joi.string().optional(),
@@ -17,15 +17,15 @@ const saveCard = {
 const addFunds = {
   [Segments.BODY]: Joi.object().keys({
     amount: Joi.number().min(1).required(),
-    
+    vaultId: Joi.string().optional(), // ✅ add vaultId validation
   }),
 };
 
 // 📄 3. Accept Contract Schema
 const acceptContract = {
   [Segments.BODY]: Joi.object().keys({
-    version: Joi.string().required(),
-    ipAddress: Joi.string().ip().required(),
+    version: Joi.string().optional(),
+    ipAddress: Joi.string().ip().optional(),
   }),
 };
 

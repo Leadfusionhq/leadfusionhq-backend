@@ -1,6 +1,6 @@
 const { User } = require('../../models/user.model');
-const { Transaction } = require('../../models/transaction.model');
-
+const  Transaction  = require('../../models/transaction.model');
+const mongoose = require('mongoose');
 // const { ContractAcceptance } = require('../../models/ContractAcceptance');
 const { createCustomerVault, chargeCustomerVault ,deleteCustomerVault} = require('../nmi/nmi.service');
 const { ErrorHandler } = require('../../utils/error-handler');
@@ -375,34 +375,53 @@ const getUserBalance = async (userId) => {
 
 const getUserTransactions = async (userId, page = 1, limit = 20, filters = {}) => {
   const skip = (page - 1) * limit;
-  const query = { userId };
+  const query = { userId: new mongoose.Types.ObjectId(userId) }; // Ensure proper ObjectId
 
   // Apply filters
   if (filters.type) query.type = filters.type;
   if (filters.status) query.status = filters.status;
+  
+  // Date range filter
   if (filters.dateFrom || filters.dateTo) {
     query.createdAt = {};
-    if (filters.dateFrom) query.createdAt.$gte = new Date(filters.dateFrom);
-    if (filters.dateTo) query.createdAt.$lte = new Date(filters.dateTo);
+    if (filters.dateFrom) {
+      query.createdAt.$gte = new Date(filters.dateFrom);
+      // If only dateFrom is provided, set time to start of day
+      if (!filters.dateTo) {
+        query.createdAt.$lte = new Date(new Date(filters.dateFrom).setHours(23, 59, 59, 999));
+      }
+    }
+    if (filters.dateTo) {
+      query.createdAt.$lte = new Date(new Date(filters.dateTo).setHours(23, 59, 59, 999));
+      // If only dateTo is provided, set time to start of day for lower bound
+      if (!filters.dateFrom) {
+        query.createdAt.$gte = new Date(new Date(filters.dateTo).setHours(0, 0, 0, 0));
+      }
+    }
   }
 
-  const transactions = await Transaction.find(query)
-    .sort({ createdAt: -1 })
-    .skip(skip)
-    .limit(limit)
-    .lean();
+  try {
+    const transactions = await Transaction.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
 
-  const total = await Transaction.countDocuments(query);
+    const total = await Transaction.countDocuments(query);
 
-  return {
-    transactions,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages: Math.ceil(total / limit)
-    }
-  };
+    return {
+      transactions,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    };
+  } catch (error) {
+    console.error('Error fetching transactions:', error);
+    throw new Error('Failed to retrieve transactions');
+  }
 };
 
 const toggleAutoTopUp = async (userId, enabled) => {

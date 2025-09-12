@@ -174,12 +174,22 @@ const getTransactions = wrapAsync(async (req, res) => {
     
     try {
         const transactions = await BillingServices.getUserTransactions(user_id, page, limit, filters);
-        return sendResponse(res, { transactions }, 'Transactions retrieved successfully');
+        return sendResponse(res, { 
+            transactions: transactions.transactions,
+            pagination: transactions.pagination
+        }, 'Transactions retrieved successfully');
     } catch (err) {
         console.error(`Failed to get transactions:`, err.message);
-        throw new ErrorHandler(500, 'Failed to retrieve transactions. Please try again later.');
+        
+        // Check if it's a known error or a database error
+        if (err.message.includes('Failed to retrieve transactions')) {
+            throw new ErrorHandler(500, 'Failed to retrieve transactions. Please try again later.');
+        } else {
+            throw new ErrorHandler(400, 'Invalid request parameters.');
+        }
     }
 });
+
 
 const toggleAutoTopUp = wrapAsync(async (req, res) => {
     const user_id = req.user._id;
