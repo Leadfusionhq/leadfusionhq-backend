@@ -261,7 +261,7 @@ const RegisterForm = () => {
                         />
                         <label htmlFor="terms" className="text-sm text-gray-600 leading-relaxed">
                           I agree to the terms and conditions. <br />
-                          By clicking "Sign Up", I certify under penalty of perjury that the information I have provided on this form is true and correct.
+                          By clicking &quot;Sign Up&quot;, I certify under penalty of perjury that the information I have provided on this form is true and correct.
                         </label>
                       </div>
                       <ErrorMessage name="terms" component="div" className="text-red-500 text-xs mt-1" />
