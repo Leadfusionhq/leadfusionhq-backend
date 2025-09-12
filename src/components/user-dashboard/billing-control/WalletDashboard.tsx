@@ -59,6 +59,9 @@ interface ApiResponse<T = unknown> {
   success: boolean;
   message?: string;
   data?: T;
+  result?: string;
+  contractAcceptance?:any;
+  defaultCard:any;
 }
 
 interface CardsResponse {
@@ -337,9 +340,9 @@ const WalletDashboard: React.FC = () => {
         url,
         {},
         token
-      ) as TermsResponse;
-     
-      setHasAcceptedTerms(response.hasAccepted || false);
+      ) as ApiResponse<{ hasAccepted: boolean }>;  // Change to this
+      setHasAcceptedTerms(response.data?.hasAccepted || false);
+
     } catch (error) {
       console.error('Failed to check terms status:', error);
       setHasAcceptedTerms(false);
@@ -358,7 +361,7 @@ const WalletDashboard: React.FC = () => {
         token
       ) as ApiResponse;
      
-      if (response.success) {
+      if (response?.contractAcceptance) {
         setHasAcceptedTerms(true);
         showToast('success', 'Terms accepted successfully');
         closeTermsModal(); // Close modal first
@@ -597,7 +600,7 @@ const WalletDashboard: React.FC = () => {
         vaultId: selectedCardId
       }, token) as ApiResponse;
 
-      if (response.success) {
+      if (response?.result) {
         showToast('success', 'Funds added successfully!');
         
         // Create a new transaction for immediate UI update
@@ -669,7 +672,7 @@ const WalletDashboard: React.FC = () => {
         zip: cardForm.zip
       }, token) as ApiResponse;
 
-      if (response.success) {
+      if (response?.data) {
         showToast('success', 'Card added successfully!');
         closeAddCardModal();
         await fetchWalletData(); // Refresh data after successful operation
@@ -693,7 +696,7 @@ const WalletDashboard: React.FC = () => {
         vaultId
       }, token) as ApiResponse;
 
-      if (response.success) {
+      if (response?.defaultCard) {
         showToast('success', 'Default card updated!');
         await fetchWalletData(); // Refresh data after successful operation
       } else {
@@ -718,7 +721,7 @@ const WalletDashboard: React.FC = () => {
         defaultCardId: autoTopUpForm.defaultCardId
       }, token) as ApiResponse;
 
-      if (response.success) {
+      if (response?.data) {
         showToast('success', 'Auto top-up settings updated!');
         await fetchWalletData(); // Refresh data after successful operation
       } else {
