@@ -12,6 +12,7 @@ interface User {
   phoneNumber?:string;
   address?:string; 
   dob?: string | null;
+  balance?:null;
 }
 
 interface AuthState {
@@ -22,6 +23,7 @@ interface AuthState {
   success: boolean;
   message: string | null;
   isLoggedIn: boolean;
+
 }
 
 const initialState: AuthState = {

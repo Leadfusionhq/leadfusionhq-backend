@@ -1,10 +1,13 @@
 import { Metadata } from "next";
-import BillingControl from "@/components/user-dashboard/billing-control/BillingControl";
+import WalletDashboard from "@/components/user-dashboard/billing-control/WalletDashboard";
+
+
 
 export default function billlingController() {
+
   return (
     <div className="leads-container">
-         <BillingControl />
+         <WalletDashboard />
     </div>
   );
 }

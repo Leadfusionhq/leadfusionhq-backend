@@ -199,12 +199,18 @@ const BILLING_API_BASE = `${API_BASE}/billing`;
 
 export const BILLING_API = {
   
-  BILLING: `${BILLING_API_BASE}/`,
-  SAVE_CARD: `${BILLING_API_BASE}/save-card`,
-  ADD_FUNDS: `${BILLING_API_BASE}/add-funds`,
-  ACCEPT_CONTRACT: `${BILLING_API_BASE}/contract/accept`,
-  ASSIGN_LEAD: `${BILLING_API_BASE}/assign-lead`,
-  CARGE_USER: `${BILLING_API_BASE}/charge-user`,
+  // BILLING: `${BILLING_API_BASE}/`,
+  // SAVE_CARD: `${BILLING_API_BASE}/save-card`,
+  // ADD_FUNDS: `${BILLING_API_BASE}/add-funds`,
+  // ACCEPT_CONTRACT: `${BILLING_API_BASE}/contract/accept`,
+  // ASSIGN_LEAD: `${BILLING_API_BASE}/assign-lead`,
+  // CARGE_USER: `${BILLING_API_BASE}/charge-user`,
+
+   SAVE_CARD: `${BILLING_API_BASE}/save-card`,
+    ADD_FUNDS: `${BILLING_API_BASE}/add-funds`,
+    GET_CARDS: `${BILLING_API_BASE}/cards`,
+    SET_DEFAULT_CARD: `${BILLING_API_BASE}/cards/default`,
+    DELETE_CARD: `${BILLING_API_BASE}/cards`,
 
 };
 
