@@ -3,6 +3,7 @@ const { sendResponse } = require('../../utils/response');
 const BillingServices = require('../../services/billing/billing.service.js');
 const { ErrorHandler } = require('../../utils/error-handler');
 const { getPaginationParams, extractFilters } = require('../../utils/pagination');
+const { User } = require('../../models/user.model');
 
 // Contract management
 const getCurrentContract = wrapAsync(async (req, res) => {
@@ -49,6 +50,58 @@ const saveCard = wrapAsync(async (req, res) => {
     }
 });
 
+// Get all user cards
+const getCards = wrapAsync(async (req, res) => {
+    const user_id = req.user._id;
+    console.log(req);
+    const user = await User.findById(user_id);
+    if (!user) throw new ErrorHandler(404, 'User not found');
+  
+    return sendResponse(res, { cards: user.paymentMethods }, 'Cards retrieved successfully');
+  });
+  
+  // Set default card
+  const setDefaultCard = wrapAsync(async (req, res) => {
+    const user_id = req.user._id;
+    const { vaultId } = req.body;
+  
+    const user = await User.findById(user_id);
+    if (!user) throw new ErrorHandler(404, 'User not found');
+  
+    // Find the card
+    const card = user.paymentMethods.find(pm => pm.customerVaultId === vaultId);
+    if (!card) throw new ErrorHandler(404, 'Card not found');
+  
+    // Update all cards to not default
+    user.paymentMethods.forEach(pm => {
+      pm.isDefault = pm.customerVaultId === vaultId;
+    });
+  
+    // Set the selected card as default
+    user.defaultPaymentMethod = vaultId;
+  
+    await user.save();
+  
+    return sendResponse(res, { defaultCard: card }, 'Default card updated successfully');
+  });
+  
+  // Delete card
+
+
+  const deleteCard = wrapAsync(async (req, res) => {
+    const userId = req.user._id;
+    const { vaultId } = req.params;
+  
+    const result = await BillingServices.deleteUserCard(userId, vaultId);
+  
+    return sendResponse(res, { nmiResponse: result.nmiResponse }, result.message);
+  });
+  
+  
+  
+
+
+
 // Billing operations
 const addFunds = wrapAsync(async (req, res) => {
     const user_id = req.user._id;
@@ -65,6 +118,12 @@ const addFunds = wrapAsync(async (req, res) => {
         return sendResponse(res, { result }, 'Funds added successfully', 201);
     } catch (err) {
         console.error(`Failed to add funds:`, err.message);
+        
+        // Check if it's a payment decline (400 error) and pass through the message
+        if (err.statusCode === 400) {
+            throw new ErrorHandler(400, err.message);
+        }
+        
         throw new ErrorHandler(500, 'Failed to add funds. Please try again later.');
     }
 });
@@ -146,4 +205,8 @@ module.exports = {
     getBalance,
     getTransactions,
     toggleAutoTopUp,
+    getCards,
+    setDefaultCard,
+    deleteCard,
+
 };

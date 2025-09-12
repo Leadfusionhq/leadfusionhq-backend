@@ -1,33 +1,34 @@
 const { User } = require('../../models/user.model');
 const { Transaction } = require('../../models/transaction.model');
-// const { Contract } = require('../../models/user.model');
+
 // const { ContractAcceptance } = require('../../models/ContractAcceptance');
-const { createCustomerVault, chargeCustomerVault } = require('../nmi/nmi.service');
+const { createCustomerVault, chargeCustomerVault ,deleteCustomerVault} = require('../nmi/nmi.service');
 const { ErrorHandler } = require('../../utils/error-handler');
 
 // Contract management
-// const getCurrentContract = async () => {
-//   const contract = await Contract.findOne({ isActive: true }).sort({ version: -1 });
-//   if (!contract) {
-//     throw new ErrorHandler(404, 'No active contract found');
-//   }
-//   return contract;
-// };
+const getCurrentContract = async () => {
+  const contract = await Contract.findOne({ isActive: true }).sort({ version: -1 });
+  if (!contract) {
+    throw new ErrorHandler(404, 'No active contract found');
+  }
+  return contract;
+};
 
-// const getUserContractStatus = async (userId) => {
-//   const currentContract = await getCurrentContract();
-//   const acceptance = await ContractAcceptance.findOne({
-//     userId,
-//     contractVersion: currentContract.version
-//   });
+const getUserContractStatus = async (userId) => {
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new ErrorHandler(404, 'User not found');
+  }
 
-//   return {
-//     currentVersion: currentContract.version,
-//     hasAcceptedLatest: !!acceptance,
-//     acceptedAt: acceptance?.acceptedAt,
-//     contract: currentContract
-//   };
-// };
+  // Simply check if the user has accepted any contract (acceptedAt exists)
+  const hasAcceptedLatest = !!user.contractAcceptance?.acceptedAt;
+
+  return {
+    hasAcceptedLatest,
+    acceptedAt: user.contractAcceptance?.acceptedAt,
+    contract: user.contractAcceptance || null
+  };
+};
 
 // const acceptContract = async (userId, version, ipAddress) => {
 //   const contract = await Contract.findOne({ version, isActive: true });
@@ -66,93 +67,192 @@ const { ErrorHandler } = require('../../utils/error-handler');
 const saveCard = async (cardData) => {
   const { user_id, card_number, expiry_month, expiry_year, cvv, billing_address, zip, full_name } = cardData;
 
+  const [first_name, ...last_nameParts] = full_name.split(" ");
+  const last_name = last_nameParts.join(" ");
+
+  const expYear = expiry_year.toString().slice(-2);
+
   const payload = {
-    first_name: full_name,
-    card_number,
-    expiration_date: `${expiry_month}${expiry_year}`,
-    cvv,
-    address1: billing_address || '',
-    zip,
+    billing_first_name: first_name,
+    billing_last_name: last_name,
+    billing_address1: billing_address || '123 Default St',
+    billing_zip: zip || '00000',
+    ccnumber: card_number,
+    ccexp: `${expiry_month}${expYear}`,
+    cvv: cvv
   };
 
   let vaultResponse;
-
   try {
     vaultResponse = await createCustomerVault(payload);
   } catch (err) {
     console.error('NMI vault creation error:', err.message);
     throw new ErrorHandler(500, 'Failed to save card to payment gateway');
   }
-  console.log('vaultResponse',vaultResponse);
-  const responseText = vaultResponse?.data;
 
-  if (!responseText || typeof responseText !== 'string') {
-    console.error('Unexpected vault response format:', responseText);
+  const responseText = typeof vaultResponse === 'string' ? vaultResponse : '';
+  if (!responseText) {
     throw new ErrorHandler(500, 'Invalid response from payment gateway');
   }
 
-  const vaultIdMatch = responseText.match(/customer_vault_id=(\d+)/);
+  const params = Object.fromEntries(
+    responseText.split('&').map(p => {
+      const [k, v] = p.split('=');
+      return [k, decodeURIComponent(v || '')];
+    })
+  );
 
-  const vaultId = vaultIdMatch ? vaultIdMatch[1] : null;
+  if (params.response !== '1') {
+    throw new ErrorHandler(400, params.responsetext || 'Failed to save card');
+  }
 
+  const vaultId = params.customer_vault_id;
   if (!vaultId) {
     throw new ErrorHandler(500, 'Failed to retrieve customer vault ID from gateway');
   }
 
+  // 🔹 Save to DB as new payment method
   const user = await User.findById(user_id);
   if (!user) throw new ErrorHandler(404, 'User not found');
 
-  user.customerVaultId = vaultId;
-  user.cardLastFour = card_number.slice(-4);
+  // Detect card brand
+  const cardBrand = detectCardBrand(card_number);
+
+  const newPaymentMethod = {
+    customerVaultId: vaultId,
+    cardLastFour: card_number.slice(-4),
+    brand: cardBrand,
+    expiryMonth: expiry_month,
+    expiryYear: expiry_year,
+    isDefault: user.paymentMethods.length === 0 // Set as default if first card
+  };
+
+  // Add to payment methods array
+  user.paymentMethods.push(newPaymentMethod);
+  
+  // If this is the first card, set it as default
+  if (user.paymentMethods.length === 1) {
+    user.defaultPaymentMethod = vaultId;
+  }
+
   user.hasStoredCard = true;
   await user.save();
 
   return {
     customerVaultId: vaultId,
     userId: user._id,
-    cardLastFour: user.cardLastFour
+    cardLastFour: newPaymentMethod.cardLastFour,
+    brand: cardBrand,
+    isDefault: newPaymentMethod.isDefault
   };
 };
+
+// Add helper function
+const detectCardBrand = (cardNumber) => {
+  const card = cardNumber.replace(/\D/g, '');
+  if (/^4/.test(card)) return 'Visa';
+  if (/^5[1-5]/.test(card)) return 'Mastercard';
+  if (/^3[47]/.test(card)) return 'Amex';
+  if (/^6(?:011|5)/.test(card)) return 'Discover';
+  return 'Unknown';
+};
+
+
 
 // Billing operations
 const addFunds = async (userId, amount) => {
   const user = await User.findById(userId);
   if (!user) throw new ErrorHandler(404, 'User not found');
 
-  if (!user.customerVaultId) {
-    throw new ErrorHandler(400, 'No payment method on file. Please add a card first.');
+  // FIRST: Try to use the new paymentMethods system
+  let customerVaultIdToUse;
+  let defaultPaymentMethod;
+  
+  // Check if user has paymentMethods with a default
+  if (user.paymentMethods && user.paymentMethods.length > 0) {
+    defaultPaymentMethod = user.paymentMethods.find(pm => pm.isDefault);
+    if (defaultPaymentMethod && defaultPaymentMethod.customerVaultId) {
+      customerVaultIdToUse = defaultPaymentMethod.customerVaultId;
+    }
+  }
+  
+  // SECOND: Fallback to old top-level customerVaultId (for backward compatibility)
+  if (!customerVaultIdToUse && user.customerVaultId) {
+    customerVaultIdToUse = user.customerVaultId;
+    // Create a mock payment method object for transaction recording
+    defaultPaymentMethod = {
+      cardLastFour: 'N/A',
+      brand: 'Unknown'
+    };
+  }
+  
+  // FINALLY: If still no vault ID, throw error
+  if (!customerVaultIdToUse) {
+    throw new ErrorHandler(400, 'No payment method found. Please add a card first.');
   }
 
-  // Charge the user's card
-  const chargeResult = await chargeCustomerVault(user.customerVaultId, amount, 'Add funds to account');
+  // Charge using the found vault ID
+  const chargeResult = await chargeCustomerVault(customerVaultIdToUse, amount, 'Add funds to account');
   
   if (!chargeResult.success) {
+    // Handle specific decline cases
+    if (chargeResult.responseCode === '2') {
+      throw new ErrorHandler(400, `Payment declined: ${chargeResult.message}. Please use a different payment method.`);
+    } else if (chargeResult.responseCode === '3') {
+      throw new ErrorHandler(400, 'Payment error. Please contact your bank or use a different card.');
+    }
+    
     throw new ErrorHandler(400, 'Payment failed: ' + chargeResult.message);
   }
 
   // Add to user's balance
-  user.balance = (user.balance || 0) + amount;
+  user.balance = (user.balance || 0) + parseFloat(amount);
   await user.save();
 
-  // Create transaction record
-  const transaction = new Transaction({
-    userId,
-    type: 'ADD_FUNDS',
-    amount,
-    status: 'COMPLETED',
-    description: 'Funds added to account',
-    paymentMethod: 'CARD',
-    transactionId: chargeResult.transactionId,
-    balanceAfter: user.balance
-  });
-  await transaction.save();
+  try {
+    // Create transaction record
+    const transaction = new Transaction({
+      userId,
+      type: 'ADD_FUNDS',
+      amount: parseFloat(amount),
+      status: 'COMPLETED',
+      description: 'Funds added to account',
+      paymentMethod: 'CARD',
+      transactionId: chargeResult.transactionId,
+      balanceAfter: user.balance,
+      // Store payment method details for reference
+      paymentMethodDetails: {
+        lastFour: defaultPaymentMethod.cardLastFour,
+        brand: defaultPaymentMethod.brand,
+        customerVaultId: customerVaultIdToUse
+      }
+    });
+    await transaction.save();
 
-  return {
-    newBalance: user.balance,
-    transactionId: transaction._id,
-    paymentTransactionId: chargeResult.transactionId
-  };
+    return {
+      success: true,
+      newBalance: user.balance,
+      customerVaultId: customerVaultIdToUse,
+      transactionId: transaction._id,
+      paymentTransactionId: chargeResult.transactionId,
+      message: 'Funds added successfully'
+    };
+
+  } catch (transactionError) {
+    console.error('Transaction creation error:', transactionError);
+    
+    // Even if transaction recording fails, the payment was successful
+    return {
+      success: true,
+      newBalance: user.balance,
+      customerVaultId: customerVaultIdToUse,
+      paymentTransactionId: chargeResult.transactionId,
+      message: 'Funds added successfully (transaction record failed)',
+      warning: 'Transaction record could not be created'
+    };
+  }
 };
+
 
 const assignLead = async (userId, leadId, leadCost, assignedBy) => {
   const user = await User.findById(userId);
@@ -324,9 +424,57 @@ const toggleAutoTopUp = async (userId, enabled) => {
   };
 };
 
+
+/**
+ * Delete a user card (DB + NMI Vault)
+ */
+const deleteUserCard = async (userId, vaultId) => {
+  const user = await User.findById(userId);
+  if (!user) throw new ErrorHandler(404, 'User not found');
+
+  const cardIndex = user.paymentMethods.findIndex(pm => pm.customerVaultId === vaultId);
+  if (cardIndex === -1) throw new ErrorHandler(404, 'Card not found');
+
+  const cardToDelete = user.paymentMethods[cardIndex];
+
+  // Cannot delete the only card
+  if (user.paymentMethods.length === 1) {
+    throw new ErrorHandler(400, 'Cannot delete your only payment method');
+  }
+
+  // Try deleting from NMI Vault first
+  const nmiDelete = await deleteCustomerVault(vaultId);
+  if (!nmiDelete.success) {
+    throw new ErrorHandler(500, 'Failed to delete card from NMI vault. Please try again.');
+  }
+
+  // If deleting default card, assign another as default
+  if (cardToDelete.isDefault) {
+    const newDefaultCard = user.paymentMethods.find(pm => pm.customerVaultId !== vaultId);
+    if (newDefaultCard) {
+      newDefaultCard.isDefault = true;
+      user.defaultPaymentMethod = newDefaultCard.customerVaultId;
+    }
+  }
+
+  // Remove the card from DB
+  user.paymentMethods.splice(cardIndex, 1);
+
+  // Update hasStoredCard if no cards left
+  user.hasStoredCard = user.paymentMethods.length > 0;
+
+  await user.save();
+
+  return {
+    success: true,
+    message: 'Card deleted successfully',
+    nmiResponse: nmiDelete.rawResponse,
+  };
+};
+
 module.exports = {
-  // getCurrentContract,
-  // getUserContractStatus,
+  getCurrentContract,
+  getUserContractStatus,
   // acceptContract,
   saveCard,
   addFunds,
@@ -335,4 +483,5 @@ module.exports = {
   getUserBalance,
   getUserTransactions,
   toggleAutoTopUp,
+  deleteUserCard,
 };

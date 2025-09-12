@@ -18,6 +18,9 @@ const API = {
   AUTO_TOP_UP: '/auto-topup/toggle',
   GET_CONTRACT: '/contract/current',
   CONTRACT_STATUS: '/contract/status',
+  GET_CARDS: '/cards', // NEW
+  SET_DEFAULT_CARD: '/cards/default', // NEW
+  DELETE_CARD: '/cards/:vaultId' // NEW
 };
 
 billingRouter.use(
@@ -47,11 +50,11 @@ billingRouter.post(
     billingController.saveCard
 );
 
-// billingRouter.post(
-//     API.ADD_FUNDS, 
-//     celebrate(BillingSchema.addFunds),
-//     billingController.addFunds
-// );
+billingRouter.post(
+    API.ADD_FUNDS, 
+    celebrate(BillingSchema.addFunds),
+    billingController.addFunds
+);
 
 // billingRouter.post(
 //     API.ASSIGN_LEAD, 
@@ -81,5 +84,9 @@ billingRouter.post(
 //     celebrate(BillingSchema.toggleAutoTopUp),
 //     billingController.toggleAutoTopUp
 // );
+billingRouter.get(API.GET_CARDS, billingController.getCards);
+billingRouter.post(API.SET_DEFAULT_CARD, billingController.setDefaultCard);
+billingRouter.delete(API.DELETE_CARD, billingController.deleteCard);
+
 
 module.exports = billingRouter;

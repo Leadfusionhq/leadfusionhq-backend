@@ -75,6 +75,55 @@ const deleteUser = wrapAsync(async (req, res) => {
   return sendResponse(res, null, 'User has been deleted.', 200);
 });
 
+
+const acceptContract = wrapAsync(async (req, res) => {
+  const { userId } = req.params;
+  const { version, ipAddress } = req.body;
+  
+  const contractData = {
+    version,
+    ipAddress: ipAddress || req.ip // Get IP here in the controller
+  };
+
+  const updatedUser = await UserServices.updateContractAcceptance(userId, contractData);
+  
+  sendResponse(res, { 
+    contractAcceptance: updatedUser.contractAcceptance 
+  }, 'Contract accepted successfully.', 200);
+});
+
+// Get contract status
+const getContractStatus = wrapAsync(async (req, res) => {
+  const { userId } = req.params;
+  const { version } = req.query;
+  
+  if (version) {
+    const hasAccepted = await UserServices.hasAcceptedContract(userId, version);
+    sendResponse(res, { 
+      hasAccepted,
+      version 
+    }, 'Contract status retrieved.', 200);
+  } else {
+    const contractData = await UserServices.getContractAcceptance(userId);
+    sendResponse(res, { 
+      contractAcceptance: contractData 
+    }, 'Contract acceptance data retrieved.', 200);
+  }
+});
+
+// Check if user has accepted current contract
+const checkContractAcceptance = wrapAsync(async (req, res) => {
+  const { userId } = req.params;
+  const { version } = req.body;
+  
+  const hasAccepted = await UserServices.hasAcceptedContract(userId, version);
+  
+  sendResponse(res, { 
+    hasAccepted,
+    requiresAcceptance: !hasAccepted 
+  }, 'Contract acceptance check completed.', 200);
+});
+
 module.exports = {
  getAllUsers,
  getAllAdmins,
@@ -82,4 +131,7 @@ module.exports = {
  getUserById,
  updateUser,
  deleteUser,
+ acceptContract,
+ getContractStatus,
+ checkContractAcceptance
 };
