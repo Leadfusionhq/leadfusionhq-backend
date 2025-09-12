@@ -34,19 +34,37 @@ export interface Card {
     updatedAt: string;
   }
   
-  // Transaction interface for wallet activities
-  export interface Transaction {
-    id: string;
-    userId: string;
-    type: 'manual_recharge' | 'auto_topup' | 'deduction';
-    amount: number;
-    status: 'pending' | 'completed' | 'failed';
-    transactionId?: string;
-    cardId?: string;
-    description: string;
-    createdAt: string;
-  }
-  
+// Update the Transaction interface to match your backend response
+export interface Transaction {
+  _id: string;
+  userId: string;
+  type: 'ADD_FUNDS' | 'WITHDRAWAL' | 'TRANSFER' | 'REFUND' | 'MANUAL' | 'AUTO' | 'DEDUCTION';
+  amount: number;
+  status: 'COMPLETED' | 'PENDING' | 'FAILED' | 'SUCCESS';
+  description: string;
+  paymentMethod?: 'CARD' | 'BANK_TRANSFER' | 'PAYPAL' | 'OTHER';
+  transactionId?: string;
+  balanceAfter?: number;
+  paymentMethodDetails?: {
+    lastFour: string;
+    brand: string;
+    customerVaultId: string;
+  };
+  note?: string;
+  createdAt: string;
+}
+
+export interface TransactionsResponse {
+  transactions: Transaction[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+  message: string;
+}
+
   // API Response interfaces
   export interface ApiResponse<T> {
     success: boolean;
