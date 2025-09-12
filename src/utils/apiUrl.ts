@@ -6,7 +6,7 @@ const API_IMPORT_BASE = `${BASE_IMPORT_URL}/api`;
 
 // here are base api:::::
 const AUTH_API_BASE = `${API_BASE}/auth`;
-const USER_API_BASE = `${API_BASE}/users`;
+export const USER_API_BASE = `${API_BASE}/users`;
 const ADMIN_API_BASE = `${API_BASE}/admins`;
 
 export const API_URL = {
@@ -19,6 +19,9 @@ export const API_URL = {
     UPDATE_USER: `${USER_API_BASE}/:userId`,
     GET_USER_BY_ID: `${USER_API_BASE}/:userId`,
     DELETE_USER_BY_ID: `${USER_API_BASE}/:userId`,
+
+    ACCEPT_CONTRACT:`${USER_API_BASE}/:userId/contract/accept`,
+    CHECK_CONTRACT:`${USER_API_BASE}/:userId/contract/status`,
     
     GET_ALL_ADMINS: `${ADMIN_API_BASE}/`,
     // add admin accounts :::::::
@@ -199,12 +202,19 @@ const BILLING_API_BASE = `${API_BASE}/billing`;
 
 export const BILLING_API = {
   
-  BILLING: `${BILLING_API_BASE}/`,
-  SAVE_CARD: `${BILLING_API_BASE}/save-card`,
-  ADD_FUNDS: `${BILLING_API_BASE}/add-funds`,
-  ACCEPT_CONTRACT: `${BILLING_API_BASE}/contract/accept`,
-  ASSIGN_LEAD: `${BILLING_API_BASE}/assign-lead`,
-  CARGE_USER: `${BILLING_API_BASE}/charge-user`,
+  // BILLING: `${BILLING_API_BASE}/`,
+  // SAVE_CARD: `${BILLING_API_BASE}/save-card`,
+  // ADD_FUNDS: `${BILLING_API_BASE}/add-funds`,
+  // ACCEPT_CONTRACT: `${BILLING_API_BASE}/contract/accept`,
+  // ASSIGN_LEAD: `${BILLING_API_BASE}/assign-lead`,
+  // CARGE_USER: `${BILLING_API_BASE}/charge-user`,
+
+   SAVE_CARD: `${BILLING_API_BASE}/save-card`,
+    ADD_FUNDS: `${BILLING_API_BASE}/add-funds`,
+    GET_CARDS: `${BILLING_API_BASE}/cards`,
+    SET_DEFAULT_CARD: `${BILLING_API_BASE}/cards/default`,
+    DELETE_CARD: `${BILLING_API_BASE}/cards`,
+    TRANSACTIONS:`${BILLING_API_BASE}/transactions`,
 
 };
 
