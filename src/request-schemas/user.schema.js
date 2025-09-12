@@ -102,8 +102,54 @@ const updateUser = {
   }),
 };
 
+const acceptContract = {
+  [Segments.BODY]: Joi.object().keys({
+    version: Joi.string().optional().messages({
+      'any.required': 'Contract version is required'
+    }),
+    ipAddress: Joi.string().ip().optional().messages({
+      'string.ip': 'IP address must be a valid IP'
+    })
+  }),
+  [Segments.PARAMS]: Joi.object().keys({
+    userId: Joi.string().required().messages({
+      'any.required': 'User ID is required'
+    })
+  })
+};
+
+const checkContract = {
+  [Segments.BODY]: Joi.object().keys({
+    version: Joi.string().required().messages({
+      'any.required': 'Contract version is required'
+    })
+  }),
+  [Segments.PARAMS]: Joi.object().keys({
+    userId: Joi.string().required().messages({
+      'any.required': 'User ID is required'
+    })
+  })
+};
+
+
+
+const getContractStatus = {
+  [Segments.PARAMS]: Joi.object().keys({
+    userId: Joi.string().required().messages({
+      'any.required': 'User ID is required'
+    })
+  }),
+  [Segments.QUERY]: Joi.object().keys({
+    version: Joi.string().optional()
+  })
+};
+
+
 module.exports = {
   createUserByAdmin,
   getUserById,
   updateUser,
+  acceptContract,
+  checkContract,
+  getContractStatus
 };

@@ -129,6 +129,65 @@ const regularUserSchema = new mongoose.Schema({
     type: String,
     trim: true,
   },
+
+  // Add other fields specific to regular users here 
+// In regularUserSchema, replace customerVaultId with:
+paymentMethods: [{
+  customerVaultId: {
+    type: String,
+    required: true
+  },
+  cardLastFour: {
+    type: String,
+    required: true
+  },
+  brand: {
+    type: String,
+    enum: ['Visa', 'Mastercard', 'Amex', 'Discover', 'Unknown'],
+    default: 'Unknown'
+  },
+  expiryMonth: String,
+  expiryYear: String,
+  isDefault: {
+    type: Boolean,
+    default: false
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
+}],
+defaultPaymentMethod: {
+  type: String, // stores customerVaultId of default card
+  default: null
+},
+hasStoredCard: {
+  type: Boolean,
+  default: false
+},
+
+  // 💰 Billing
+  balance: {
+    type: Number,
+    default: 0,
+  },
+  autoTopUpEnabled: {
+    type: Boolean,
+    default: false,
+  },
+  lastChargedAt: {
+    type: Date,
+    default: null,
+  },
+
+  // 📄 Contract Acceptance
+  contractAcceptance: {
+    version: { type: String, default: null },
+    acceptedAt: { type: Date, default: null },
+    ipAddress: { type: String, default: null },
+  }
+
+
 });
 
 const RegularUser = User.discriminator(CONSTANT_ENUM.USER_ROLE.USER, regularUserSchema);

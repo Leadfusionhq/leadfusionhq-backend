@@ -111,6 +111,67 @@ const addUserService = async (data) => {
   return { user: userWithoutPassword };
 };
 
+
+// Add these methods to your existing user.service.js
+const updateContractAcceptance = async (userId, contractData) => {
+  console.log('=== UPDATE CONTRACT START ===');
+  console.log('User ID:', userId);
+  console.log('Contract Data:', contractData);
+  
+  try {
+    const user = await User.findById(userId);
+    console.log('Found user:', user ? user._id : 'NOT FOUND');
+    
+    if (!user) {
+      throw new ErrorHandler(404, 'User not found');
+    }
+
+    console.log('Current contractAcceptance:', user.contractAcceptance);
+    
+    user.contractAcceptance = {
+      version: contractData.version,
+      acceptedAt: new Date(),
+      ipAddress: contractData.ipAddress
+    };
+
+    console.log('New contractAcceptance to set:', user.contractAcceptance);
+    
+    const updatedUser = await user.save();
+    console.log('Saved user contractAcceptance:', updatedUser.contractAcceptance);
+    
+    return updatedUser;
+  } catch (error) {
+    console.log('Error in updateContractAcceptance:', error);
+    throw error;
+  }
+};
+
+const getContractAcceptance = async (userId) => {
+  const user = await User.findById(userId, { 
+    'contractAcceptance': 1 
+  }).exec();
+  
+  if (!user) throw new ErrorHandler(404, 'User not found');
+  return user.contractAcceptance;
+};
+
+const hasAcceptedContract = async (userId, version = null) => {
+  const user = await User.findById(userId, { 
+    'contractAcceptance': 1 
+  }).exec();
+  
+  if (!user) return false;
+  
+  if (version) {
+    return user.contractAcceptance && 
+           user.contractAcceptance.version === version && 
+           user.contractAcceptance.acceptedAt !== null;
+  }
+  
+  return user.contractAcceptance && user.contractAcceptance.acceptedAt !== null;
+};
+
+
 module.exports = {
   getUserByEmail,
   getUserByID,
@@ -123,4 +184,7 @@ module.exports = {
   getAllUsersService,
   getAllAdminsService,
   addUserService,
+  updateContractAcceptance,
+  getContractAcceptance,
+  hasAcceptedContract,
 };
