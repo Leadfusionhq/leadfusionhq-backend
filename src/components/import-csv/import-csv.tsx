@@ -44,6 +44,22 @@ export const REQUIRED_COLUMNS = [
   "not_import",
 ];
 
+const regexList: RegExp[] = [
+  /(phone|mobile|contact|number)/i,
+  /(first|fname|f_name|given|name)/i,
+  /(mid|middle|mname|m_name|name)/i,
+  /(last|surname|lname|l_name|name)/i,
+  /(homeowner|owner|resident|desc|description)/i,
+  /(gender|sex)/i,
+  /(age|years?)/i,
+  /(house|unit|apartment|flat)/i,
+  /(street|avenue)/i,
+  /(address|addr|location)/i,
+  /(city|town)/i,
+  /(state|province|region)/i,
+  /(zip|postal|postcode|pincode)/i,
+];
+
 function MappingStep({
   message,
   csvHeaders,
@@ -183,7 +199,7 @@ export default function CSVImport() {
     setShowMapping(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
-  
+
   const uploadMultipart = async (
     file: File,
     presignedUrls: string[],
@@ -211,7 +227,8 @@ export default function CSVImport() {
           body: blob,
         });
 
-        if (!res.ok) throw new Error(`Failed to upload part ${i + 1}: ${res.statusText}`);
+        if (!res.ok)
+          throw new Error(`Failed to upload part ${i + 1}: ${res.statusText}`);
 
         const eTag = res.headers.get("ETag")?.replace(/"/g, "") || "";
         uploadedParts.push({ ETag: eTag, PartNumber: i + 1 });
@@ -225,86 +242,134 @@ export default function CSVImport() {
     return uploadedParts.sort((a, b) => a.PartNumber - b.PartNumber);
   };
 
-  const handleSubmit = async (providedMapping?: Mapping) => {
-    if (!file) {
-      toast.warn("Please select a CSV file");
-      return;
-    }
-    if (!selectedSourceId) {
-      toast.warn("Please select a source");
-      return;
-    }
+ const handleSubmit = async (providedMapping?: Mapping) => {
+  if (!file) {
+    toast.warn("Please select a CSV file");
+    return;
+  }
+  if (!selectedSourceId) {
+    toast.warn("Please select a source");
+    return;
+  }
 
-    try {
-      setIsLoading(true);
+  try {
+    setIsLoading(true);
 
-      // headers & mapping
-      const headersInCSV = (await getCSVHeaders(file)).map((h) => h.toLowerCase());
-      setCsvHeaders(headersInCSV);
+    // 1️⃣ Read CSV headers & normalize
+    const headersInCSV = (await getCSVHeaders(file)).map((h) =>
+      h.trim().toLowerCase()
+    );
+    setCsvHeaders(headersInCSV);
 
-      const finalMapping: Mapping = providedMapping
-        ? providedMapping
-        : headersInCSV.reduce((acc: Mapping, csvCol) => {
-            const match = REQUIRED_COLUMNS.find((dbCol) => dbCol.toLowerCase() === csvCol);
-            if (match) acc[csvCol] = match;
-            return acc;
-          }, {});
-      setMapping(finalMapping);
+    // 2️⃣ Build mapping (either use providedMapping from the UI,
+    // or auto-generate a mapping if this is the first pass)
+    let finalMapping: Mapping;
+    if (providedMapping) {
+      // Use the mapping user submitted from MappingStep
+      finalMapping = providedMapping;
 
-      const unmatched = headersInCSV.filter((col) => !Object.keys(finalMapping).includes(col));
-      if (unmatched.length > 0) {
+      // Ensure the provided mapping covers all CSV headers (and none are empty)
+      const missingFromProvided = headersInCSV.filter((h) => !(h in finalMapping));
+      if (missingFromProvided.length > 0) {
+        // unexpected, but show mapping UI
         setShowMapping(true);
-        toast.info("Some CSV columns do not match DB columns. Please map them.");
+        toast.info(`Please map the CSV columns: ${missingFromProvided.join(", ")}`);
+        setIsLoading(false);
         return;
       }
 
-      // 1) Request server to start multipart and return presignedUrls + chunkSize
-      toast.info("Requesting multipart upload...");
-      const startResp = (await axiosWrapper(
-        "post",
-        CSV_API.CREATE_MULTIPART_UPLOAD,
-        { fileName: file.name, fileSize: file.size },
-        NEXT_PUBLIC_CSV_API_TOKEN
-      )) as StartMultipartResponse;
-
-      const { uploadId, key: fileKey, presignedUrls, chunkSize } = startResp;
-
-      // 2) Upload parts in parallel (controlled concurrency)
-      toast.info("Uploading parts...");
-      const parts = await uploadMultipart(file, presignedUrls, chunkSize);
-
-      // parts -> [{ ETag, PartNumber }]
-      // 3) Tell backend to complete multipart upload
-      toast.info("Completing multipart upload...");
-      await axiosWrapper(
-        "post",
-        CSV_API.COMPLETE_MULTIPART_UPLOAD,
-        { key: fileKey, uploadId, parts },
-        NEXT_PUBLIC_CSV_API_TOKEN
+      const stillUnmapped = headersInCSV.some(
+        (h) => !finalMapping[h] || finalMapping[h] === ""
       );
+      if (stillUnmapped) {
+        setShowMapping(true);
+        toast.info("Please finish mapping all CSV columns before continuing.");
+        setIsLoading(false);
+        return;
+      }
+    } else {
+      // Auto-build mapping
+      finalMapping = headersInCSV.reduce((acc: Mapping, csvCol) => {
+        const exactMatch = REQUIRED_COLUMNS.find(
+          (dbCol) => dbCol.toLowerCase() === csvCol
+        );
 
-      // 4) Tell backend to process the file (S3 key)
-      toast.info("Processing CSV in background...");
-      const res = (await axiosWrapper(
-        "post",
-        CSV_API.IMPORT_MAPPED_CSV,
-        {
-          s3Key: fileKey,
-          data_source_id: selectedSourceId,
-          mapping: finalMapping,
-        },
-        NEXT_PUBLIC_CSV_API_TOKEN
-      )) as UploadSuccessResponse;
+        if (exactMatch) {
+          // Auto map exact matches
+          acc[csvCol] = exactMatch;
+        } else {
+          // If any regex matches -> require manual selection
+          const isPartial = regexList.some((regex) => regex.test(csvCol));
+          if (isPartial) {
+            acc[csvCol] = ""; // force user to pick in MappingStep
+          } else {
+            acc[csvCol] = "not_import"; // auto exclude extras
+          }
+        }
+        return acc;
+      }, {});
+      // push prefilled mapping into state so MappingStep shows those values
+      setMapping(finalMapping);
 
-      toast.success(res.message || "CSV queued for processing!");
-      resetState();
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err?.error || err?.message || "CSV upload failed");
-    } finally {
-      setIsLoading(false);
+      // If any mapping entries are blank (""), we must show the mapping UI and let user finish mapping
+      const needsManual = Object.values(finalMapping).some((v) => v === "");
+      if (needsManual) {
+        setShowMapping(true);
+        toast.info("Some CSV columns look like matches — please confirm mappings.");
+        setIsLoading(false);
+        return; // wait for user to map and call handleSubmit(mapping)
+      }
     }
-  };
+
+    // If we reached here -> mapping is complete (either auto or user-provided)
+    // Proceed with multipart upload flow
+
+    // 3️⃣ Request multipart upload
+    toast.info("Requesting multipart upload...");
+    const startResp = (await axiosWrapper(
+      "post",
+      CSV_API.CREATE_MULTIPART_UPLOAD,
+      { fileName: file.name, fileSize: file.size },
+      NEXT_PUBLIC_CSV_API_TOKEN
+    )) as StartMultipartResponse;
+
+    const { uploadId, key: fileKey, presignedUrls, chunkSize } = startResp;
+
+    // 4️⃣ Upload parts in parallel
+    toast.info("Uploading parts...");
+    const parts = await uploadMultipart(file, presignedUrls, chunkSize);
+
+    // 5️⃣ Complete multipart upload
+    toast.info("Completing multipart upload...");
+    await axiosWrapper(
+      "post",
+      CSV_API.COMPLETE_MULTIPART_UPLOAD,
+      { key: fileKey, uploadId, parts },
+      NEXT_PUBLIC_CSV_API_TOKEN
+    );
+
+    // 6️⃣ Tell backend to process file
+    toast.info("Processing CSV in background...");
+    const res = (await axiosWrapper(
+      "post",
+      CSV_API.IMPORT_MAPPED_CSV,
+      {
+        s3Key: fileKey,
+        data_source_id: selectedSourceId,
+        mapping: finalMapping,
+      },
+      NEXT_PUBLIC_CSV_API_TOKEN
+    )) as UploadSuccessResponse;
+
+    toast.success(res.message || "CSV queued for processing!");
+    resetState();
+  } catch (err: any) {
+    console.error(err);
+    toast.error(err?.error || err?.message || "CSV upload failed");
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   return (
     <div className="p-6 max-w-2xl w-full bg-white rounded-lg shadow-md space-y-6">
