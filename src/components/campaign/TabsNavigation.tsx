@@ -6,9 +6,9 @@ interface TabsNavigationProps {
   setActiveTab: (tabId: string) => void;
   isSubmitting: boolean;
   isEditMode?: boolean;
-  validateForm: () => Promise<any>; // Add validateForm prop
-  setTouched: (touched: any) => void; // Add setTouched prop
-  values: any; // Add values prop
+  validateForm?: () => Promise<any>; // Make optional
+  setTouched?: (touched: any) => void; // Make optional
+  values?: any; // Make optional
 }
 
 export const TabsNavigation = ({ 
@@ -16,9 +16,9 @@ export const TabsNavigation = ({
   setActiveTab, 
   isSubmitting, 
   isEditMode = false, 
-  validateForm, 
-  setTouched,
-  values 
+  validateForm = async () => ({}),
+  setTouched = () => {}, // Default function
+  values = {} // Default empty object
 }: TabsNavigationProps) => {
   const currentIndex = tabs.findIndex((tab) => tab.id === activeTab);
   const isLastTab = currentIndex === tabs.length - 1;

@@ -4,7 +4,7 @@ import { tabs } from "@/components/campaign/tab";
 interface TabsHeaderProps {
   activeTab: string;
   setActiveTab: (tabId: string) => void;
-  errors: any; // Add errors prop
+  errors?: any; // Add errors prop
 }
 
 export const TabsHeader = ({ activeTab, setActiveTab, errors }: TabsHeaderProps) => {
