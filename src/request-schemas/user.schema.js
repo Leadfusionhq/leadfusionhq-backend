@@ -31,9 +31,7 @@ const createUserByAdmin = {
         'any.required': 'Phone number is required',
       }),
   
-      zipCode: Joi.string().required().messages({
-        'any.required': 'Zip code is required',
-      }),
+  
 
       role: Joi.string()
        .valid(CONSTANT_ENUM.USER_ROLE.USER)
@@ -85,9 +83,7 @@ const updateUser = {
       'any.required': 'Phone number is required',
     }),
 
-    zipCode: Joi.string().required().messages({
-      'any.required': 'Zip code is required',
-    }),
+ 
 
     role: Joi.string()
       .valid(CONSTANT_ENUM.USER_ROLE.USER)
