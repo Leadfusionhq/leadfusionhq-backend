@@ -55,10 +55,10 @@ export const loginUser = createAsyncThunk<LoginResponse, { email: string; passwo
   }
 );
 
-export const registerUser = createAsyncThunk<{ message: string }, { name: string; email: string; password: string; companyName: string; phoneNumber: string; zipCode: string }>(
+export const registerUser = createAsyncThunk<{ message: string }, { name: string; email: string; password: string; companyName: string; phoneNumber: string;  }>(
   'auth/registerUser',
   async (
-    { name, email, password, companyName, phoneNumber, zipCode },
+    { name, email, password, companyName, phoneNumber },
     { rejectWithValue }
   ) => {
     try {
@@ -68,7 +68,7 @@ export const registerUser = createAsyncThunk<{ message: string }, { name: string
         password,
         companyName,
         phoneNumber,
-        zipCode,
+     
       });
       return data as { message: string };
     } catch (err: unknown) {

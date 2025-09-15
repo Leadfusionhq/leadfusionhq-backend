@@ -85,13 +85,13 @@ export const adminSidebarItems: SidebarItem[] = [
     link: '/import-csv',
 
   },
-   {
-    id: 'billing-control',
-    name: 'Billing Control',
-    icon: '/images/icons/billing-control.svg',
-    link: '/admin/billing-control',
+  //  {
+  //   id: 'billing-control',
+  //   name: 'Billing Control',
+  //   icon: '/images/icons/billing-control.svg',
+  //   link: '/admin/billing-control',
 
-  },
+  // },
 
 
 
