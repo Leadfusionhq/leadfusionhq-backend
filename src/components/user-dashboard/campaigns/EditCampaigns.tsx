@@ -126,6 +126,8 @@ const transformBackendDataToFormData = (backendData: any, statesList: State[]) =
 
 const EditCampaign = () => {
   const token = useSelector((state: RootState) => state.auth.token);
+  const userRole = useSelector((state: RootState) => state.auth.user?.role); 
+  const isAdmin = userRole === 'admin' || userRole === 'ADMIN';
   const { campaignId } = useParams();
 
   const [activeTab, setActiveTab] = useState("basic");
@@ -366,7 +368,8 @@ const EditCampaign = () => {
                     isLoadingUtilities,
                     activeDeliveryTab,
                     setActiveDeliveryTab,
-                    true
+                    true,
+                    isAdmin,
                   )}
                 </div>
 

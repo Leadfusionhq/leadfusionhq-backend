@@ -26,10 +26,34 @@ function MainHeader() {
           </button>
           </Link>
           <div className='flex items-center gap-3'>
-            <Image src="/images/icons/twitter.png" alt="Twitter" className='w-[15px] h-[15px]' height={15} width={15} />
+            <a 
+              href="https://x.com/LeadFusionHQ?fbclid=IwQ0xDSwMaovhleHRuA2FlbQIxMAABHgPedtS3mJvQnzM7zvsJwdnkObBRj6DvEX3173zC_RjiVn9LPz5A9h4whIVX_aem_KmRcEXvk20jOFu3mrvcqag" 
+              target="_blank" 
+              rel="noopener noreferrer"
+            >
+              <Image src="/images/icons/twitter.png" alt="Twitter" className='w-[15px] h-[15px]' height={15} width={15} />
+            </a>
+            <a 
+              href="https://www.facebook.com/share/16t9oy3bwq/?mibextid=wwXIfr" 
+              target="_blank" 
+              rel="noopener noreferrer"
+            >
             <Image src="/images/icons/facebook.png" alt="Facebook" className='w-[15px] h-[15px]' height={15} width={15} />
+            </a>
+            <a 
+              href="https://www.linkedin.com/company/leadfusionhq" 
+              target="_blank" 
+              rel="noopener noreferrer"
+            >
             <Image src="/images/icons/linkedin.png" alt="LinkedIn" className='w-[15px] h-[15px]' height={15} width={15} />
+            </a>
+            <a 
+              href="https://www.instagram.com/leadfusionhq?igsh=MTdjeHp1bmFudXhyNQ==" 
+              target="_blank" 
+              rel="noopener noreferrer"
+            >
             <Image src="/images/icons/instagram.png" alt="Instagram" className='w-[15px] h-[15px]' height={15} width={15} />
+            </a>
           </div>
         </div>
 

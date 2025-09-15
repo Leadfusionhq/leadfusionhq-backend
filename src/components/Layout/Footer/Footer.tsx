@@ -29,16 +29,20 @@ function Footer() {
                     <p className='text-white text-xl font-bold'>Follow on</p>
                     <div className='text-white flex gap-3 items-center font-light'>
                         <Image src="/images/icons/f-facebook.png" alt="Facebook" className='max-w-[15px] max-h-[15px] object-contain' height={20} width={20}/>
-                        <p className='font-light text-sm'>Facebook</p>
+                        <Link href="https://www.facebook.com/share/16t9oy3bwq/?mibextid=wwXIfr" className='text-white block font-light text-sm cusrsor-pointer'>Facebook</Link>
                     </div>
                     <div className='text-white flex gap-3 items-center font-light'>
                         <Image src="/images/icons/f-twitter.png" alt="Twitter" className='max-w-[15px] max-h-[15px] object-contain' height={20} width={20}/>
-                        <p className='font-light text-sm'>Twitter</p>
+                        {/* <p className='font-light text-sm'>Twitter</p> */}
+                        <Link href="https://x.com/LeadFusionHQ?fbclid=IwQ0xDSwMaovhleHRuA2FlbQIxMAABHgPedtS3mJvQnzM7zvsJwdnkObBRj6DvEX3173zC_RjiVn9LPz5A9h4whIVX_aem_KmRcEXvk20jOFu3mrvcqag" className='text-white block font-light text-sm cusrsor-pointer'>Twitter</Link>
+
                     </div>
                     <div className='text-white flex gap-3 items-center font-light'>
                         <Image src="/images/icons/f-insta.png" alt="Instagram" className='max-w-[15px] max-h-[15px] object-contain' height={20} width={20}/>
-                        <p className='font-light text-sm'>Instagram</p>
+                        {/* <p className='font-light text-sm'>Instagram</p> */}
+                        <Link href="https://www.instagram.com/leadfusionhq?igsh=MTdjeHp1bmFudXhyNQ==" className='text-white block font-light text-sm cusrsor-pointer'>Instagram</Link>
                     </div>
+                   
                 </div>
                 <div className='md:w-[25%] w-full md:space-y-4 space-y-2'>
                     <p className='text-white text-xl font-bold'>Contact Us</p>
