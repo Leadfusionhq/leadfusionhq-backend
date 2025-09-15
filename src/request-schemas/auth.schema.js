@@ -26,9 +26,6 @@ const registerUser = {
       'any.required': 'Phone number is required',
     }),
 
-    zipCode: Joi.string().required().messages({
-      'any.required': 'Zip code is required',
-    }),
   }),
 };
 

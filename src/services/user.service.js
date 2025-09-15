@@ -79,7 +79,9 @@ const getAllAdminsService = async (filter = {}, options = {}) => {
   return User.find(query);
 };
 const addUserService = async (data) => {
-  const { email, password, name, phoneNumber, companyName, region, country, zipCode } = data;
+  const { email, password, name, phoneNumber, companyName, region, country,
+   
+     } = data;
   const normalizedEmail = email.toLowerCase();
 
   const existingUser = await getUserByEmail(normalizedEmail);
@@ -98,7 +100,7 @@ const addUserService = async (data) => {
     companyName,
     region,
     country,
-    zipCode,
+
     role: 'USER',
     isEmailVerified: false,
     verificationToken,

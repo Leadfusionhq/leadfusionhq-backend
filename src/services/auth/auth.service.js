@@ -5,7 +5,7 @@ const { generateVerificationToken , getTokenExpiration } = require('../../utils/
 const UserServices = require('../user.service');
 
 const registerUser = async (data) => {
-  const { email, password, name, phoneNumber, companyName, region, country, zipCode } = data;
+  const { email, password, name, phoneNumber, companyName, region, country } = data;
   const normalizedEmail = email.toLowerCase();
 
   const existingUser = await UserServices.getUserByEmail(normalizedEmail);
@@ -24,7 +24,7 @@ const registerUser = async (data) => {
     companyName,
     region,
     country,
-    zipCode,
+
     role: 'USER',
     isEmailVerified: false,
     verificationToken,
