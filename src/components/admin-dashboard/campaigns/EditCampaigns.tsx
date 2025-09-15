@@ -44,7 +44,7 @@ const transformBackendDataToFormData = (backendData: any, statesList: State[]) =
     if (backendData.geography) {
       // Transform state ID to StateOption object
       if (backendData.geography.state && statesList.length > 0) {
-        const stateData = statesList.find(state => state._id === backendData.geography.state._id);
+        const stateData = statesList.find(state => state._id === backendData.geography.state);
         if (stateData) {
           formData.geography.state = {
             label: `${stateData.name} (${stateData.abbreviation})`,
@@ -61,9 +61,8 @@ const transformBackendDataToFormData = (backendData: any, statesList: State[]) =
         if (backendData.geography.coverage.partial) {
           const partial = backendData.geography.coverage.partial;
           formData.geography.coverage.partial = {
-            // counties: partial.countyDetails || [],
-            counties: Array.isArray(partial.counties)
-            ? partial.counties.map((county: County) => ({
+            counties: Array.isArray(partial.countyDetails)
+            ? partial.countyDetails.map((county: County) => ({
                 label: `${county.name}`,
                 value: county._id,
               }))
@@ -127,6 +126,8 @@ const transformBackendDataToFormData = (backendData: any, statesList: State[]) =
 
 const EditCampaign = () => {
   const token = useSelector((state: RootState) => state.auth.token);
+  const userRole = useSelector((state: RootState) => state.auth.user?.role); 
+  const isAdmin = userRole === 'admin' || userRole === 'ADMIN';
   const { campaignId } = useParams();
 
   const [activeTab, setActiveTab] = useState("basic");
@@ -181,7 +182,7 @@ const EditCampaign = () => {
         };
 
         console.log("Backend campaign data:", res);
-        console.log(res);
+
         if (res?.data) {
           const transformedData = transformBackendDataToFormData(res.data, statesList);
           setFormInitialValues(transformedData);
@@ -220,12 +221,62 @@ const EditCampaign = () => {
     callback(filteredOptions);
   };
 
-  // Submit handler
+  // Helper function to determine which tab contains a field
+  const getTabForField = (fieldName: string): string => {
+    if (fieldName.includes('name') || fieldName.includes('status') || 
+        fieldName.includes('lead_type') || fieldName.includes('exclusivity') ||
+        fieldName.includes('language') || fieldName.includes('poc_phone') ||
+        fieldName.includes('company_contact')) {
+      return 'basic';
+    } else if (fieldName.includes('geography')) {
+      return 'geography';
+    } else if (fieldName.includes('delivery')) {
+      return 'delivery';
+    } else if (fieldName.includes('note')) {
+      return 'notes';
+    }
+    return 'basic'; // default
+  };
+
+  // Submit handler with validation
   const handleSubmit = async (
     values: typeof defaultValues,
-    { setSubmitting }: { setSubmitting: (isSubmitting: boolean) => void }
+    { setSubmitting, setTouched, validateForm }: { 
+      setSubmitting: (isSubmitting: boolean) => void;
+      setTouched: (touched: any) => void;
+      validateForm: () => Promise<any>;
+    }
   ) => {
     try {
+      // Validate all fields first
+      const errors = await validateForm();
+      
+      // If there are errors, show them and scroll to the first one
+      if (Object.keys(errors).length > 0) {
+        // Mark all fields as touched to show errors
+        const allTouched = {};
+        Object.keys(defaultValues).forEach(key => {
+          allTouched[key] = true;
+        });
+        setTouched(allTouched);
+        
+        // Find the tab with the first error and switch to it
+        const firstError = Object.keys(errors)[0];
+        const tabWithError = getTabForField(firstError);
+        setActiveTab(tabWithError);
+        
+        // Scroll to the error after a small delay to allow tab switch
+        setTimeout(() => {
+          const errorElement = document.querySelector(`[name="${firstError}"]`);
+          if (errorElement) {
+            errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 100);
+        
+        setSubmitting(false);
+        return; // Don't submit if there are errors
+      }
+      
       const id = Array.isArray(campaignId) ? campaignId[0] : campaignId;
       if (!id) return;
 
@@ -251,6 +302,7 @@ const EditCampaign = () => {
       setSubmitting(false);
     }
   };
+  
   const loadCounties = (inputValue: string, callback: (options: { label: string; value: string }[]) => void) => {
     const filteredOptions = countiesList
       .filter((county) =>
@@ -286,7 +338,7 @@ const EditCampaign = () => {
         validationSchema={validationSchema}
         onSubmit={handleSubmit}
       >
-        {({ isSubmitting, values, setFieldValue }) => {
+        {({ isSubmitting, values, setFieldValue, validateForm, setTouched, errors }) => {
           console.log("Current form values:", values);
           
           return (
@@ -301,7 +353,7 @@ const EditCampaign = () => {
                 setIsLoadingUtilities={setIsLoadingUtilities}
               />
 
-              <TabsHeader activeTab={activeTab} setActiveTab={setActiveTab} />
+              <TabsHeader activeTab={activeTab} setActiveTab={setActiveTab} errors={errors} />
 
               <Form className="space-y-8">
                 <div className="bg-white p-8 rounded-lg border border-[#E0E0E0] min-h-[500px]">
@@ -316,7 +368,8 @@ const EditCampaign = () => {
                     isLoadingUtilities,
                     activeDeliveryTab,
                     setActiveDeliveryTab,
-                    true
+                    true,
+                    isAdmin,
                   )}
                 </div>
 
@@ -325,6 +378,9 @@ const EditCampaign = () => {
                   setActiveTab={setActiveTab}
                   isSubmitting={isSubmitting}
                   isEditMode={true}
+                  validateForm={validateForm}
+                  setTouched={setTouched}
+                  values={values}
                 />
               </Form>
             </div>

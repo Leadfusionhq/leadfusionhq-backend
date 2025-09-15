@@ -23,6 +23,8 @@ import { getErrorMessage } from '@/utils/getErrorMessage';
 
 const AddNewCampaign = () => {
   const token = useSelector((state: RootState) => state.auth.token);
+  const userRole = useSelector((state: RootState) => state.auth.user?.role); 
+  const isAdmin = userRole === 'admin' || userRole === 'ADMIN';
   const [activeTab, setActiveTab] = useState("basic");
   const [statesList, setStatesList] = useState<State[]>([]);
   const [countiesList, setCountiesList] = useState<County[]>([]);
@@ -195,7 +197,8 @@ const AddNewCampaign = () => {
                     isLoadingUtilities,
                     activeDeliveryTab,
                     setActiveDeliveryTab,
-                    false
+                    false,
+                    isAdmin,
                   )}
                 </div>
 
