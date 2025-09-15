@@ -22,7 +22,7 @@ interface Card {
 interface AutoTopUpRule {
   threshold: number;
   rechargeAmount: number;
-  isEnabled: boolean;
+  enabled: boolean;
   defaultCardId: string;
 }
 
@@ -105,7 +105,7 @@ interface CardFormData {
 interface AutoTopUpFormData {
   threshold: number;
   rechargeAmount: number;
-  isEnabled: boolean;
+  enabled: boolean;  
   defaultCardId: string;
 }
 
@@ -125,7 +125,13 @@ const WalletDashboard: React.FC = () => {
   // State management
   const [balance, setBalance] = useState<number>(0);
   const [cards, setCards] = useState<Card[]>([]);
-  const [autoTopUp, setAutoTopUp] = useState<AutoTopUpRule | null>(null);
+  const [autoTopUp, setAutoTopUp] = useState<AutoTopUpRule>({
+    enabled: false,
+    threshold: 0,
+    rechargeAmount: 0, // ✅ matches AutoTopUpRule
+    defaultCardId: '', // ✅ required by type
+  });
+  
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [pagination, setPagination] = useState<Pagination>({
     page: 1,
@@ -169,9 +175,10 @@ const WalletDashboard: React.FC = () => {
   const [autoTopUpForm, setAutoTopUpForm] = useState<AutoTopUpFormData>({
     threshold: 50,
     rechargeAmount: 250,
-    isEnabled: false,
+    enabled: false,      // ✅ matches everywhere
     defaultCardId: ''
   });
+  
   const [autoTopUpLoading, setAutoTopUpLoading] = useState<boolean>(false);
 
   // Toast notification system
@@ -532,22 +539,29 @@ const WalletDashboard: React.FC = () => {
       const calculatedBalance = calculateBalanceFromTransactions(transactionsResponse.transactions);
 
       // Fetch auto top-up settings (placeholder for actual API)
-      const autoTopUpResponse: AutoTopUpResponse = { autoTopUp: null };
-
+      const autoTopUpResponse = await axiosWrapper("get", BILLING_API.GET_BALANCE, {}, token) as any;
+     
       setBalance(calculatedBalance);
       setCards(cardsResponse.cards || []);
-      setAutoTopUp(autoTopUpResponse.autoTopUp);
+      setAutoTopUp({
+        threshold: autoTopUpResponse.balance.autoTopUp.threshold || 10,
+        rechargeAmount: autoTopUpResponse.balance.autoTopUp.topUpAmount || 50,
+        enabled: autoTopUpResponse.balance.autoTopUp.enabled || false, 
+        defaultCardId: ''
+      });
       setTransactions(transactionsResponse.transactions || []);
       setPagination(transactionsResponse.pagination);
 
-      if (autoTopUpResponse.autoTopUp) {
+      console.log(autoTopUpResponse?.balance?.autoTopUp);
+      if (autoTopUpResponse?.balance?.autoTopUp) {
+
         setAutoTopUpForm({
-          threshold: autoTopUpResponse.autoTopUp.threshold,
-          rechargeAmount: autoTopUpResponse.autoTopUp.rechargeAmount,
-          isEnabled: autoTopUpResponse.autoTopUp.isEnabled,
-          defaultCardId: autoTopUpResponse.autoTopUp.defaultCardId
+          threshold: autoTopUpResponse.balance.autoTopUp.threshold || 10,
+          rechargeAmount: autoTopUpResponse.balance.autoTopUp.topUpAmount || 50,
+          enabled: autoTopUpResponse.balance.autoTopUp.enabled || false, 
+          defaultCardId: ''
         });
-      }
+}
     } catch (error) {
       console.error('Failed to fetch wallet data:', error);
       showToast('error', 'Failed to load wallet data');
@@ -714,14 +728,13 @@ const WalletDashboard: React.FC = () => {
    
     try {
       setAutoTopUpLoading(true);
-      const response = await axiosWrapper("post", '/api/wallet/auto-topup', {
-        enabled: autoTopUpForm.isEnabled,
+      const response = await axiosWrapper("post", BILLING_API.AUTO_TOPUP, {
+        enabled: autoTopUpForm.enabled,
         threshold: autoTopUpForm.threshold,
-        rechargeAmount: autoTopUpForm.rechargeAmount,
-        defaultCardId: autoTopUpForm.defaultCardId
+        topUpAmount: autoTopUpForm.rechargeAmount, // Note: backend expects 'topUpAmount'
       }, token) as ApiResponse;
-
-      if (response?.data) {
+  
+      if (response?.result) {
         showToast('success', 'Auto top-up settings updated!');
         await fetchWalletData(); // Refresh data after successful operation
       } else {
@@ -876,7 +889,7 @@ const WalletDashboard: React.FC = () => {
             </div>
             <DollarSign className="w-12 h-12 text-gray-400" />
           </div>
-          {autoTopUp?.isEnabled && (
+          {autoTopUp?.enabled && (
             <div className="mt-4 flex items-center space-x-2">
               <Zap className="w-4 h-4" />
               <span className="text-sm">Auto Top-Up: ${autoTopUp.rechargeAmount} when below ${autoTopUp.threshold}</span>
@@ -1026,7 +1039,8 @@ const WalletDashboard: React.FC = () => {
                 <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                   <h3 className="font-medium text-gray-700">Auto Top-Up</h3>
                   <p className="text-lg font-semibold text-black">
-                    {autoTopUp?.isEnabled ? 'Enabled' : 'Disabled'}
+                    
+                    {autoTopUp?.enabled ? 'Enabled' : 'Disabled'}
                   </p>
                 </div>
               </div>
@@ -1283,8 +1297,8 @@ const WalletDashboard: React.FC = () => {
                 <div className="flex items-center space-x-2">
                   <input
                     type="checkbox"
-                    checked={autoTopUpForm.isEnabled}
-                    onChange={(e) => setAutoTopUpForm({ ...autoTopUpForm, isEnabled: e.target.checked })}
+                    checked={autoTopUpForm.enabled}
+                    onChange={(e) => setAutoTopUpForm({ ...autoTopUpForm, enabled: e.target.checked })}
                     className="w-4 h-4 text-gray-600 rounded focus:ring-gray-500"
                   />
                   <label className="text-sm font-medium text-gray-700">Enable Auto Top-Up</label>
@@ -1335,14 +1349,17 @@ const WalletDashboard: React.FC = () => {
                     onChange={(e) => setAutoTopUpForm({ ...autoTopUpForm, defaultCardId: e.target.value })}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
                   >
-                    <option value="">Select a card</option>
-                    {cards.map((card) => (
-                      <option key={card.customerVaultId} value={card.customerVaultId}>
-                        **** **** **** {card.cardLastFour} ({card.brand}) {card.isDefault ? '- Default' : ''}
-                      </option>
-                    ))}
+            
+                    {cards
+                      .filter((card) => card.isDefault) // ✅ Only default card
+                      .map((card) => (
+                        <option key={card.customerVaultId} value={card.customerVaultId}>
+                          **** **** **** {card.cardLastFour} ({card.brand}) - Default
+                        </option>
+                      ))}
                   </select>
                 </div>
+
 
                 <button
                   onClick={handleUpdateAutoTopUp}
