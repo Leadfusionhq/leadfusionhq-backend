@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 // const { ContractAcceptance } = require('../../models/ContractAcceptance');
 const { createCustomerVault, chargeCustomerVault ,deleteCustomerVault} = require('../nmi/nmi.service');
 const { ErrorHandler } = require('../../utils/error-handler');
+const { RegularUser } = require('../../models/user.model');
 
 // Contract management
 const getCurrentContract = async () => {
@@ -362,16 +363,26 @@ const manualCharge = async (userId, amount, note, chargedBy) => {
 
 // Account information
 const getUserBalance = async (userId) => {
-  const user = await User.findById(userId).select('balance hasStoredCard cardLastFour autoTopUp');
+  const user = await RegularUser.findById(userId)
+    .select('balance hasStoredCard autoTopUp paymentMethods defaultPaymentMethod');
   if (!user) throw new ErrorHandler(404, 'User not found');
+
+  let cardLastFour = null;
+  if (user.hasStoredCard && user.paymentMethods.length > 0) {
+    const defaultCard = user.paymentMethods.find(
+      pm => pm.customerVaultId === user.defaultPaymentMethod
+    );
+    cardLastFour = defaultCard ? defaultCard.cardLastFour : null;
+  }
 
   return {
     balance: user.balance || 0,
     hasStoredCard: user.hasStoredCard || false,
-    cardLastFour: user.cardLastFour,
+    cardLastFour,
     autoTopUp: user.autoTopUp || { enabled: false }
   };
 };
+
 
 const getUserTransactions = async (userId, page = 1, limit = 20, filters = {}) => {
   const skip = (page - 1) * limit;
@@ -424,18 +435,24 @@ const getUserTransactions = async (userId, page = 1, limit = 20, filters = {}) =
   }
 };
 
-const toggleAutoTopUp = async (userId, enabled) => {
+const toggleAutoTopUp = async (userId, autoTopUpData) => {
   const user = await User.findById(userId);
   if (!user) throw new ErrorHandler(404, 'User not found');
 
-  if (enabled && !user.customerVaultId) {
+  const { enabled, threshold, topUpAmount } = autoTopUpData;
+
+  // If enabling, ensure user has a payment method
+  if (enabled && (!user.paymentMethods || user.paymentMethods.length === 0)) {
     throw new ErrorHandler(400, 'Please add a payment method before enabling auto top-up.');
   }
 
   user.autoTopUp = {
     enabled,
+    threshold: threshold || user.autoTopUp?.threshold || 10,
+    topUpAmount: topUpAmount || user.autoTopUp?.topUpAmount || 50,
     updatedAt: new Date()
   };
+  
   await user.save();
 
   return {
@@ -443,6 +460,135 @@ const toggleAutoTopUp = async (userId, enabled) => {
   };
 };
 
+// New function to check and perform auto top-up
+const checkAndPerformAutoTopUp = async (userId, currentBalance) => {
+  const user = await User.findById(userId);
+  if (!user) return { performed: false, reason: 'User not found' };
+
+  // Check if auto top-up is enabled
+  if (!user.autoTopUp?.enabled) {
+    return { performed: false, reason: 'Auto top-up disabled' };
+  }
+
+  // Check if balance is below threshold
+  const threshold = user.autoTopUp.threshold || 10;
+  if (currentBalance >= threshold) {
+    return { performed: false, reason: 'Balance above threshold' };
+  }
+
+  // Get default payment method
+  let customerVaultIdToUse;
+  let defaultPaymentMethod;
+  
+  if (user.paymentMethods && user.paymentMethods.length > 0) {
+    defaultPaymentMethod = user.paymentMethods.find(pm => pm.isDefault);
+    if (defaultPaymentMethod?.customerVaultId) {
+      customerVaultIdToUse = defaultPaymentMethod.customerVaultId;
+    }
+  }
+
+  if (!customerVaultIdToUse) {
+    return { performed: false, reason: 'No payment method available' };
+  }
+
+  try {
+    const topUpAmount = user.autoTopUp.topUpAmount || 50;
+    
+    // Charge using the found vault ID
+    const chargeResult = await chargeCustomerVault(
+      customerVaultIdToUse, 
+      topUpAmount, 
+      'Auto top-up'
+    );
+
+    if (!chargeResult.success) {
+      return { 
+        performed: false, 
+        reason: `Payment failed: ${chargeResult.message}`,
+        error: chargeResult
+      };
+    }
+
+    // Add to user's balance
+    user.balance = (user.balance || 0) + parseFloat(topUpAmount);
+    await user.save();
+
+    // Create transaction record
+    const transaction = new Transaction({
+      userId,
+      type: 'AUTO',
+      amount: parseFloat(topUpAmount),
+      status: 'COMPLETED',
+      description: 'Auto top-up performed',
+      paymentMethod: 'CARD',
+      transactionId: chargeResult.transactionId,
+      balanceAfter: user.balance,
+      paymentMethodDetails: {
+        lastFour: defaultPaymentMethod.cardLastFour,
+        brand: defaultPaymentMethod.brand,
+        customerVaultId: customerVaultIdToUse
+      }
+    });
+    await transaction.save();
+
+    return {
+      performed: true,
+      newBalance: user.balance,
+      topUpAmount,
+      transactionId: transaction._id,
+      paymentTransactionId: chargeResult.transactionId
+    };
+
+  } catch (error) {
+    console.error('Auto top-up error:', error);
+    return { 
+      performed: false, 
+      reason: 'Auto top-up processing failed',
+      error: error.message 
+    };
+  }
+};
+
+const testAutoTopUpFunctionality = async (userId, deductAmount) => {
+  const user = await User.findById(userId);
+  if (!user) throw new ErrorHandler(404, 'User not found');
+
+  const originalBalance = user.balance || 0;
+  console.log(`Original balance: $${originalBalance}`);
+  console.log(`Deducting: $${deductAmount}`);
+  
+  // Simulate a deduction
+  user.balance = Math.max(0, originalBalance - deductAmount);
+  await user.save();
+  
+  console.log(`New balance after deduction: $${user.balance}`);
+  console.log(`Auto top-up threshold: $${user.autoTopUp?.threshold || 10}`);
+  
+  // Check if auto top-up should trigger
+  const autoTopUpResult = await checkAndPerformAutoTopUp(userId, user.balance);
+  
+  // Create a test transaction record
+  const transaction = new Transaction({
+    userId,
+    type: 'TEST_DEDUCTION',
+    amount: -deductAmount,
+    status: 'COMPLETED',
+    description: `Test deduction for auto top-up functionality`,
+    paymentMethod: 'OTHER',
+    balanceAfter: user.balance
+  });
+  await transaction.save();
+
+  return {
+    originalBalance,
+    deductAmount,
+    balanceAfterDeduction: user.balance,
+    autoTopUpTriggered: autoTopUpResult.performed,
+    autoTopUpDetails: autoTopUpResult,
+    finalBalance: autoTopUpResult.performed ? autoTopUpResult.newBalance : user.balance,
+    transactionId: transaction._id
+  };
+};
 
 /**
  * Delete a user card (DB + NMI Vault)
@@ -503,4 +649,6 @@ module.exports = {
   getUserTransactions,
   toggleAutoTopUp,
   deleteUserCard,
+  testAutoTopUpFunctionality,
+  checkAndPerformAutoTopUp, 
 };

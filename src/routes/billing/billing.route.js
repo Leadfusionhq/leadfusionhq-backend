@@ -6,6 +6,7 @@ const authorizedRoles = require('../../middleware/authorized-roles.js');
 const CONSTANT_ENUM = require('../../helper/constant-enums.js');
 const BillingSchema = require('../../request-schemas/billing.schema.js');
 const { celebrate } = require('celebrate');
+const { Joi, Segments } = require('celebrate');
 
 const API = {
   SAVE_CARD: '/save-card',
@@ -20,7 +21,8 @@ const API = {
   CONTRACT_STATUS: '/contract/status',
   GET_CARDS: '/cards', // NEW
   SET_DEFAULT_CARD: '/cards/default', // NEW
-  DELETE_CARD: '/cards/:vaultId' // NEW
+  DELETE_CARD: '/cards/:vaultId' ,
+  TEST_AUTO_TOPUP: '/test-auto-topup'
 };
 
 billingRouter.use(
@@ -43,6 +45,16 @@ billingRouter.use(
 //     celebrate(BillingSchema.acceptContract),
 //     billingController.acceptContract
 // );
+
+billingRouter.post(
+    API.TEST_AUTO_TOPUP,
+    celebrate({
+      [Segments.BODY]: Joi.object().keys({
+        deductAmount: Joi.number().min(0.01).required()
+      })
+    }),
+    billingController.testAutoTopUp
+);
 
 billingRouter.post(
     API.SAVE_CARD, 
@@ -69,21 +81,21 @@ billingRouter.post(
 //     billingController.chargeUser
 // );
 
-// billingRouter.get(
-//     API.BALANCE,
-//     billingController.getBalance
-// );
+billingRouter.get(
+    API.BALANCE,
+    billingController.getBalance
+);
 
 billingRouter.get(
     API.TRANSACTIONS,
     billingController.getTransactions
 );
 
-// billingRouter.post(
-//     API.AUTO_TOP_UP,
-//     celebrate(BillingSchema.toggleAutoTopUp),
-//     billingController.toggleAutoTopUp
-// );
+billingRouter.post(
+    API.AUTO_TOP_UP,
+    celebrate(BillingSchema.toggleAutoTopUp),
+    billingController.toggleAutoTopUp
+);
 billingRouter.get(API.GET_CARDS, billingController.getCards);
 billingRouter.post(API.SET_DEFAULT_CARD, billingController.setDefaultCard);
 billingRouter.delete(API.DELETE_CARD, billingController.deleteCard);
