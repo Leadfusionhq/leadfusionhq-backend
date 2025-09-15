@@ -98,6 +98,18 @@ const getCards = wrapAsync(async (req, res) => {
   });
   
   
+  const testAutoTopUp = wrapAsync(async (req, res) => {
+    const user_id = req.user._id;
+    const { deductAmount } = req.body;
+    
+    try {
+        const result = await BillingServices.testAutoTopUpFunctionality(user_id, deductAmount);
+        return sendResponse(res, { result }, 'Auto top-up test completed');
+    } catch (err) {
+        console.error(`Failed to test auto top-up:`, err.message);
+        throw new ErrorHandler(500, 'Failed to test auto top-up functionality.');
+    }
+});
   
 
 
@@ -193,16 +205,17 @@ const getTransactions = wrapAsync(async (req, res) => {
 
 const toggleAutoTopUp = wrapAsync(async (req, res) => {
     const user_id = req.user._id;
-    const { enabled } = req.body;
-    
+    const autoTopUpData = req.body;
+   
     try {
-        const result = await BillingServices.toggleAutoTopUp(user_id, enabled);
-        return sendResponse(res, { result }, `Auto top-up ${enabled ? 'enabled' : 'disabled'} successfully`);
+      const result = await BillingServices.toggleAutoTopUp(user_id, autoTopUpData);
+      const action = autoTopUpData.enabled ? 'enabled' : 'disabled';
+      return sendResponse(res, { result }, `Auto top-up ${action} successfully`);
     } catch (err) {
-        console.error(`Failed to toggle auto top-up:`, err.message);
-        throw new ErrorHandler(500, 'Failed to update auto top-up settings. Please try again later.');
+      console.error(`Failed to toggle auto top-up:`, err.message);
+      throw new ErrorHandler(500, 'Failed to update auto top-up settings. Please try again later.');
     }
-});
+  });
 
 module.exports = {
     getCurrentContract,
@@ -218,5 +231,5 @@ module.exports = {
     getCards,
     setDefaultCard,
     deleteCard,
-
+    testAutoTopUp,
 };

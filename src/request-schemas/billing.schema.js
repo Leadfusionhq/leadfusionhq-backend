@@ -50,9 +50,11 @@ const chargeUser = {
 // ✅ 6. Toggle Auto Top-Up
 const toggleAutoTopUp = {
   [Segments.BODY]: Joi.object().keys({
-    enabled: Joi.boolean().required()
+    enabled: Joi.boolean().required(),
+    threshold: Joi.number().min(0).optional(), // minimum balance before topping up
+    topUpAmount: Joi.number().min(1).optional() // amount to add when topping up
   }),
-};
+ };
 
 module.exports = {
   saveCard,

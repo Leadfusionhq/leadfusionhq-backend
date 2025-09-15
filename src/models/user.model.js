@@ -171,10 +171,25 @@ hasStoredCard: {
     type: Number,
     default: 0,
   },
-  autoTopUpEnabled: {
+// In regularUserSchema
+autoTopUp: {
+  enabled: {
     type: Boolean,
-    default: false,
+    default: false
   },
+  threshold: {
+    type: Number,
+    default: 10 // top up when balance falls below $10
+  },
+  topUpAmount: {
+    type: Number,
+    default: 50 // add $50 when topping up
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now
+  }
+},
   lastChargedAt: {
     type: Date,
     default: null,
