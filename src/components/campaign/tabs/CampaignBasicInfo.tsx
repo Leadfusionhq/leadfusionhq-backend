@@ -8,9 +8,10 @@ interface Props {
   values: any;
   setFieldValue: (field: string, value: any) => void;
   isEditMode?: boolean;
+  isAdmin?: boolean;
 }
 
-const CampaignBasicInfo: React.FC<Props> = ({ values, setFieldValue ,isEditMode = false}) => {
+const CampaignBasicInfo: React.FC<Props> = ({ values, setFieldValue ,isEditMode = false ,isAdmin = false}) => {
   return (
     <div className="space-y-6">
       <h3 className="text-[20px] font-[500] text-[#1C1C1C] mb-4">Basic Information</h3>
@@ -42,6 +43,16 @@ const CampaignBasicInfo: React.FC<Props> = ({ values, setFieldValue ,isEditMode 
           }))}
         />
         {/* <FormikInput name="bid_price" type="number" min="0" label="Bid Price *" placeholder="0" /> */}
+        {(isAdmin || isEditMode) && (
+          <FormikInput 
+            name="bid_price" 
+            type="number" 
+            min="0" 
+            label="Bid Price *" 
+            placeholder="0"
+            disabled={isEditMode && !isAdmin} // Disable if in edit mode and not admin
+          />
+        )}
         <FormikSelect
           name="language"
           label="Language *"

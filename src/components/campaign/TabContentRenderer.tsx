@@ -19,10 +19,11 @@ export const renderTabContent = (
   activeDeliveryTab: "method" | "schedule" | "other",
   setActiveDeliveryTab: (tab: "method" | "schedule" | "other") => void,
   isEditMode: boolean,
+  isAdmin: boolean,
 ) => {
   switch (activeTab) {
     case "basic":
-      return <CampaignBasicInfo values={values} setFieldValue={setFieldValue} isEditMode={isEditMode}/>;
+      return <CampaignBasicInfo values={values} setFieldValue={setFieldValue} isEditMode={isEditMode} isAdmin={isAdmin} />;
     case "geography":
       return (
         <CampaignGeography
