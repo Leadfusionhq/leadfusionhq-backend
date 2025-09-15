@@ -25,6 +25,23 @@ const createCustomerVault = async (cardInfo) => {
 };
 
 const chargeCustomerVault = async (customerVaultId, amount, description = '') => {
+
+  if (!SECURITY_KEY) {
+    console.error('NMI_SECURITY_KEY is not set in environment variables');
+    return {
+      success: false,
+      message: 'Payment configuration error: Missing security key'
+    };
+  }
+
+  if (!NMI_API_URL || !NMI_API_URL.startsWith('http')) {
+    console.error('NMI_API_URL is not a valid absolute URL:', NMI_API_URL);
+    return {
+      success: false,
+      message: 'Payment configuration error: Invalid API URL'
+    };
+  }
+  
   const payload = {
     security_key: SECURITY_KEY,
     type: 'sale',
