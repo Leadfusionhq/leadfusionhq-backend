@@ -1,17 +1,29 @@
 const { Joi, Segments } = require('celebrate');
 
 // 🔐 1. Save Card Schema
+// 🔐 1. Save Card Schema
 const saveCard = {
   [Segments.BODY]: Joi.object().keys({
-    card_number: Joi.string().required().length(16),
-    expiry_month: Joi.string().required().length(2),
-    expiry_year: Joi.string().required().length(4),
-    cvv: Joi.string().required().length(3),
+    card_number: Joi.string()
+      .pattern(/^\d+$/)
+      .min(13)
+      .max(19) // most networks fall between 13–19 digits
+      .required(),
+    expiry_month: Joi.string()
+      .pattern(/^(0[1-9]|1[0-2])$/) // 01–12
+      .required(),
+    expiry_year: Joi.string()
+      .pattern(/^\d{4}$/) // e.g. 2028
+      .required(),
+    cvv: Joi.string()
+      .pattern(/^\d{3,4}$/) // 3 for Visa/Mastercard, 4 for Amex
+      .required(),
     billing_address: Joi.string().optional(),
     zip: Joi.string().optional(),
     full_name: Joi.string().required()
   }),
 };
+
 
 // 💰 2. Add Funds Schema
 const addFunds = {
