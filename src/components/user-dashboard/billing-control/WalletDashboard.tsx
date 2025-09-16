@@ -7,6 +7,8 @@ import { RootState } from "@/redux/store";
 import axiosWrapper from "@/utils/api";
 import { BILLING_API } from "@/utils/apiUrl";
 import { API_URL } from "@/utils/apiUrl";
+import { Trash2 } from 'lucide-react';
+import ConfirmDialog from '@/components/common/ConfirmDialog';
 
 // Enhanced TypeScript interfaces
 interface Card {
@@ -157,6 +159,19 @@ const WalletDashboard: React.FC = () => {
   const [selectedCardId, setSelectedCardId] = useState<string>('');
   const [rechargeLoading, setRechargeLoading] = useState<boolean>(false);
 
+  // Add this state for confirm dialog
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    vaultId: string | null;
+    title: string;
+    message: string;
+  }>({
+    open: false,
+    vaultId: null,
+    title: 'Delete Card',
+    message: 'Are you sure you want to delete this card?'
+  });
+
   // Add card state
   const [showAddCard, setShowAddCard] = useState<boolean>(false);
   const [cardForm, setCardForm] = useState<CardFormData>({
@@ -170,6 +185,7 @@ const WalletDashboard: React.FC = () => {
   });
   const [cardFormErrors, setCardFormErrors] = useState<CardFormErrors>({});
   const [addCardLoading, setAddCardLoading] = useState<boolean>(false);
+  const [deletingCard, setDeletingCard] = useState<string | null>(null);
 
   // Auto top-up settings
   const [autoTopUpForm, setAutoTopUpForm] = useState<AutoTopUpFormData>({
@@ -209,6 +225,62 @@ const WalletDashboard: React.FC = () => {
     });
     setCardFormErrors({});
   }, []);
+
+
+  const handleDeleteCard = async (vaultId: string): Promise<void> => {
+    // Check if this is the only card
+    if (cards.length === 1) {
+      showToast('error', 'Cannot delete your only payment method');
+      return;
+    }
+  
+    // Open confirm dialog instead of using window.confirm
+    setConfirmDialog({
+      open: true,
+      vaultId,
+      title: 'Delete Card',
+      message: 'Are you sure you want to delete this card?'
+    });
+  };
+  
+  // Add this function to handle the actual deletion after confirmation
+  const confirmDeleteCard = async (): Promise<void> => {
+    const { vaultId } = confirmDialog;
+    
+    if (!vaultId) return;
+  
+    try {
+      setDeletingCard(vaultId);
+      
+      // Call the API to delete the card
+      await axiosWrapper(
+        "delete",
+        `${BILLING_API.DELETE_CARD}/${vaultId}`,
+        {},
+        token || undefined
+      );
+      
+      // Remove the card from local state
+      setCards(cards.filter(card => card.customerVaultId !== vaultId));
+      
+      // Show success message
+      showToast('success', 'Card deleted successfully');
+      
+    } catch (error: unknown) {
+      console.error('Error deleting card:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete card';
+      showToast('error', errorMessage);
+    } finally {
+      setDeletingCard(null);
+      // Close the dialog
+      setConfirmDialog(prev => ({ ...prev, open: false, vaultId: null }));
+    }
+  };
+  
+  // Add this function to handle canceling the deletion
+  const cancelDeleteCard = (): void => {
+    setConfirmDialog(prev => ({ ...prev, open: false, vaultId: null }));
+  };
 
   const resetAddFundsForm = useCallback(() => {
     setRechargeAmount('');
@@ -1304,35 +1376,56 @@ const WalletDashboard: React.FC = () => {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {cards.map((card) => (
-                  <div key={card.customerVaultId} className="border border-gray-200 rounded-lg p-4 relative hover:shadow-md transition-shadow bg-white">
-                    {card.isDefault && (
-                      <span className="absolute top-2 right-2 bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded border border-gray-200">
-                        Default
-                      </span>
-                    )}
-                    <div className="flex items-center space-x-3">
-                      <CreditCard className="w-8 h-8 text-gray-400" />
-                      <div>
-                        <p className="font-medium text-black">**** **** **** {card.cardLastFour}</p>
-                        <p className="text-sm text-gray-500">{card.brand} • {card.expiryMonth}/{card.expiryYear}</p>
-                        {card.cardholderName && (
-                          <p className="text-xs text-gray-400">{card.cardholderName}</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {cards.map((card) => (
+                    <div key={card.customerVaultId} className="border border-gray-200 rounded-lg p-4 relative hover:shadow-md transition-shadow bg-white">
+                      {/* Top-right section for default + delete */}
+                      <div className="absolute top-2 right-2 flex items-center space-x-2">
+                        {card.isDefault && (
+                          <span className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded border border-gray-200">
+                            Default
+                          </span>
+                        )}
+
+                        <button
+                          onClick={() => handleDeleteCard(card.customerVaultId)}
+                          disabled={deletingCard === card.customerVaultId}
+                          className="text-gray-400 hover:text-red-500 transition-colors disabled:opacity-50"
+                          title="Delete card"
+                        >
+                          {deletingCard === card.customerVaultId ? (
+                            <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+
+                      {/* Card details */}
+                      <div className="flex items-center space-x-3 mt-6">
+                        <CreditCard className="w-8 h-8 text-gray-400" />
+                        <div>
+                          <p className="font-medium text-black">**** **** **** {card.cardLastFour}</p>
+                          <p className="text-sm text-gray-500">{card.brand} • {card.expiryMonth}/{card.expiryYear}</p>
+                          {card.cardholderName && (
+                            <p className="text-xs text-gray-400">{card.cardholderName}</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="mt-3 flex space-x-3">
+                        {!card.isDefault && (
+                          <button
+                            onClick={() => handleSetDefaultCard(card.customerVaultId)}
+                            className="text-sm text-black hover:text-gray-700 transition-colors underline"
+                          >
+                            Set as Default
+                          </button>
                         )}
                       </div>
                     </div>
-                    {!card.isDefault && (
-                      <button
-                        onClick={() => handleSetDefaultCard(card.customerVaultId)}
-                        className="mt-2 text-sm text-black hover:text-gray-700 transition-colors underline"
-                      >
-                        Set as Default
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
 
               {cards.length === 0 && (
                 <div className="text-center py-8 text-gray-500">
@@ -1530,6 +1623,15 @@ const WalletDashboard: React.FC = () => {
           )}
         </div>
       </div>
+      
+      {/* Confirm Dialog for Card Deletion */}
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        onConfirm={confirmDeleteCard}
+        onCancel={cancelDeleteCard}
+      />
 
       {/* Terms & Conditions Modal */}
       {showTermsModal && (
