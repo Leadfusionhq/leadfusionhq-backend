@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
-export const validateUserSchema = (data: { name: string, email: string, password: string, role: string, companyName?: string, phoneNumber?: string, zipCode?: string }) => {
-  const { name, email, password, role, companyName, phoneNumber, zipCode } = data;
+export const validateUserSchema = (data: { name: string, email: string, password: string, role: string, companyName?: string, phoneNumber?: string,  }) => {
+  const { name, email, password, role, companyName, phoneNumber } = data;
 
   if (!name || !email || !password) {
     return NextResponse.json({ error: 'All fields are required' }, { status: 400 });
@@ -16,7 +16,7 @@ export const validateUserSchema = (data: { name: string, email: string, password
     return NextResponse.json({ error: 'Password must be at least 8 characters long' }, { status: 400 });
   }
 
-  if (role !== 'ADMIN' && (!companyName || !phoneNumber || !zipCode)) {
+  if (role !== 'ADMIN' && (!companyName || !phoneNumber )) {
     return NextResponse.json({
       error: 'Company name, phone number, and zip code are required for users or if role is null',
     }, { status: 400 });
@@ -27,8 +27,8 @@ export const validateUserSchema = (data: { name: string, email: string, password
 
 
 
-export const validateUserUpdateSchema = (data: { name: string, email: string, password: string, role: string, companyName?: string, phoneNumber?: string, zipCode?: string }) => {
-  const {  name, email, password, role, companyName, phoneNumber, zipCode } = data;
+export const validateUserUpdateSchema = (data: { name: string, email: string, password: string, role: string, companyName?: string, phoneNumber?: string}) => {
+  const {  name, email, password, role, companyName, phoneNumber } = data;
 
   if (!name || !email) {
     return NextResponse.json({ error: 'All fields are required' }, { status: 400 });
@@ -50,7 +50,7 @@ export const validateUserUpdateSchema = (data: { name: string, email: string, pa
     }
   }
 
-  if (role !== 'ADMIN' && (!companyName || !phoneNumber || !zipCode)) {
+  if (role !== 'ADMIN' && (!companyName || !phoneNumber)) {
     return NextResponse.json({
       error: 'Company name, phone number, and zip code are required for users or if role is null',
     }, { status: 400 });

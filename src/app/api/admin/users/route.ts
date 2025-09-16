@@ -8,7 +8,7 @@ import { authorizedRoles } from '@/middleware/authorized-roles';
 
 export async function POST(req: NextRequest) {
   try {
-    const { name, email, password, role, companyName, phoneNumber, zipCode } = await req.json();
+    const { name, email, password, role, companyName, phoneNumber,  } = await req.json();
 
     const validationResponse = validateUserSchema({
       name,
@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
       role,
       companyName,
       phoneNumber,
-      zipCode
+   
     });
 
     if (validationResponse instanceof NextResponse) {
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
       return authorizedResponse;
     }
 
-    const userData = { name, email, password, role, companyName, phoneNumber, zipCode };
+    const userData = { name, email, password, role, companyName, phoneNumber };
 
     const newUser = await createUser(userData);
     return NextResponse.json({ message: 'User Added successfully', user: newUser }, { status: 201 });

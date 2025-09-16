@@ -389,96 +389,151 @@ const WalletDashboard: React.FC = () => {
 
   const loadTermsContent = useCallback(async (): Promise<void> => {
     try {
-      // Add comprehensive dummy terms and conditions
-      const dummyTermsContent = `
+      const agreementContent = `
         <div class="space-y-6">
-          <h1 class="text-2xl font-bold text-gray-900 mb-4">Terms and Conditions</h1>
-          
+          <h1 class="text-2xl font-bold text-gray-900 mb-4">Lead Generation Agreement</h1>
+  
           <section>
-            <h2 class="text-lg font-semibold text-gray-800 mb-2">1. Acceptance of Terms</h2>
             <p class="text-gray-700 mb-4">
-              By accessing and using this wallet service, you accept and agree to be bound by the terms and provision of this agreement. 
-              If you do not agree to abide by the above, please do not use this service.
+              This Lead Generation Agreement ("Agreement") is made and entered into as of the date of your
+              acceptance by and between Lead Fusion HQ, LLC, with its principal place of business at 525 Rt 73N,
+              Marlton, NJ 08053 ("Supplier"), and you, the Lead buyer ("Buyer"). By agreeing to the terms set forth
+              herein, you confirm that you have the authority to bind Buyer to this Agreement. Supplier and Buyer are
+              each referred to individually as a “Party” and collectively as the “Parties.
             </p>
           </section>
-
           <section>
-            <h2 class="text-lg font-semibold text-gray-800 mb-2">2. Payment Processing</h2>
+            <h2 class="text-lg font-semibold text-gray-800 mb-2">1. Purpose</h2>
             <p class="text-gray-700 mb-4">
-              All payment transactions are processed securely through our certified payment gateway. We use industry-standard encryption 
-              to protect your financial information. By adding a payment method, you authorize us to charge the selected payment method 
-              for wallet top-ups and other services.
+              This Agreement establishes the terms under which Lead Fusion HQ, LLC ("Supplier") will provide leads 
+              to the Lead Buyer ("Buyer") for its business operations.
             </p>
           </section>
-
+  
           <section>
-            <h2 class="text-lg font-semibold text-gray-800 mb-2">3. Auto Top-Up Service</h2>
+            <h2 class="text-lg font-semibold text-gray-800 mb-2">2. Responsibilities of the Buyer</h2>
             <p class="text-gray-700 mb-4">
-              When you enable auto top-up, you authorize us to automatically charge your selected payment method when your wallet 
-              balance falls below the specified threshold. You can modify or disable this feature at any time through your wallet settings.
+              Buyer shall maintain confidentiality of all proprietary information provided by Supplier and ensure compliance 
+              with all applicable laws and regulations when using leads.
             </p>
           </section>
-
+  
           <section>
-            <h2 class="text-lg font-semibold text-gray-800 mb-2">4. Refund Policy</h2>
+            <h2 class="text-lg font-semibold text-gray-800 mb-2">3. Payment Terms</h2>
             <p class="text-gray-700 mb-4">
-              Wallet funds are generally non-refundable. However, in cases of unauthorized transactions or system errors, 
-              we will investigate and provide appropriate remediation. Please contact our support team within 30 days of any disputed transaction.
+              Supplier’s total liability shall not exceed the Lead Fees actually paid by Buyer in the preceding six (6) months. 
+              Fees may be pre-paid via Merchant Account or paid on a Pay-as-you-go basis. Late payments may require pre-payment 
+              before leads are distributed. Supplier’s system is the sole source of truth regarding payments.
             </p>
           </section>
-
+  
           <section>
-            <h2 class="text-lg font-semibold text-gray-800 mb-2">5. Security and Privacy</h2>
+            <h2 class="text-lg font-semibold text-gray-800 mb-2">4. Representations and Warranties</h2>
             <p class="text-gray-700 mb-4">
-              We implement robust security measures to protect your account and financial information. You are responsible for 
-              maintaining the confidentiality of your account credentials. Please notify us immediately of any unauthorized access or suspicious activity.
+              Buyer represents and warrants that it has authority to enter this Agreement, will use leads in compliance with laws, 
+              possesses all required licenses and approvals, and complies with privacy and data protection laws including the CCPA.
             </p>
           </section>
-
+  
           <section>
-            <h2 class="text-lg font-semibold text-gray-800 mb-2">6. Service Availability</h2>
+            <h2 class="text-lg font-semibold text-gray-800 mb-2">5. Supplier’s Services</h2>
             <p class="text-gray-700 mb-4">
-              While we strive to maintain 99.9% uptime, we do not guarantee uninterrupted service. We may perform maintenance 
-              or updates that could temporarily affect service availability. We will provide advance notice when possible.
+              Supplier shall use commercially reasonable efforts to provide leads in compliance with 10DLC standards. 
+              Leads will be delivered via email, XML feed, or other agreed methods, and verified according to company standards.
             </p>
           </section>
-
+  
           <section>
-            <h2 class="text-lg font-semibold text-gray-800 mb-2">7. Limitation of Liability</h2>
+            <h2 class="text-lg font-semibold text-gray-800 mb-2">6. Intellectual Property</h2>
             <p class="text-gray-700 mb-4">
-              Our liability is limited to the amount in your wallet balance. We are not liable for any indirect, incidental, 
-              special, or consequential damages arising from your use of this service.
+              Buyer may use leads solely to contact potential consumers. Buyer shall not sublicense, transfer, or resell 
+              leads to third parties.
             </p>
           </section>
-
+  
           <section>
-            <h2 class="text-lg font-semibold text-gray-800 mb-2">8. Modifications to Terms</h2>
+            <h2 class="text-lg font-semibold text-gray-800 mb-2">7. No Chargeback Clause</h2>
             <p class="text-gray-700 mb-4">
-              We reserve the right to modify these terms at any time. Changes will be effective immediately upon posting. 
-              Continued use of the service after changes constitutes acceptance of the new terms.
+              All payments are final and non-refundable. Buyer agrees not to initiate chargebacks, disputes, or reversals 
+              with their bank or payment processor. Disputes must be addressed directly with Supplier through its web portal.
             </p>
           </section>
-
+  
           <section>
-            <h2 class="text-lg font-semibold text-gray-800 mb-2">9. Contact Information</h2>
+            <h2 class="text-lg font-semibold text-gray-800 mb-2">8. Filtering Criteria</h2>
             <p class="text-gray-700 mb-4">
-              If you have any questions about these Terms and Conditions, please contact our support team at support@example.com 
-              or through the help section in your account dashboard.
+              Leads shall be filtered based on Buyer’s selected criteria including lead type, project type, and customer location.
             </p>
           </section>
-
+  
+          <section>
+            <h2 class="text-lg font-semibold text-gray-800 mb-2">9. Lead Delivery</h2>
+            <p class="text-gray-700 mb-4">
+              A "Lead" is defined as contact information for a potential customer. Supplier shall include name, address, 
+              contact details, and other relevant information.
+            </p>
+          </section>
+  
+          <section>
+            <h2 class="text-lg font-semibold text-gray-800 mb-2">10. Modifications</h2>
+            <p class="text-gray-700 mb-4">
+              Buyer may modify filtering criteria at any time through Supplier’s portal or written communication. 
+              Lead prices may change subject to Supplier’s confirmation.
+            </p>
+          </section>
+  
+          <section>
+            <h2 class="text-lg font-semibold text-gray-800 mb-2">11. Disclaimers and Limitation of Liability</h2>
+            <p class="text-gray-700 mb-4">
+              Lead services are provided “as is.” Each Party disclaims all warranties. Neither Party shall be liable 
+              for consequential, indirect, or punitive damages.
+            </p>
+          </section>
+  
+          <section>
+            <h2 class="text-lg font-semibold text-gray-800 mb-2">12. Indemnification</h2>
+            <p class="text-gray-700 mb-4">
+              Buyer agrees to indemnify Supplier against any losses, damages, claims, or expenses arising from Buyer’s 
+              non-compliance, unlawful use, or negligence.
+            </p>
+          </section>
+  
+          <section>
+            <h2 class="text-lg font-semibold text-gray-800 mb-2">13. Other Conditions</h2>
+            <p class="text-gray-700 mb-4">
+              All conditions or waivers must be made in writing.
+            </p>
+          </section>
+  
+          <section>
+            <h2 class="text-lg font-semibold text-gray-800 mb-2">14. Termination</h2>
+            <p class="text-gray-700 mb-4">
+              Either Party may terminate this Agreement upon thirty (30) days’ written notice.
+            </p>
+          </section>
+  
+          <section>
+            <h2 class="text-lg font-semibold text-gray-800 mb-2">15. Notices</h2>
+            <p class="text-gray-700 mb-4">
+              All notices must be in writing and delivered in person, by email, or certified mail. 
+              To Supplier: 525 Rt 73N, Marlton, NJ 08053. To Buyer: address provided during registration.
+            </p>
+          </section>
+  
           <p class="text-sm text-gray-600 mt-6 p-4 bg-gray-50 rounded-lg">
-            <strong>Last updated:</strong> September 12, 2025<br>
-            <strong>Effective date:</strong> September 12, 2025
+            <strong>Supplier:</strong> Lead Fusion HQ, LLC<br>
+            <strong>Location:</strong> 525 Rt 73N, Marlton, NJ 08053<br>
+            <strong>Agreement Effective Date:</strong> Upon Buyer’s acceptance
           </p>
         </div>
       `;
-      setTermsContent(dummyTermsContent);
+      setTermsContent(agreementContent);
     } catch (error) {
       console.error('Failed to load terms:', error);
       setTermsContent('<p class="text-red-600">Failed to load terms and conditions. Please try again.</p>');
     }
   }, []);
+  
 
   const fetchTransactions = useCallback(async (params?: {
     page?: number;
