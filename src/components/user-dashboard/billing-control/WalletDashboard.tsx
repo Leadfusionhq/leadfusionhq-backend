@@ -1455,43 +1455,61 @@ const WalletDashboard: React.FC = () => {
                 </div>
               )}
 
-              <div className="space-y-3">
-                {transactions.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <History className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                    <p>No transactions found</p>
-                    <p className="text-sm">Your transaction history will appear here</p>
-                  </div>
-                ) : (
-                  transactions.map((transaction) => (
-                    <div key={transaction._id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow bg-white">
+            <div className="space-y-3">
+              {transactions.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <History className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                  <p>No transactions found</p>
+                  <p className="text-sm">Your transaction history will appear here</p>
+                </div>
+              ) : (
+                transactions.map((transaction) => {
+                  const isNegative = transaction.amount < 0;
+                  const formattedAmount = `${isNegative ? "-" : "+"}$${Math.abs(transaction.amount).toFixed(2)}`;
+
+                  return (
+                    <div
+                      key={transaction._id}
+                      className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow bg-white"
+                    >
+                      {/* Left Section */}
                       <div className="flex items-center space-x-3">
-                        <div className={`w-3 h-3 rounded-full ${
-                          transaction.status === 'COMPLETED' || transaction.status === 'SUCCESS' ? 'bg-gray-600' :
-                          transaction.status === 'FAILED' ? 'bg-gray-800' : 'bg-gray-400'
-                        }`} />
+                        <div
+                          className={`w-3 h-3 rounded-full ${
+                            transaction.status === "COMPLETED" || transaction.status === "SUCCESS"
+                              ? "bg-gray-600"
+                              : transaction.status === "FAILED"
+                              ? "bg-gray-800"
+                              : "bg-gray-400"
+                          }`}
+                        />
                         <div>
                           <p className="font-medium text-black">{transaction.description}</p>
                           <p className="text-sm text-gray-500">
-                            {new Date(transaction.createdAt).toLocaleDateString('en-US', {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
+                            {new Date(transaction.createdAt).toLocaleDateString("en-US", {
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
                             })}
-                            {transaction.paymentMethodDetails && ` • Card: ****${transaction.paymentMethodDetails.lastFour}`}
+                            {transaction.paymentMethodDetails &&
+                              ` • Card: ****${transaction.paymentMethodDetails.lastFour}`}
                           </p>
                           {transaction.note && (
                             <p className="text-xs text-gray-400 mt-1">{transaction.note}</p>
                           )}
                         </div>
                       </div>
+
+                      {/* Right Section */}
                       <div className="text-right">
-                        <p className={`font-medium ${
-                          transaction.type === 'DEDUCTION' || transaction.type === 'WITHDRAWAL' ? 'text-gray-800' : 'text-black'
-                        }`}>
-                          {transaction.type === 'DEDUCTION' || transaction.type === 'WITHDRAWAL' ? '-' : '+'}${transaction.amount.toFixed(2)}
+                        <p
+                          className={`font-medium ${
+                            isNegative ? "text-red-600" : "text-green-600"
+                          }`}
+                        >
+                          {formattedAmount}
                         </p>
                         <p className="text-sm text-gray-500 capitalize">
                           {transaction.status.toLowerCase()}
@@ -1503,9 +1521,11 @@ const WalletDashboard: React.FC = () => {
                         )}
                       </div>
                     </div>
-                  ))
-                )}
-              </div>
+                  );
+                })
+              )}
+            </div>
+
             </div>
           )}
         </div>
