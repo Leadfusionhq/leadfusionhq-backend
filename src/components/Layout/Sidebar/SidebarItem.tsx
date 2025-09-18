@@ -16,7 +16,7 @@ interface SidebarItemProps {
 const SidebarItem: FC<SidebarItemProps> = ({ item }) => {
   const pathname = usePathname();
   const { collapsed}=useSelector((state:RootState)=>state.theme);
-  console.log("inside collapsed",collapsed);
+  // console.log("inside collapsed",collapsed);
   const isActive =
     pathname === item.link ||
     (item.link !== '/dashboard' && pathname?.startsWith(item.link + '/'));

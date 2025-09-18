@@ -10,9 +10,9 @@ import { CAMPAIGNS_API, LOCATION_API } from "@/utils/apiUrl";
 import { useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
 
-import  {validationSchema}  from '@/request-schemas/campaign-schema';
-import  {initialValues}  from '@/constants/initialCampaign';
-import { Utility ,StateOption , County , State} from "@/types/campaign";
+import { validationSchema } from '@/request-schemas/campaign-schema';
+import { initialValues } from '@/constants/freshInitialCampaign';
+import { Utility, StateOption, County, State } from "@/types/campaign";
 
 import { renderTabContent } from "@/components/campaign/TabContentRenderer";
 import { StateEffectsHandler } from "@/hooks/useCampaignStateEffects";
@@ -23,8 +23,10 @@ import { getErrorMessage } from '@/utils/getErrorMessage';
 
 const AddNewCampaign = () => {
   const token = useSelector((state: RootState) => state.auth.token);
-  const userRole = useSelector((state: RootState) => state.auth.user?.role); 
+  const userRole = useSelector((state: RootState) => state.auth.user?.role);
   const isAdmin = userRole === 'admin' || userRole === 'ADMIN';
+  
+  // State management
   const [activeTab, setActiveTab] = useState("basic");
   const [statesList, setStatesList] = useState<State[]>([]);
   const [countiesList, setCountiesList] = useState<County[]>([]);
@@ -32,6 +34,13 @@ const AddNewCampaign = () => {
   const [utilitiesList, setUtilitiesList] = useState<Utility[]>([]);
   const [isLoadingUtilities, setIsLoadingUtilities] = useState(false);
   const [activeDeliveryTab, setActiveDeliveryTab] = useState<"method" | "schedule" | "other">("method");
+  const [formKey, setFormKey] = useState(Date.now());
+  const [isEditMode, setIsEditMode] = useState(false);
+
+  // Fresh initial values for each form instance
+  const [currentInitialValues, setCurrentInitialValues] = useState(() => {
+    return JSON.parse(JSON.stringify(initialValues)); // Deep clone
+  });
 
   useEffect(() => {
     const fetchStates = async () => {
@@ -51,6 +60,37 @@ const AddNewCampaign = () => {
     fetchStates();
   }, [token]);
 
+  // Reset form to fresh state when switching to add mode
+  const resetToAddMode = useCallback(() => {
+    console.log("Resetting to add mode");
+    setIsEditMode(false);
+    setActiveTab("basic");
+    setActiveDeliveryTab("method");
+    
+    // Create fresh initial values
+    const freshInitialValues = JSON.parse(JSON.stringify(initialValues));
+    console.log("Initial Values:", initialValues);
+
+    setCurrentInitialValues(freshInitialValues);
+    console.log("Fresh Initial Values:", freshInitialValues);
+    // Clear all related state
+    setCountiesList([]);
+    setUtilitiesList([]);
+    setIsLoadingCounties(false);
+    setIsLoadingUtilities(false);
+    
+    // Force form remount with new key
+    setFormKey(Date.now());
+  }, []);
+
+  // Call resetToAddMode when component mounts (for fresh add campaigns)
+  useEffect(() => {
+    // Only reset if we're not in edit mode and this is a fresh mount
+    if (!isEditMode) {
+      resetToAddMode();
+    }
+  }, []); // Empty dependency array for mount only
+
   const loadStates = (inputValue: string, callback: (options: StateOption[]) => void) => {
     const filteredOptions = statesList
       .filter(
@@ -68,61 +108,116 @@ const AddNewCampaign = () => {
     callback(filteredOptions);
   };
 
-  // Updated handleSubmit to validate and scroll to errors
   const handleSubmit = async (
     values: typeof initialValues,
-    { setSubmitting, resetForm, setTouched, validateForm }: { 
+    { setSubmitting, resetForm, setTouched, validateForm, setFieldError }: { 
       setSubmitting: (isSubmitting: boolean) => void; 
       resetForm: () => void;
       setTouched: (touched: any) => void;
       validateForm: () => Promise<any>;
+      setFieldError: (field: string, message: string) => void;
     }
   ) => {
     try {
+      setSubmitting(true);
+      
       // Validate all fields first
       const errors = await validateForm();
       
-      // If there are errors, show them and scroll to the first one
       if (Object.keys(errors).length > 0) {
-        // Mark all fields as touched to show errors
-        const allTouched = {};
-        Object.keys(initialValues).forEach(key => {
-          allTouched[key] = true;
-        });
-        setTouched(allTouched);
+        console.log("Validation errors:", errors);
         
-        // Find the tab with the first error and switch to it
-        const firstError = Object.keys(errors)[0];
-        const tabWithError = getTabForField(firstError);
+        const touchedFields = {};
+        const markAllFieldsTouched = (obj: any, prefix = '') => {
+          Object.keys(obj).forEach(key => {
+            const fullKey = prefix ? `${prefix}.${key}` : key;
+            if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
+              markAllFieldsTouched(obj[key], fullKey);
+            } else {
+              touchedFields[fullKey] = true;
+            }
+          });
+        };
+        markAllFieldsTouched(initialValues);
+        setTouched(touchedFields);
+        
+        const firstErrorField = Object.keys(errors)[0];
+        const tabWithError = getTabForField(firstErrorField);
         setActiveTab(tabWithError);
         
-        // Scroll to the error after a small delay to allow tab switch
+        toast.error("Please fix the validation errors and try again.");
+        
         setTimeout(() => {
-          const errorElement = document.querySelector(`[name="${firstError}"]`);
-          if (errorElement) {
-            errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }
-        }, 100);
-        // Scroll to header after switching tab
-        setTimeout(() => {
-          const headerEl = document.querySelector(".tabs-header"); // 👈 add a className to TabsHeader wrapper
+          const headerEl = document.querySelector(".tabs-header");
           if (headerEl) {
             headerEl.scrollIntoView({ behavior: "smooth", block: "start" });
           }
 
-          // Existing scroll to field
-          const errorElement = document.querySelector(`[name="${firstError}"]`);
-          if (errorElement) {
-            errorElement.scrollIntoView({ behavior: "smooth", block: "center" });
-          }
+          setTimeout(() => {
+            const errorElement = document.querySelector(`[name="${firstErrorField}"]`) ||
+                               document.querySelector(`input[name="${firstErrorField}"]`) ||
+                               document.querySelector(`select[name="${firstErrorField}"]`) ||
+                               document.querySelector(`textarea[name="${firstErrorField}"]`);
+            if (errorElement) {
+              errorElement.scrollIntoView({ behavior: "smooth", block: "center" });
+              if (errorElement instanceof HTMLElement && 'focus' in errorElement) {
+                errorElement.focus();
+              }
+            }
+          }, 200);
         }, 150);
-
         
         setSubmitting(false);
-        return; // Don't submit if there are errors
+        return;
       }
       
-      setSubmitting(true);
+      // Delivery method validation
+      if (!values.delivery.method || values.delivery.method.length === 0) {
+        setFieldError('delivery.method', 'Please select at least one delivery method');
+        setActiveTab('delivery');
+        toast.error("Please select at least one delivery method");
+        setSubmitting(false);
+        return;
+      }
+
+      // Validate delivery method specific fields
+      if (values.delivery.method.includes('email')) {
+        if (!values.delivery.email.addresses) {
+          setFieldError('delivery.email.addresses', 'Email addresses are required');
+          setActiveTab('delivery');
+          toast.error("Email addresses are required for email delivery");
+          setSubmitting(false);
+          return;
+        }
+        if (!values.delivery.email.subject) {
+          setFieldError('delivery.email.subject', 'Email subject is required');
+          setActiveTab('delivery');
+          toast.error("Email subject is required for email delivery");
+          setSubmitting(false);
+          return;
+        }
+      }
+
+      if (values.delivery.method.includes('phone')) {
+        if (!values.delivery.phone.numbers) {
+          setFieldError('delivery.phone.numbers', 'Phone numbers are required');
+          setActiveTab('delivery');
+          toast.error("Phone numbers are required for phone delivery");
+          setSubmitting(false);
+          return;
+        }
+      }
+
+      if (values.delivery.method.includes('crm')) {
+        if (!values.delivery.crm.instructions) {
+          setFieldError('delivery.crm.instructions', 'CRM instructions are required');
+          setActiveTab('delivery');
+          toast.error("CRM instructions are required for CRM delivery");
+          setSubmitting(false);
+          return;
+        }
+      }
+
       const cleanedValues = cleanCampaignValues(values);
       console.log("Cleaned Values:", cleanedValues);
 
@@ -131,9 +226,13 @@ const AddNewCampaign = () => {
         details?: { message: string }[];
       };
       
-      console.warn(response);
+      console.log("Campaign created successfully:", response);
       toast.success(response?.message || "Campaign added successfully!");
+      
+      // Reset form and state completely after successful submission
       resetForm();
+      resetToAddMode(); // This will reset everything to fresh state
+      
     } catch (err) {
       console.error("Error saving campaign:", err);
       toast.error(getErrorMessage(err));
@@ -142,12 +241,11 @@ const AddNewCampaign = () => {
     }
   };
 
-  // Helper function to determine which tab contains a field
   const getTabForField = (fieldName: string): string => {
     if (fieldName.includes('name') || fieldName.includes('status') || 
         fieldName.includes('lead_type') || fieldName.includes('exclusivity') ||
         fieldName.includes('language') || fieldName.includes('poc_phone') ||
-        fieldName.includes('company_contact')) {
+        fieldName.includes('company_contact') || fieldName.includes('bid_price')) {
       return 'basic';
     } else if (fieldName.includes('geography')) {
       return 'geography';
@@ -156,7 +254,7 @@ const AddNewCampaign = () => {
     } else if (fieldName.includes('note')) {
       return 'notes';
     }
-    return 'basic'; // default
+    return 'basic';
   };
 
   return (
@@ -164,11 +262,15 @@ const AddNewCampaign = () => {
       <h2 className="text-[24px] font-[500] text-[#1C1C1C] text-center mb-6">Add New Campaign</h2>
 
       <Formik 
-        initialValues={initialValues} 
+        key={formKey}
+        initialValues={currentInitialValues}
         validationSchema={validationSchema} 
+        enableReinitialize={false} // Changed to false to prevent unwanted reinitializations
         onSubmit={handleSubmit}
+        validateOnChange={true}
+        validateOnBlur={true}
       >
-        {({ isSubmitting, values, setFieldValue, validateForm, setTouched, errors }) => {
+        {({ isSubmitting, values, setFieldValue, validateForm, setTouched, setFieldTouched, errors, touched, setFieldError, submitForm }) => {
           return (
             <div className="w-full max-w-[1200px]">
               <StateEffectsHandler
@@ -181,10 +283,9 @@ const AddNewCampaign = () => {
                 setIsLoadingUtilities={setIsLoadingUtilities}
               />
 
-              {/* Pass errors to TabsHeader */}
               <TabsHeader activeTab={activeTab} setActiveTab={setActiveTab} errors={errors} />
 
-              <Form className="space-y-8">
+              <Form className="space-y-8" noValidate>
                 <div className="bg-white p-8 rounded-lg border border-[#E0E0E0] min-h-[500px]">
                   {renderTabContent(
                     activeTab,
@@ -197,20 +298,23 @@ const AddNewCampaign = () => {
                     isLoadingUtilities,
                     activeDeliveryTab,
                     setActiveDeliveryTab,
-                    false,
+                    isEditMode,
                     isAdmin,
+                    formKey
                   )}
                 </div>
 
-                {/* Pass validateForm, setTouched, and values to TabsNavigation */}
                 <TabsNavigation
                   activeTab={activeTab}
                   setActiveTab={setActiveTab}
                   isSubmitting={isSubmitting}
-                  isEditMode={false}
                   validateForm={validateForm}
                   setTouched={setTouched}
+                  setFieldTouched={setFieldTouched}
                   values={values}
+                  errors={errors}
+                  getTabForField={getTabForField}
+                  submitForm={submitForm}
                 />
               </Form>
             </div>

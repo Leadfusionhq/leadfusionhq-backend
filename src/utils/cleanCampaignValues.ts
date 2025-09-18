@@ -42,6 +42,7 @@ export const cleanCampaignValues = (values: typeof initialValues) => {
     exclusivity: values.exclusivity,
     bid_price: values.bid_price,
     language: values.language,
+    payment_type: values.payment_type || "",
     poc_phone: values.poc_phone || '',
     company_contact_phone: values.company_contact_phone || '',
     company_contact_email: values.company_contact_email || '',
@@ -72,7 +73,7 @@ export const cleanCampaignValues = (values: typeof initialValues) => {
     },
     delivery: {
       ...values.delivery,
-      method:values.delivery.method,
+      method: values.delivery.method || [],
     //   schedule: {
     //     ...values.geography.coverage,
     

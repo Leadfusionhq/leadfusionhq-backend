@@ -23,7 +23,7 @@ const AddNewUser = () => {
     confirmPassword: '',
     companyName: '',
     phoneNumber: '',
-    zipCode: '',
+    // zipCode: '',
     role: 'USER',
   };
 
@@ -36,7 +36,7 @@ const AddNewUser = () => {
       .required('Confirm Password is required'),
     companyName: Yup.string().required('Company Name is required'),
     phoneNumber: Yup.string().required('Phone Number is required'),
-    zipCode: Yup.string().required('Zip Code is required'),
+    // zipCode: Yup.string().required('Zip Code is required'),
     role: Yup.string().required('Role is required'),
   });
 
@@ -101,9 +101,9 @@ const AddNewUser = () => {
               <div className="col-span-1">
                 <FormikInput name="phoneNumber" autoComplete="off" placeholder="Phone Number" label="Phone Number" />
               </div>
-              <div className="col-span-1">
+              {/* <div className="col-span-1">
                 <FormikInput name="zipCode" autoComplete="off" placeholder="Zip Code" label="Zip Code" />
-              </div>
+              </div> */}
             </div>
             <button
               type="submit"

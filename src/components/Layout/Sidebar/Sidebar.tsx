@@ -16,7 +16,7 @@ const Sidebar = () => {
   const dispatch = useDispatch<AppDispatch>();
   const router = useRouter();
   const { collapsed}=useSelector((state:RootState)=>state.theme);
-   console.log("inside collapsed sidebar",collapsed)
+  //  console.log("inside collapsed sidebar",collapsed)
   // const pathname = usePathname();
 
   const { user } = useSelector((state: RootState) => state.auth);

@@ -49,7 +49,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
     try {
       const response = (await axiosWrapper("get", `${NOTIFICATION_API.GET_NOTIFICATIONS}?unreadOnly=${unreadOnly}`, {}, token ?? undefined)) as any;
       
-      console.log('response : notifications', response);
+      //console.log('response : notifications', response);
       
       const formattedNotifications = response.data.map((notif: any) => ({
         _id: notif._id,
@@ -97,7 +97,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
       const url = NOTIFICATION_API.MARK_AS_READ.replace(':notificationId', notificationId);
       const response = (await axiosWrapper("patch", url, {}, token ?? undefined)) as any;
 
-      console.log('response', response);
+      //console.log('response', response);
 
       setNotifications(prev => 
         prev.map(notif => 

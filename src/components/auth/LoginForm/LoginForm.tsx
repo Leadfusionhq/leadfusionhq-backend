@@ -58,10 +58,11 @@ const LoginForm = () => {
     if (user) {
       console.warn('user', user)
       toast.dismiss();
-      toast.success('Login successful!');
       if (user.role === 'ADMIN') {
+        toast.success('Login to Admin Dashboard successful!');
         router.push('/admin/dashboard');
       } else {
+        toast.success('Login to Client Dashboard successful!');
         router.push('/dashboard');
       }
     }
