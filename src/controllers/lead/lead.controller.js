@@ -11,33 +11,57 @@ const generateUniqueLeadId = require('../../utils/idGenerator');
 const { cleanupTempFile } = require('../../middleware/csv-upload');
 const path = require('path');
 const fs = require('fs');
+const MAIL_HANDLER = require('../../mail/mails');
 
 // Create single lead
 const createLead = wrapAsync(async (req, res) => {
     const user_id = req.user._id;
     const lead_id = await generateUniqueLeadId();
     const leadData = { ...req.body, user_id, lead_id };
-    
+  
     const result = await LeadServices.createLead(leadData);
     const message = 'New Lead has been assigned to your campaign!';
-    
-    console.log('Campaign User ID:', result?.campaign_id?.user_id);
+    await result.populate('campaign_id');
 
+    console.log('Campaign User ID:', result?.campaign_id?.user_id);
+  
     try {
-        await NotificationServices.createNotification(
-            user_id,        
-            result?.campaign_id?.user_id,   
-            'info',          
-            message,         
-            0,               
-            `/dashboard/leads`
-        );
-    } catch (err) {
-        console.error(`Failed to send notification:`, err.message);
-    }
+      // Send notification
+      await NotificationServices.createNotification(
+        user_id,
+        result?.campaign_id?.user_id,
+        'info',
+        message,
+        0,
+        `/dashboard/leads`
+      );
+  
+      // ---- Send Lead Assignment Email ----
+ const campaign = result.campaign_id;
+console.log("Campaign after populate:", campaign?.name, campaign?.delivery);
     
+      if (campaign?.delivery?.method?.includes('email') && campaign?.delivery?.email?.addresses) {
+        try {
+          await MAIL_HANDLER.sendLeadAssignEmail({
+            to: campaign.delivery.email.addresses,
+            name: campaign?.name || 'Campaign User',
+            leadName: result?.lead_id,
+            assignedBy: req.user?.name || 'System',
+            leadDetailsUrl: `${process.env.UI_LINK}/dashboard/leads/${result?._id}`,
+            campaignName: campaign?.name,
+          });
+          console.log(`Lead assignment email sent to ${campaign.delivery.email.addresses}`);
+        } catch (err) {
+          console.error('Failed to send lead assignment email:', err.message);
+        }
+      }
+    } catch (err) {
+      console.error(`Failed to send notification:`, err.message);
+    }
+  
     sendResponse(res, { leadData: result }, 'Lead has been created successfully', 201);
-});
+  });
+  
 
 // Get all leads (paginated with filters)
 const getLeads = wrapAsync(async (req, res) => {

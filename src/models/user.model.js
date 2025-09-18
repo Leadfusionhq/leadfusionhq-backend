@@ -172,23 +172,18 @@ hasStoredCard: {
     default: 0,
   },
 // In regularUserSchema
+// In your user model where autoTopUp is defined
+// In the user schema, update the autoTopUp object:
 autoTopUp: {
-  enabled: {
-    type: Boolean,
-    default: false
+  enabled: { type: Boolean, default: false },
+  threshold: { type: Number, default: 10 },        // Keep for backward compatibility
+  topUpAmount: { type: Number, default: 50 },      // Keep for backward compatibility
+  paymentMode: { 
+    type: String, 
+    enum: ['prepaid', 'payAsYouGo'], 
+    default: 'prepaid' 
   },
-  threshold: {
-    type: Number,
-    default: 10 // top up when balance falls below $10
-  },
-  topUpAmount: {
-    type: Number,
-    default: 50 // add $50 when topping up
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  }
+  updatedAt: { type: Date, default: Date.now }
 },
   lastChargedAt: {
     type: Date,

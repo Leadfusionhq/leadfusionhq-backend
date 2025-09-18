@@ -59,14 +59,14 @@ const chargeUser = {
   }),
 };
 
-// ✅ 6. Toggle Auto Top-Up
 const toggleAutoTopUp = {
   [Segments.BODY]: Joi.object().keys({
-    enabled: Joi.boolean().required(),
-    threshold: Joi.number().min(0).optional(), // minimum balance before topping up
-    topUpAmount: Joi.number().min(1).optional() // amount to add when topping up
+    enabled: Joi.boolean().required(), // ✅ Make required again
+    threshold: Joi.number().min(0).optional(),
+    topUpAmount: Joi.number().min(1).optional(),
+    paymentMode: Joi.string().valid('prepaid', 'payAsYouGo').required()
   }),
- };
+};
 
 module.exports = {
   saveCard,
