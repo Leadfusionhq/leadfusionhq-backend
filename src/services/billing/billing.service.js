@@ -435,30 +435,34 @@ const getUserTransactions = async (userId, page = 1, limit = 20, filters = {}) =
   }
 };
 
-const toggleAutoTopUp = async (userId, autoTopUpData) => {
+// Rename toggleAutoTopUp to updatePaymentMode:
+const updatePaymentMode = async (userId, paymentModeData) => {
   const user = await User.findById(userId);
   if (!user) throw new ErrorHandler(404, 'User not found');
 
-  const { enabled, threshold, topUpAmount } = autoTopUpData;
+  const { paymentMode, enabled } = paymentModeData;
 
-  // If enabling, ensure user has a payment method
-  if (enabled && (!user.paymentMethods || user.paymentMethods.length === 0)) {
-    throw new ErrorHandler(400, 'Please add a payment method before enabling auto top-up.');
+  // Ensure user has payment methods for both modes
+  if ((!user.paymentMethods || user.paymentMethods.length === 0)) {
+    throw new ErrorHandler(400, 'Please add a payment method first.');
   }
 
   user.autoTopUp = {
-    enabled,
-    threshold: threshold || user.autoTopUp?.threshold || 10,
-    topUpAmount: topUpAmount || user.autoTopUp?.topUpAmount || 50,
+    enabled: enabled, // ✅ Use the enabled value from frontend
+    threshold: user.autoTopUp?.threshold || 10,
+    topUpAmount: user.autoTopUp?.topUpAmount || 50,
+    paymentMode: paymentMode,
     updatedAt: new Date()
   };
   
   await user.save();
 
   return {
-    autoTopUp: user.autoTopUp
+    autoTopUp: user.autoTopUp,
+    paymentMode: paymentMode
   };
 };
+
 
 // New function to check and perform auto top-up
 const checkAndPerformAutoTopUp = async (userId, currentBalance) => {
@@ -549,45 +553,133 @@ const checkAndPerformAutoTopUp = async (userId, currentBalance) => {
   }
 };
 
-const testAutoTopUpFunctionality = async (userId, deductAmount) => {
+const testLeadDeduction = async (userId, deductAmount) => {
   const user = await User.findById(userId);
   if (!user) throw new ErrorHandler(404, 'User not found');
 
   const originalBalance = user.balance || 0;
   console.log(`Original balance: $${originalBalance}`);
-  console.log(`Deducting: $${deductAmount}`);
+  console.log(`Attempting to deduct: $${deductAmount}`);
   
-  // Simulate a deduction
-  user.balance = Math.max(0, originalBalance - deductAmount);
-  await user.save();
+  // Check payment mode
+  const paymentMode = user.autoTopUp?.paymentMode || 'prepaid';
+  const autoPayEnabled = user.autoTopUp?.enabled || false;
   
-  console.log(`New balance after deduction: $${user.balance}`);
-  console.log(`Auto top-up threshold: $${user.autoTopUp?.threshold || 10}`);
-  
-  // Check if auto top-up should trigger
-  const autoTopUpResult = await checkAndPerformAutoTopUp(userId, user.balance);
-  
-  // Create a test transaction record
-  const transaction = new Transaction({
-    userId,
-    type: 'TEST_DEDUCTION',
-    amount: -deductAmount,
-    status: 'COMPLETED',
-    description: `Test deduction for auto top-up functionality`,
-    paymentMethod: 'OTHER',
-    balanceAfter: user.balance
-  });
-  await transaction.save();
+  console.log(`Payment mode: ${paymentMode}, Auto-pay enabled: ${autoPayEnabled}`);
 
-  return {
-    originalBalance,
-    deductAmount,
-    balanceAfterDeduction: user.balance,
-    autoTopUpTriggered: autoTopUpResult.performed,
-    autoTopUpDetails: autoTopUpResult,
-    finalBalance: autoTopUpResult.performed ? autoTopUpResult.newBalance : user.balance,
-    transactionId: transaction._id
-  };
+  // Step 1: Check if wallet balance is sufficient
+  if (originalBalance >= deductAmount) {
+    // Sufficient balance - deduct from wallet
+    user.balance = originalBalance - deductAmount;
+    await user.save();
+
+    // Create deduction transaction
+    const transaction = new Transaction({
+      userId,
+      type: 'LEAD_DEDUCTION',
+      amount: -deductAmount,
+      status: 'COMPLETED',
+      description: `Lead cost deduction - Paid from wallet balance`,
+      paymentMethod: 'WALLET',
+      balanceAfter: user.balance
+    });
+    await transaction.save();
+
+    return {
+      success: true,
+      paymentMethod: 'WALLET',
+      originalBalance,
+      deductAmount,
+      finalBalance: user.balance,
+      transactionId: transaction._id,
+      message: 'Payment successful - Deducted from wallet balance'
+    };
+  }
+
+  // Step 2: Insufficient wallet balance - check payment mode
+  console.log('Insufficient wallet balance, checking payment mode...');
+
+  if (paymentMode === 'payAsYouGo' && autoPayEnabled) {
+    // Pay as you go with auto-pay enabled - charge card directly
+    return await handleDirectCardCharge(user, deductAmount, originalBalance);
+  } else {
+    // Prepaid mode or auto-pay disabled - require manual top-up
+    throw new ErrorHandler(400, 
+      `Insufficient wallet balance ($${originalBalance.toFixed(2)}). ` +
+      `You need $${deductAmount.toFixed(2)} to complete this transaction. ` +
+      `Please add funds to your wallet to continue.`
+    );
+  }
+};
+
+const handleDirectCardCharge = async (user, deductAmount, originalBalance) => {
+  console.log('Attempting direct card charge...');
+  
+  // Get default payment method
+  let defaultPaymentMethod;
+  if (user.paymentMethods && user.paymentMethods.length > 0) {
+    defaultPaymentMethod = user.paymentMethods.find(pm => pm.isDefault);
+  }
+
+  if (!defaultPaymentMethod?.customerVaultId) {
+    throw new ErrorHandler(400, 
+      'No default payment method available for direct charging. ' +
+      'Please add a payment method or add funds to your wallet.'
+    );
+  }
+
+  try {
+    // Charge the card directly for the lead amount
+    const chargeResult = await chargeCustomerVault(
+      defaultPaymentMethod.customerVaultId, 
+      deductAmount, 
+      'Direct lead payment'
+    );
+
+    if (!chargeResult.success) {
+      throw new ErrorHandler(400, 
+        `Payment failed: ${chargeResult.message}. ` +
+        'Please use a different payment method or add funds to your wallet.'
+      );
+    }
+
+    // Create transaction record for direct charge
+    const transaction = new Transaction({
+      userId: user._id,
+      type: 'TEST_DEDUCTION',
+      amount: -deductAmount,
+      status: 'COMPLETED',
+      description: 'Lead cost - Direct card charge',
+      paymentMethod: 'CARD',
+      transactionId: chargeResult.transactionId,
+      balanceAfter: originalBalance, // Balance unchanged since charged directly
+      paymentMethodDetails: {
+        lastFour: defaultPaymentMethod.cardLastFour,
+        brand: defaultPaymentMethod.brand,
+        customerVaultId: defaultPaymentMethod.customerVaultId
+      }
+    });
+    await transaction.save();
+
+    return {
+      success: true,
+      paymentMethod: 'CARD',
+      originalBalance,
+      deductAmount,
+      finalBalance: originalBalance, // Balance unchanged
+      transactionId: transaction._id,
+      paymentTransactionId: chargeResult.transactionId,
+      cardUsed: `****${defaultPaymentMethod.cardLastFour}`,
+      message: 'Payment successful - Charged directly to card'
+    };
+
+  } catch (error) {
+    console.error('Direct card charge error:', error);
+    throw new ErrorHandler(400, 
+      `Direct card payment failed: ${error.message}. ` +
+      'Please add funds to your wallet or update your payment method.'
+    );
+  }
 };
 
 /**
@@ -647,8 +739,8 @@ module.exports = {
   manualCharge,
   getUserBalance,
   getUserTransactions,
-  toggleAutoTopUp,
+  updatePaymentMode,
   deleteUserCard,
-  testAutoTopUpFunctionality,
+  testLeadDeduction,
   checkAndPerformAutoTopUp, 
 };

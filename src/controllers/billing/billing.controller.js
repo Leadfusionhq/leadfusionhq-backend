@@ -97,20 +97,24 @@ const getCards = wrapAsync(async (req, res) => {
     return sendResponse(res, { nmiResponse: result.nmiResponse }, result.message);
   });
   
-  
   const testAutoTopUp = wrapAsync(async (req, res) => {
     const user_id = req.user._id;
     const { deductAmount } = req.body;
     
     try {
-        const result = await BillingServices.testAutoTopUpFunctionality(user_id, deductAmount);
-        return sendResponse(res, { result }, 'Auto top-up test completed');
+      const result = await BillingServices.testLeadDeduction(user_id, deductAmount);
+      return sendResponse(res, { result }, result.message);
     } catch (err) {
-        console.error(`Failed to test auto top-up:`, err.message);
-        throw new ErrorHandler(500, 'Failed to test auto top-up functionality.');
+      console.error(`Failed to process lead deduction:`, err.message);
+      
+      // Pass through the specific error message for insufficient funds
+      if (err.statusCode === 400) {
+        throw new ErrorHandler(400, err.message);
+      }
+      
+      throw new ErrorHandler(500, 'Failed to process lead deduction. Please try again later.');
     }
-});
-  
+  });
 
 
 
@@ -203,17 +207,22 @@ const getTransactions = wrapAsync(async (req, res) => {
 });
 
 
+// Update the toggleAutoTopUp function:
 const toggleAutoTopUp = wrapAsync(async (req, res) => {
     const user_id = req.user._id;
-    const autoTopUpData = req.body;
-   
+    const { paymentMode, enabled } = req.body; // ✅ Accept enabled from request
+    
     try {
-      const result = await BillingServices.toggleAutoTopUp(user_id, autoTopUpData);
-      const action = autoTopUpData.enabled ? 'enabled' : 'disabled';
-      return sendResponse(res, { result }, `Auto top-up ${action} successfully`);
+      const result = await BillingServices.updatePaymentMode(user_id, {
+        paymentMode,
+        enabled // ✅ Pass enabled to service
+      });
+      
+      const statusText = enabled ? 'enabled' : 'disabled';
+      return sendResponse(res, { result }, `Payment mode updated to ${paymentMode} (auto top-up ${statusText})`);
     } catch (err) {
-      console.error(`Failed to toggle auto top-up:`, err.message);
-      throw new ErrorHandler(500, 'Failed to update auto top-up settings. Please try again later.');
+      console.error(`Failed to update payment mode:`, err.message);
+      throw new ErrorHandler(500, 'Failed to update payment mode. Please try again later.');
     }
   });
 
