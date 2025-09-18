@@ -1,6 +1,6 @@
 "use client";
-import { LEAD_TYPE, EXCLUSIVITY, STATUS, DAYS_OF_WEEK, LANGUAGE, UTILITIES } from "@/constants/enums";
-import { DaySchedule, UtilityMode  ,CountyOption ,StateOption } from "@/types/campaign";
+import { LEAD_TYPE, EXCLUSIVITY, STATUS, DAYS_OF_WEEK, LANGUAGE, UTILITIES,PAYMENT_TYPE } from "@/constants/enums";
+import { DaySchedule, UtilityMode  ,CountyOption ,StateOption, } from "@/types/campaign";
 
 
 export const initialValues = {
@@ -13,6 +13,7 @@ export const initialValues = {
     poc_phone: "", // Added for WARM_TRANSFER
     company_contact_phone: "", // Added for APPOINTMENT
     company_contact_email: "", // Added for APPOINTMENT
+    payment_type: PAYMENT_TYPE.PREPAID,
     geography: {
       state: null as StateOption | null,
       coverage: {
@@ -32,7 +33,7 @@ export const initialValues = {
       include_some: [] as string[],
     },
     delivery: {
-      method: "email",
+      method: [] as string[], 
       email: {
         addresses: "",
         subject: "",

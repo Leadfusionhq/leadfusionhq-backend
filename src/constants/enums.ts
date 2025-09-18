@@ -18,6 +18,11 @@ export const EXCLUSIVITY = {
   // APPOINTMENT: 'APPOINTMENT',
 } as const;
 
+export const PAYMENT_TYPE ={
+  PREPAID: 'prepaid',
+  PAY_AS_YOU_GO: 'payasyougo',
+} as const;
+
 export const STATUS = {
   PENDING: 'PENDING',
   ACTIVE: 'ACTIVE',

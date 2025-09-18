@@ -1,25 +1,29 @@
 'use client'
 import React from 'react';
 import AsyncSelect from 'react-select/async';
-import { useField } from 'formik';
+import { useField, ErrorMessage } from 'formik';
 
 interface Option {
   label: string;
   value: string;
 }
 
-interface FormikAsyncSelectProps {
+interface Props {
   name: string;
   label?: string;
-  loadOptions: (inputValue: string, callback: (options: Option[]) => void) => void;
+  loadOptions: (
+    inputValue: string,
+    callback: (options: Option[]) => void
+  ) => void;
   placeholder?: string;
   isMulti?: boolean;
   onChange?: (option: Option | Option[] | null) => void;
   defaultOptions?: boolean | Option[];
   cacheOptions?: boolean;
+  isDisabled?: boolean; // ✅ added here
 }
 
-const CustomFormikAsyncSelect = ({
+const CustomFormikAsyncSelect: React.FC<Props> = ({
   name,
   label,
   loadOptions,
@@ -28,7 +32,8 @@ const CustomFormikAsyncSelect = ({
   onChange,
   defaultOptions = true,
   cacheOptions = true,
-}: FormikAsyncSelectProps) => {
+  isDisabled = false, // ✅ default false
+}) => {
   const [field, meta, helpers] = useField(name);
   const { setValue, setTouched } = helpers;
 
@@ -40,62 +45,66 @@ const CustomFormikAsyncSelect = ({
     } else {
       setValue(option ? (option as Option) : null);
     }
-    
-    // Mark the field as touched when a value is selected
-    setTouched(true, false);
-    
+
+    setTouched(true);
+
     if (onChange) {
       onChange(option);
     }
   };
 
   const handleBlur = () => {
-    // Mark the field as touched when it loses focus
-    setTouched(true, false);
+    setTouched(true);
   };
+
+  const hasValue =
+    isMulti
+      ? Array.isArray(selectedOption) && selectedOption.length > 0
+      : selectedOption !== null;
 
   return (
     <div className="w-full">
-      {label && <label className="block text-[#1C1C1C] text-lg mb-2">{label}</label>}
+      {label && (
+        <label className="block text-[#1C1C1C] text-lg mb-2">{label}</label>
+      )}
       <AsyncSelect
         cacheOptions={cacheOptions}
         defaultOptions={defaultOptions}
         loadOptions={loadOptions}
         onChange={handleChange}
-        onBlur={handleBlur} // Added onBlur handler
+        onBlur={handleBlur}
         value={selectedOption}
         placeholder={placeholder}
         classNamePrefix="react-select"
         isMulti={isMulti}
         isClearable
+        isDisabled={isDisabled} // ✅ forward here
         styles={{
-          control: (base, state) => ({
+          control: (base) => ({
             ...base,
             minHeight: '48px',
-            border: meta.touched && meta.error 
-              ? '1px solid #ef4444' // Red border for error state
-              : '1px solid #E0E0E0',
+            border:
+              meta.touched && meta.error && !hasValue
+                ? '1px solid #ef4444'
+                : '1px solid #E0E0E0',
             borderRadius: '8px',
             paddingLeft: '12px',
             fontSize: '16px',
             fontFamily: 'Inter',
             backgroundColor: '#FFFFFF',
             color: '#333333',
-            '&:hover': {
-              borderColor: meta.touched && meta.error ? '#ef4444' : '#000',
-            },
-            '&:focus-within': {
-              borderColor: meta.touched && meta.error ? '#ef4444' : '#000',
-              boxShadow: meta.touched && meta.error 
-                ? '0 0 0 1px #ef4444' 
-                : '0 0 0 1px #000',
-            },
           }),
         }}
       />
-      {meta.touched && meta.error && (
-        <div className="text-red-500 text-xs mt-1">{meta.error}</div>
-      )}
+      <div className="min-h-[20px]">
+        {!hasValue ? (
+          <ErrorMessage
+            name={name}
+            component="div"
+            className="text-red-500 text-xs transition-opacity duration-300"
+          />
+        ) : null}
+      </div>
     </div>
   );
 };

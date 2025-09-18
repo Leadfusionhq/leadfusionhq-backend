@@ -34,7 +34,7 @@ const transformBackendDataToFormData = (backendData: any, statesList: State[]) =
     if (backendData.bid_price !== undefined) formData.bid_price = backendData.bid_price;
     if (backendData.language) formData.language = backendData.language;
     if (backendData.note) formData.note = backendData.note;
-
+    if (backendData.payment_type) formData.payment_type = backendData.payment_type;
     // Contact fields
     if (backendData.poc_phone) formData.poc_phone = backendData.poc_phone;
     if (backendData.company_contact_phone) formData.company_contact_phone = backendData.company_contact_phone;
