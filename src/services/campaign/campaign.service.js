@@ -240,15 +240,23 @@ const getCampaignById = async (campaignId, userId) => {
 // };
 const getCampaignByIdForAdmin = async (campaignId) => {
   const campaign = await Campaign.findById(campaignId)
-    .populate('geography.state', 'name abbreviation')
+    // .populate('geography.state', 'name abbreviation')
     .populate('user_id', 'name email')
-    .populate('geography.coverage.partial.counties', 'name code fips_code state')
+    // .populate('geography.coverage.partial.counties', 'name code fips_code state')
     .lean();
-
+  console.log('campaign data : ',campaign);
   if (!campaign) {
     throw new ErrorHandler(404, 'Campaign not found');
   }
+  if (campaign.geography?.coverage?.type === 'PARTIAL') {
+    const countyIds = campaign.geography.coverage.partial.counties || [];
 
+    const counties = await County.find({ _id: { $in: countyIds } })
+      .select('_id name fips_code state')
+      .lean();
+
+    campaign.geography.coverage.partial.countyDetails = counties;
+  }
   return campaign;
 };
 
