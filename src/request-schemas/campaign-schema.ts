@@ -57,13 +57,13 @@ export const validationSchema = Yup.object().shape({
       include_some: Yup.array(), // Not required
     }),
     delivery: Yup.object().shape({
-      method: Yup.string()
-        .oneOf(["email", "phone", "crm"])
-        .required("Method is required"),
+      method: Yup.array()
+        .min(1, "At least one delivery method is required")
+        .required("Delivery method is required"),
 
       email: Yup.object().shape({
         addresses: Yup.string().when("$delivery.method", {
-          is: "email",
+          is: (method: string[]) => method.includes("email"),
           then: (schema) =>
             schema
               .required("Email addresses are required")
@@ -73,12 +73,16 @@ export const validationSchema = Yup.object().shape({
               ),
           otherwise: (schema) => schema.notRequired(),
         }),
-        subject: Yup.string(),
+        subject: Yup.string().when("$delivery.method", {
+          is: (method: string[]) => method.includes("email"),
+          then: (schema) => schema.required("Email subject is required"),
+          otherwise: (schema) => schema.notRequired(),
+        }),
       }),
 
       phone: Yup.object().shape({
         numbers: Yup.string().when("$delivery.method", {
-          is: "phone",
+          is: (method: string[]) => method.includes("phone"),
           then: (schema) =>
             schema
               .required("Phone numbers are required")
@@ -92,7 +96,7 @@ export const validationSchema = Yup.object().shape({
 
       crm: Yup.object().shape({
         instructions: Yup.string().when("$delivery.method", {
-          is: "crm",
+          is: (method: string[]) => method.includes("crm"),
           then: (schema) => schema.required("Instructions are required for CRM"),
           otherwise: (schema) => schema.notRequired(),
         }),
