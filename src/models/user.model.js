@@ -131,20 +131,65 @@ const regularUserSchema = new mongoose.Schema({
   },
 
   // Add other fields specific to regular users here 
+// In regularUserSchema, replace customerVaultId with:
+paymentMethods: [{
   customerVaultId: {
     type: String,
-    default: null,
+    required: true
   },
+  cardLastFour: {
+    type: String,
+    required: true
+  },
+  brand: {
+    type: String,
+    enum: ['Visa', 'Mastercard', 'Amex', 'Discover', 'Unknown'],
+    default: 'Unknown'
+  },
+  expiryMonth: String,
+  expiryYear: String,
+  isDefault: {
+    type: Boolean,
+    default: false
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
+}],
+defaultPaymentMethod: {
+  type: String, // stores customerVaultId of default card
+  default: null
+},
+hasStoredCard: {
+  type: Boolean,
+  default: false
+},
 
   // 💰 Billing
   balance: {
     type: Number,
     default: 0,
   },
-  autoTopUpEnabled: {
+// In regularUserSchema
+autoTopUp: {
+  enabled: {
     type: Boolean,
-    default: false,
+    default: false
   },
+  threshold: {
+    type: Number,
+    default: 10 // top up when balance falls below $10
+  },
+  topUpAmount: {
+    type: Number,
+    default: 50 // add $50 when topping up
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now
+  }
+},
   lastChargedAt: {
     type: Date,
     default: null,

@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
-const { LEAD_TYPE, STATUS, EXCLUSIVITY, DAYS_OF_WEEK } = require('../helper/constant-enums');
+const { LEAD_TYPE, STATUS, EXCLUSIVITY, DAYS_OF_WEEK,PAYMENT_TYPE } = require('../helper/constant-enums');
+
 
 const campaignSchema = new mongoose.Schema({
   campaign_id: { 
@@ -26,6 +27,13 @@ const campaignSchema = new mongoose.Schema({
     enum: Object.values(LEAD_TYPE),
     required: true,
   },
+  payment_type: {
+    type: String,
+    enum: Object.values(PAYMENT_TYPE),
+    required: true,
+    default: PAYMENT_TYPE.PREPAID,
+  },
+  
   exclusivity: {
     type: String,
     enum: Object.values(EXCLUSIVITY),
@@ -91,7 +99,7 @@ const campaignSchema = new mongoose.Schema({
 
   delivery: {
     method: {
-      type: String,
+      type: [String],
       enum: ['email', 'phone', 'crm'],
       required: true,
     },

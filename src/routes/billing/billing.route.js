@@ -6,6 +6,7 @@ const authorizedRoles = require('../../middleware/authorized-roles.js');
 const CONSTANT_ENUM = require('../../helper/constant-enums.js');
 const BillingSchema = require('../../request-schemas/billing.schema.js');
 const { celebrate } = require('celebrate');
+const { Joi, Segments } = require('celebrate');
 
 const API = {
   SAVE_CARD: '/save-card',
@@ -18,60 +19,68 @@ const API = {
   AUTO_TOP_UP: '/auto-topup/toggle',
   GET_CONTRACT: '/contract/current',
   CONTRACT_STATUS: '/contract/status',
+  GET_CARDS: '/cards', // NEW
+  SET_DEFAULT_CARD: '/cards/default', // NEW
+  DELETE_CARD: '/cards/:vaultId' ,
+  TEST_AUTO_TOPUP: '/test-auto-topup'
 };
 
-// Apply authentication and authorization to all routes
 billingRouter.use(
     checkAuth,
-    authorizedRoles([CONSTANT_ENUM.USER_ROLE.ADMIN], [CONSTANT_ENUM.USER_ROLE.USER])
+    authorizedRoles([CONSTANT_ENUM.USER_ROLE.USER])
 );
 
-// Contract routes - must be first
-billingRouter.get(
-    API.GET_CONTRACT,
-    billingController.getCurrentContract
-);
+// billingRouter.get(
+//     API.GET_CONTRACT,
+//     billingController.getCurrentContract
+// );
 
-billingRouter.get(
-    API.CONTRACT_STATUS,
-    billingController.getContractStatus
-);
+// billingRouter.get(
+//     API.CONTRACT_STATUS,
+//     billingController.getContractStatus
+// );
+
+// billingRouter.post(
+//     API.ACCEPT_CONTRACT, 
+//     celebrate(BillingSchema.acceptContract),
+//     billingController.acceptContract
+// );
 
 billingRouter.post(
-    API.ACCEPT_CONTRACT, 
-    celebrate(BillingSchema.acceptContract),
-    billingController.acceptContract
+    API.TEST_AUTO_TOPUP,
+    celebrate({
+      [Segments.BODY]: Joi.object().keys({
+        deductAmount: Joi.number().min(0.01).required()
+      })
+    }),
+    billingController.testAutoTopUp
 );
 
-// Card management routes
 billingRouter.post(
     API.SAVE_CARD, 
     celebrate(BillingSchema.saveCard),
     billingController.saveCard
 );
 
-// Billing operations
 billingRouter.post(
     API.ADD_FUNDS, 
     celebrate(BillingSchema.addFunds),
     billingController.addFunds
 );
 
-billingRouter.post(
-    API.ASSIGN_LEAD, 
-    celebrate(BillingSchema.assignLead),
-    billingController.assignLead
-);
+// billingRouter.post(
+//     API.ASSIGN_LEAD, 
+//     celebrate(BillingSchema.assignLead),
+//     billingController.assignLead
+// );
 
-// Admin only routes
-billingRouter.post(
-    API.CHARGE_USER,
-    authorizedRoles([CONSTANT_ENUM.USER_ROLE.ADMIN]),
-    celebrate(BillingSchema.chargeUser),
-    billingController.chargeUser
-);
+// billingRouter.post(
+//     API.CHARGE_USER,
+//     authorizedRoles([CONSTANT_ENUM.USER_ROLE.ADMIN]),
+//     celebrate(BillingSchema.chargeUser),
+//     billingController.chargeUser
+// );
 
-// Account information routes
 billingRouter.get(
     API.BALANCE,
     billingController.getBalance
@@ -87,5 +96,9 @@ billingRouter.post(
     celebrate(BillingSchema.toggleAutoTopUp),
     billingController.toggleAutoTopUp
 );
+billingRouter.get(API.GET_CARDS, billingController.getCards);
+billingRouter.post(API.SET_DEFAULT_CARD, billingController.setDefaultCard);
+billingRouter.delete(API.DELETE_CARD, billingController.deleteCard);
+
 
 module.exports = billingRouter;

@@ -1,5 +1,5 @@
 const fetchWrapper = require('../../utils/fetchWrapper');
-const NMI_API_URL = 'https://secure.nmi.com/api/transact.php';
+const NMI_API_URL = process.env.NMI_API_URL;
 const SECURITY_KEY = process.env.NMI_SECURITY_KEY;
 
 const createCustomerVault = async (cardInfo) => {
@@ -9,19 +9,39 @@ const createCustomerVault = async (cardInfo) => {
     ...cardInfo
   };
 
+  console.log('Sending to NMI:', payload);
+
+  // ✅ fetchWrapper already returns plain text or JSON
   const response = await fetchWrapper(
     'POST',
     NMI_API_URL,
     payload,
     null,
-    false,  // no N8N header
-    true    // formEncoded = true
+    false, // no N8N header
+    true   // formEncoded = true
   );
 
-  return response;
+  return response; // raw text from NMI
 };
 
 const chargeCustomerVault = async (customerVaultId, amount, description = '') => {
+
+  if (!SECURITY_KEY) {
+    console.error('NMI_SECURITY_KEY is not set in environment variables');
+    return {
+      success: false,
+      message: 'Payment configuration error: Missing security key'
+    };
+  }
+
+  if (!NMI_API_URL || !NMI_API_URL.startsWith('http')) {
+    console.error('NMI_API_URL is not a valid absolute URL:', NMI_API_URL);
+    return {
+      success: false,
+      message: 'Payment configuration error: Invalid API URL'
+    };
+  }
+  
   const payload = {
     security_key: SECURITY_KEY,
     type: 'sale',
@@ -29,6 +49,7 @@ const chargeCustomerVault = async (customerVaultId, amount, description = '') =>
     amount: amount.toFixed(2),
     order_description: description
   };
+  console.log('NMI Request Payload:', payload);
 
   try {
     const response = await fetchWrapper(
@@ -40,8 +61,20 @@ const chargeCustomerVault = async (customerVaultId, amount, description = '') =>
       true    // formEncoded = true
     );
 
-    const responseText = response.data;
-    console.log('NMI charge response:', responseText);
+    console.log('NMI Raw Response:', response);
+    
+    // Handle the response correctly - it's a string, not an object with .data
+    let responseText;
+    if (typeof response === 'string') {
+      responseText = response;
+    } else if (response && typeof response === 'object') {
+      // If it's an object, try to get the text content
+      responseText = response.data || response.text || JSON.stringify(response);
+    } else {
+      responseText = String(response);
+    }
+
+    console.log('NMI charge response text:', responseText);
 
     // Parse the response
     const responseMatch = responseText.match(/response=(\d+)/);
@@ -53,7 +86,9 @@ const chargeCustomerVault = async (customerVaultId, amount, description = '') =>
     const responseTextMatch = responseText.match(/responsetext=([^&\s]+)/);
     const responseMessage = responseTextMatch ? decodeURIComponent(responseTextMatch[1].replace(/\+/g, ' ')) : '';
 
-    // Response code 1 = Approved
+    console.log('Parsed response:', { responseCode, transactionId, responseMessage });
+
+    // Response code 1 = Approved, 2 = Declined, 3 = Error
     const success = responseCode === '1';
 
     return {
@@ -111,19 +146,36 @@ const deleteCustomerVault = async (customerVaultId) => {
       NMI_API_URL,
       payload,
       null,
-      false,  // no N8N header
-      true    // formEncoded = true
+      false,
+      true
     );
 
-    const responseText = response.data;
+    let responseText;
+    if (typeof response === 'string') {
+      responseText = response;
+    } else {
+      responseText = response.data || JSON.stringify(response);
+    }
+
+    console.log('NMI Delete Raw Response:', responseText);
+
     const responseMatch = responseText.match(/response=(\d+)/);
     const responseCode = responseMatch ? responseMatch[1] : null;
+    
+    const responseTextMatch = responseText.match(/responsetext=([^&]+)/);
+    const message = responseTextMatch ? decodeURIComponent(responseTextMatch[1]) : '';
+
+    // Handle "invalid vault ID" as a special case - it might already be deleted
+    const isInvalidVault = message.includes('Invalid Customer Vault Id');
 
     return {
-      success: responseCode === '1',
+      success: responseCode === '1' || isInvalidVault, // Consider success if it's already gone
       responseCode,
+      message,
+      alreadyDeleted: isInvalidVault,
       rawResponse: responseText
     };
+
   } catch (error) {
     console.error('NMI delete customer vault error:', error);
     throw error;

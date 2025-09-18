@@ -3,6 +3,7 @@ const { sendResponse } = require('../../utils/response');
 const BillingServices = require('../../services/billing/billing.service.js');
 const { ErrorHandler } = require('../../utils/error-handler');
 const { getPaginationParams, extractFilters } = require('../../utils/pagination');
+const { User } = require('../../models/user.model');
 
 // Contract management
 const getCurrentContract = wrapAsync(async (req, res) => {
@@ -33,11 +34,10 @@ const acceptContract = wrapAsync(async (req, res) => {
 const saveCard = wrapAsync(async (req, res) => {
     const user_id = req.user._id;
     
-    // Check if user has accepted the latest contract
-    const contractStatus = await BillingServices.getUserContractStatus(user_id);
-    if (!contractStatus.hasAcceptedLatest) {
-        throw new ErrorHandler(400, 'You must accept the latest contract before saving payment information.');
-    }
+    // const contractStatus = await BillingServices.getUserContractStatus(user_id);
+    // if (!contractStatus.hasAcceptedLatest) {
+    //     throw new ErrorHandler(400, 'You must accept the latest contract before saving payment information.');
+    // }
     
     const cardData = { ...req.body, user_id };
 
@@ -49,6 +49,70 @@ const saveCard = wrapAsync(async (req, res) => {
         throw new ErrorHandler(500, 'Failed to save your card details. Please try again later.');
     }
 });
+
+// Get all user cards
+const getCards = wrapAsync(async (req, res) => {
+    const user_id = req.user._id;
+    console.log(req);
+    const user = await User.findById(user_id);
+    if (!user) throw new ErrorHandler(404, 'User not found');
+  
+    return sendResponse(res, { cards: user.paymentMethods }, 'Cards retrieved successfully');
+  });
+  
+  // Set default card
+  const setDefaultCard = wrapAsync(async (req, res) => {
+    const user_id = req.user._id;
+    const { vaultId } = req.body;
+  
+    const user = await User.findById(user_id);
+    if (!user) throw new ErrorHandler(404, 'User not found');
+  
+    // Find the card
+    const card = user.paymentMethods.find(pm => pm.customerVaultId === vaultId);
+    if (!card) throw new ErrorHandler(404, 'Card not found');
+  
+    // Update all cards to not default
+    user.paymentMethods.forEach(pm => {
+      pm.isDefault = pm.customerVaultId === vaultId;
+    });
+  
+    // Set the selected card as default
+    user.defaultPaymentMethod = vaultId;
+  
+    await user.save();
+  
+    return sendResponse(res, { defaultCard: card }, 'Default card updated successfully');
+  });
+  
+  // Delete card
+
+
+  const deleteCard = wrapAsync(async (req, res) => {
+    const userId = req.user._id;
+    const { vaultId } = req.params;
+  
+    const result = await BillingServices.deleteUserCard(userId, vaultId);
+  
+    return sendResponse(res, { nmiResponse: result.nmiResponse }, result.message);
+  });
+  
+  
+  const testAutoTopUp = wrapAsync(async (req, res) => {
+    const user_id = req.user._id;
+    const { deductAmount } = req.body;
+    
+    try {
+        const result = await BillingServices.testAutoTopUpFunctionality(user_id, deductAmount);
+        return sendResponse(res, { result }, 'Auto top-up test completed');
+    } catch (err) {
+        console.error(`Failed to test auto top-up:`, err.message);
+        throw new ErrorHandler(500, 'Failed to test auto top-up functionality.');
+    }
+});
+  
+
+
 
 // Billing operations
 const addFunds = wrapAsync(async (req, res) => {
@@ -66,6 +130,12 @@ const addFunds = wrapAsync(async (req, res) => {
         return sendResponse(res, { result }, 'Funds added successfully', 201);
     } catch (err) {
         console.error(`Failed to add funds:`, err.message);
+        
+        // Check if it's a payment decline (400 error) and pass through the message
+        if (err.statusCode === 400) {
+            throw new ErrorHandler(400, err.message);
+        }
+        
         throw new ErrorHandler(500, 'Failed to add funds. Please try again later.');
     }
 });
@@ -116,25 +186,36 @@ const getTransactions = wrapAsync(async (req, res) => {
     
     try {
         const transactions = await BillingServices.getUserTransactions(user_id, page, limit, filters);
-        return sendResponse(res, { transactions }, 'Transactions retrieved successfully');
+        return sendResponse(res, { 
+            transactions: transactions.transactions,
+            pagination: transactions.pagination
+        }, 'Transactions retrieved successfully');
     } catch (err) {
         console.error(`Failed to get transactions:`, err.message);
-        throw new ErrorHandler(500, 'Failed to retrieve transactions. Please try again later.');
+        
+        // Check if it's a known error or a database error
+        if (err.message.includes('Failed to retrieve transactions')) {
+            throw new ErrorHandler(500, 'Failed to retrieve transactions. Please try again later.');
+        } else {
+            throw new ErrorHandler(400, 'Invalid request parameters.');
+        }
     }
 });
 
+
 const toggleAutoTopUp = wrapAsync(async (req, res) => {
     const user_id = req.user._id;
-    const { enabled } = req.body;
-    
+    const autoTopUpData = req.body;
+   
     try {
-        const result = await BillingServices.toggleAutoTopUp(user_id, enabled);
-        return sendResponse(res, { result }, `Auto top-up ${enabled ? 'enabled' : 'disabled'} successfully`);
+      const result = await BillingServices.toggleAutoTopUp(user_id, autoTopUpData);
+      const action = autoTopUpData.enabled ? 'enabled' : 'disabled';
+      return sendResponse(res, { result }, `Auto top-up ${action} successfully`);
     } catch (err) {
-        console.error(`Failed to toggle auto top-up:`, err.message);
-        throw new ErrorHandler(500, 'Failed to update auto top-up settings. Please try again later.');
+      console.error(`Failed to toggle auto top-up:`, err.message);
+      throw new ErrorHandler(500, 'Failed to update auto top-up settings. Please try again later.');
     }
-});
+  });
 
 module.exports = {
     getCurrentContract,
@@ -147,4 +228,8 @@ module.exports = {
     getBalance,
     getTransactions,
     toggleAutoTopUp,
+    getCards,
+    setDefaultCard,
+    deleteCard,
+    testAutoTopUp,
 };
