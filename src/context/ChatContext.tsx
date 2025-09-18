@@ -166,7 +166,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Stable socket event handlers
   const handleNewMessage = useCallback((data: { chatId: string; message: Message }) => {
-    console.log('📨 NEW MESSAGE RECEIVED:', data);
+    //console.log('📨 NEW MESSAGE RECEIVED:', data);
   
     // Prevent processing the same message multiple times
     if (processedMessageIds.current.has(data.message._id)) {
@@ -220,7 +220,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [user]);
 
   const handleChatCreated = useCallback((data: { chat: Chat }) => {
-    console.log('💬 NEW CHAT CREATED:', data);
+    //console.log('💬 NEW CHAT CREATED:', data);
     setChats(prev => {
       const exists = prev.find(c => c._id === data.chat._id);
       if (!exists) {
@@ -231,7 +231,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const handleUserTyping = useCallback((data: { chatId: string; userId: string; isTyping: boolean }) => {
-    console.log('⌨️ TYPING INDICATOR:', data);
+    //console.log('⌨️ TYPING INDICATOR:', data);
     
     if (currentChatRef.current && data.chatId === currentChatRef.current._id && data.userId !== user?._id) {
       setTypingUsers(prev => {
@@ -259,7 +259,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // FIXED: Message deletion handler with proper state management
   const handleMessageDeleted = useCallback((data: { chatId: string; messageId: string; isLastMessage: boolean }) => {
-    console.log('🗑️ MESSAGE DELETED:', data);
+    //console.log('🗑️ MESSAGE DELETED:', data);
     
     // Update messages - mark as deleted
     setMessages(prev => {
@@ -314,7 +314,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const handleChatUpdated = useCallback((data: { chatId: string; chat: Chat }) => {
-    console.log('🔄 CHAT UPDATED:', data);
+    //console.log('🔄 CHAT UPDATED:', data);
     
     setChats(prev => prev.map(chat => 
       chat._id === data.chatId 
@@ -335,7 +335,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     messageIds: string[] | 'all';
     readAt?: string;
   }) => {
-    console.log('👁️ MESSAGES READ:', data);
+    //console.log('👁️ MESSAGES READ:', data);
     
     // Update messages with read receipts in real-time
     setMessages(prev => {
@@ -379,11 +379,11 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Socket event listeners setup
   useEffect(() => {
     if (!socket || !connected || !user) {
-      console.log('Socket not ready:', { socket: !!socket, connected, user: !!user });
+      //console.log('Socket not ready:', { socket: !!socket, connected, user: !!user });
       return;
     }
 
-    console.log('Setting up chat socket listeners for user:', user._id);
+    //console.log('Setting up chat socket listeners for user:', user._id);
 
     // Register all socket listeners with stable references
     socket.on('new-message', handleNewMessage);
@@ -395,7 +395,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     // Cleanup listeners
     return () => {
-      console.log('🧹 Cleaning up chat socket listeners');
+      //console.log('🧹 Cleaning up chat socket listeners');
       socket.off('new-message', handleNewMessage);
       socket.off('chat-created', handleChatCreated);
       socket.off('user-typing', handleUserTyping);
@@ -418,7 +418,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const url = `${CHAT_API.GET_CHATS}?${queryParams.toString()}`;
       const response = await axiosWrapper("get", url, {}, token ?? undefined) as any;
       
-      console.log('FETCH CHATS RESPONSE:', response);
+      //console.log('FETCH CHATS RESPONSE:', response);
       
       const chatsData = response.data?.data || response.data || response || [];
       setChats(Array.isArray(chatsData) ? chatsData : []);
@@ -438,7 +438,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const url = CHAT_API.GET_CHAT_BY_ID.replace(':chatId', chatId);
       const response = await axiosWrapper("get", url, {}, token ?? undefined) as any;
       
-      console.log('SELECT CHAT RESPONSE:', response);
+      //console.log('SELECT CHAT RESPONSE:', response);
       
       // const chatData = response.data?.chat || response.chat || response.data || response;
       const chatData = response.data?.data?.chat || response.data?.chat || response.chat || response.data?.data || response.data || response;
@@ -464,7 +464,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         priority: 'medium'
       }, token ?? undefined) as any;
       
-      console.log('CREATE/GET CHAT RESPONSE:', response);
+      //console.log('CREATE/GET CHAT RESPONSE:', response);
       
       // const chatData = response.data?.chat || response.chat || response.data || response;
       const chatData = response.data?.data?.chat || response.data?.chat || response.chat || response.data?.data || response.data || response;
@@ -492,7 +492,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const url = CHAT_API.GET_MESSAGES.replace(':chatId', chatId);
       const response = await axiosWrapper("get", `${url}?page=${page}&limit=50`, {}, token ?? undefined) as any;
       
-      console.log('FETCH MESSAGES RESPONSE:', response);
+      //console.log('FETCH MESSAGES RESPONSE:', response);
       
       const messagesData = response.data?.data || response.data || response || [];
       
@@ -568,7 +568,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         replyTo
       }, token ?? undefined) as any;
       
-      console.log('SEND MESSAGE RESPONSE:', response);
+      //console.log('SEND MESSAGE RESPONSE:', response);
       
       // Replace optimistic message with real one when response comes back
       // const realMessage = response.data?.message || response.message || response.data || response;
@@ -608,7 +608,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     
     // Skip deletion of temporary messages
     if (messageId.startsWith('temp_')) {
-      console.log('Skipping deletion of temporary message:', messageId);
+      //console.log('Skipping deletion of temporary message:', messageId);
       setMessages(prev => prev.filter(msg => msg._id !== messageId));
       return;
     }
@@ -661,7 +661,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const url = CHAT_API.DELETE_MESSAGE.replace(':chatId', currentChat._id).replace(':messageId', messageId);
       const response = await axiosWrapper("delete", url, {}, token ?? undefined) as any;
-      console.log('✅ Message deleted successfully', response);
+      //console.log('✅ Message deleted successfully', response);
       
     } catch (error: any) {
       console.error('❌ Failed to delete message:', error);
@@ -748,7 +748,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const url = CHAT_API.UPLOAD_FILE.replace(':chatId', chatId);
       const response = await axiosWrapper("post", url, formData, token ?? undefined) as any;
       
-      console.log('FILE UPLOAD RESPONSE:', response);
+      //console.log('FILE UPLOAD RESPONSE:', response);
     } catch (error) {
       console.error('Failed to upload file:', error);
       throw error;
@@ -825,7 +825,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     
     try {
       const response = await axiosWrapper("get", CHAT_API.GET_UNREAD_COUNT, {}, token ?? undefined) as any;
-      console.log('UNREAD COUNT RESPONSE:', response);
+      //console.log('UNREAD COUNT RESPONSE:', response);
       
       // const count = response.data?.unreadCount || response.unreadCount || 0;
       const count = response.data?.data?.unreadCount || response.data?.unreadCount || response.unreadCount || 0;

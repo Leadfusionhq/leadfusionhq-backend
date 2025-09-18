@@ -175,9 +175,12 @@ const EditCampaign = () => {
           {},
           token ?? undefined
         ) as { data?: any };
+        console.log("Backend campaign data:", res);
+
 
         if (res?.data) {
           const transformedData = transformBackendDataToFormData(res.data, statesList);
+          console.log("Transformed Data:", transformedData);
           setFormInitialValues(transformedData);
           setDataReady(true);
         } else {

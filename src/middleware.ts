@@ -6,8 +6,12 @@ export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const token = req.cookies.get("token")?.value;
 
+  console.log("Pathname:", pathname);
+  console.log("Token present?", !!token);
+
   if (!token) {
-    const res = NextResponse.redirect(new URL("/login", req.url));
+    console.log("No token. Redirecting to login.");
+    const res = NextResponse.redirect(new URL("/logout", req.url));
     res.cookies.set("toast", "login-required", { path: "/", maxAge: 5 });
     return res;
   }
@@ -17,20 +21,25 @@ export async function middleware(req: NextRequest) {
     const { payload } = await jwtVerify(token, secret);
     const role = (payload as any).role;
 
+    console.log("Token verified. Role:", role);
+
     if (pathname.startsWith("/admin") && role !== "ADMIN") {
+      console.log("Unauthorized ADMIN access");
       const res = NextResponse.redirect(new URL("/dashboard", req.url));
       res.cookies.set("toast", "unauthorized", { path: "/", maxAge: 5 });
       return res;
     }
 
     if (pathname.startsWith("/dashboard") && role !== "USER") {
+      console.log("Unauthorized USER access");
       const res = NextResponse.redirect(new URL("/admin/dashboard", req.url));
       res.cookies.set("toast", "unauthorized", { path: "/", maxAge: 5 });
       return res;
     }
 
     return NextResponse.next();
-  } catch {
+  } catch (err) {
+    console.log("JWT invalid or expired:", err);
     const res = NextResponse.redirect(new URL("/login", req.url));
     res.cookies.delete("token");
     res.cookies.set("toast", "login-required", { path: "/", maxAge: 5 });
@@ -38,6 +47,8 @@ export async function middleware(req: NextRequest) {
   }
 }
 
+
 export const config = {
+  
   matcher: ["/dashboard/:path*", "/admin/:path*"],
 };

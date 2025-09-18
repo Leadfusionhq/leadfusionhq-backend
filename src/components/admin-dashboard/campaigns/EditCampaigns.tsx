@@ -35,6 +35,8 @@ const transformBackendDataToFormData = (backendData: any, statesList: State[]) =
     if (backendData.language) formData.language = backendData.language;
     if (backendData.note) formData.note = backendData.note;
     if (backendData.payment_type) formData.payment_type = backendData.payment_type;
+
+
     // Contact fields
     if (backendData.poc_phone) formData.poc_phone = backendData.poc_phone;
     if (backendData.company_contact_phone) formData.company_contact_phone = backendData.company_contact_phone;
@@ -42,7 +44,6 @@ const transformBackendDataToFormData = (backendData: any, statesList: State[]) =
 
     // Geography
     if (backendData.geography) {
-      // Transform state ID to StateOption object
       if (backendData.geography.state && statesList.length > 0) {
         const stateData = statesList.find(state => state._id === backendData.geography.state);
         if (stateData) {
@@ -57,22 +58,20 @@ const transformBackendDataToFormData = (backendData: any, statesList: State[]) =
 
       if (backendData.geography.coverage) {
         formData.geography.coverage.type = backendData.geography.coverage.type || "FULL_STATE";
-        
         if (backendData.geography.coverage.partial) {
           const partial = backendData.geography.coverage.partial;
           formData.geography.coverage.partial = {
             counties: Array.isArray(partial.countyDetails)
-            ? partial.countyDetails.map((county: County) => ({
-                label: `${county.name}`,
-                value: county._id,
-              }))
-            : [],
+              ? partial.countyDetails.map((county: County) => ({
+                  label: `${county.name}`,
+                  value: county._id,
+                }))
+              : [],
             radius: partial.radius || "",
             zipcode: partial.zipcode || "",
             zip_codes: Array.isArray(partial.zip_codes) ? partial.zip_codes.join("|") : (partial.zip_codes || ""),
             countries: partial.countries || ["US"],
           };
-          console.warn('partial',partial)
         }
       }
     }
@@ -86,7 +85,7 @@ const transformBackendDataToFormData = (backendData: any, statesList: State[]) =
 
     // Delivery
     if (backendData.delivery) {
-      formData.delivery.method = backendData.delivery.method || "email";
+      formData.delivery.method = backendData.delivery.method || [];
 
       if (backendData.delivery.email) {
         formData.delivery.email.addresses = backendData.delivery.email.addresses || "";
@@ -117,10 +116,9 @@ const transformBackendDataToFormData = (backendData: any, statesList: State[]) =
     }
 
     return formData;
-
   } catch (error) {
     console.error("Error transforming backend data:", error);
-    return formData; // Return default values if transformation fails
+    return formData;
   }
 };
 
@@ -143,28 +141,27 @@ const EditCampaign = () => {
   const [loading, setLoading] = useState(true);
   const [dataReady, setDataReady] = useState(false);
 
-  // Fetch states list first
   useEffect(() => {
     const fetchStates = async () => {
       try {
-        const res = await axiosWrapper("get", LOCATION_API.GET_STATES, {}, token ?? undefined) as {
-          data?: State[];
-        };
-        if (res?.data) {
-          setStatesList(res.data);
-        }
+        const res = await axiosWrapper("get", LOCATION_API.GET_STATES, {}, token ?? undefined) as { data?: State[] };
+        if (res?.data) setStatesList(res.data);
       } catch (err) {
         console.error("Failed to load states:", err);
         toast.error("Could not load state list");
       }
     };
-
-    if (token) {
-      fetchStates();
-    }
+    if (token) fetchStates();
   }, [token]);
 
-  // Fetch campaign data after states are loaded
+  useEffect(() => {
+    if (dataReady) {
+      setActiveTab("basic"); // or you can set based on first error if editing
+      setActiveDeliveryTab("method");
+    }
+  }, [dataReady]);
+  
+
   useEffect(() => {
     const fetchCampaign = async () => {
       const id = Array.isArray(campaignId) ? campaignId[0] : campaignId;
@@ -177,14 +174,13 @@ const EditCampaign = () => {
           CAMPAIGNS_API.GET_CAMPAIGN.replace(":campaignId", id),
           {},
           token ?? undefined
-        ) as {
-          data?: any;
-        };
-
+        ) as { data?: any };
         console.log("Backend campaign data:", res);
+
 
         if (res?.data) {
           const transformedData = transformBackendDataToFormData(res.data, statesList);
+          console.log("Transformed Data:", transformedData);
           setFormInitialValues(transformedData);
           setDataReady(true);
         } else {
@@ -197,102 +193,110 @@ const EditCampaign = () => {
         setLoading(false);
       }
     };
-
-    if (campaignId && statesList.length > 0) {
-      fetchCampaign();
-    }
+    if (campaignId && statesList.length > 0) fetchCampaign();
   }, [campaignId, token, statesList]);
 
-  // Autocomplete filter
   const loadStates = (inputValue: string, callback: (options: StateOption[]) => void) => {
     const filteredOptions = statesList
-      .filter(
-        (state) =>
-          state.name.toLowerCase().includes(inputValue.toLowerCase()) ||
-          state.abbreviation.toLowerCase().includes(inputValue.toLowerCase())
-      )
-      .map((state) => ({
-        label: `${state.name} (${state.abbreviation})`,
-        value: state._id,
-        name: state.name,
-        abbreviation: state.abbreviation,
-      }));
-
+      .filter(s => s.name.toLowerCase().includes(inputValue.toLowerCase()) || s.abbreviation.toLowerCase().includes(inputValue.toLowerCase()))
+      .map(s => ({ label: `${s.name} (${s.abbreviation})`, value: s._id, name: s.name, abbreviation: s.abbreviation }));
     callback(filteredOptions);
   };
 
-  // Helper function to determine which tab contains a field
   const getTabForField = (fieldName: string): string => {
-    if (fieldName.includes('name') || fieldName.includes('status') || 
+    if (fieldName.includes('name') || fieldName.includes('status') ||
         fieldName.includes('lead_type') || fieldName.includes('exclusivity') ||
         fieldName.includes('language') || fieldName.includes('poc_phone') ||
-        fieldName.includes('company_contact')) {
-      return 'basic';
-    } else if (fieldName.includes('geography')) {
-      return 'geography';
-    } else if (fieldName.includes('delivery')) {
-      return 'delivery';
-    } else if (fieldName.includes('note')) {
-      return 'notes';
-    }
-    return 'basic'; // default
+        fieldName.includes('company_contact')) return 'basic';
+    else if (fieldName.includes('geography')) return 'geography';
+    else if (fieldName.includes('delivery')) return 'delivery';
+    else if (fieldName.includes('note')) return 'notes';
+    return 'basic';
   };
 
-  // Submit handler with validation
   const handleSubmit = async (
     values: typeof defaultValues,
-    { setSubmitting, setTouched, validateForm }: { 
+    { setSubmitting, setTouched, validateForm, setFieldError }: { 
       setSubmitting: (isSubmitting: boolean) => void;
       setTouched: (touched: any) => void;
       validateForm: () => Promise<any>;
+      setFieldError: (field: string, message: string) => void;
     }
   ) => {
     try {
-      // Validate all fields first
+      setSubmitting(true);
       const errors = await validateForm();
-      
-      // If there are errors, show them and scroll to the first one
+
       if (Object.keys(errors).length > 0) {
-        // Mark all fields as touched to show errors
-        const allTouched = {};
-        Object.keys(defaultValues).forEach(key => {
-          allTouched[key] = true;
-        });
-        setTouched(allTouched);
-        
-        // Find the tab with the first error and switch to it
+        const touchedFields: any = {};
+        Object.keys(defaultValues).forEach(k => { touchedFields[k] = true; });
+        setTouched(touchedFields);
+
         const firstError = Object.keys(errors)[0];
-        const tabWithError = getTabForField(firstError);
-        setActiveTab(tabWithError);
-        
-        // Scroll to the error after a small delay to allow tab switch
+        setActiveTab(getTabForField(firstError));
+
         setTimeout(() => {
           const errorElement = document.querySelector(`[name="${firstError}"]`);
-          if (errorElement) {
-            errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }
-        }, 100);
-        
+          if (errorElement) errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 150);
+
+        toast.error("Please fix the validation errors and try again.");
         setSubmitting(false);
-        return; // Don't submit if there are errors
+        return;
       }
-      
+
+      // Delivery method validation
+      if (!values.delivery.method || values.delivery.method.length === 0) {
+        setFieldError('delivery.method', 'Please select at least one delivery method');
+        setActiveTab('delivery');
+        toast.error("Please select at least one delivery method");
+        setSubmitting(false);
+        return;
+      }
+
+      if (values.delivery.method.includes('email')) {
+        if (!values.delivery.email.addresses) {
+          setFieldError('delivery.email.addresses', 'Email addresses are required');
+          setActiveTab('delivery');
+          toast.error("Email addresses are required for email delivery");
+          setSubmitting(false);
+          return;
+        }
+        if (!values.delivery.email.subject) {
+          setFieldError('delivery.email.subject', 'Email subject is required');
+          setActiveTab('delivery');
+          toast.error("Email subject is required for email delivery");
+          setSubmitting(false);
+          return;
+        }
+      }
+
+      if (values.delivery.method.includes('phone') && !values.delivery.phone.numbers) {
+        setFieldError('delivery.phone.numbers', 'Phone numbers are required');
+        setActiveTab('delivery');
+        toast.error("Phone numbers are required for phone delivery");
+        setSubmitting(false);
+        return;
+      }
+
+      if (values.delivery.method.includes('crm') && !values.delivery.crm.instructions) {
+        setFieldError('delivery.crm.instructions', 'CRM instructions are required');
+        setActiveTab('delivery');
+        toast.error("CRM instructions are required for CRM delivery");
+        setSubmitting(false);
+        return;
+      }
+
+      const cleanedValues = cleanCampaignValues(values);
       const id = Array.isArray(campaignId) ? campaignId[0] : campaignId;
       if (!id) return;
-
-      setSubmitting(true);
-      const cleanedValues = cleanCampaignValues(values);
-      
-      console.log("Submitting cleaned values:", cleanedValues);
 
       const res = await axiosWrapper(
         "put",
         CAMPAIGNS_API.UPDATE_CAMPAIGN.replace(":campaignId", id),
         cleanedValues,
         token ?? undefined
-      ) as {
-        message?: string;
-      };
+      ) as { message?: string };
 
       toast.success(res?.message || "Campaign updated successfully!");
     } catch (err) {
@@ -302,21 +306,14 @@ const EditCampaign = () => {
       setSubmitting(false);
     }
   };
-  
+
   const loadCounties = (inputValue: string, callback: (options: { label: string; value: string }[]) => void) => {
     const filteredOptions = countiesList
-      .filter((county) =>
-        county.name.toLowerCase().includes(inputValue.toLowerCase())
-      )
-      .map((county) => ({
-        label: `${county.name}`,
-        value: county._id,
-      }));
-
+      .filter(c => c.name.toLowerCase().includes(inputValue.toLowerCase()))
+      .map(c => ({ label: c.name, value: c._id }));
     callback(filteredOptions);
   };
 
-  // Show loading until both states and campaign data are ready
   if (loading || !dataReady) {
     return (
       <div className="container min-h-screen flex justify-center items-center">
@@ -338,54 +335,54 @@ const EditCampaign = () => {
         validationSchema={validationSchema}
         onSubmit={handleSubmit}
       >
-        {({ isSubmitting, values, setFieldValue, validateForm, setTouched, errors }) => {
-          console.log("Current form values:", values);
-          
-          return (
-            <div className="w-full max-w-[1200px]">
-              <StateEffectsHandler
-                selectedState={values.geography.state}
-                coverageType={values.geography.coverage?.type}
-                token={token}
-                setCountiesList={setCountiesList}
-                setIsLoadingCounties={setIsLoadingCounties}
-                setUtilitiesList={setUtilitiesList}
-                setIsLoadingUtilities={setIsLoadingUtilities}
+        {({ isSubmitting, values, setFieldValue, validateForm, setTouched, setFieldError, errors, submitForm }) => (
+          <div className="w-full max-w-[1200px]">
+            <StateEffectsHandler
+              selectedState={values.geography.state}
+              coverageType={values.geography.coverage?.type}
+              token={token}
+              setCountiesList={setCountiesList}
+              setIsLoadingCounties={setIsLoadingCounties}
+              setUtilitiesList={setUtilitiesList}
+              setIsLoadingUtilities={setIsLoadingUtilities}
+            />
+
+            <TabsHeader activeTab={activeTab} setActiveTab={setActiveTab} errors={errors} />
+
+            <Form className="space-y-8">
+              <div className="bg-white p-8 rounded-lg border border-[#E0E0E0] min-h-[500px]">
+                {renderTabContent(
+                  activeTab,
+                  values,
+                  setFieldValue,
+                  countiesList,
+                  isLoadingCounties,
+                  loadStates,
+                  utilitiesList,
+                  isLoadingUtilities,
+                  activeDeliveryTab,
+                  setActiveDeliveryTab,
+                  true,
+                  isAdmin,
+                
+                )}
+              </div>
+
+              <TabsNavigation
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                isSubmitting={isSubmitting}
+                isEditMode={true}
+                validateForm={validateForm}
+                setTouched={setTouched}
+                values={values}
+                errors={errors}
+                setFieldError={setFieldError}
+                submitForm={submitForm}
               />
-
-              <TabsHeader activeTab={activeTab} setActiveTab={setActiveTab} errors={errors} />
-
-              <Form className="space-y-8">
-                <div className="bg-white p-8 rounded-lg border border-[#E0E0E0] min-h-[500px]">
-                  {renderTabContent(
-                    activeTab,
-                    values,
-                    setFieldValue,
-                    countiesList,
-                    isLoadingCounties,
-                    loadStates,
-                    utilitiesList,
-                    isLoadingUtilities,
-                    activeDeliveryTab,
-                    setActiveDeliveryTab,
-                    true,
-                    isAdmin,
-                  )}
-                </div>
-
-                <TabsNavigation
-                  activeTab={activeTab}
-                  setActiveTab={setActiveTab}
-                  isSubmitting={isSubmitting}
-                  isEditMode={true}
-                  validateForm={validateForm}
-                  setTouched={setTouched}
-                  values={values}
-                />
-              </Form>
-            </div>
-          );
-        }}
+            </Form>
+          </div>
+        )}
       </Formik>
     </div>
   );

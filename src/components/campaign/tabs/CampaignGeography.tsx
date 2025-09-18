@@ -114,14 +114,14 @@ const CampaignGeography: React.FC<GeographyProps> = ({
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <FormikInput
+            {/* <FormikInput
               key={`zipcode-${formKey}`}
               name="geography.coverage.partial.zipcode"
               type="text"
               placeholder="90210"
               label="Center Zip Code"
               disabled={isLocked}
-            />
+            /> */}
 
             {isLoadingCounties ? (
               <div className="flex items-center justify-center">
