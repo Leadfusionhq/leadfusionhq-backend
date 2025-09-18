@@ -109,6 +109,7 @@ interface AutoTopUpFormData {
   rechargeAmount: number;
   enabled: boolean;  
   defaultCardId: string;
+  paymentMode: 'prepaid' | 'payAsYouGo'; // Add this new field
 }
 
 interface Toast {
@@ -191,8 +192,9 @@ const WalletDashboard: React.FC = () => {
   const [autoTopUpForm, setAutoTopUpForm] = useState<AutoTopUpFormData>({
     threshold: 50,
     rechargeAmount: 250,
-    enabled: false,      // ✅ matches everywhere
-    defaultCardId: ''
+    enabled: false,
+    defaultCardId: '',
+    paymentMode: 'prepaid' // Add default value
   });
   
   const [autoTopUpLoading, setAutoTopUpLoading] = useState<boolean>(false);
@@ -290,11 +292,14 @@ const WalletDashboard: React.FC = () => {
   const closeAddFundsModal = useCallback(() => {
     setShowAddFunds(false);
     resetAddFundsForm();
+    setSelectedCardId('');
+    setHasAcceptedTerms(false); 
   }, [resetAddFundsForm]);
 
   const closeAddCardModal = useCallback(() => {
     setShowAddCard(false);
     resetCardForm();
+    setHasAcceptedTerms(false); 
   }, [resetCardForm]);
 
   const closeTermsModal = useCallback(() => {
@@ -430,22 +435,16 @@ const WalletDashboard: React.FC = () => {
 
   const handleAcceptTerms = useCallback(async (): Promise<void> => {
     if (!userId || !token) return;
-   
+  
     try {
       const url = API_URL.ACCEPT_CONTRACT.replace(':userId', userId);
-      const response = await axiosWrapper(
-        "put",
-        url,
-        {},
-        token
-      ) as ApiResponse;
-     
+      const response = await axiosWrapper("put", url, {}, token) as ApiResponse;
+  
       if (response?.contractAcceptance) {
-        setHasAcceptedTerms(true);
+        setHasAcceptedTerms(true); // ✅ mark accepted
         showToast('success', 'Terms accepted successfully');
-        closeTermsModal(); // Close modal first
-        
-        // Execute pending action after closing modal
+        closeTermsModal();
+  
         if (pendingAction) {
           setTimeout(() => {
             pendingAction();
@@ -458,6 +457,7 @@ const WalletDashboard: React.FC = () => {
       showToast('error', 'Failed to accept terms. Please try again.');
     }
   }, [userId, token, pendingAction, showToast, closeTermsModal]);
+  
 
   const loadTermsContent = useCallback(async (): Promise<void> => {
     try {
@@ -592,11 +592,7 @@ const WalletDashboard: React.FC = () => {
             </p>
           </section>
   
-          <p class="text-sm text-gray-600 mt-6 p-4 bg-gray-50 rounded-lg">
-            <strong>Supplier:</strong> Lead Fusion HQ, LLC<br>
-            <strong>Location:</strong> 525 Rt 73N, Marlton, NJ 08053<br>
-            <strong>Agreement Effective Date:</strong> Upon Buyer’s acceptance
-          </p>
+         
         </div>
       `;
       setTermsContent(agreementContent);
@@ -670,10 +666,12 @@ const WalletDashboard: React.FC = () => {
      
       setBalance(calculatedBalance);
       setCards(cardsResponse.cards || []);
+      const autoTopUpData = autoTopUpResponse.balance.autoTopUp;
+
       setAutoTopUp({
         threshold: autoTopUpResponse.balance.autoTopUp.threshold || 10,
         rechargeAmount: autoTopUpResponse.balance.autoTopUp.topUpAmount || 50,
-        enabled: autoTopUpResponse.balance.autoTopUp.enabled || false, 
+        enabled: autoTopUpData.enabled ?? false,
         defaultCardId: ''
       });
       setTransactions(transactionsResponse.transactions || []);
@@ -682,12 +680,14 @@ const WalletDashboard: React.FC = () => {
       console.log(autoTopUpResponse?.balance?.autoTopUp);
       if (autoTopUpResponse?.balance?.autoTopUp) {
 
-        setAutoTopUpForm({
-          threshold: autoTopUpResponse.balance.autoTopUp.threshold || 10,
-          rechargeAmount: autoTopUpResponse.balance.autoTopUp.topUpAmount || 50,
-          enabled: autoTopUpResponse.balance.autoTopUp.enabled || false, 
-          defaultCardId: ''
-        });
+      // In the fetchWalletData callback, update the autoTopUpForm state:
+      setAutoTopUpForm({
+        threshold: autoTopUpResponse.balance.autoTopUp.threshold || 10,
+        rechargeAmount: autoTopUpResponse.balance.autoTopUp.topUpAmount || 50,
+        enabled: autoTopUpResponse.balance.autoTopUp.enabled || false, 
+        defaultCardId: '',
+        paymentMode: autoTopUpResponse.balance.autoTopUp.paymentMode || 'prepaid' // Add this
+      });
 }
     } catch (error) {
       console.error('Failed to fetch wallet data:', error);
@@ -856,25 +856,24 @@ const WalletDashboard: React.FC = () => {
     try {
       setAutoTopUpLoading(true);
       const response = await axiosWrapper("post", BILLING_API.AUTO_TOPUP, {
-        enabled: autoTopUpForm.enabled,
-        threshold: autoTopUpForm.threshold,
-        topUpAmount: autoTopUpForm.rechargeAmount, // Note: backend expects 'topUpAmount'
+        paymentMode: autoTopUpForm.paymentMode,
+        enabled: autoTopUpForm.paymentMode === 'payAsYouGo', // ✅ Only enable auto for payAsYouGo
       }, token) as ApiResponse;
   
       if (response?.result) {
-        showToast('success', 'Auto top-up settings updated!');
-        await fetchWalletData(); // Refresh data after successful operation
+        showToast('success', `Payment mode updated to ${autoTopUpForm.paymentMode} successfully!`);
+        await fetchWalletData();
       } else {
-        showToast('error', response.message || 'Failed to update auto top-up settings');
+        showToast('error', response.message || 'Failed to update payment mode');
       }
     } catch (error: unknown) {
-      console.error('Update auto top-up error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to update auto top-up settings';
+      console.error('Update payment mode error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update payment mode';
       showToast('error', errorMessage);
     } finally {
       setAutoTopUpLoading(false);
     }
-  }, [token, autoTopUpForm, fetchWalletData, showToast]);
+  }, [token, autoTopUpForm.paymentMode, fetchWalletData, showToast]);
 
   // Enhanced form field handlers with real-time validation
   const handleCardFormChange = useCallback((field: keyof CardFormData, value: string) => {
@@ -1019,7 +1018,7 @@ const WalletDashboard: React.FC = () => {
           {autoTopUp?.enabled && (
             <div className="mt-4 flex items-center space-x-2">
               <Zap className="w-4 h-4" />
-              <span className="text-sm">Auto Top-Up: ${autoTopUp.rechargeAmount} when below ${autoTopUp.threshold}</span>
+              <span className="text-sm">Auto Top-Up</span>
             </div>
           )}
         </div>
@@ -1437,89 +1436,224 @@ const WalletDashboard: React.FC = () => {
             </div>
           )}
 
-          {activeTab === 'settings' && (
-            <div className="space-y-6">
-              <h2 className="text-xl font-semibold text-black">Auto Top-Up Settings</h2>
+{activeTab === 'settings' && (
+  <div className="space-y-8">
+    <div>
+      <h2 className="text-2xl font-bold text-black mb-2">Payment Settings</h2>
+      <p className="text-gray-600">Choose how you want to pay for leads</p>
+    </div>
 
-              <div className="space-y-4">
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    checked={autoTopUpForm.enabled}
-                    onChange={(e) => setAutoTopUpForm({ ...autoTopUpForm, enabled: e.target.checked })}
-                    className="w-4 h-4 text-gray-600 rounded focus:ring-gray-500"
-                  />
-                  <label className="text-sm font-medium text-gray-700">Enable Auto Top-Up</label>
+    <div className="space-y-6">
+      {/* Payment Mode Selection */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-black">Payment Method</h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Prepaid Option */}
+          <label className="cursor-pointer">
+            <div className={`p-6 rounded-lg border-2 transition-all ${
+              autoTopUpForm.paymentMode === 'prepaid' 
+                ? 'border-black bg-gray-50' 
+                : 'border-gray-200 bg-white hover:border-gray-300'
+            }`}>
+              <div className="flex items-start space-x-3">
+                <input
+                  type="radio"
+                  name="paymentMode"
+                  value="prepaid"
+                  checked={autoTopUpForm.paymentMode === 'prepaid'}
+                  onChange={(e) => setAutoTopUpForm({ ...autoTopUpForm, paymentMode: e.target.value as 'prepaid' | 'payAsYouGo' })}
+                  className="w-5 h-5 text-black border-2 border-gray-300 focus:ring-black mt-0.5"
+                />
+                <div className="flex-1">
+                  <h4 className="font-semibold text-black mb-1">Prepaid Wallet</h4>
+                  <p className="text-sm text-gray-600">Add funds to your wallet balance and pay for leads from your balance</p>
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Recharge When Balance Falls Below
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
-                      <input
-                        type="number"
-                        value={autoTopUpForm.threshold}
-                        onChange={(e) => setAutoTopUpForm({ ...autoTopUpForm, threshold: parseFloat(e.target.value) || 0 })}
-                        className="pl-8 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
-                        min="0"
-                        step="0.01"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Recharge Amount
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
-                      <input
-                        type="number"
-                        value={autoTopUpForm.rechargeAmount}
-                        onChange={(e) => setAutoTopUpForm({ ...autoTopUpForm, rechargeAmount: parseFloat(e.target.value) || 0 })}
-                        className="pl-8 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
-                        min="0"
-                        step="0.01"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Default Card for Auto Top-Up
-                  </label>
-                  <select
-                    value={autoTopUpForm.defaultCardId}
-                    onChange={(e) => setAutoTopUpForm({ ...autoTopUpForm, defaultCardId: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
-                  >
-            
-                    {cards
-                      .filter((card) => card.isDefault) // ✅ Only default card
-                      .map((card) => (
-                        <option key={card.customerVaultId} value={card.customerVaultId}>
-                          **** **** **** {card.cardLastFour} ({card.brand}) - Default
-                        </option>
-                      ))}
-                  </select>
-                </div>
-
-
-                <button
-                  onClick={handleUpdateAutoTopUp}
-                  disabled={autoTopUpLoading}
-                  className="bg-black text-white px-6 py-2 rounded-lg hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
-                >
-                  {autoTopUpLoading && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
-                  <span>Update Settings</span>
-                </button>
               </div>
             </div>
-          )}
+          </label>
+
+          {/* Pay as You Go Option */}
+          <label className="cursor-pointer">
+            <div className={`p-6 rounded-lg border-2 transition-all ${
+              autoTopUpForm.paymentMode === 'payAsYouGo' 
+                ? 'border-black bg-gray-50' 
+                : 'border-gray-200 bg-white hover:border-gray-300'
+            }`}>
+              <div className="flex items-start space-x-3">
+                <input
+                  type="radio"
+                  name="paymentMode"
+                  value="payAsYouGo"
+                  checked={autoTopUpForm.paymentMode === 'payAsYouGo'}
+                  onChange={(e) => setAutoTopUpForm({ ...autoTopUpForm, paymentMode: e.target.value as 'prepaid' | 'payAsYouGo' })}
+                  className="w-5 h-5 text-black border-2 border-gray-300 focus:ring-black mt-0.5"
+                />
+                <div className="flex-1">
+                  <h4 className="font-semibold text-black mb-1">Pay as You Go</h4>
+                  <p className="text-sm text-gray-600">Pay for each lead directly from your default card</p>
+                </div>
+              </div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      {/* Prepaid Section */}
+      {autoTopUpForm.paymentMode === 'prepaid' && (
+        <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-semibold text-black">Add Funds to Wallet</h3>
+            <div className="text-sm text-gray-500">
+              Current Balance: <span className="font-semibold text-black">${balance.toFixed(2)}</span>
+            </div>
+          </div>
+          
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-semibold text-black mb-2">
+                  Amount <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">$</span>
+                  <input
+                    type="number"
+                    value={rechargeAmount}
+                    onChange={(e) => setRechargeAmount(e.target.value)}
+                    className="pl-8 w-full border border-gray-300 rounded-lg px-3 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-black text-black font-medium"
+                    placeholder="0.00"
+                    min="1"
+                    max="10000"
+                    step="0.01"
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Min: $1.00 • Max: $10,000.00</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-black mb-2">
+                  Payment Method <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={selectedCardId}
+                  onChange={(e) => setSelectedCardId(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-black text-black"
+                >
+                  <option value="" className="text-gray-500">Choose a payment method</option>
+                  {cards.map((card) => (
+                    <option key={card.customerVaultId} value={card.customerVaultId}>
+                      •••• {card.cardLastFour} ({card.brand}) {card.isDefault ? '- Default' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="border-t border-gray-200 pt-4">
+              <div className="flex items-start space-x-3">
+                <input
+                  type="checkbox"
+                  id="prepaidTerms"
+                  checked={hasAcceptedTerms}
+                  onChange={(e) => {
+                    if (!hasAcceptedTerms) {
+                      setShowTermsModal(true);
+                      e.preventDefault();
+                    } else {
+                      setHasAcceptedTerms(false);
+                    }
+                  }}
+                  className="w-4 h-4 text-black border-2 border-gray-300 rounded focus:ring-black mt-0.5"
+                />
+                <label htmlFor="prepaidTerms" className="text-sm text-gray-700 leading-relaxed">
+                  I accept the{" "}
+                  <button
+                    type="button"
+                    onClick={() => setShowTermsModal(true)}
+                    className="text-black hover:text-gray-700 underline font-medium"
+                  >
+                    Terms & Conditions
+                  </button>
+                  {hasAcceptedTerms && <span className="text-black font-medium"> ✓</span>}
+                </label>
+              </div>
+            </div>
+
+            <button
+              onClick={handleManualRecharge}
+              disabled={rechargeLoading || !rechargeAmount || !selectedCardId}
+              className="w-full bg-black text-white px-6 py-3 rounded-lg hover:bg-gray-800 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center space-x-2 font-semibold"
+            >
+              {rechargeLoading && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
+              <span>Add Funds to Wallet</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Pay as You Go Section */}
+      {autoTopUpForm.paymentMode === 'payAsYouGo' && (
+        <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <h3 className="text-lg font-semibold text-black mb-4">Pay as You Go Setup</h3>
+          
+          <div className="space-y-4">
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <p className="text-sm text-gray-700 mb-4">
+                With Pay as You Go, each lead will be charged directly to your default payment method. No wallet balance required.
+              </p>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-semibold text-black mb-2">
+                Default Payment Method
+              </label>
+              <div className="bg-white border border-gray-300 rounded-lg p-4">
+                {cards.find(card => card.isDefault) ? (
+                  <div className="flex items-center space-x-3">
+                    <CreditCard className="w-6 h-6 text-gray-400" />
+                    <div>
+                      <p className="font-semibold text-black">
+                        •••• •••• •••• {cards.find(card => card.isDefault)?.cardLastFour}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {cards.find(card => card.isDefault)?.brand} • 
+                        {cards.find(card => card.isDefault)?.expiryMonth}/{cards.find(card => card.isDefault)?.expiryYear}
+                      </p>
+                    </div>
+                    <div className="ml-auto">
+                      <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                        Default
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-sm text-red-600 font-medium">No default payment method set</p>
+                    <p className="text-xs text-gray-500 mt-1">Please set a default card in the Payment Methods tab</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Update Button */}
+      <div className="border-t border-gray-200 pt-6">
+        <button
+          onClick={handleUpdateAutoTopUp}
+          disabled={autoTopUpLoading}
+          className="bg-black text-white px-8 py-3 rounded-lg hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center space-x-2 font-semibold"
+        >
+          {autoTopUpLoading && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
+          <span>Save Payment Settings</span>
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
 
           {activeTab === 'history' && (
             <div className="space-y-6">
@@ -1633,6 +1767,7 @@ const WalletDashboard: React.FC = () => {
         onCancel={cancelDeleteCard}
       />
 
+
       {/* Terms & Conditions Modal */}
       {showTermsModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -1640,7 +1775,10 @@ const WalletDashboard: React.FC = () => {
             <div className="flex justify-between items-center p-4 border-b border-gray-200">
               <h3 className="text-lg font-semibold text-black">Terms & Conditions</h3>
               <button
-                onClick={closeTermsModal}
+                onClick={() => {
+                  setHasAcceptedTerms(false); // ensure checkbox reset
+                  closeTermsModal();
+                }}
                 className="text-gray-500 hover:text-gray-700 transition-colors"
               >
                 <X className="w-5 h-5" />
@@ -1660,39 +1798,28 @@ const WalletDashboard: React.FC = () => {
               )}
             </div>
 
-            <div className="p-4 border-t border-gray-200 flex flex-col space-y-4">
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="acceptTerms"
-                  checked={hasAcceptedTerms}
-                  onChange={(e) => setHasAcceptedTerms(e.target.checked)}
-                  className="w-4 h-4 text-gray-600 rounded focus:ring-gray-500"
-                />
-                <label htmlFor="acceptTerms" className="text-sm font-medium text-gray-700">
-                  I have read and accept the Terms & Conditions
-                </label>
-              </div>
-
-              <div className="flex justify-end space-x-3">
-                <button
-                  onClick={closeTermsModal}
-                  className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleAcceptTerms}
-                  disabled={!hasAcceptedTerms}
-                  className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-                >
-                  Confirm Acceptance
-                </button>
-              </div>
+            {/* ✅ Only confirm/cancel */}
+            <div className="p-4 border-t border-gray-200 flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setHasAcceptedTerms(false); // cancel → reset
+                  closeTermsModal();
+                }}
+                className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAcceptTerms} // confirm → set true + close
+                className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
+              >
+                Confirm Acceptance
+              </button>
             </div>
           </div>
         </div>
       )}
+
     </div>
   );
 };
