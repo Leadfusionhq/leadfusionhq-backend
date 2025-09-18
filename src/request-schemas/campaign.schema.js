@@ -1,5 +1,5 @@
 const { Joi, Segments } = require('celebrate');
-const { LEAD_TYPE, STATUS, EXCLUSIVITY, DAYS_OF_WEEK } = require('../helper/constant-enums');
+const { LEAD_TYPE, STATUS, EXCLUSIVITY, DAYS_OF_WEEK ,PAYMENT_TYPE} = require('../helper/constant-enums');
 
 const createCampaign = {
   [Segments.BODY]: Joi.object({
@@ -18,6 +18,14 @@ const createCampaign = {
     exclusivity: Joi.string().valid(...Object.values(EXCLUSIVITY)).optional(),
 
     bid_price: Joi.number().min(0).optional(),
+
+    payment_type: Joi.string()
+    .valid(...Object.values(PAYMENT_TYPE))
+    .required()
+    .messages({
+      'any.required': 'Payment type is required',
+      'any.only': 'Payment type must be either prepaid or payasyougo',
+    }),
 
     language: Joi.string().min(2).optional(),
     poc_phone: Joi.string().allow('').optional(),
@@ -50,30 +58,23 @@ const createCampaign = {
     }).optional(),
 
     // Delivery validation - FIXED structure
+
     delivery: Joi.object({
-      method: Joi.string().valid('email', 'phone', 'crm').required(),
-      email: Joi.when('method', {
-        is: 'email',
-        then: Joi.object({
-          addresses: Joi.string().required(),
-          subject: Joi.string().required(),
-        }).required(),
-        otherwise: Joi.optional(),
+      method: Joi.array().items(Joi.string().valid('email','phone','crm')).min(1).required(), // ✅ changed
+      email: Joi.when('method', { // ✅ reference 'method'
+        is: Joi.array().has('email'),
+        then: Joi.object({ addresses: Joi.string().required(), subject: Joi.string().required() }).required(),
+        otherwise: Joi.optional()
       }),
       phone: Joi.when('method', {
-        is: 'phone',
-        then: Joi.object({
-          numbers: Joi.string().required(),
-        }).required(),
-        otherwise: Joi.optional(),
+        is: Joi.array().has('phone'),
+        then: Joi.object({ numbers: Joi.string().required() }).required(),
+        otherwise: Joi.optional()
       }),
-
       crm: Joi.when('method', {
-        is: 'crm',
-        then: Joi.object({
-          instructions: Joi.string().allow('').optional(),
-        }).required(),
-        otherwise: Joi.optional(),
+        is: Joi.array().has('crm'),
+        then: Joi.object({ instructions: Joi.string().required() }).required(),
+        otherwise: Joi.optional()
       }),
       schedule: Joi.object({
         days: Joi.array().items(
@@ -86,14 +87,14 @@ const createCampaign = {
           })
         ).required()
       }).required(),
-
       other: Joi.object({
         homeowner: Joi.boolean().optional(),
         second_pro_call_request: Joi.boolean().optional(),
         homeowner_count: Joi.number().min(0).optional(),
-        
       }).optional(),
     }).required(),
+
+
 
     note: Joi.string().allow('').max(500).optional(),
   })
@@ -121,6 +122,14 @@ const updateCampaign = {
     bid_price: Joi.number().min(0).optional(),
 
     language: Joi.string().min(2).optional(),
+    payment_type: Joi.string()
+    .valid(...Object.values(PAYMENT_TYPE))
+    .required()
+    .messages({
+      'any.required': 'Payment type is required',
+      'any.only': 'Payment type must be either prepaid or payasyougo',
+    }),
+    
     poc_phone: Joi.string().allow('').optional(),
     company_contact_phone: Joi.string().allow('').optional(),
     company_contact_email: Joi.string().allow('').optional(),
@@ -152,49 +161,58 @@ const updateCampaign = {
 
     // Delivery validation - FIXED structure
     delivery: Joi.object({
-      method: Joi.string().valid('email', 'phone', 'crm').required(),
+      method: Joi.array()
+        .items(Joi.string().valid('email', 'phone', 'crm'))
+        .min(1)
+        .required(),
+    
       email: Joi.when('method', {
-        is: 'email',
+        is: Joi.array().has('email'),
         then: Joi.object({
           addresses: Joi.string().required(),
           subject: Joi.string().required(),
         }).required(),
         otherwise: Joi.optional(),
       }),
+    
       phone: Joi.when('method', {
-        is: 'phone',
+        is: Joi.array().has('phone'),
         then: Joi.object({
           numbers: Joi.string().required(),
         }).required(),
         otherwise: Joi.optional(),
       }),
-
+    
       crm: Joi.when('method', {
-        is: 'crm',
+        is: Joi.array().has('crm'),
         then: Joi.object({
-          instructions: Joi.string().allow('').optional(),
+          instructions: Joi.string().required(),
         }).required(),
         otherwise: Joi.optional(),
       }),
+    
       schedule: Joi.object({
-        days: Joi.array().items(
-          Joi.object({
-            day: Joi.string().valid(...DAYS_OF_WEEK).required(),
-            active: Joi.boolean().optional(),
-            start_time: Joi.string().optional(),
-            end_time: Joi.string().optional(),
-            cap: Joi.number().min(0).optional()
-          })
-        ).required()
+        days: Joi.array()
+          .items(
+            Joi.object({
+              day: Joi.string().valid(...DAYS_OF_WEEK).required(),
+              active: Joi.boolean().optional(),
+              start_time: Joi.string().optional(),
+              end_time: Joi.string().optional(),
+              cap: Joi.number().min(0).optional()
+            })
+          )
+          .required()
       }).required(),
-
+    
       other: Joi.object({
         homeowner: Joi.boolean().optional(),
         second_pro_call_request: Joi.boolean().optional(),
         homeowner_count: Joi.number().min(0).optional(),
-        
       }).optional(),
     }).required(),
+    
+
 
     note: Joi.string().allow('').max(500).optional(),
   })

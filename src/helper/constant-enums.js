@@ -51,6 +51,12 @@ const CHAT_STATUS = {
   READ: 'read',
 }
 
+
+const PAYMENT_TYPE = {
+  PREPAID: 'prepaid',
+  PAY_AS_YOU_GO: 'payasyougo',
+};
+
 module.exports = {
   USER_ROLE,
   LEAD_TYPE,
@@ -61,4 +67,5 @@ module.exports = {
   
   CONTENT_TYPE,
   CHAT_STATUS,
+  PAYMENT_TYPE
 };
