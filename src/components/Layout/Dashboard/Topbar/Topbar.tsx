@@ -24,10 +24,10 @@ const Topbar = () => {
     const notificationRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
-  const profileSrc = user?.avatar
-  ? `${process.env.NEXT_PUBLIC_BACKEND_API_URL}${user.avatar}`
-  : "/images/icons/User.svg";
-
+  // const profileSrc = user?.avatar
+  // ? `${process.env.NEXT_PUBLIC_BACKEND_API_URL}${user.avatar}`
+  // : "/images/icons/User.svg";
+  const profileSrc = "/images/icons/User.svg";
 
   const sidebarItems =
     role === 'ADMIN'

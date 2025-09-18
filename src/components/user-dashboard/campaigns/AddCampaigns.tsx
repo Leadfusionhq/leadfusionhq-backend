@@ -11,7 +11,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
 
 import { validationSchema } from '@/request-schemas/campaign-schema';
-import { initialValues } from '@/constants/initialCampaign';
+import { initialValues } from '@/constants/freshInitialCampaign';
 import { Utility, StateOption, County, State } from "@/types/campaign";
 
 import { renderTabContent } from "@/components/campaign/TabContentRenderer";
@@ -69,8 +69,10 @@ const AddNewCampaign = () => {
     
     // Create fresh initial values
     const freshInitialValues = JSON.parse(JSON.stringify(initialValues));
+    console.log("Initial Values:", initialValues);
+
     setCurrentInitialValues(freshInitialValues);
-    
+    console.log("Fresh Initial Values:", freshInitialValues);
     // Clear all related state
     setCountiesList([]);
     setUtilitiesList([]);

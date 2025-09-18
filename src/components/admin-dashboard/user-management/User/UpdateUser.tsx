@@ -17,7 +17,7 @@ type User = {
   email: string;
   companyName: string;
   phoneNumber: string;
-  zipCode: string;
+  // zipCode: string;
   role: string;
 };
 
@@ -33,7 +33,7 @@ const EditUser = () => {
     confirmPassword: '',
     companyName: '',
     phoneNumber: '',
-    zipCode: '',
+    // zipCode: '',
     role: 'USER',
   });
 
@@ -53,7 +53,7 @@ const EditUser = () => {
     }),
     companyName: Yup.string().required('Company Name is required'),
     phoneNumber: Yup.string().required('Phone Number is required'),
-    zipCode: Yup.string().required('Zip Code is required'),
+    // zipCode: Yup.string().required('Zip Code is required'),
     role: Yup.string().required('Role is required'),
   });
 
@@ -80,7 +80,7 @@ const EditUser = () => {
             confirmPassword: '',
             companyName: user.companyName || '',
             phoneNumber: user.phoneNumber || '',
-            zipCode: user.zipCode || '',
+            // zipCode: user.zipCode || '',
             role: user.role || 'USER',
           });
         }
@@ -160,7 +160,7 @@ const EditUser = () => {
               <FormikInput name="confirmPassword" placeholder="Confirm Password" type="password" label="Confirm Password" />
               <FormikInput name="companyName" placeholder="Company Name" label="Company" />
               <FormikInput name="phoneNumber" placeholder="Phone Number" label="Phone Number" />
-              <FormikInput name="zipCode" placeholder="Zip Code" label="Zip Code" />
+              {/* <FormikInput name="zipCode" placeholder="Zip Code" label="Zip Code" /> */}
             </div>
             <button
               type="submit"

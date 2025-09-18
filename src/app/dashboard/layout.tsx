@@ -16,7 +16,7 @@ export default function UserLayout({ children }: { children: ReactNode }) {
   const { setUserId, connected } = useSocket();
 
   useEffect(() => {
-    console.warn('user',user)
+    // console.warn('user',user)
     if (!isLoggedIn || !user || user.role !== 'USER') {
       router.push('/login');
     }
@@ -25,7 +25,7 @@ export default function UserLayout({ children }: { children: ReactNode }) {
   // Initialize socket with user ID when user is available
   useEffect(() => {
     if (user && user._id) {
-      console.log('Initializing socket for USER:', user._id);
+      // console.log('Initializing socket for USER:', user._id);
       setUserId(user._id);
     }
   }, [user, setUserId]);
