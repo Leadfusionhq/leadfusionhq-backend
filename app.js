@@ -29,7 +29,7 @@ const ghlRoutes = require('./src/routes/ghl.route');
 const faqRoutes = require('./src/routes/faq/faq.routes');
 const feedbackRoutes  = require('./src/routes/feedback/feedback.routes');
 const billingRoutes  = require('./src/routes/billing/billing.route');
-
+const geocodingRouter=require(`./src/routes/geocoding/geocoding.routes`);
 const testRoutes = require('./src/routes/test/email-routes');
 
 
@@ -61,6 +61,7 @@ app.use(`/${config.server.route}/utilities`, utilityRoutes);
 app.use(`/${config.server.route}/ghl`, ghlRoutes);
 app.use(`/${config.server.route}/test`, testRoutes);
 
+
 /** ::::::::::::::::::faq routes:::::::::::::::::: */
 app.use(`/${config.server.route}/faqs`, faqRoutes);
 
@@ -69,6 +70,10 @@ app.use(`/${config.server.route}/feedback`, feedbackRoutes);
 
 /** ::::::::::::::::::billing routes:::::::::::::::::: */
 app.use(`/${config.server.route}/billing`, billingRoutes);
+
+
+/** ::::::::::::::::::geocoding routes:::::::::::::::::: */
+app.use(`/${config.server.route}/geocoding`, geocodingRouter);
 
 
 app.use(errors());
