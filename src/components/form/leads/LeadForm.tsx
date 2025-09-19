@@ -4,6 +4,8 @@ import { FormikInput, FormikTextarea, CustomFormikAsyncSelect, FormikSelect } fr
 import { LeadValidationSchema } from "@/request-schemas/lead-schema";
 import { StateOption } from "@/types/campaign";
 import { initialLeadValues } from "@/constants/initialLeadValues";
+import FormikAddressInput from '@/components/common/AddressAutocomplete';
+
 
 type LeadFormProps = {
   campaignId: string;
@@ -78,7 +80,7 @@ const LeadForm = ({
       validationSchema={LeadValidationSchema}
       onSubmit={onSubmit}
     >
-      {({ isSubmitting, errors, touched ,values}) => (
+      {({ isSubmitting, errors, touched ,values,setFieldValue,}) => (
 
         <>
 
@@ -240,12 +242,32 @@ const LeadForm = ({
           <div className="border-b border-gray-200 pb-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Main Address</h3>
             
-            <FormikInput
+            {/* <FormikInput
               name="address.full_address"
               label="Full Address *"
               placeholder="Enter complete address"
               errorMessage={touched?.address?.full_address && errors?.address?.full_address}
-            />
+            /> */}
+
+
+        <FormikAddressInput
+          name="address.full_address"
+          label="Full Address *"
+          placeholder="Enter complete address"
+          errorMessage={
+            touched?.address?.full_address ? errors?.address?.full_address : undefined
+          }
+          // country="us" // <-- Remove this line to search globally
+          showCurrentLocation={true}
+          onAddressSelect={(addressData) => {
+            if (addressData) {
+              setFieldValue('address.coordinates', addressData.coordinates);
+              setFieldValue('address.place_id', addressData.placeId);
+              
+            }
+          }}
+        />
+
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
               <FormikInput

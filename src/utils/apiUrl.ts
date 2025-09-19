@@ -1,7 +1,7 @@
 const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_API_URL;
 const BASE_IMPORT_URL = process.env.NEXT_PUBLIC_IMPORT_API_URL;
 
-const API_BASE = `${BASE_URL}/api`;
+const  API_BASE = `${BASE_URL}/api`;
 const API_IMPORT_BASE = `${BASE_IMPORT_URL}/api`;
 
 // here are base api:::::
@@ -220,3 +220,15 @@ export const BILLING_API = {
     GET_BALANCE: `${BILLING_API_BASE}/balance`,
 };
 
+
+// constants/api-urls.js
+// Add to your existing API_URL object
+
+const GEOCODING_API_BASE = `${API_BASE}/geocoding`;
+
+export const GEOCODING_API = {
+    AUTOCOMPLETE: `${GEOCODING_API_BASE}/autocomplete`,
+    PLACE_DETAILS: `${GEOCODING_API_BASE}/place-details`,
+    VALIDATE_ADDRESS: `${GEOCODING_API_BASE}/validate`,
+    REVERSE_GEOCODE: `${GEOCODING_API_BASE}/reverse`,
+};
