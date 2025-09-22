@@ -1,18 +1,21 @@
 'use client';
 
 import React from 'react';
+import Link from "next/link";
 
 interface BannerHomeProps {
   title: string;
   description: string;
   buttonText?: string;
   backgroundImage?: string;
+  buttonLink?: string;
 }
 
 function BannerHome({
   title,
   description,
   buttonText,
+  buttonLink,
   backgroundImage = '/images/home-banner.png',
 }: BannerHomeProps) {
   return (
@@ -25,10 +28,12 @@ function BannerHome({
         <p className="text-white md:max-w-[60%] mb-4 text-lg font-light">
           {description}
         </p>
-        {buttonText && (
-          <button className="bg-white border border-[#fff] px-6 py-3 text-[#000] rounded-[6px] hover:bg-[transparent] duration-300 hover:text-[#fff]">
-            {buttonText}
-          </button>
+        {buttonText && buttonLink && (
+          <Link href={buttonLink}>
+            <button className="bg-white border border-[#fff] px-6 py-3 text-[#000] rounded-[6px] hover:bg-[transparent] duration-300 hover:text-[#fff]">
+              {buttonText}
+            </button>
+          </Link>
         )}
       </div>
     </section>
