@@ -41,7 +41,7 @@ function WhyMultiChannel() {
                 <div>
                   <h3 className="text-xl font-bold text-[#204D9D] mb-3">Consumer Behavior Shift</h3>
                   <p className='text-gray-600 text-lg leading-relaxed'>
-                    Consumer behavior has shifted dramatically in recent years. No longer does a single channel suffice; today's prospects scroll through social media, browse search engines, check their email, and use mobile apps—all within a single day. If your marketing efforts are limited to just one platform, you're missing out on a large portion of potential leads.
+                    Consumer behavior has shifted dramatically in recent years. No longer does a single channel suffice; today&apos;s prospects scroll through social media, browse search engines, check their email, and use mobile apps—all within a single day. If your marketing efforts are limited to just one platform, you&apos;re missing out on a large portion of potential leads.
                   </p>
                 </div>
               </div>

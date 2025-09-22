@@ -37,7 +37,7 @@ function LearnMoreBanner() {
           </h1>
           <div className="space-y-6">
             <p className='text-white/95 text-xl font-light leading-relaxed'>
-              In today's fast-paced and highly competitive marketplace, reaching your target audience requires more than just a single touchpoint. Consumers are everywhere — on social media, email, search engines, mobile apps, and more. To truly maximize your outreach and generate high-quality leads, you need a comprehensive, multi-channel marketing approach that leverages the full spectrum of digital platforms.
+              In today&apos;s fast-paced and highly competitive marketplace, reaching your target audience requires more than just a single touchpoint. Consumers are everywhere — on social media, email, search engines, mobile apps, and more. To truly maximize your outreach and generate high-quality leads, you need a comprehensive, multi-channel marketing approach that leverages the full spectrum of digital platforms.
             </p>
             <p className='text-white/85 text-lg font-light leading-relaxed'>
               At Lead Fusion HQ, we specialize in delivering precisely that. Our multi-channel marketing solutions are designed to connect your business with potential customers across multiple channels, increasing visibility, engagement, and conversions. With our innovative, data-driven strategies, we ensure your message reaches the right audience, at the right time, through the right medium.

@@ -57,7 +57,7 @@ function LearnMoreCta() {
               Ready to Expand Your Reach and <span className="text-yellow-300">Grow Your Business?</span>
             </h2>
             <p className='text-white/95 text-xl mb-12 max-w-[800px] mx-auto leading-relaxed font-light'>
-              Multi-channel marketing isn't just a trend; it's the future of lead generation. 
+              Multi-channel marketing isn&apos;t just a trend; it&apos;s the future of lead generation. 
               By adopting a comprehensive approach, you can unlock new opportunities, attract more qualified leads, 
               and achieve sustainable growth.
             </p>
@@ -88,7 +88,7 @@ function LearnMoreCta() {
             </div>
             <h3 className='font-bold text-2xl mb-4 group-hover:text-[#204D9D] transition-colors duration-300'>Scalable Solutions</h3>
             <p className='text-gray-600 text-lg leading-relaxed'>
-              Whether you're a small local business or a large enterprise, our strategies are flexible 
+              Whether you&apos;re a small local business or a large enterprise, our strategies are flexible 
               and scalable to meet your needs.
             </p>
           </div>
@@ -110,7 +110,7 @@ function LearnMoreCta() {
             </div>
             <h3 className='font-bold text-2xl mb-4 group-hover:text-[#204D9D] transition-colors duration-300'>Results Focused</h3>
             <p className='text-gray-600 text-lg leading-relaxed'>
-              At Lead Fusion HQ, we're passionate about helping businesses harness the full potential 
+              At Lead Fusion HQ, we&apos;re passionate about helping businesses harness the full potential 
               of digital marketing for measurable growth.
             </p>
           </div>
@@ -121,10 +121,10 @@ function LearnMoreCta() {
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-gray-100/50 to-transparent rounded-3xl"></div>
           <div className="relative z-10 py-16 px-8">
             <div className="inline-block bg-[#204D9D]/10 rounded-full px-8 py-3 mb-6">
-              <span className="text-[#204D9D] font-semibold">Don't Wait - Act Now</span>
+              <span className="text-[#204D9D] font-semibold">Don&apos;t Wait - Act Now</span>
             </div>
             <h3 className='font-extrabold md:text-4xl text-2xl text-[#000] mb-6 tracking-tight'>
-              Don't Leave Your Success to <span className="text-[#204D9D]">Chance</span>
+              Don&apos;t Leave Your Success to <span className="text-[#204D9D]">Chance</span>
             </h3>
             <p className='text-gray-600 max-w-[700px] mx-auto text-xl leading-relaxed font-light'>
               Take control of your marketing today. Contact us to learn more about how our 

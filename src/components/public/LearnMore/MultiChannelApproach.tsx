@@ -86,7 +86,7 @@ function MultiChannelApproach() {
           </div>
           <div className="max-w-[900px] space-y-6">
             <p className='text-gray-600 text-xl leading-relaxed font-light'>
-              At Lead Fusion HQ, we don't believe in one-size-fits-all solutions. Every business is unique, and so are its marketing needs. That's why we begin by understanding your goals, target audience, and current market position. From there, we craft a customized multi-channel strategy that integrates various platforms seamlessly.
+              At Lead Fusion HQ, we don&apos;t believe in one-size-fits-all solutions. Every business is unique, and so are its marketing needs. That&apos;s why we begin by understanding your goals, target audience, and current market position. From there, we craft a customized multi-channel strategy that integrates various platforms seamlessly.
             </p>
             <div className="flex items-center gap-3 mt-6">
               <div className="w-3 h-3 bg-[#204D9D] rounded-full"></div>
