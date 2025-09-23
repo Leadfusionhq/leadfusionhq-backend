@@ -8,8 +8,12 @@ const API = {
   COMBINED_LOGS: '/combined',
   ERROR_LOGS: '/errors',
   STATS: '/stats',
-  SEARCH: '/search' 
-}; 
+  SEARCH: '/search',
+  CLEAR_BILLING: '/clear/billing',
+  CLEAR_COMBINED: '/clear/combined',
+  CLEAR_ERRORS: '/clear/errors',
+  CLEAR_ALL: '/clear/all'
+};
 
  
 
@@ -49,6 +53,12 @@ logsRouter.get(API.LOGS_INFO, (req, res) => {
       },
       statistics: {
         getStats: 'GET /api/logs/stats'
+      },
+      clear: {
+        clearBillingLogs: 'DELETE /api/logs/clear/billing',
+        clearCombinedLogs: 'DELETE /api/logs/clear/combined',
+        clearErrorLogs: 'DELETE /api/logs/clear/errors',
+        clearAllLogs: 'DELETE /api/logs/clear/all'
       }
     },
     logTypes: {
@@ -73,9 +83,26 @@ logsRouter.get(API.LOGS_INFO, (req, res) => {
       'Search functionality',
       'Cross-file search',
       'Structured JSON responses',
-      'Log statistics and file info'
+      'Log statistics and file info',
+      'Clear log files functionality'
     ]
   });
 });
+
+// Clear billing logs
+// DELETE /api/logs/clear/billing
+logsRouter.delete(API.CLEAR_BILLING, logsController.clearBillingLogs);
+
+// Clear combined logs
+// DELETE /api/logs/clear/combined
+logsRouter.delete(API.CLEAR_COMBINED, logsController.clearCombinedLogs);
+
+// Clear error logs
+// DELETE /api/logs/clear/errors
+logsRouter.delete(API.CLEAR_ERRORS, logsController.clearErrorLogs);
+
+// Clear all logs
+// DELETE /api/logs/clear/all
+logsRouter.delete(API.CLEAR_ALL, logsController.clearAllLogs);
 
 module.exports = logsRouter;

@@ -65,10 +65,38 @@ const searchLogs = wrapAsync(async (req, res) => {
     return sendResponse(res, results, 'Log search completed successfully');
 });
 
+// Clear billing logs
+const clearBillingLogs = wrapAsync(async (req, res) => {
+    const result = await LogsService.clearLogFile('billing');
+    return sendResponse(res, result, result.message);
+});
+
+// Clear combined logs
+const clearCombinedLogs = wrapAsync(async (req, res) => {
+    const result = await LogsService.clearLogFile('combined');
+    return sendResponse(res, result, result.message);
+});
+
+// Clear error logs
+const clearErrorLogs = wrapAsync(async (req, res) => {
+    const result = await LogsService.clearLogFile('error');
+    return sendResponse(res, result, result.message);
+});
+
+// Clear all logs
+const clearAllLogs = wrapAsync(async (req, res) => {
+    const result = await LogsService.clearAllLogFiles();
+    return sendResponse(res, result, result.message);
+});
+
 module.exports = {
     getBillingLogs,
     getCombinedLogs,
     getErrorLogs,
     getLogStats,
-    searchLogs
+    searchLogs,
+    clearBillingLogs,
+    clearCombinedLogs,
+    clearErrorLogs,
+    clearAllLogs
 };
