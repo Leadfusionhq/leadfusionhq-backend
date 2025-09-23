@@ -32,6 +32,7 @@ const billingRoutes  = require('./src/routes/billing/billing.route');
 const geocodingRouter=require(`./src/routes/geocoding/geocoding.routes`);
 const testRoutes = require('./src/routes/test/email-routes');
 const billingLogTestRoutes = require('./src/routes/test/billing-log-test');
+const logsRoutes = require('./src/routes/logs/logs.routes');
 
 
 app.use(cors());
@@ -76,6 +77,9 @@ app.use(`/${config.server.route}/billing`, billingRoutes);
 
 /** ::::::::::::::::::geocoding routes:::::::::::::::::: */
 app.use(`/${config.server.route}/geocoding`, geocodingRouter);
+
+/** ::::::::::::::::::logs routes:::::::::::::::::: */
+app.use(`/${config.server.route}/logs`, logsRoutes);
 
 
 app.use(errors());
