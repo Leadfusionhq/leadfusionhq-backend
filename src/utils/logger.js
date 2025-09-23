@@ -39,7 +39,7 @@ const logger = winston.createLogger({
             filename: path.join(logsDir, 'combined.log'),
             maxsize: 5242880, // 5MB
             maxFiles: 5
-        }),
+        }), 
         
         // Write error logs to error.log
         new winston.transports.File({ 

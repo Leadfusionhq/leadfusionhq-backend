@@ -1,9 +1,7 @@
 # Node.js dependencies
 node_modules/
 
-# Ignore all log files and log directories
-log/
-logs/
+# Logs
 *.log
 
 # Environment variables
