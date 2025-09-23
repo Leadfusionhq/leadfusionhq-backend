@@ -241,8 +241,86 @@ const formatBytes = (bytes) => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
+// Clear log file
+const clearLogFile = async (logType) => {
+    const filePath = getLogFilePath(logType);
+    
+    try {
+        // Check if file exists
+        if (!fs.existsSync(filePath)) {
+            return {
+                success: true,
+                message: `${logType} log file does not exist - nothing to clear`,
+                logType,
+                cleared: false
+            };
+        }
+        
+        // Get file stats before clearing
+        const fileStats = fs.statSync(filePath);
+        const originalSize = fileStats.size;
+        
+        // Clear the file by writing empty content
+        fs.writeFileSync(filePath, '', 'utf8');
+        
+        return {
+            success: true,
+            message: `${logType} log file cleared successfully`,
+            logType,
+            cleared: true,
+            originalSize,
+            originalSizeFormatted: formatBytes(originalSize),
+            clearedAt: new Date().toISOString()
+        };
+        
+    } catch (error) {
+        throw new ErrorHandler(500, `Failed to clear ${logType} logs: ${error.message}`);
+    }
+};
+
+// Clear all log files
+const clearAllLogFiles = async () => {
+    const logTypes = ['billing', 'combined', 'error'];
+    const results = [];
+    let totalCleared = 0;
+    let totalSize = 0;
+    
+    for (const logType of logTypes) {
+        try {
+            const result = await clearLogFile(logType);
+            results.push(result);
+            
+            if (result.cleared) {
+                totalCleared++;
+                totalSize += result.originalSize || 0;
+            }
+        } catch (error) {
+            results.push({
+                success: false,
+                message: error.message,
+                logType,
+                cleared: false
+            });
+        }
+    }
+    
+    return {
+        success: true,
+        message: `Cleared ${totalCleared} out of ${logTypes.length} log files`,
+        results,
+        summary: {
+            totalFilesCleared: totalCleared,
+            totalSizeCleared: totalSize,
+            totalSizeClearedFormatted: formatBytes(totalSize),
+            clearedAt: new Date().toISOString()
+        }
+    };
+};
+
 module.exports = {
     readLogFile,
     getLogStatistics,
-    searchLogs
+    searchLogs,
+    clearLogFile,
+    clearAllLogFiles
 };
