@@ -37,6 +37,25 @@ logsRouter.get(API.STATS, logsController.getLogStats);
 // GET /api/logs/search?query=payment&page=1&limit=50&logType=billing
 logsRouter.get(API.SEARCH, logsController.searchLogs);
 
+
+
+// Clear billing logs
+// DELETE /api/logs/clear/billing
+logsRouter.delete(API.CLEAR_BILLING, logsController.clearBillingLogs);
+
+// Clear combined logs
+// DELETE /api/logs/clear/combined
+logsRouter.delete(API.CLEAR_COMBINED, logsController.clearCombinedLogs);
+
+// Clear error logs
+// DELETE /api/logs/clear/errors
+logsRouter.delete(API.CLEAR_ERRORS, logsController.clearErrorLogs);
+
+// Clear all logs
+// DELETE /api/logs/clear/all
+logsRouter.delete(API.CLEAR_ALL, logsController.clearAllLogs);
+
+
 // Info endpoint for Logs API
 logsRouter.get(API.LOGS_INFO, (req, res) => {
   res.json({
@@ -88,21 +107,4 @@ logsRouter.get(API.LOGS_INFO, (req, res) => {
     ]
   });
 });
-
-// Clear billing logs
-// DELETE /api/logs/clear/billing
-logsRouter.delete(API.CLEAR_BILLING, logsController.clearBillingLogs);
-
-// Clear combined logs
-// DELETE /api/logs/clear/combined
-logsRouter.delete(API.CLEAR_COMBINED, logsController.clearCombinedLogs);
-
-// Clear error logs
-// DELETE /api/logs/clear/errors
-logsRouter.delete(API.CLEAR_ERRORS, logsController.clearErrorLogs);
-
-// Clear all logs
-// DELETE /api/logs/clear/all
-logsRouter.delete(API.CLEAR_ALL, logsController.clearAllLogs);
-
 module.exports = logsRouter;
