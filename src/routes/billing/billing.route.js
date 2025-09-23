@@ -26,10 +26,50 @@ const API = {
   TEST_AUTO_TOPUP: '/test-auto-topup'
 };
 
-// billingRouter.use(
-    // checkAuth,
-    // authorizedRoles([CONSTANT_ENUM.USER_ROLE.USER])
-// );
+// Info endpoint for Billing API
+billingRouter.get(API.BILLING_INFO, (req, res) => {
+  res.json({
+    message: 'LeadFusionHQ Billing API',
+    version: '1.0.0',
+    siteURL: 'https://api.leadfusionhq.com',
+    baseUrl: '/api/billing',
+    endpoints: {
+      cards: {
+        saveCard: 'POST /api/billing/save-card',
+        getCards: 'GET /api/billing/cards',
+        setDefaultCard: 'POST /api/billing/cards/default',
+        deleteCard: 'DELETE /api/billing/cards/:vaultId'
+      },
+      funds: {
+        addFunds: 'POST /api/billing/add-funds',
+        testAutoTopUp: 'POST /api/billing/test-auto-topup',
+        toggleAutoTopUp: 'POST /api/billing/auto-topup/toggle',
+        getBalance: 'GET /api/billing/balance',
+        getTransactions: 'GET /api/billing/transactions'
+      },
+      contracts: {
+        acceptContract: 'POST /api/billing/contract/accept [INACTIVE]',
+        getCurrentContract: 'GET /api/billing/contract/current [INACTIVE]',
+        getContractStatus: 'GET /api/billing/contract/status [INACTIVE]'
+      },
+      admin: {
+        chargeUser: 'POST /api/billing/charge-user [INACTIVE]',
+        assignLead: 'POST /api/billing/assign-lead [INACTIVE]'
+      }
+    },
+    security: {
+      auth: 'JWT-based authentication required',
+      roles: 'Access restricted to users with USER role (some endpoints ADMIN only)'
+    }
+  });
+});
+
+
+
+billingRouter.use(
+    checkAuth,
+    authorizedRoles([CONSTANT_ENUM.USER_ROLE.USER])
+);
 
 // billingRouter.get(
 //     API.GET_CONTRACT,
@@ -102,43 +142,7 @@ billingRouter.post(API.SET_DEFAULT_CARD, billingController.setDefaultCard);
 billingRouter.delete(API.DELETE_CARD, billingController.deleteCard);
 
 
-// Info endpoint for Billing API
-billingRouter.get(API.BILLING_INFO, (req, res) => {
-  res.json({
-    message: 'LeadFusionHQ Billing API',
-    version: '1.0.0',
-    siteURL: 'https://api.leadfusionhq.com',
-    baseUrl: '/api/billing',
-    endpoints: {
-      cards: {
-        saveCard: 'POST /api/billing/save-card',
-        getCards: 'GET /api/billing/cards',
-        setDefaultCard: 'POST /api/billing/cards/default',
-        deleteCard: 'DELETE /api/billing/cards/:vaultId'
-      },
-      funds: {
-        addFunds: 'POST /api/billing/add-funds',
-        testAutoTopUp: 'POST /api/billing/test-auto-topup',
-        toggleAutoTopUp: 'POST /api/billing/auto-topup/toggle',
-        getBalance: 'GET /api/billing/balance',
-        getTransactions: 'GET /api/billing/transactions'
-      },
-      contracts: {
-        acceptContract: 'POST /api/billing/contract/accept [INACTIVE]',
-        getCurrentContract: 'GET /api/billing/contract/current [INACTIVE]',
-        getContractStatus: 'GET /api/billing/contract/status [INACTIVE]'
-      },
-      admin: {
-        chargeUser: 'POST /api/billing/charge-user [INACTIVE]',
-        assignLead: 'POST /api/billing/assign-lead [INACTIVE]'
-      }
-    },
-    security: {
-      auth: 'JWT-based authentication required',
-      roles: 'Access restricted to users with USER role (some endpoints ADMIN only)'
-    }
-  });
-});
+
 
 
 module.exports = billingRouter;
