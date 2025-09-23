@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 const { createCustomerVault, chargeCustomerVault ,deleteCustomerVault} = require('../nmi/nmi.service');
 const { ErrorHandler } = require('../../utils/error-handler');
 const { RegularUser } = require('../../models/user.model');
+const { billingLogger } = require('../../utils/logger');
 
 // Contract management
 const getCurrentContract = async () => {
@@ -68,6 +69,12 @@ const getUserContractStatus = async (userId) => {
 const saveCard = async (cardData) => {
   const { user_id, card_number, expiry_month, expiry_year, cvv, billing_address, zip, full_name } = cardData;
 
+  billingLogger.info('Starting card save process', { 
+    userId: user_id, 
+    cardLast4: card_number.slice(-4),
+    fullName: full_name 
+  });
+
   const [first_name, ...last_nameParts] = full_name.split(" ");
   const last_name = last_nameParts.join(" ");
 
@@ -83,11 +90,19 @@ const saveCard = async (cardData) => {
     cvv: cvv
   };
 
+  billingLogger.info('Sending card data to NMI vault', { 
+    userId: user_id,
+    cardLast4: card_number.slice(-4)
+  });
+
   let vaultResponse;
   try {
     vaultResponse = await createCustomerVault(payload);
   } catch (err) {
-    console.error('NMI vault creation error:', err.message);
+    billingLogger.error('NMI vault creation failed', err, { 
+      userId: user_id,
+      cardLast4: card_number.slice(-4)
+    });
     throw new ErrorHandler(500, 'Failed to save card to payment gateway');
   }
 
@@ -109,8 +124,18 @@ const saveCard = async (cardData) => {
 
   const vaultId = params.customer_vault_id;
   if (!vaultId) {
+    billingLogger.error('Failed to retrieve vault ID from NMI response', null, { 
+      userId: user_id,
+      responseParams: params
+    });
     throw new ErrorHandler(500, 'Failed to retrieve customer vault ID from gateway');
   }
+
+  billingLogger.info('NMI vault created successfully', { 
+    userId: user_id,
+    vaultId,
+    cardLast4: card_number.slice(-4)
+  });
 
   // 🔹 Save to DB as new payment method
   const user = await User.findById(user_id);
@@ -139,6 +164,14 @@ const saveCard = async (cardData) => {
   user.hasStoredCard = true;
   await user.save();
 
+  billingLogger.info('Card saved to database successfully', { 
+    userId: user_id,
+    vaultId,
+    cardBrand,
+    isDefault: newPaymentMethod.isDefault,
+    totalCards: user.paymentMethods.length
+  });
+
   return {
     customerVaultId: vaultId,
     userId: user._id,
@@ -162,6 +195,11 @@ const detectCardBrand = (cardNumber) => {
 
 // Billing operations
 const addFunds = async (userId, amount) => {
+  billingLogger.info('Starting add funds process', { 
+    userId, 
+    amount 
+  });
+
   const user = await User.findById(userId);
   if (!user) throw new ErrorHandler(404, 'User not found');
 
@@ -189,13 +227,34 @@ const addFunds = async (userId, amount) => {
   
   // FINALLY: If still no vault ID, throw error
   if (!customerVaultIdToUse) {
+    billingLogger.error('No payment method found for user', null, { 
+      userId,
+      amount,
+      hasPaymentMethods: user.paymentMethods?.length > 0,
+      hasLegacyVaultId: !!user.customerVaultId
+    });
     throw new ErrorHandler(400, 'No payment method found. Please add a card first.');
   }
+
+  billingLogger.info('Charging payment method for funds', { 
+    userId,
+    amount,
+    vaultId: customerVaultIdToUse,
+    cardLast4: defaultPaymentMethod.cardLastFour
+  });
 
   // Charge using the found vault ID
   const chargeResult = await chargeCustomerVault(customerVaultIdToUse, amount, 'Add funds to account');
   
   if (!chargeResult.success) {
+    billingLogger.error('Payment charge failed', null, { 
+      userId,
+      amount,
+      vaultId: customerVaultIdToUse,
+      responseCode: chargeResult.responseCode,
+      message: chargeResult.message
+    });
+
     // Handle specific decline cases
     if (chargeResult.responseCode === '2') {
       throw new ErrorHandler(400, `Payment declined: ${chargeResult.message}. Please use a different payment method.`);
@@ -206,9 +265,18 @@ const addFunds = async (userId, amount) => {
     throw new ErrorHandler(400, 'Payment failed: ' + chargeResult.message);
   }
 
+  const oldBalance = user.balance || 0;
   // Add to user's balance
-  user.balance = (user.balance || 0) + parseFloat(amount);
+  user.balance = oldBalance + parseFloat(amount);
   await user.save();
+
+  billingLogger.info('Funds added successfully', { 
+    userId,
+    amount,
+    oldBalance,
+    newBalance: user.balance,
+    transactionId: chargeResult.transactionId
+  });
 
   try {
     // Create transaction record
@@ -554,18 +622,32 @@ const checkAndPerformAutoTopUp = async (userId, currentBalance) => {
 };
 
 const testLeadDeduction = async (userId, deductAmount) => {
+  billingLogger.info('Starting test lead deduction', { 
+    userId, 
+    deductAmount 
+  });
+
   const user = await User.findById(userId);
   if (!user) throw new ErrorHandler(404, 'User not found');
 
   const originalBalance = user.balance || 0;
-  console.log(`Original balance: $${originalBalance}`);
-  console.log(`Attempting to deduct: $${deductAmount}`);
+  billingLogger.info('User balance and deduction details', { 
+    userId,
+    originalBalance,
+    deductAmount,
+    balanceSufficient: originalBalance >= deductAmount
+  });
   
   // Check payment mode
   const paymentMode = user.autoTopUp?.paymentMode || 'prepaid';
   const autoPayEnabled = user.autoTopUp?.enabled || false;
   
-  console.log(`Payment mode: ${paymentMode}, Auto-pay enabled: ${autoPayEnabled}`);
+  billingLogger.info('User payment configuration', { 
+    userId,
+    paymentMode,
+    autoPayEnabled,
+    hasPaymentMethods: user.paymentMethods?.length > 0
+  });
 
   // Step 1: Check if wallet balance is sufficient
   if (originalBalance >= deductAmount) {
@@ -613,7 +695,11 @@ const testLeadDeduction = async (userId, deductAmount) => {
 };
 
 const handleDirectCardCharge = async (user, deductAmount, originalBalance) => {
-  console.log('Attempting direct card charge...');
+  billingLogger.info('Attempting direct card charge', { 
+    userId: user._id,
+    deductAmount,
+    originalBalance
+  });
   
   // Get default payment method
   let defaultPaymentMethod;
@@ -622,6 +708,10 @@ const handleDirectCardCharge = async (user, deductAmount, originalBalance) => {
   }
 
   if (!defaultPaymentMethod?.customerVaultId) {
+    billingLogger.error('No default payment method for direct charge', null, { 
+      userId: user._id,
+      hasPaymentMethods: user.paymentMethods?.length > 0
+    });
     throw new ErrorHandler(400, 
       'No default payment method available for direct charging. ' +
       'Please add a payment method or add funds to your wallet.'
