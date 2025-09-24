@@ -12,6 +12,7 @@ const { cleanupTempFile } = require('../../middleware/csv-upload');
 const path = require('path');
 const fs = require('fs');
 const MAIL_HANDLER = require('../../mail/mails');
+const SmsServices = require('../../services/sms/sms.service');
 
 // Create single lead
 const createLead = wrapAsync(async (req, res) => {
@@ -59,6 +60,27 @@ console.log("Campaign after populate:", campaign?.name, campaign?.delivery);
       console.error(`Failed to send notification:`, err.message);
     }
   
+    /*  ---- Send Lead Assignment SMS ----  **/
+      if (hasSMS && campaign?.delivery?.phone?.numbers) {
+        try {
+          await SmsServices.sendLeadAssignSMS({
+            to: campaign.delivery.phone.numbers,
+            name: campaign?.name || 'Campaign User',
+            leadName: result?.lead_id,
+            assignedBy: req.user?.name || 'System',
+            leadDetailsUrl: `${process.env.UI_LINK}/dashboard/leads/${result?._id}`,
+            campaignName: campaign?.name,
+          });
+          console.log(`Lead assignment SMS sent to ${campaign.delivery.phone.numbers}`);
+        } catch (err) {
+          console.error('Failed to send lead assignment SMS:', err.message);
+        }
+      }
+
+    /*  ---- Send Both Email and SMS (if both are enabled) ----**/
+      if (hasEmail && hasSMS && campaign?.delivery?.email?.addresses && campaign?.delivery?.phone?.numbers) {
+        console.log('Both email and SMS notifications sent for lead assignment');
+      }
     sendResponse(res, { leadData: result }, 'Lead has been created successfully', 201);
   });
   
