@@ -12,11 +12,10 @@ const API = {
 };
 
 
-
 smsRouter.post(API.SEND_SMS, SmsController.sendSMS);
-smsRouter.post(API.BULK_SEND, SmsController.sendBulkSMS);
+// smsRouter.post(API.BULK_SEND, SmsController.sendBulkSMS);
 // smsRouter.post(API.LEAD_ASSIGN, SmsController.sendLeadAssignSMS);
-smsRouter.get(API.STATUS, SmsController.getSMSStatus);
+// smsRouter.get(API.STATUS, SmsController.getSMSStatus);
 
 smsRouter.get(API.INFO, (req, res) => {
   res.json({

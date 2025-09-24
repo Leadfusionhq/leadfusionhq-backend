@@ -2,7 +2,7 @@ const Lead = require('../models/lead.model');
 
 const generateRandomId = () => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let result = 'CMP-';
+  let result = 'LED-';
   for (let i = 0; i < 5; i++) {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
   }

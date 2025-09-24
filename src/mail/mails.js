@@ -258,6 +258,11 @@ const sendTestMail = async (toEmail) => {
   }
 };
 const sendLeadAssignEmail = async ({ to, name, leadName, assignedBy, leadDetailsUrl, campaignName }) => {
+  
+  const recipients = Array.isArray(to) 
+    ? to 
+    : to.split(',').map(email => email.trim());
+
   const html = createEmailTemplate({
     title: 'New Lead Assigned',
     greeting: `Hello ${name},`,
@@ -275,7 +280,7 @@ const sendLeadAssignEmail = async ({ to, name, leadName, assignedBy, leadDetails
 
   return resend.emails.send({
     from: FROM_EMAIL,
-    to,
+    to: recipients,
     subject: `📋 New Lead Assigned in "${campaignName}"`,
     html,
   });

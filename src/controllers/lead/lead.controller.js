@@ -13,6 +13,7 @@ const path = require('path');
 const fs = require('fs');
 const MAIL_HANDLER = require('../../mail/mails');
 const SmsServices = require('../../services/sms/sms.service');
+// const SmsController = require('../../controllers/sms/sms.controller.js')
 
 // Create single lead
 const createLead = wrapAsync(async (req, res) => {
@@ -38,49 +39,45 @@ const createLead = wrapAsync(async (req, res) => {
       );
   
       // ---- Send Lead Assignment Email ----
- const campaign = result.campaign_id;
-console.log("Campaign after populate:", campaign?.name, campaign?.delivery);
-    
-      if (campaign?.delivery?.method?.includes('email') && campaign?.delivery?.email?.addresses) {
-        try {
-          await MAIL_HANDLER.sendLeadAssignEmail({
-            to: campaign.delivery.email.addresses,
-            name: campaign?.name || 'Campaign User',
-            leadName: result?.lead_id,
-            assignedBy: req.user?.name || 'System',
-            leadDetailsUrl: `${process.env.UI_LINK}/dashboard/leads/${result?._id}`,
-            campaignName: campaign?.name,
-          });
-          console.log(`Lead assignment email sent to ${campaign.delivery.email.addresses}`);
-        } catch (err) {
-          console.error('Failed to send lead assignment email:', err.message);
+        const campaign = result.campaign_id;
+        console.log("Campaign after populate:", campaign?.name, campaign?.delivery);
+        
+        if (campaign?.delivery?.method?.includes('email') && campaign?.delivery?.email?.addresses) {
+            try {
+            await MAIL_HANDLER.sendLeadAssignEmail({
+                to: campaign.delivery.email.addresses,
+                name: campaign?.name || 'Campaign User',
+                leadName: result?.lead_id,
+                assignedBy: req.user?.name || 'System',
+                leadDetailsUrl: `${process.env.UI_LINK}/dashboard/leads/${result?._id}`,
+                campaignName: campaign?.name,
+            });
+            console.log(`Lead assignment email sent to ${campaign.delivery.email.addresses}`);
+            } catch (err) {
+            console.error('Failed to send lead assignment email:', err.message);
+            }
         }
-      }
+
+        if (campaign?.delivery?.method?.includes('phone') && campaign?.delivery?.phone?.numbers) {
+            try {
+
+                await SmsServices.sendSms({
+                    to: campaign.delivery.phone.numbers,
+                    message: `A new lead, ${result?.lead_id}, has been assigned to you under the campaign: ${campaign?.name}. Please check your dashboard for more details.`,
+                    from: '+18563908470',
+                });
+
+                console.log(`Lead assignment SMS sent to ${campaign.delivery.phone.numbers}`);
+
+            } catch (err) {
+                console.error('Failed to send lead assignment SMS:', err.message);
+            }
+        }
+
     } catch (err) {
       console.error(`Failed to send notification:`, err.message);
     }
-  
-    /*  ---- Send Lead Assignment SMS ----  **/
-      if (hasSMS && campaign?.delivery?.phone?.numbers) {
-        try {
-          await SmsServices.sendLeadAssignSMS({
-            to: campaign.delivery.phone.numbers,
-            name: campaign?.name || 'Campaign User',
-            leadName: result?.lead_id,
-            assignedBy: req.user?.name || 'System',
-            leadDetailsUrl: `${process.env.UI_LINK}/dashboard/leads/${result?._id}`,
-            campaignName: campaign?.name,
-          });
-          console.log(`Lead assignment SMS sent to ${campaign.delivery.phone.numbers}`);
-        } catch (err) {
-          console.error('Failed to send lead assignment SMS:', err.message);
-        }
-      }
 
-    /*  ---- Send Both Email and SMS (if both are enabled) ----**/
-      if (hasEmail && hasSMS && campaign?.delivery?.email?.addresses && campaign?.delivery?.phone?.numbers) {
-        console.log('Both email and SMS notifications sent for lead assignment');
-      }
     sendResponse(res, { leadData: result }, 'Lead has been created successfully', 201);
   });
   
