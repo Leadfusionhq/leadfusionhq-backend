@@ -13,74 +13,82 @@ const path = require('path');
 const fs = require('fs');
 const MAIL_HANDLER = require('../../mail/mails');
 const SmsServices = require('../../services/sms/sms.service');
-// const SmsController = require('../../controllers/sms/sms.controller.js')
+const BillingServices = require('../../services/billing/billing.service.js');
+const mongoose = require('mongoose');
 
 // Create single lead
+
 const createLead = wrapAsync(async (req, res) => {
-    const user_id = req.user._id;
-    const lead_id = await generateUniqueLeadId();
-    const leadData = { ...req.body, user_id, lead_id };
-  
-    const result = await LeadServices.createLead(leadData);
-    const message = 'New Lead has been assigned to your campaign!';
-    await result.populate('campaign_id');
 
-    console.log('Campaign User ID:', result?.campaign_id?.user_id);
-  
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
     try {
-      // Send notification
-      await NotificationServices.createNotification(
-        user_id,
-        result?.campaign_id?.user_id,
-        'info',
-        message,
-        0,
-        `/dashboard/leads`
-      );
-  
-      // ---- Send Lead Assignment Email ----
-        const campaign = result.campaign_id;
-        console.log("Campaign after populate:", campaign?.name, campaign?.delivery);
-        
-        if (campaign?.delivery?.method?.includes('email') && campaign?.delivery?.email?.addresses) {
-            try {
-            await MAIL_HANDLER.sendLeadAssignEmail({
-                to: campaign.delivery.email.addresses,
-                name: campaign?.name || 'Campaign User',
-                leadName: result?.lead_id,
-                assignedBy: req.user?.name || 'System',
-                leadDetailsUrl: `${process.env.UI_LINK}/dashboard/leads/${result?._id}`,
-                campaignName: campaign?.name,
-            });
-            console.log(`Lead assignment email sent to ${campaign.delivery.email.addresses}`);
-            } catch (err) {
-            console.error('Failed to send lead assignment email:', err.message);
+        const leadCost = 0;
+        const { campaign_id } = req.body;
+        const user_id = req.user._id;
+        const campaignData = await LeadServices.validatePrepaidCampaignBalance(campaign_id, leadCost);
+        console.log('Balance available, generating lead...');
+        const lead_id = await generateUniqueLeadId();
+        const leadData = { ...req.body, user_id, lead_id };
+        const result = await LeadServices.createLead(leadData, { session });
+        await result.populate('campaign_id');
+        console.log('Campaign User ID:', result?.campaign_id?.user_id);
+        const assignedBy = req.user._id;
+        await BillingServices.assignLeadNew(
+            campaignData.user_id,
+            result._id,
+            leadCost,
+            assignedBy,
+            session
+        );
+        await session.commitTransaction();
+        session.endSession();
+        console.log('Lead assigned in billing successfully');
+        const message = 'New Lead has been assigned to your campaign!';
+        try {
+            await NotificationServices.createNotification(user_id, result?.campaign_id?.user_id, 'info', message, 0, `/dashboard/leads`);
+            const campaign = result.campaign_id;
+            console.log("Campaign after populate:", campaign?.name, campaign?.delivery);
+            if (campaign?.delivery?.method?.includes('email') && campaign?.delivery?.email?.addresses) {
+                try {
+                    await MAIL_HANDLER.sendLeadAssignEmail({
+                        to: campaign.delivery.email.addresses,
+                        name: campaign?.name || 'Campaign User',
+                        leadName: result?.lead_id,
+                        assignedBy: req.user?.name || 'System',
+                        leadDetailsUrl: `${process.env.UI_LINK}/dashboard/leads/${result?._id}`,
+                        campaignName: campaign?.name,
+                    });
+                    console.log(`Lead assignment email sent to ${campaign.delivery.email.addresses}`);
+                } catch (err) {
+                    console.error('Failed to send lead assignment email:', err.message);
+                }
             }
-        }
-
-        if (campaign?.delivery?.method?.includes('phone') && campaign?.delivery?.phone?.numbers) {
-            try {
-
-                await SmsServices.sendSms({
-                    to: campaign.delivery.phone.numbers,
-                    message: `A new lead, ${result?.lead_id}, has been assigned to you under the campaign: ${campaign?.name}. Please check your dashboard for more details.`,
-                    from: '+18563908470',
-                });
-
-                console.log(`Lead assignment SMS sent to ${campaign.delivery.phone.numbers}`);
-
-            } catch (err) {
-                console.error('Failed to send lead assignment SMS:', err.message);
+            if (campaign?.delivery?.method?.includes('phone') && campaign?.delivery?.phone?.numbers) {
+                try {
+                    await SmsServices.sendSms({
+                        to: campaign.delivery.phone.numbers,
+                        message: `A new lead, ${result?.lead_id}, has been assigned to you under the campaign: ${campaign?.name}. Please check your dashboard for more details.`,
+                        from: '+18563908470',
+                    });
+                    console.log(`Lead assignment SMS sent to ${campaign.delivery.phone.numbers}`);
+                } catch (err) {
+                    console.error('Failed to send lead assignment SMS:', err.message);
+                }
             }
+        } catch (err) {
+            console.error(`Failed to send notification:`, err.message);
         }
-
+        sendResponse(res, { leadData: result }, 'Lead has been created successfully', 201);
     } catch (err) {
-      console.error(`Failed to send notification:`, err.message);
+        await session.abortTransaction();
+        session.endSession();
+        throw err;
     }
+});
 
-    sendResponse(res, { leadData: result }, 'Lead has been created successfully', 201);
-  });
-  
+
 
 // Get all leads (paginated with filters)
 const getLeads = wrapAsync(async (req, res) => {

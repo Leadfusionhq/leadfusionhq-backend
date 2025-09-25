@@ -6,11 +6,17 @@ const { ErrorHandler } = require('../../utils/error-handler');
 const CONSTANT_ENUM = require('../../helper/constant-enums.js');
 const { addCSVProcessingJob, getJobStatus } = require('../../queue/csvProcessor');
 const mongoose = require('mongoose');
+const { User } = require('../../models/user.model.js');
 
-const createLead = async (data) => {
+const createLead = async (data,  options = {}) => {
   try {
-    const newLead = await Lead.create(data);
-    const populatedLead = await Lead.findById(newLead._id).populate('campaign_id', 'user_id').exec();
+    const { session } = options;
+
+    const newLead = await Lead.create([data], { session });
+    const populatedLead = await Lead.findById(newLead[0]._id)
+    .populate('campaign_id', 'user_id')
+    .session(session || null) 
+    .exec();
 
     return populatedLead;
   } catch (error) {
@@ -287,6 +293,38 @@ const getUserProcessingJobs = async (userId, page = 1, limit = 10) => {
   }
 };
 
+const validatePrepaidCampaignBalance = async (campaign_id, leadPrice = 10) => {
+
+  try {
+
+    const campaign = await Campaign.findById(campaign_id);
+    if (!campaign) {
+      throw new ErrorHandler(404, 'Campaign not found');
+    }
+
+    if (campaign.payment_type === 'prepaid') {
+      const campaignUser = await User.findById(campaign.user_id);
+
+      if (!campaignUser) {
+        throw new ErrorHandler(404, 'Campaign user not found');
+      }
+
+      console.log(`User Balance: ${campaignUser.balance}, Lead Price: ${leadPrice}`);
+
+      if (campaignUser.balance < leadPrice) {
+        throw new ErrorHandler(400, 'Insufficient balance to create lead');
+      }
+    }
+
+    return campaign;
+  } catch (error) {
+    if (error instanceof ErrorHandler) {
+      throw error;
+    }
+    throw new ErrorHandler(500, error.message || 'Failed to validate campaign balance');
+  }
+};
+
 module.exports = {
   createLead,
   getLeads,
@@ -298,4 +336,5 @@ module.exports = {
   getProcessingStatus,
   getUserProcessingJobs,
   validateCSVFormat,
+  validatePrepaidCampaignBalance,
 };

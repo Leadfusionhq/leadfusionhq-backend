@@ -67,7 +67,7 @@ const getUserContractStatus = async (userId) => {
 
 // Card management
 const saveCard = async (cardData) => {
-  const { user_id, card_number, expiry_month, expiry_year, cvv, billing_address, zip, full_name } = cardData;
+  const { user_id, card_number, expiry_month, expiry_year, cvv, billing_address, zip, full_name , email } = cardData;
 
   billingLogger.info('Starting card save process', { 
     userId: user_id, 
@@ -81,10 +81,17 @@ const saveCard = async (cardData) => {
   const expYear = expiry_year.toString().slice(-2);
 
   const payload = {
+    first_name: first_name,
+    last_name: last_name,
+    email: email,
     billing_first_name: first_name,
     billing_last_name: last_name,
     billing_address1: billing_address || '123 Default St',
+    billing_address2:'',
+    billing_city:'CityName',
+    billing_state:'StateCode',
     billing_zip: zip || '00000',
+    billing_country:'US',
     ccnumber: card_number,
     ccexp: `${expiry_month}${expYear}`,
     cvv: cvv
@@ -391,6 +398,40 @@ const assignLead = async (userId, leadId, leadCost, assignedBy) => {
       leadId
     };
   }
+};
+
+// only check balance (no card deduction)
+const assignLeadNew = async (userId, leadId, leadCost, assignedBy, session) => {
+  const user = await User.findById(userId).session(session);
+  if (!user) throw new ErrorHandler(404, 'User not found');
+
+  const currentBalance = user.balance || 0;
+  if (currentBalance < leadCost) {
+    throw new ErrorHandler(400, 'Insufficient balance to assign lead');
+  }
+
+  user.balance = currentBalance - leadCost;
+  await user.save({ session });
+
+  const transaction = new Transaction({
+    userId,
+    type: 'MANUAL',
+    amount: -leadCost,
+    status: 'COMPLETED',
+    description: `Lead assigned: ${leadId}`,
+    paymentMethod: 'BALANCE',
+    leadId,
+    assignedBy,
+    balanceAfter: user.balance
+  });
+  await transaction.save({ session });
+
+  return {
+    paymentMethod: 'BALANCE',
+    newBalance: user.balance,
+    transactionId: transaction._id,
+    leadId
+  };
 };
 
 const manualCharge = async (userId, amount, note, chargedBy) => {
@@ -833,4 +874,5 @@ module.exports = {
   deleteUserCard,
   testLeadDeduction,
   checkAndPerformAutoTopUp, 
+  assignLeadNew,
 };

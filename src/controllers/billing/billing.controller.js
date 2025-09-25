@@ -53,13 +53,14 @@ const acceptContract = wrapAsync(async (req, res) => {
 // Card management
 const saveCard = wrapAsync(async (req, res) => {
     const user_id = req.user._id;
+    const email = req.user.email;
     
     // const contractStatus = await BillingServices.getUserContractStatus(user_id);
     // if (!contractStatus.hasAcceptedLatest) {
     //     throw new ErrorHandler(400, 'You must accept the latest contract before saving payment information.');
     // }
     
-    const cardData = { ...req.body, user_id };
+    const cardData = { ...req.body, user_id , email};
     
     billingLogger.info('User attempting to save card', { 
         userId: user_id,
