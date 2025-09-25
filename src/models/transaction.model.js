@@ -26,7 +26,7 @@ const transactionSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['CARD', 'BANK_TRANSFER', 'PAYPAL', 'OTHER'],
+    enum: ['CARD', 'BANK_TRANSFER', 'PAYPAL', 'OTHER', 'BALANCE'],
   },
   transactionId: {
     type: String,
