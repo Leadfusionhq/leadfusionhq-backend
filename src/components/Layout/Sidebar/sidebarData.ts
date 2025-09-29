@@ -93,6 +93,12 @@ export const adminSidebarItems: SidebarItem[] = [
 
   // },
 
+  {
+    id: 'search',
+    name: 'Search',
+    icon: '/images/icons/search.svg',
+    link: '/search',
+  },
 
 
 ];

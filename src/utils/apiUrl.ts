@@ -146,6 +146,15 @@ export const CSV_API = {
   IMPORT_SHEET_CSV: `${CSV_API_BASE}/csv/google-sheet`,
 };
 
+/** ::::::::::::::::::SEARCH ROUTES :::::::::::::::::: */
+const SEARCH_API_BASE = `${API_IMPORT_BASE}/filters`;
+
+export const SEARCH_API = {
+  FILTER_QUERIES: `${SEARCH_API_BASE}/filteringdata`,
+  SEARCH_QUERIES: `${SEARCH_API_BASE}/count`,
+
+};
+
 
 /** ::::::::::::::::::notifications ROUTES :::::::::::::::::: */
 const NOTIFICATION_API_BASE = `${API_BASE}/notifications`;
