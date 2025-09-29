@@ -2,6 +2,7 @@ const fetchWrapper = require('../../utils/fetchWrapper');
 const { billingLogger } = require('../../utils/logger');
 const NMI_API_URL = process.env.NMI_API_URL;
 const SECURITY_KEY = process.env.NMI_SECURITY_KEY;
+const { User } = require('../../models/user.model');
 
 const createCustomerVault = async (cardInfo) => {
   const payload = {
@@ -69,13 +70,33 @@ const chargeCustomerVault = async (customerVaultId, amount, description = '') =>
       message: 'Payment configuration error: Invalid API URL'
     };
   }
+
+  const uniqueOrderId = `ORDER-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+  const result = await User.aggregate([
+    { $unwind: "$paymentMethods" },
+    { $match: { "paymentMethods.customerVaultId": customerVaultId } },
+    { $project: { _id: 0, cvv: "$paymentMethods.cvv" } }
+  ]);
+  const cvv = result.length > 0 ? result[0].cvv : null;
+
+  if(cvv == null){
+    return {
+      success: false,
+      message: 'Update Your Card Details'
+    };
+  }
   
   const payload = {
     security_key: SECURITY_KEY,
     type: 'sale',
     customer_vault_id: customerVaultId,
     amount: amount.toFixed(2),
-    order_description: description
+    // currency: 'USD', 
+    // orderid: uniqueOrderId, 
+    order_description: description || 'Customer charge',
+    // test_mode: '1',
+    cvv:cvv,
   };
   
   billingLogger.info('Sending charge request to NMI', { 
