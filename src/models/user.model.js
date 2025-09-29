@@ -152,6 +152,11 @@ paymentMethods: [{
     type: Boolean,
     default: false
   },
+  cvv: {
+    type: String,
+    required: false,
+    default: null  
+  },
   createdAt: {
     type: Date,
     default: Date.now

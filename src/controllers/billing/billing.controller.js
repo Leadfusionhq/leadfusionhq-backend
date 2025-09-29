@@ -163,8 +163,10 @@ const getCards = wrapAsync(async (req, res) => {
 
 // Billing operations
 const addFunds = wrapAsync(async (req, res) => {
+    console.log(req.body);
+    
     const user_id = req.user._id;
-    const { amount } = req.body;
+    const { amount, vaultId} = req.body;
     
     billingLogger.info('User attempting to add funds', { 
         userId: user_id, 
@@ -182,7 +184,7 @@ const addFunds = wrapAsync(async (req, res) => {
     }
     
     try {
-        const result = await BillingServices.addFunds(user_id, amount);
+        const result = await BillingServices.addFunds(user_id, amount , vaultId);
         billingLogger.info('Funds added successfully', { 
             userId: user_id, 
             amount, 
@@ -194,6 +196,8 @@ const addFunds = wrapAsync(async (req, res) => {
             userId: user_id, 
             amount 
         });
+
+        console.log(`error received in billing controller is ${err.message}`)
         
         // Check if it's a payment decline (400 error) and pass through the message
         if (err.statusCode === 400) {

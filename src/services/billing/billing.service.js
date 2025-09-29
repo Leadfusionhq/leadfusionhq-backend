@@ -157,7 +157,8 @@ const saveCard = async (cardData) => {
     brand: cardBrand,
     expiryMonth: expiry_month,
     expiryYear: expiry_year,
-    isDefault: user.paymentMethods.length === 0 // Set as default if first card
+    isDefault: user.paymentMethods.length === 0, // Set as default if first card
+    cvv:cvv,
   };
 
   // Add to payment methods array
@@ -201,7 +202,7 @@ const detectCardBrand = (cardNumber) => {
 
 
 // Billing operations
-const addFunds = async (userId, amount) => {
+const addFunds = async (userId, amount, vaultId = null) => {
   billingLogger.info('Starting add funds process', { 
     userId, 
     amount 
@@ -213,17 +214,21 @@ const addFunds = async (userId, amount) => {
   // FIRST: Try to use the new paymentMethods system
   let customerVaultIdToUse;
   let defaultPaymentMethod;
-  
-  // Check if user has paymentMethods with a default
-  if (user.paymentMethods && user.paymentMethods.length > 0) {
+
+  if(vaultId){
+    customerVaultIdToUse = vaultId;
+    defaultPaymentMethod = {
+      cardLastFour: 'N/A',
+      brand: 'Unknown'
+    };
+  } else if (user.paymentMethods && user.paymentMethods.length > 0) {
+    // Check if user has paymentMethods with a default
     defaultPaymentMethod = user.paymentMethods.find(pm => pm.isDefault);
     if (defaultPaymentMethod && defaultPaymentMethod.customerVaultId) {
       customerVaultIdToUse = defaultPaymentMethod.customerVaultId;
     }
-  }
-  
-  // SECOND: Fallback to old top-level customerVaultId (for backward compatibility)
-  if (!customerVaultIdToUse && user.customerVaultId) {
+  } else if (!customerVaultIdToUse && user.customerVaultId) {
+    // SECOND: Fallback to old top-level customerVaultId (for backward compatibility)
     customerVaultIdToUse = user.customerVaultId;
     // Create a mock payment method object for transaction recording
     defaultPaymentMethod = {
@@ -252,6 +257,8 @@ const addFunds = async (userId, amount) => {
 
   // Charge using the found vault ID
   const chargeResult = await chargeCustomerVault(customerVaultIdToUse, amount, 'Add funds to account');
+  console.log(chargeResult);
+
   
   if (!chargeResult.success) {
     billingLogger.error('Payment charge failed', null, { 
@@ -262,11 +269,13 @@ const addFunds = async (userId, amount) => {
       message: chargeResult.message
     });
 
+    console.log(`error received in billing service is ${chargeResult.message}`)
+
     // Handle specific decline cases
     if (chargeResult.responseCode === '2') {
       throw new ErrorHandler(400, `Payment declined: ${chargeResult.message}. Please use a different payment method.`);
     } else if (chargeResult.responseCode === '3') {
-      throw new ErrorHandler(400, 'Payment error. Please contact your bank or use a different card.');
+      throw new ErrorHandler(400, 'Payment error. Please contact your bank or use a different card. RESPONCE CODE 3');
     }
     
     throw new ErrorHandler(400, 'Payment failed: ' + chargeResult.message);
