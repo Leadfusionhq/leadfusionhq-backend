@@ -12,7 +12,7 @@ const transactionSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['ADD_FUNDS', 'WITHDRAWAL', 'TRANSFER', 'REFUND', 'MANUAL', 'AUTO', 'DEDUCTION','TEST_DEDUCTION'],
+    enum: ['ADD_FUNDS', 'WITHDRAWAL', 'TRANSFER', 'REFUND', 'MANUAL', 'AUTO', 'DEDUCTION','TEST_DEDUCTION','ADMIN_ADD_FUNDS'],
     required: true,
   },
   status: {

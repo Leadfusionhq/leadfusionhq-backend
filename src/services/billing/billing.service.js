@@ -869,6 +869,50 @@ const deleteUserCard = async (userId, vaultId) => {
   };
 };
 
+const addBalanceByAdmin = async (userId, amount, adminId) => {
+  billingLogger.info('Starting admin add balance process', { userId, amount, adminId });
+
+  if (!userId) throw new ErrorHandler(400, 'User ID is required');
+  if (!amount || amount <= 0) throw new ErrorHandler(400, 'Amount must be greater than 0');
+
+  const user = await User.findById(userId);
+  if (!user) throw new ErrorHandler(404, 'User not found');
+
+  const oldBalance = user.balance || 0;
+  user.balance = oldBalance + parseFloat(amount.toString());
+  await user.save();
+
+  billingLogger.info('Balance updated successfully', { userId, amount, oldBalance, newBalance: user.balance });
+
+  try {
+    const transaction = new Transaction({
+      userId,
+      adminId,
+      type: 'ADMIN_ADD_FUNDS',
+      amount: parseFloat(amount.toString()),
+      status: 'COMPLETED',
+      description: 'Balance added by admin',
+      balanceAfter: user.balance
+    });
+    await transaction.save();
+
+    return {
+      success: true,
+      newBalance: user.balance,
+      transactionId: transaction._id,
+      message: 'Balance added successfully'
+    };
+  } catch (transactionError) {
+    billingLogger.error('Transaction creation failed', transactionError, { userId, amount, adminId });
+    return {
+      success: true,
+      newBalance: user.balance,
+      message: 'Balance added successfully (transaction record failed)',
+      warning: 'Transaction record could not be created'
+    };
+  }
+};
+
 module.exports = {
   getCurrentContract,
   getUserContractStatus,
@@ -884,4 +928,5 @@ module.exports = {
   testLeadDeduction,
   checkAndPerformAutoTopUp, 
   assignLeadNew,
+  addBalanceByAdmin,
 };
