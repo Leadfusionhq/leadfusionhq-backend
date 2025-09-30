@@ -95,19 +95,37 @@ const getLeadByUserId = async (page = 1, limit = 10, user_id) => {
 };
 
 const getLeadById = async (leadId, userId) => {
-  const lead = await Lead.findOne({ _id: leadId, user_id: userId }).lean();
+  // const lead = await Lead.findOne({ _id: leadId, user_id: userId }).lean();
+  // console.log('userId',userId)
+  // console.log('leadId',leadId)
+  // console.log(lead)
+  // if (!lead) {
+  //   throw new ErrorHandler(404, 'Lead not found or access denied');
+  // }
 
-  if (!lead) {
+  // return lead;
+
+  const lead = await Lead.findOne({ _id: leadId })
+  .populate({
+    path: 'campaign_id',
+  })
+  .lean();
+
+  if (!lead || String(lead.campaign_id?.user_id) !== String(userId)) {
     throw new ErrorHandler(404, 'Lead not found or access denied');
   }
 
   return lead;
+
 };
 
 const getLeadByIdForAdmin = async (leadId) => {
   const lead = await Lead.findById(leadId)
     .populate('user_id', 'name email')
     .populate('address.state', 'name abbreviation')
+    .populate({
+      path: 'campaign_id',
+    })
     .lean();
 
   if (!lead) {

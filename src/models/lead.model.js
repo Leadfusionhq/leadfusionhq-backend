@@ -204,7 +204,7 @@ const leadSchema = new mongoose.Schema({
 });
 
 // Compound indexes for efficient querying
-leadSchema.index({ campaign_id: 1, phone_number: 1 }, { unique: true });
+// leadSchema.index({ campaign_id: 1, phone_number: 1 }, { unique: true });
 leadSchema.index({ campaign_id: 1, email: 1 }, { 
   unique: true, 
   sparse: true,
