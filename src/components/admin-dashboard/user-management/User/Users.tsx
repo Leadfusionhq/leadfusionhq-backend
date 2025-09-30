@@ -23,6 +23,7 @@ type User = {
     phoneNumber?: string;
     zipCode?: string;
     image?: string;
+    balance?: number;
 };
 
 type ApiResponse = {
@@ -218,6 +219,18 @@ export default function UserTable() {
                   row.email
                 ),
               sortable: true,
+        },
+        {
+          name: "Balance",
+          selector: (row: User & { balance?: number }) =>
+            row.balance !== undefined ? row.balance.toString() : "0",
+          cell: (row) =>
+            row._id.startsWith("skeleton") ? (
+              <Skeleton variant="text" width={100} />
+            ) : (
+              <span>$ {row.balance ?? 0}</span> 
+            ),
+          sortable: true,
         },
         {
           name: "Action",

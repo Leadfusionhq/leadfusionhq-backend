@@ -774,7 +774,13 @@ const WalletDashboard: React.FC = () => {
       }
     } catch (error: unknown) {
       console.error('Recharge error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to add funds';
+      let errorMessage = 'Failed to add funds';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'object' && error !== null && 'message' in error) {
+        errorMessage = (error as { message: string }).message;
+      }
+      // const errorMessage = error instanceof Error ? error.message : 'Failed to add funds';
       showToast('error', errorMessage);
     } finally {
       setRechargeLoading(false);
@@ -838,6 +844,8 @@ const WalletDashboard: React.FC = () => {
       }, token) as ApiResponse;
 
       if (response?.defaultCard) {
+        console.log(response?.defaultCard);
+        
         showToast('success', 'Default card updated!');
         await fetchWalletData(); // Refresh data after successful operation
       } else {
@@ -1537,7 +1545,11 @@ const WalletDashboard: React.FC = () => {
                 </label>
                 <select
                   value={selectedCardId}
-                  onChange={(e) => setSelectedCardId(e.target.value)}
+                  // onChange={(e) => setSelectedCardId(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedCardId(e.target.value);
+                    console.log("Selected Card ID:", selectedCardId);
+                  }}
                   className="w-full border border-gray-300 rounded-lg px-3 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-black text-black"
                 >
                   <option value="" className="text-gray-500">Choose a payment method</option>

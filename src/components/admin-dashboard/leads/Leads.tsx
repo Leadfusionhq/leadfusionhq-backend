@@ -181,10 +181,10 @@ export default function LeadTable() {
         row._id.startsWith("skeleton") ? (
           <Skeleton variant="text" width={120} animation="wave" />
         ) : (
-          <div className="font-medium text-gray-900">{row.lead_id}</div>
+          <div style={{ minWidth: "120px" }} className="font-medium text-gray-900">{row.lead_id}</div>
         ),
       sortable: true,
-      minWidth: "120px",
+      // minWidth: "120px",
     },
     {
       name: "Name",
@@ -193,10 +193,10 @@ export default function LeadTable() {
         row._id.startsWith("skeleton") ? (
           <Skeleton variant="text" width={150} animation="wave" />
         ) : (
-          <div className="font-medium text-gray-900">{`${row.first_name} ${row.last_name}`}</div>
+          <div style={{ minWidth: "160px" }} className="font-medium text-gray-900">{`${row.first_name} ${row.last_name}`}</div>
         ),
       sortable: true,
-      minWidth: "160px",
+      // minWidth: "160px",
     },
     {
       name: "Email",
@@ -205,10 +205,10 @@ export default function LeadTable() {
         row._id.startsWith("skeleton") ? (
           <Skeleton variant="text" width={180} animation="wave" />
         ) : (
-          <div className="text-sm text-gray-600">{row.email}</div>
+          <div style={{ minWidth: "200px" }} className="text-sm text-gray-600">{row.email}</div>
         ),
       sortable: true,
-      minWidth: "200px",
+      // minWidth: "200px",
     },
     {
       name: "Phone",
@@ -217,10 +217,10 @@ export default function LeadTable() {
         row._id.startsWith("skeleton") ? (
           <Skeleton variant="text" width={120} animation="wave" />
         ) : (
-          <div className="text-sm text-gray-600">{row.phone}</div>
+          <div style={{ minWidth: "130px" }} className="text-sm text-gray-600">{row.phone}</div>
         ),
       sortable: true,
-      minWidth: "130px",
+      // minWidth: "130px",
     },
     {
       name: "State",
@@ -229,10 +229,10 @@ export default function LeadTable() {
         row._id.startsWith("skeleton") ? (
           <Skeleton variant="text" width={80} animation="wave" />
         ) : (
-          <div className="text-sm text-gray-600">{row.address.state.abbreviation ?? ''}</div>
+          <div style={{ minWidth: "100px" }} className="text-sm text-gray-600">{row.address.state.abbreviation ?? ''}</div>
         ),
       sortable: true,
-      minWidth: "100px",
+      // minWidth: "100px",
     },
     {
       name: "Campaign",
@@ -244,14 +244,14 @@ export default function LeadTable() {
         row._id.startsWith("skeleton") ? (
           <Skeleton variant="text" width={120} animation="wave" />
         ) : (
-          <div className="text-sm text-gray-600">
+          <div style={{ minWidth: "130px" }} className="text-sm text-gray-600">
             {typeof row.campaign_id === "object" && row.campaign_id !== null
               ? row.campaign_id.name
               : row.campaign_id || "N/A"}
           </div>
         ),
       sortable: true,
-      minWidth: "130px",
+      // minWidth: "130px",
     },
     // {
     //   name: "Status",
@@ -272,7 +272,7 @@ export default function LeadTable() {
         row._id.startsWith("skeleton") ? (
           <Skeleton variant="text" width={90} animation="wave" />
         ) : (
-          <div className="text-sm text-gray-500">
+          <div style={{ minWidth: "110px" }} className="text-sm text-gray-500">
             {new Date(row.createdAt).toLocaleDateString('en-US', {
               year: 'numeric',
               month: 'short',
@@ -281,7 +281,7 @@ export default function LeadTable() {
           </div>
         ),
       sortable: true,
-      minWidth: "110px",
+      // minWidth: "110px",
     },
     {
       name: "Actions",
@@ -294,7 +294,7 @@ export default function LeadTable() {
             animation="wave"
           />
         ) : (
-          <div className="flex gap-2">
+          <div style={{ minWidth: "140px" }} className="flex gap-2">
             <Button
               className="!bg-[#838383] !text-white hover:!bg-[#6b6b6b]"
               size="small"
@@ -324,9 +324,9 @@ export default function LeadTable() {
           </div>
         ),
       ignoreRowClick: true,
-      allowOverflow: true,
-      button: true,
-      minWidth: "140px",
+      // allowOverflow: true,
+      // button: 'true',
+      // minWidth: "140px",
     },
   ];
 
