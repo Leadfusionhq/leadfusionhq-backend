@@ -20,6 +20,7 @@ export const API_URL = {
     GET_USER_BY_ID: `${USER_API_BASE}/:userId`,
     DELETE_USER_BY_ID: `${USER_API_BASE}/:userId`,
 
+
     ACCEPT_CONTRACT:`${USER_API_BASE}/:userId/contract/accept`,
     CHECK_CONTRACT:`${USER_API_BASE}/:userId/contract/status`,
     
@@ -32,6 +33,8 @@ export const API_URL = {
 
     GET_ALL_REGULAR_ADMIN: `${ADMIN_API_BASE}?role=Admin`,
     UPLOAD_AVATAR: `${ADMIN_API_BASE}/:adminId/avatar`,
+    
+    ADD_BALANCE:`${ADMIN_API_BASE}/:userId/addBalance`,
 
     // Auth URLs
     LOGIN_USER: `${AUTH_API_BASE}/login`,
