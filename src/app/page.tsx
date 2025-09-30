@@ -19,6 +19,7 @@ export default function Home() {
       title="Discover the Power of Precision Marketing"
       description="Our data-driven lead generation helps your business connect with the right customers at the right time."
       buttonText="LEARN MORE"
+      buttonLink="/learn-more"
       backgroundImage="/images/home-banner.png"
     />
    <Build4Growth/>

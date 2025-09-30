@@ -257,13 +257,16 @@ const LeadForm = ({
           errorMessage={
             touched?.address?.full_address ? errors?.address?.full_address : undefined
           }
-          // country="us" // <-- Remove this line to search globally
+          country="us" // <-- Remove this line to search globally
           showCurrentLocation={true}
           onAddressSelect={(addressData) => {
             if (addressData) {
               setFieldValue('address.coordinates', addressData.coordinates);
               setFieldValue('address.place_id', addressData.placeId);
-              
+              // setFieldValue('address.street', addressData.street);
+              // setFieldValue('address.city', addressData.city);
+              // setFieldValue('address.state', addressData.state);
+              // setFieldValue('address.zip_code', addressData.postalCode);
             }
           }}
         />

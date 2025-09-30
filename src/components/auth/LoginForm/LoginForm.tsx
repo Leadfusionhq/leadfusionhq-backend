@@ -71,7 +71,8 @@ const LoginForm = () => {
   useEffect(() => {
     if (error) {
       if (error.includes('Email not verified and verification link expired') || 
-          error.includes('verification link expired')) {
+          error.includes('verification link expired') ||
+          error.includes('Please verify your email first')) {
         setShowResendButton(true);
 
         const formEmail = document.querySelector('input[name="email"]') as HTMLInputElement;
@@ -168,8 +169,8 @@ const LoginForm = () => {
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
               <div className="space-y-4">
                 <div>
-                  <h3 className="text-sm font-medium text-blue-800 mb-2">Email Verification Required</h3>
-                  <p className="text-sm text-blue-700">
+                  <h3 className="text-sm font-medium text-black mb-2">Email Verification Required</h3>
+                  <p className="text-sm text-black">
                     Your account needs to be verified before you can log in. Enter your email below to receive a new verification link.
                   </p>
                 </div>
@@ -180,12 +181,12 @@ const LoginForm = () => {
                     value={resendEmail}
                     onChange={(e) => setResendEmail(e.target.value)}
                     placeholder="Enter your email address"
-                    className="flex-1 px-3 py-2 border border-blue-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="flex-1 px-3 py-2 border border-black rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
                   />
                   <button
                     onClick={handleResendVerification}
                     disabled={resendLoading || !resendEmail}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                    className="px-4 py-2 bg-black text-white hover:bg-black text-white rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
                   >
                     {resendLoading ? 'Sending...' : 'Send Verification Email'}
                   </button>
@@ -198,7 +199,7 @@ const LoginForm = () => {
                       setResendEmail('');
                       setUserEmail('');
                     }}
-                    className="text-sm text-blue-600 hover:text-blue-800 underline"
+                    className="text-sm text-black hover:text-gray-800"
                   >
                     Cancel
                   </button>

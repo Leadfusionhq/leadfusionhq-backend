@@ -27,6 +27,11 @@ const AddNewUser = () => {
     role: 'USER',
   };
 
+  type ApiError = {
+    error: boolean;
+    message: string;
+  };
+
   const validationSchema = Yup.object().shape({
     name: Yup.string().required('Name is required'),
     email: Yup.string().email('Invalid email').required('Email is required'),
@@ -48,7 +53,9 @@ const AddNewUser = () => {
       resetForm();
     } catch (err) {
       console.error('Error saving user:', err);
-      toast.error('Failed to save user');
+      const apiErr = err as ApiError;
+      toast.error(apiErr.message || "Failed to save user");
+
     } finally {
       setSubmitting(false);
     }
