@@ -580,9 +580,10 @@ export default function LeadTable() {
         row._id.startsWith("skeleton") ? (
           <Skeleton variant="text" width={180} animation="wave" />
         ) : (
-          <div style={{ minWidth: "200px" }} className="text-sm text-gray-600">{row.email}</div>
+          <div style={{ minWidth: "200px" }} className="text-sm text-gray-600 whitespace-nowrap overflow-hidden text-ellipsis" title={row.email} >{row.email}</div>
         ),
       sortable: true,
+      width: "220px",
     },
     {
       name: "Phone",
@@ -602,9 +603,10 @@ export default function LeadTable() {
         row._id.startsWith("skeleton") ? (
           <Skeleton variant="text" width={80} animation="wave" />
         ) : (
-          <div style={{ minWidth: "100px" }} className="text-sm text-gray-600">{row.address.state.abbreviation ?? ''}</div>
+          <div style={{ minWidth: "90px" }} className="text-sm text-gray-600">{row.address.state.abbreviation ?? ''}</div>
         ),
       sortable: true,
+      width: "90px",
     },
     {
       name: "Campaign",
