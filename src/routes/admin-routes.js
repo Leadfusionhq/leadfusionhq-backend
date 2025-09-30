@@ -15,6 +15,7 @@ const API = {
     GET_ADMIN_BY_ID:'/:adminId',
     DELETE_ADMIN_BY_ID:'/:adminId',
     UPLOAD_AVATAR: "/:adminId/avatar",
+    ADD_BALANCE:"/:userId/addBalance",
 };
 
 
@@ -28,6 +29,8 @@ userRouter.use(
 userRouter.get(API.GET_ALL_ADMINS, AdminController.getAllAdmins);
 
 userRouter.post(API.ADD_ADMIN, celebrate(AdminSchema.createAdminByAdmin),  AdminController.addAdmin);
+
+userRouter.post(API.ADD_BALANCE, celebrate(AdminSchema.userBalanceByAdmin),  AdminController.addUserBalance);
 
 userRouter.get(API.GET_ADMIN_BY_ID, AdminController.getAdminById);
 

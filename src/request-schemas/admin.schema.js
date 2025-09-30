@@ -92,8 +92,23 @@ const updateAdmin = {
   }),
 };
 
+const userBalanceByAdmin = {
+  [Segments.BODY]: Joi.object().keys({
+    userId: Joi.string().required().messages({
+      "any.required": "User ID is required",
+      "string.empty": "User ID cannot be empty",
+    }),
+    amount: Joi.number().positive().required().messages({
+      "any.required": "Amount is required",
+      "number.base": "Amount must be a number",
+      "number.positive": "Amount must be greater than 0",
+    }),
+  }),
+};
+
 module.exports = {
   createAdminByAdmin,
   getAdminById,
   updateAdmin,
+  userBalanceByAdmin,
 };

@@ -6,7 +6,7 @@ const UserServices = require('../services/user.service');
 const N8nServices = require('../services/n8n/n8n.automation.service');
 
 const AdminServices = require('../services/admin.service');
-
+const {addBalanceByAdmin} = require('../services/billing/billing.service')
 const MAIL_HANDLER = require('../mail/mails');
 const fs = require("fs");
 const path = require("path");
@@ -99,9 +99,16 @@ const uploadAvatarAdmin = wrapAsync(async (req, res) => {
   sendResponse(res, { user: updatedUser }, "Avatar uploaded successfully", 200);
 });
 
+const addUserBalance = wrapAsync(async (req, res) => {
+  const { userId } = req.params;
+  const { amount } = req.body;
+  const adminId = req.user.id;
 
+  const result = await addBalanceByAdmin(userId, amount, adminId);
 
+  sendResponse(res, result, result.message, 200);
 
+});
 
 
 module.exports = {
@@ -111,4 +118,5 @@ module.exports = {
  updateAdmin,
  deleteAdmin,
  uploadAvatarAdmin,
+ addUserBalance,
 };
