@@ -58,6 +58,10 @@ export default function Filters() {
   }, []);
 
   const handleSearch = async () => {
+    if (!selectedCounty && !selectedZip && !selectedCity) {
+      alert("Select the filter first");
+      return;
+    }
     try {
       showLoader()
       const payload = {
@@ -80,6 +84,7 @@ export default function Filters() {
       }
     } catch (err) {
       console.error("Search failed:", err);
+      hideLoader();
     }
   };
 
