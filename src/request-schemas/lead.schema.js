@@ -55,11 +55,12 @@ const createLead = {
 
     // Address object
     address: Joi.object({
-      full_address: Joi.string().min(1).max(500).required().messages({
-        'string.base': 'Full Address must be a string',
-        'string.empty': 'Full Address is required',
-        'any.required': 'Full Address is required',
-      }),
+      // full_address: Joi.string().min(1).max(500).required().messages({
+      //   'string.base': 'Full Address must be a string',
+      //   'string.empty': 'Full Address is required',
+      //   'any.required': 'Full Address is required',
+      // }),
+      full_address: Joi.string().max(500).allow('').optional(),
 
       street: Joi.string().min(1).max(200).required().messages({
         'string.base': 'Street Address must be a string',
