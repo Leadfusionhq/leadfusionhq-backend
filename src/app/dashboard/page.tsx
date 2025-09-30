@@ -1,10 +1,10 @@
 import { Metadata } from "next";
+import ViewDashboard from "@/components/user-dashboard/dashboard/ViewDashboard";
 
-export default function UserDashboard() {
+export default function ViewUserDashboard() {
   return (
-    <div>
-      <h1>User Dashboard</h1>
-      <p>Welcome to the User dashboard!</p>
+    <div className="locations-container">
+          <ViewDashboard />
     </div>
   );
 }

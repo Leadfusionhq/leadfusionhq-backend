@@ -1,5 +1,5 @@
 import { Metadata } from "next";
-import ViewLeads from "@/components/admin-dashboard/leads/ViewLeads";
+import ViewLeads from "@/components/user-dashboard/leads/UserViewLeads";
 
 export default function LeadDetailsPage() {
   return (
