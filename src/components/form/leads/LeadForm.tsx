@@ -263,10 +263,10 @@ const LeadForm = ({
             if (addressData) {
               setFieldValue('address.coordinates', addressData.coordinates);
               setFieldValue('address.place_id', addressData.placeId);
-              setFieldValue('address.street', addressData.street);
-              setFieldValue('address.city', addressData.city);
-              setFieldValue('address.state', addressData.state);
-              setFieldValue('address.zip_code', addressData.postalCode);
+              // setFieldValue('address.street', addressData.street);
+              // setFieldValue('address.city', addressData.city);
+              // setFieldValue('address.state', addressData.state);
+              // setFieldValue('address.zip_code', addressData.postalCode);
             }
           }}
         />
