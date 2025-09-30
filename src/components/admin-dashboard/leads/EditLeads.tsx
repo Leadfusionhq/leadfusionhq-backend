@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useParams , useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
@@ -15,6 +15,7 @@ import { State, StateOption } from "@/types/campaign";
 import SpinnerLoader from "@/components/common/SpinnerLoader"
 
 const EditLeadPage = () => {
+  const router = useRouter();
   const { leadId } = useParams();
   const leadIdString = Array.isArray(leadId) ? leadId[0] : leadId;
   const token = useSelector((state: RootState) => state.auth.token);
@@ -121,6 +122,7 @@ const EditLeadPage = () => {
       ) as { message?: string };
 
       toast.success(response?.message || "Lead updated successfully!");
+      router.push("/admin/leads");
     } catch (err) {
       console.error("Error updating lead:", err);
       toast.error("An error occurred while updating the lead.");
