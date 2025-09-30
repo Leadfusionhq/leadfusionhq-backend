@@ -28,23 +28,23 @@ export default function Filters() {
   useEffect(() => {
     const fetchFilters = async () => {
       try {
-        const { data } = await axiosWrapper(
+        const res = (await axiosWrapper(
           "get",
           SEARCH_API.FILTER_QUERIES
-        );
-        if (!Array.isArray(data)) {
+        )) as { data: { Zip?: string; counties?: string | null; city?: string }[] };
+        if (!Array.isArray(res?.data)) {
           throw new Error("Invalid response format: expected an array");
         }
         const uniqueCounties = Array.from(
-          new Set(data.map((d) => d.counties).filter(Boolean))
+          new Set(res?.data.map((d) => d.counties).filter(Boolean))
         ) as string[];
 
         const uniqueZips = Array.from(
-          new Set(data.map((d) => d.Zip).filter(Boolean))
+          new Set(res?.data.map((d) => d.Zip).filter(Boolean))
         ) as string[];
 
         const uniqueCities = Array.from(
-          new Set(data.map((d) => d.city).filter(Boolean))
+          new Set(res?.data.map((d) => d.city).filter(Boolean) as string[])
         ).sort((a, b) => a.localeCompare(b)) as string[];
 
         setCounties(uniqueCounties);
