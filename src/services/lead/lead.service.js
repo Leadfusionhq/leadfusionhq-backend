@@ -342,6 +342,22 @@ const validatePrepaidCampaignBalance = async (campaign_id, leadPrice = 10) => {
     throw new ErrorHandler(500, error.message || 'Failed to validate campaign balance');
   }
 };
+const getLeadCountByCampaignId = async (campaign_id) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(campaign_id)) {
+      throw new ErrorHandler(400, 'Invalid campaign ID');
+    }
+
+    const count = await Lead.countDocuments({ campaign_id });
+
+    return {
+      campaign_id,
+      totalLeads: count
+    };
+  } catch (error) {
+    throw new ErrorHandler(500, error.message || 'Failed to count leads for campaign');
+  }
+};
 
 module.exports = {
   createLead,
@@ -355,4 +371,5 @@ module.exports = {
   getUserProcessingJobs,
   validateCSVFormat,
   validatePrepaidCampaignBalance,
+  getLeadCountByCampaignId,
 };
