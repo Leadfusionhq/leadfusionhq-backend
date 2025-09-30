@@ -269,9 +269,16 @@ export default function CampaignDetailPage() {
               {/* {campaign.bid_price && (
                 <DetailRow 
                   label="Bid Price" 
-                  value={`${campaign.bid_price.toFixed(2)}`} 
+                  value={`$ ${campaign.bid_price.toFixed(2)}`} 
                 />
               )} */}
+              {campaign.bid_price !== undefined && campaign.bid_price !== null && (
+                <DetailRow 
+                  label="Bid Price" 
+                  value={`$ ${campaign.bid_price.toFixed(2)}`} 
+                />
+              )}
+
               {campaign.language && <DetailRow label="Language" value={campaign.language} />}
               {campaign.updatedAt && (
                 <DetailRow 
