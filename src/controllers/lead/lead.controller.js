@@ -119,7 +119,11 @@ const getLeadById = wrapAsync(async (req, res) => {
         data = await LeadServices.getLeadByIdForAdmin(leadId);
     } else {
         data = await LeadServices.getLeadById(leadId, user_id);
+        // data = await LeadServices.getLeadByIdForAdmin(leadId);
     }
+
+    console.log(`the lead data is : `);
+    console.log(data);
 
     sendResponse(res, { data }, 'Lead fetched successfully', 200);
 });
