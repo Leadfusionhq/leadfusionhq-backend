@@ -138,7 +138,9 @@ export default function CampaignTable() {
   const handleEdit = (row: Campaign) => {
     router.push(`/dashboard/campaigns/${row._id}/edit`);
   };
-
+  const handleView = (row: Campaign) => {
+    router.push(`/dashboard/campaigns/${row._id}`);
+  };
   const columns: TableColumn<Campaign>[] = [
     {
       name: "Campaign Name",
@@ -265,7 +267,7 @@ export default function CampaignTable() {
             height: "28px",
             textTransform: "capitalize",
           }}
-          // onClick={() => handleView(row)} // ✳️ Add this function if needed
+          onClick={() => handleView(row)}
         >
           View
         </Button>
