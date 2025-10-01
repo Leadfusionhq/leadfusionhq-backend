@@ -276,8 +276,8 @@ const sendLeadAssignEmail = async ({ to, name, leadName, assignedBy, leadDetails
     : 'N/A';
 
   const Address = `
-    <a href="https://maps.google.com/?q=${encodeURIComponent(fullAddress)}" target="_blank" rel="noopener noreferrer">
-      ${fullAddress}
+    <a href="https://maps.google.com/?q=${encodeURIComponent(address?.full_address)}" target="_blank" rel="noopener noreferrer">
+      ${address?.full_address}
     </a>
   `;
   const link = `
