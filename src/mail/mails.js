@@ -302,7 +302,7 @@ const sendLeadAssignEmail = async ({ to, name, leadName, assignedBy, leadDetails
 
   const html = createEmailTemplate({
     title: 'New Lead Assigned',
-    greeting: `${name},`,
+    // greeting: `${name},`,
     mainText:mainText,
     // buttonText: 'View Lead Details',
     // buttonUrl: leadDetailsUrl,
