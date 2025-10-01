@@ -22,16 +22,15 @@ export default function Filters() {
   const [results, setResults] = useState<number | null>(null);
   const [campaignCount, setCampaignCount] = useState<number | null>(null);
   const [available, setAvailableCount] = useState<number | null>(null);
-  const { showLoader, hideLoader } = useLoader(); 
+  const { showLoader, hideLoader } = useLoader();
 
   // Fetch filter data on mount
   useEffect(() => {
     const fetchFilters = async () => {
       try {
-        const res = (await axiosWrapper(
-          "get",
-          SEARCH_API.FILTER_QUERIES
-        )) as { data: { Zip?: string; counties?: string | null; city?: string }[] };
+        const res = (await axiosWrapper("get", SEARCH_API.FILTER_QUERIES)) as {
+          data: { Zip?: string; counties?: string | null; State?: string }[];
+        };
         if (!Array.isArray(res?.data)) {
           throw new Error("Invalid response format: expected an array");
         }
@@ -44,7 +43,7 @@ export default function Filters() {
         ) as string[];
 
         const uniqueCities = Array.from(
-          new Set(res?.data.map((d) => d.city).filter(Boolean) as string[])
+          new Set(res?.data.map((d) => d.State).filter(Boolean) as string[])
         ).sort((a, b) => a.localeCompare(b)) as string[];
 
         setCounties(uniqueCounties);
@@ -63,19 +62,19 @@ export default function Filters() {
       return;
     }
     try {
-      showLoader()
+      showLoader();
       const payload = {
         county: selectedCounty || undefined,
         zip: selectedZip || undefined,
         city: selectedCity || undefined,
       };
 
-      const res = await axiosWrapper(
+      const res = (await axiosWrapper(
         "post",
         SEARCH_API.SEARCH_QUERIES,
         payload,
         undefined
-      ) as SearchResponse;
+      )) as SearchResponse;
       if (res) {
         setResults(res?.count ?? 0);
         setCampaignCount(res?.campaignCount ?? 0);
@@ -88,11 +87,43 @@ export default function Filters() {
     }
   };
 
+  const handleZipChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+
+    if (value && !selectedZip.split(",").includes(value)) {
+      setSelectedZip((prev) => (prev ? `${prev},${value}` : value));
+    }
+  };
+
+  const handleRemove = (zip: string) => {
+    const updated = selectedZip
+      .split(",")
+      .filter((z) => z !== zip)
+      .join(",");
+    setSelectedZip(updated);
+  };
+
+  const handleCountyChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+
+    if (value && !selectedCounty.split(",").includes(value)) {
+      setSelectedCounty((prev) => (prev ? `${prev},${value}` : value));
+    }
+  };
+
+  const handleCountyRemove = (zip: string) => {
+    const updated = selectedCounty
+      .split(",")
+      .filter((z) => z !== zip)
+      .join(",");
+    setSelectedCounty(updated);
+  };
+
   return (
     <div className="layout_admin flex flex-col gap-6 p-6 w-full max-w-3xl mx-auto">
       <h2 className="text-2xl font-semibold text-gray-800">Data Query</h2>
       <p className="text-gray-500 text-sm">
-        Select county, zip code, or city to check available data counts.
+        Select county, zip code, or state to check available data counts.
       </p>
 
       <div className="bg-white shadow-md rounded-2xl p-6 flex flex-col gap-4">
@@ -102,7 +133,7 @@ export default function Filters() {
           </label>
           <select
             value={selectedCounty}
-            onChange={(e) => setSelectedCounty(e.target.value)}
+            onChange={handleCountyChange}
             className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
           >
             <option value="">Select County</option>
@@ -112,6 +143,24 @@ export default function Filters() {
               </option>
             ))}
           </select>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {selectedCounty &&
+              selectedCounty.split(",").map((county) => (
+                <div
+                  key={county}
+                  className="flex items-center bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm"
+                >
+                  {county}
+                  <button
+                    type="button"
+                    onClick={() => handleCountyRemove(county)}
+                    className="ml-2 text-red-500 hover:text-red-700"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+          </div>
         </div>
 
         <div>
@@ -120,7 +169,7 @@ export default function Filters() {
           </label>
           <select
             value={selectedZip}
-            onChange={(e) => setSelectedZip(e.target.value)}
+            onChange={handleZipChange}
             className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
           >
             <option value="">Select Zip</option>
@@ -130,18 +179,36 @@ export default function Filters() {
               </option>
             ))}
           </select>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {selectedZip &&
+              selectedZip.split(",").map((zip) => (
+                <div
+                  key={zip}
+                  className="flex items-center bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm"
+                >
+                  {zip}
+                  <button
+                    type="button"
+                    onClick={() => handleRemove(zip)}
+                    className="ml-2 text-red-500 hover:text-red-700"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+          </div>
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            City
+            State
           </label>
           <select
             value={selectedCity}
             onChange={(e) => setSelectedCity(e.target.value)}
             className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
           >
-            <option value="">Select City</option>
+            <option value="">Select State</option>
             {cities.map((city) => (
               <option key={city} value={city}>
                 {city}
