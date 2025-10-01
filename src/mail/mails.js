@@ -243,7 +243,7 @@ const sendTestMail = async (toEmail) => {
     throw err;
   }
 };
-const sendLeadAssignEmail = async ({ to, name, leadName, assignedBy, leadDetailsUrl, campaignName , leadData}) => {
+const sendLeadAssignEmail = async ({ to, name, leadName, assignedBy, leadDetailsUrl, campaignName , leadData,realleadId}) => {
   
   const recipients = Array.isArray(to) 
     ? to 
@@ -256,23 +256,38 @@ const sendLeadAssignEmail = async ({ to, name, leadName, assignedBy, leadDetails
     email,
     address = {},
     lead_id,
+    _id,
   } = leadData;
   const fullName = `${first_name || ''} ${last_name || ''}`.trim() || 'N/A';
   const telLink = phone_number ? `<a href="tel:${phone_number}">${phone_number}</a>` : 'N/A';
   const emailAddr = email || 'N/A';
-  const fullAddress = `${address.full_address || ''}, ${address.city || ''}, ${address.zip_code || ''}`.trim() || 'N/A';
+  // const fullAddress = `${address.full_address || ''}, ${address.city || ''}, ${address.zip_code || ''}`.trim() || 'N/A';
+
+   const addressParts = [
+    address.street,
+    address?.full_address,
+    address.city,
+    address.state?.name || address.state, 
+    address.zip_code
+  ].filter(Boolean); 
+  
+  const fullAddress = addressParts.length > 0 
+    ? addressParts.join(', ') 
+    : 'N/A';
 
   const Address = `
     <a href="https://maps.google.com/?q=${encodeURIComponent(fullAddress)}" target="_blank" rel="noopener noreferrer">
       ${fullAddress}
     </a>
   `;
-
-
+  const link = `
+    <a href="https://www.leadfusionhq.com/dashboard/leads/${realleadId}" target="_blank" rel="noopener noreferrer">
+      https://www.leadfusionhq.com/dashboard/leads/${realleadId}
+    </a>
+  `;
+  // const link = `https://www.leadfusionhq.com/dashboard/leads/${lead_id}`;
+  
   const mainText = `
-    A new lead named <strong>${leadName}</strong> has been assigned to you by <strong>${assignedBy}</strong>.
-    <br /><br />
-    <strong>Lead Details:</strong>
     <ul>
       <li><strong style="color: #1C1C1C;">Full Name:</strong> ${fullName}</li>
       <li><strong style="color: #1C1C1C;">Phone:</strong> ${telLink}</li>
@@ -280,9 +295,9 @@ const sendLeadAssignEmail = async ({ to, name, leadName, assignedBy, leadDetails
       <li><strong style="color: #1C1C1C;">Address:</strong> ${Address}</li>
       <li><strong style="color: #1C1C1C;">Lead ID:</strong> ${lead_id}</li>
       <li><strong>Campaign:</strong> ${campaignName}</li>
+      <li><strong>View Lead</strong> ${link}</li>
     </ul>
     <br />
-    Please review the lead details and take necessary action.
   `;
 
   const html = createEmailTemplate({
@@ -291,7 +306,7 @@ const sendLeadAssignEmail = async ({ to, name, leadName, assignedBy, leadDetails
     mainText:mainText,
     // buttonText: 'View Lead Details',
     // buttonUrl: leadDetailsUrl,
-    footerText: 'If you have any questions or need assistance, please contact your manager or support team.',
+    // footerText: 'If you have any questions or need assistance, please contact your manager or support team.',
     // warningText: 'Do not share lead or campaign information outside the organization.',
   });
 
@@ -299,6 +314,72 @@ const sendLeadAssignEmail = async ({ to, name, leadName, assignedBy, leadDetails
     from: FROM_EMAIL,
     to: recipients,
     subject: `New Lead Assigned in "${campaignName}"`,
+    html,
+  });
+};
+const sendLeadReturnEmail = async ({ adminEmails, lead, campaign, returnedBy, returnStatus }) => {
+  const {
+    first_name,
+    last_name,
+    phone_number,
+    email,
+    address = {},
+    lead_id,
+  } = lead;
+  
+  const fullName = `${first_name || ''} ${last_name || ''}`.trim() || 'N/A';
+  const telLink = phone_number ? `<a href="tel:${phone_number}">${phone_number}</a>` : 'N/A';
+  const emailAddr = email || 'N/A';
+  // const fullAddress = `${address.full_address || ''}, ${address.city || ''}, ${address.zip_code || ''}`.trim() || 'N/A';
+
+
+  const addressParts = [
+    address.street,
+    address.full_address,
+    address.city,
+    address.state?.name || address.state, 
+    address.zip_code
+  ].filter(Boolean); 
+  
+  const fullAddress = addressParts.length > 0 
+    ? addressParts.join(', ') 
+    : 'N/A';
+
+  const Address = `
+    <a href="https://maps.google.com/?q=${encodeURIComponent(fullAddress)}" target="_blank" rel="noopener noreferrer">
+      ${fullAddress}
+    </a>
+  `;
+
+  const mainText = `
+    A lead <strong>${lead_id}</strong> has been returned by <strong>${returnedBy}</strong>.
+    <br /><br />
+    <strong>Return Status:</strong> <span style="color: #dc2626;">${returnStatus}</span>
+    <br /><br />
+    <strong>Lead Details:</strong>
+    <ul>
+      <li><strong style="color: #1C1C1C;">Full Name:</strong> ${fullName}</li>
+      <li><strong style="color: #1C1C1C;">Phone:</strong> ${telLink}</li>
+      <li><strong style="color: #1C1C1C;">Email:</strong> <a href="mailto:${emailAddr}">${emailAddr}</a></li>
+      <li><strong style="color: #1C1C1C;">Address:</strong> ${Address}</li>
+      <li><strong style="color: #1C1C1C;">Lead ID:</strong> ${lead_id}</li>
+      <li><strong>Campaign:</strong> ${campaign?.name || 'N/A'}</li>
+    </ul>
+    <br />
+    Please review the returned lead and take necessary action.
+  `;
+
+  const html = createEmailTemplate({
+    title: 'Lead Returned',
+    greeting: 'Admin,',
+    mainText: mainText,
+    footerText: 'If you have any questions or need assistance, please contact support.',
+  });
+
+  return resend.emails.send({
+    from: FROM_EMAIL,
+    to: adminEmails,
+    subject: `Lead Returned - ${lead_id} from "${campaign?.name || 'Campaign'}"`,
     html,
   });
 };
@@ -314,4 +395,5 @@ module.exports = {
   sendNotificationEmail,
   sendTestMail,
   sendLeadAssignEmail,
+  sendLeadReturnEmail,
 };
