@@ -115,7 +115,7 @@ export const LeadValidationSchema = Yup.object().shape({
   address: Yup.object().shape({
     full_address: Yup.string()
       .trim()
-      .required('Full address is required')
+      // .required('Full address is required')
       .min(1, 'Full address must be at least 1 character')
       .max(500, 'Full address must be at most 500 characters'),
       

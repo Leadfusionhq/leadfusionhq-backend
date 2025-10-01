@@ -138,6 +138,11 @@ export default function UserTable() {
         router.push(`/admin/user-management/user/${row._id}/edit`);
     };
 
+    const handleAddBalance = (row:User) =>{
+      console.log(row._id);
+      router.push(`/admin/user-management/user/${row._id}/addBalance`);
+    }
+
     const handleDelete = async (row: User) => {
     const confirmation = window.confirm(`Are you sure you want to delete ${row.name}?`);
     if (!confirmation) return;
@@ -240,6 +245,22 @@ export default function UserTable() {
               <Skeleton variant="rectangular" width={80} height={30} />
             ) : (
               <div style={{ display: "flex", gap: "6px" }}>
+                <Button
+                  className="!bg-white !text-[#838383] hover:!bg-[#f5f5f5] border border-[#838383]"
+                  size="small"
+                  sx={{
+                    fontSize: "11px",
+                    minWidth: "50px",
+                    height: "26px",
+                    padding: "0px 6px",
+                    textTransform: "capitalize",
+                    fontWeight: 500,
+                  }}
+                  onClick={() => handleAddBalance(row)}
+                >
+                  +Add
+                </Button>
+
                 <Button
                   className="!bg-[#838383] !text-white hover:!bg-[#6b6b6b]"
                   size="small"

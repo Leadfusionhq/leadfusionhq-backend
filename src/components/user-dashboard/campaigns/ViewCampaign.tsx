@@ -182,11 +182,11 @@ export default function CampaignDetailPage() {
   }, [campaignId, token]);
 
   const handleEdit = (id:any) => {
-    router.push(`/admin/campaigns/${id}/edit`);
+    router.push(`/dashboard/campaigns/${id}/edit`);
   };
-  const handleAddLead = (id:any) => {
-    router.push(`/admin/campaigns/${id}/leads/add`);
-  };
+  // const handleAddLead = (id:any) => {
+  //   router.push(`/dashboard/campaigns/${id}/leads/add`);
+  // };
   if (loading) {
     return (
       <Box sx={{ p: { xs: 2, sm: 3, md: 4 } }}>
@@ -250,9 +250,9 @@ export default function CampaignDetailPage() {
             <IconButton sx={{ color: 'white' }}>
               <Edit onClick={() => handleEdit(campaign._id)}/>
             </IconButton>
-            <IconButton sx={{ color: 'white' }}>
+            {/* <IconButton sx={{ color: 'white' }}>
               <Add onClick={() => handleAddLead(campaign._id)} />
-            </IconButton>
+            </IconButton> */}
             
           </Stack>
         </Stack>
@@ -269,16 +269,9 @@ export default function CampaignDetailPage() {
               {/* {campaign.bid_price && (
                 <DetailRow 
                   label="Bid Price" 
-                  value={`$ ${campaign.bid_price.toFixed(2)}`} 
+                  value={`${campaign.bid_price.toFixed(2)}`} 
                 />
               )} */}
-              {campaign.bid_price !== undefined && campaign.bid_price !== null && (
-                <DetailRow 
-                  label="Bid Price" 
-                  value={`$ ${campaign.bid_price.toFixed(2)}`} 
-                />
-              )}
-
               {campaign.language && <DetailRow label="Language" value={campaign.language} />}
               {campaign.updatedAt && (
                 <DetailRow 

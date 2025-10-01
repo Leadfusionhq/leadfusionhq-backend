@@ -9,6 +9,7 @@ import { BILLING_API } from "@/utils/apiUrl";
 import { API_URL } from "@/utils/apiUrl";
 import { Trash2 } from 'lucide-react';
 import ConfirmDialog from '@/components/common/ConfirmDialog';
+import BillingAddressAutocomplete from '@/components/common/BillingAddressAutocomplete';
 
 // Enhanced TypeScript interfaces
 interface Card {
@@ -1303,18 +1304,13 @@ const WalletDashboard: React.FC = () => {
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Billing Address <span className="text-red-500">*</span>
                       </label>
-                      <input
-                        type="text"
+                      <BillingAddressAutocomplete
                         value={cardForm.billing_address}
-                        onChange={(e) => handleCardFormChange('billing_address', e.target.value)}
-                        className={`w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 ${
-                          cardFormErrors.billing_address ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-gray-500 focus:ring-gray-500'
-                        }`}
+                        onChange={(val) => handleCardFormChange('billing_address', val)}
                         placeholder="123 Main Street, City, State"
+                        errorMessage={cardFormErrors.billing_address}
+                        showCurrentLocation
                       />
-                      {cardFormErrors.billing_address && (
-                        <p className="mt-1 text-sm text-red-600">{cardFormErrors.billing_address}</p>
-                      )}
                     </div>
 
                     <div>

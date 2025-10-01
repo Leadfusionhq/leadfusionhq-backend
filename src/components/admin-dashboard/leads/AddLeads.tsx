@@ -1,5 +1,5 @@
 "use client";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import LeadForm from "@/components/form/leads/LeadForm";
 import axiosWrapper from "@/utils/api";
 import { useSelector } from "react-redux";
@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import { State, StateOption } from "@/types/campaign";
 
 const AddLeadPage = () => {
+  const router = useRouter();
   const { campaignId } = useParams();
   const token = useSelector((state: RootState) => state.auth.token);
   const [stateOptions, setStateOptions] = useState<StateOption[]>([]);
@@ -67,6 +68,7 @@ const AddLeadPage = () => {
 
       toast.success(response?.message || "Lead added successfully!");
       resetForm();
+      router.push("/admin/leads");
     } catch (err) {
       console.error("Error adding lead:", err);
       toast.error("An error occurred while adding the lead.");

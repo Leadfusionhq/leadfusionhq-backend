@@ -23,7 +23,11 @@ export const cleanLeadValues = (values: typeof initialLeadValues) => {
   
   return {
     // Required fields
-    campaign_id: values.campaign_id,
+    // campaign_id: values.campaign_id._id,
+    campaign_id: typeof values.campaign_id === 'object'
+  ? (values.campaign_id as { _id: string })._id
+  : values.campaign_id,
+
     first_name: values.first_name,
     last_name: values.last_name,
     phone_number: phoneNumber,

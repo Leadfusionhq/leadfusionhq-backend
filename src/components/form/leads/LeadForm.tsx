@@ -185,8 +185,8 @@ const LeadForm = ({
               />
               <FormikInput
                 name="house"
-                label="House Number"
-                placeholder="Enter house number"
+                label="Year Build"
+                placeholder="Enter Year Build"
                 errorMessage={touched.house && errors.house}
               />
               <FormikInput
@@ -199,7 +199,7 @@ const LeadForm = ({
           </div>
 
           {/* Address Components Section */}
-          <div className="border-b border-gray-200 pb-6">
+          {/* <div className="border-b border-gray-200 pb-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Address Components</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <FormikInput
@@ -236,7 +236,7 @@ const LeadForm = ({
                 errorMessage={touched.aptnbr && errors.aptnbr}
               />
             </div>
-          </div>
+          </div> */}
 
           {/* Main Address Section */}
           <div className="border-b border-gray-200 pb-6">
@@ -252,7 +252,7 @@ const LeadForm = ({
 
         <FormikAddressInput
           name="address.full_address"
-          label="Full Address *"
+          label="Full Address"
           placeholder="Enter complete address"
           errorMessage={
             touched?.address?.full_address ? errors?.address?.full_address : undefined
@@ -263,10 +263,10 @@ const LeadForm = ({
             if (addressData) {
               setFieldValue('address.coordinates', addressData.coordinates);
               setFieldValue('address.place_id', addressData.placeId);
-              setFieldValue('address.street', addressData.street);
-              setFieldValue('address.city', addressData.city);
-              setFieldValue('address.state', addressData.state);
-              setFieldValue('address.zip_code', addressData.postalCode);
+              // setFieldValue('address.street', addressData.street);
+              // setFieldValue('address.city', addressData.city);
+              // setFieldValue('address.state', addressData.state);
+              // setFieldValue('address.zip_code', addressData.postalCode);
             }
           }}
         />

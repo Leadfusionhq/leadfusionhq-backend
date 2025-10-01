@@ -24,23 +24,17 @@ const CampaignDelivery: React.FC<CampaignDeliveryProps> = ({
   isEditMode = false,
   formKey // Receive formKey
 }) => {
-  const tabs = ["method", "schedule", "other"] as const;
+  const tabs = ["method", "schedule"] as const;
 
-  // Remove the problematic useEffect that was clearing fields on tab navigation
-  // The form reset is handled by Formik's key prop and enableReinitialize
 
-  // Handle delivery method checkbox change
   const handleDeliveryMethodChange = (method: string, isChecked: boolean) => {
     const currentMethods = values.delivery.method || [];
     
     if (isChecked) {
-      // Add method if checked
       setFieldValue('delivery.method', [...currentMethods, method]);
     } else {
-      // Remove method if unchecked
       setFieldValue('delivery.method', currentMethods.filter((m: string) => m !== method));
       
-      // Clear related fields when method is deselected
       if (method === 'email') {
         setFieldValue('delivery.email.addresses', '');
         setFieldValue('delivery.email.subject', '');
@@ -52,7 +46,6 @@ const CampaignDelivery: React.FC<CampaignDeliveryProps> = ({
     }
   };
 
-  // Check if a method is selected
   const isMethodSelected = (method: string) => {
     return (values.delivery.method || []).includes(method);
   };
@@ -196,7 +189,7 @@ const CampaignDelivery: React.FC<CampaignDeliveryProps> = ({
       )}
 
       {/* Other Tab */}
-      {activeDeliveryTab === "other" && (
+      {/* {activeDeliveryTab === "other" && (
         <div className="space-y-6">
           <h4 className="text-lg font-medium">Other Settings</h4>
           <div className="border border-[#E0E0E0] rounded-lg p-6">
@@ -209,7 +202,7 @@ const CampaignDelivery: React.FC<CampaignDeliveryProps> = ({
             />
           </div>
         </div>
-      )}
+      )} */}
     </div>
   );
 };
