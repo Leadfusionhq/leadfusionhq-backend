@@ -15,6 +15,7 @@ const MAIL_HANDLER = require('../../mail/mails');
 const SmsServices = require('../../services/sms/sms.service');
 const BillingServices = require('../../services/billing/billing.service.js');
 const mongoose = require('mongoose');
+const { User } = require('../../models/user.model.js');
 
 // Create single lead
 
@@ -40,9 +41,14 @@ const createLead = wrapAsync(async (req, res) => {
         console.log('Balance available, generating lead...');
 
         const lead_id = await generateUniqueLeadId();
-        const leadData = { ...req.body, user_id, lead_id };
+        let leadData = { ...req.body, user_id, lead_id };
         const result = await LeadServices.createLead(leadData, { session });
         await result.populate('campaign_id');
+        await result.populate('address.state');
+        console.log('lead data ')
+        console.log(leadData)
+        console.log('result data ')
+        console.log(result)
         console.log('Campaign User ID:', result?.campaign_id?.user_id);
         const assignedBy = req.user._id;
         await BillingServices.assignLeadNew(
@@ -70,6 +76,7 @@ const createLead = wrapAsync(async (req, res) => {
                         leadDetailsUrl: `${process.env.UI_LINK}/dashboard/leads/${result?._id}`,
                         campaignName: campaign?.name,
                         leadData:leadData,
+                        realleadId: result._id,
                     });
                     console.log(`Lead assignment email sent to ${campaign.delivery.email.addresses}`);
                 } catch (err) {
@@ -201,6 +208,32 @@ const returnLead = wrapAsync(async(req, res)=> {
     const { lead_id, return_status } = req.body;
 
     const result = await LeadServices.returnLead(lead_id, return_status);
+    const campaign = await LeadServices.getCampaignByLead(lead_id);
+
+    // const lead = await Lead.findById(lead_id); 
+    const lead = await Lead.findById(lead_id).populate('address.state');
+    
+    try {
+        const adminUsers = await User.find({ role: 'ADMIN' }); 
+        
+        if (adminUsers && adminUsers.length > 0) {
+            const adminEmails = adminUsers.map(admin => admin.email).filter(Boolean);
+            
+            if (adminEmails.length > 0) {
+                await MAIL_HANDLER.sendLeadReturnEmail({
+                    adminEmails: adminEmails,
+                    lead: lead,
+                    campaign: campaign,
+                    returnedBy: req.user?.name || req.user?.email || 'User',
+                    returnStatus: return_status,
+                });
+                
+                console.log(`Lead return email sent to ${adminEmails.length} admin(s)`);
+            }
+        }
+    } catch (err) {
+        console.error('Failed to send lead return email to admins:', err.message);
+    }
 
     sendResponse(res, { result }, 'Lead return request submitted successfully', 200);
 });

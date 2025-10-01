@@ -400,6 +400,29 @@ const validatePrepaidCampaignBalance = async (campaign_id) => {
   }
 };
 
+const getCampaignByLead = async (leadId) => {
+  try {
+
+    const lead = await Lead.findById(leadId).lean();
+    if (!lead) {
+      throw new ErrorHandler(404, 'Lead not found');
+    }
+
+    const campaignId = lead.campaign_id;
+    if (!campaignId) {
+      throw new ErrorHandler(400, 'Lead does not have a campaign associated');
+    }
+
+    const campaign = await Campaign.findById(campaignId).lean();
+    if (!campaign) {
+      throw new ErrorHandler(404, 'Campaign not found for this lead');
+    }
+
+    return campaign;
+  } catch (error) {
+    throw new ErrorHandler(error.statusCode || 500, error.message || 'Failed to get campaign');
+  }
+};
 
 const returnLead = async (leadId, returnStatus) => {
   try {
@@ -572,5 +595,6 @@ module.exports = {
   rejectReturnLead,
   approveReturnLead,
   getLeadCountByCampaignId,
+  getCampaignByLead,
 
 };
