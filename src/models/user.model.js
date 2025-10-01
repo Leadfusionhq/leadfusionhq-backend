@@ -174,6 +174,11 @@ balance: {
   type: Number,
   default: 0,
 },
+refundMoney: {
+  type: Number,
+  default: 0,
+  min: 0,
+},
 // In regularUserSchema
 // In your user model where autoTopUp is defined
 // In the user schema, update the autoTopUp object:

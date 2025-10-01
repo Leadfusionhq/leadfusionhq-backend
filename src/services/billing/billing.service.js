@@ -414,12 +414,30 @@ const assignLeadNew = async (userId, leadId, leadCost, assignedBy, session) => {
   const user = await User.findById(userId).session(session);
   if (!user) throw new ErrorHandler(404, 'User not found');
 
+  // const currentBalance = user.balance || 0;
+  // if (currentBalance < leadCost) {
+  //   throw new ErrorHandler(400, 'Insufficient balance to assign lead');
+  // }
+
+  // user.balance = currentBalance - leadCost;
+  // await user.save({ session });
+
   const currentBalance = user.balance || 0;
-  if (currentBalance < leadCost) {
-    throw new ErrorHandler(400, 'Insufficient balance to assign lead');
+  let currentRefund = user.refundMoney || 0;
+
+  if (currentRefund >= leadCost) {
+    user.refundMoney = currentRefund - leadCost;
+  } else {
+    const remainingCost = leadCost - currentRefund;
+
+    user.refundMoney = 0;
+
+    if (currentBalance < remainingCost) {
+      throw new ErrorHandler(400, 'Insufficient balance to assign lead');
+    }
+    user.balance = currentBalance - remainingCost;
   }
 
-  user.balance = currentBalance - leadCost;
   await user.save({ session });
 
   const transaction = new Transaction({

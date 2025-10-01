@@ -184,6 +184,21 @@ const leadSchema = new mongoose.Schema({
     enum: ['manual', 'csv_upload', 'api', 'import'],
     default: 'manual'
   },
+
+  return_status: {
+    type: String,
+    enum: ['Not Returned', 'Pending', 'Approved', 'Rejected'],
+    default: 'Not Returned',
+    index: true
+  },
+  return_attempts: {
+    type: Number,
+    default: 0
+  },
+  max_return_attempts: {
+    type: Number,
+    default: 2
+  },
   
   // Timestamps
   createdAt: {

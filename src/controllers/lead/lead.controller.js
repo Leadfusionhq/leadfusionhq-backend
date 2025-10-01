@@ -24,11 +24,21 @@ const createLead = wrapAsync(async (req, res) => {
     session.startTransaction();
 
     try {
-        const leadCost = 0;
+        
+        // const campaign = await Campaign.findById(campaign_id);
+        
+        // if (!campaign) {
+            // throw new ErrorHandler(404, 'Campaign not found');
+            // }
+            // const leadCost = campaign.bid_price || 0;
+            
+            // const campaignData = await LeadServices.validatePrepaidCampaignBalance(campaign_id, leadCost);
         const { campaign_id } = req.body;
         const user_id = req.user._id;
-        const campaignData = await LeadServices.validatePrepaidCampaignBalance(campaign_id, leadCost);
+        const {campaignData, leadCost} = await LeadServices.validatePrepaidCampaignBalance(campaign_id);
+
         console.log('Balance available, generating lead...');
+
         const lead_id = await generateUniqueLeadId();
         const leadData = { ...req.body, user_id, lead_id };
         const result = await LeadServices.createLead(leadData, { session });
@@ -130,6 +140,30 @@ const getLeads = wrapAsync(async (req, res) => {
     sendResponse(res, data, "Leads fetched successfully", 200);
 });
 
+const getReturnLeads = wrapAsync(async (req, res) => {
+    const { page, limit } = getPaginationParams(req.query);
+
+    data = await LeadServices.getReturnLeads(page, limit);
+
+    sendResponse(res, data, "Return leads fetched successfully", 200);
+});
+
+const rejectReturnLead = wrapAsync(async (req, res) => {
+  const { lead_id, return_status } = req.body;
+
+  result = await LeadServices.rejectReturnLead(lead_id, return_status);
+
+  sendResponse(res, result, 'Lead return rejected successfully', 200);
+});
+
+const approveReturnLead = wrapAsync(async (req, res) =>{
+    const { lead_id, return_status } = req.body;
+
+    result = await LeadServices.approveReturnLead(lead_id, return_status);
+
+    sendResponse(res, result, 'Lead return approved successfully', 200);
+})
+
 // Get single lead by ID
 const getLeadById = wrapAsync(async (req, res) => {
     const user_id = req.user._id;
@@ -159,6 +193,16 @@ const updateLead = wrapAsync(async (req, res) => {
     const result = await LeadServices.updateLead(leadId, user_id, role, leadData);
 
     sendResponse(res, { result }, 'Lead has been updated successfully', 200);
+});
+
+const returnLead = wrapAsync(async(req, res)=> {
+    console.log(req.body);
+
+    const { lead_id, return_status } = req.body;
+
+    const result = await LeadServices.returnLead(lead_id, return_status);
+
+    sendResponse(res, { result }, 'Lead return request submitted successfully', 200);
 });
 
 // Delete lead (soft delete by updating status)
@@ -585,5 +629,9 @@ module.exports = {
     getLeadsByCampaign,
     bulkUpdateLeads,
     getLeadStats,
-    exportLeads
+    exportLeads,
+    returnLead,
+    getReturnLeads,
+    rejectReturnLead,
+    approveReturnLead,
 };

@@ -170,8 +170,60 @@ const getLead = {
   }),
 };
 
+const returnLead = {
+  [Segments.BODY]: Joi.object({
+    lead_id: Joi.string().hex().length(24).required().messages({
+      'any.required': 'Lead ID is required',
+    }),
+    return_status: Joi.string()
+      .valid('Pending') 
+      .default('Pending')
+      .messages({
+        'any.only': 'Return status must be "Pending"',
+      }),
+  }),
+};
+
+const rejectReturnLead = {
+  [Segments.BODY]: Joi.object({
+    lead_id: Joi.string().hex().length(24).required().messages({
+      'string.base': 'Lead ID must be a string',
+      'string.length': 'Lead ID must be 24 characters long',
+      'string.hex': 'Lead ID must only contain hexadecimal characters',
+      'any.required': 'Lead ID is required',
+    }),
+    return_status: Joi.string()
+      .valid('Rejected')
+      .required()
+      .messages({
+        'any.only': 'Return status must be "Rejected"',
+        'any.required': 'Return status is required',
+      }),
+  }),
+};
+const approveReturnLead = {
+  [Segments.BODY]: Joi.object({
+    lead_id: Joi.string().hex().length(24).required().messages({
+      'string.base': 'Lead ID must be a string',
+      'string.length': 'Lead ID must be 24 characters long',
+      'string.hex': 'Lead ID must only contain hexadecimal characters',
+      'any.required': 'Lead ID is required',
+    }),
+    return_status: Joi.string()
+      .valid('Approved')
+      .required()
+      .messages({
+        'any.only': 'Return status must be "Approved"',
+        'any.required': 'Return status is required',
+      }),
+  }),
+};
+
 module.exports = {
   createLead,
   updateLead,
   getLead,
+  returnLead,
+  rejectReturnLead,
+  approveReturnLead,
 };
