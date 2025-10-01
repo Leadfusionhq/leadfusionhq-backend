@@ -69,6 +69,7 @@ const createLead = wrapAsync(async (req, res) => {
                         assignedBy: req.user?.name || 'System',
                         leadDetailsUrl: `${process.env.UI_LINK}/dashboard/leads/${result?._id}`,
                         campaignName: campaign?.name,
+                        leadData:leadData,
                     });
                     console.log(`Lead assignment email sent to ${campaign.delivery.email.addresses}`);
                 } catch (err) {
@@ -77,9 +78,30 @@ const createLead = wrapAsync(async (req, res) => {
             }
             if (campaign?.delivery?.method?.includes('phone') && campaign?.delivery?.phone?.numbers) {
                 try {
+
+                    const fullName = `${result.first_name} ${result.last_name}`;
+                    const phoneNumber = result.phone_number || result.phone || '';
+                    const email = result.email || '';
+                    const address = `${result?.address?.full_address || ''}, ${result?.address?.city || ''}, ${result?.address?.zip_code || ''}`.trim();
+                    const leadId = result.lead_id;
+                    const campaignName = campaign?.name || 'N/A';
+
+                    // Construct SMS message
+                    const smsMessage = `New Lead Assigned
+
+                    Name: ${fullName}
+                    Phone: ${phoneNumber}
+                    Email: ${email}
+                    Address: ${address}
+                    Lead ID: ${leadId}
+                    Campaign: ${campaignName}
+
+                    View Lead: ${process.env.UI_LINK}/dashboard/leads/${result._id}`;
+
                     await SmsServices.sendSms({
                         to: campaign.delivery.phone.numbers,
-                        message: `A new lead, ${result?.lead_id}, has been assigned to you under the campaign: ${campaign?.name}. Please check your dashboard for more details.`,
+                        message: smsMessage,
+                        // message: `A new lead, ${result?.lead_id}, has been assigned to you under the campaign: ${campaign?.name}. Please check your dashboard for more details.`,
                         from: '+18563908470',
                     });
                     console.log(`Lead assignment SMS sent to ${campaign.delivery.phone.numbers}`);

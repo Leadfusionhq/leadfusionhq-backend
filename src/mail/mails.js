@@ -4,21 +4,7 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 const FROM_EMAIL = 'Leadfusionhq <noreply@leadfusionhq.com>';
 
-/**
- * Creates a reusable email template with consistent branding
- * @param {Object} options - Template configuration
- * @param {string} options.title - Email title
- * @param {string} options.greeting - Greeting text (e.g., "Hello John")
- * @param {string} options.mainText - Main body text
- * @param {string} options.highlightedContent - Content to highlight (OTP, password, etc.)
- * @param {string} options.highlightLabel - Label for highlighted content
- * @param {string} options.buttonText - Button text (optional)
- * @param {string} options.buttonUrl - Button URL (optional)
- * @param {string} options.footerText - Additional footer text
- * @param {string} options.warningText - Warning/security text
- * @param {string} options.companyName - Company name for footer
- * @returns {string} HTML email template
- */
+
 const createEmailTemplate = ({
   title = '',
   greeting = '',
@@ -257,31 +243,62 @@ const sendTestMail = async (toEmail) => {
     throw err;
   }
 };
-const sendLeadAssignEmail = async ({ to, name, leadName, assignedBy, leadDetailsUrl, campaignName }) => {
+const sendLeadAssignEmail = async ({ to, name, leadName, assignedBy, leadDetailsUrl, campaignName , leadData}) => {
   
   const recipients = Array.isArray(to) 
     ? to 
     : to.split(',').map(email => email.trim());
+  
+  const {
+    first_name,
+    last_name,
+    phone_number,
+    email,
+    address = {},
+    lead_id,
+  } = leadData;
+  const fullName = `${first_name || ''} ${last_name || ''}`.trim() || 'N/A';
+  const telLink = phone_number ? `<a href="tel:${phone_number}">${phone_number}</a>` : 'N/A';
+  const emailAddr = email || 'N/A';
+  const fullAddress = `${address.full_address || ''}, ${address.city || ''}, ${address.zip_code || ''}`.trim() || 'N/A';
+
+  const Address = `
+    <a href="https://maps.google.com/?q=${encodeURIComponent(fullAddress)}" target="_blank" rel="noopener noreferrer">
+      ${fullAddress}
+    </a>
+  `;
+
+
+  const mainText = `
+    A new lead named <strong>${leadName}</strong> has been assigned to you by <strong>${assignedBy}</strong>.
+    <br /><br />
+    <strong>Lead Details:</strong>
+    <ul>
+      <li><strong style="color: #1C1C1C;">Full Name:</strong> ${fullName}</li>
+      <li><strong style="color: #1C1C1C;">Phone:</strong> ${telLink}</li>
+      <li><strong style="color: #1C1C1C;">Email:</strong> <a href="mailto:${emailAddr}">${emailAddr}</a></li>
+      <li><strong style="color: #1C1C1C;">Address:</strong> ${Address}</li>
+      <li><strong style="color: #1C1C1C;">Lead ID:</strong> ${lead_id}</li>
+      <li><strong>Campaign:</strong> ${campaignName}</li>
+    </ul>
+    <br />
+    Please review the lead details and take necessary action.
+  `;
 
   const html = createEmailTemplate({
     title: 'New Lead Assigned',
-    greeting: `Hello ${name},`,
-    mainText: `
-      A new lead named <strong>${leadName}</strong> has been assigned to you by <strong>${assignedBy}</strong>.
-      <br /><br />
-      <strong>Campaign:</strong> ${campaignName}
-      <br /><br />
-      Please review the lead details and take necessary action.`,
-    buttonText: 'View Lead Details',
-    buttonUrl: leadDetailsUrl,
+    greeting: `${name},`,
+    mainText:mainText,
+    // buttonText: 'View Lead Details',
+    // buttonUrl: leadDetailsUrl,
     footerText: 'If you have any questions or need assistance, please contact your manager or support team.',
-    warningText: 'Do not share lead or campaign information outside the organization.',
+    // warningText: 'Do not share lead or campaign information outside the organization.',
   });
 
   return resend.emails.send({
     from: FROM_EMAIL,
     to: recipients,
-    subject: `📋 New Lead Assigned in "${campaignName}"`,
+    subject: `New Lead Assigned in "${campaignName}"`,
     html,
   });
 };

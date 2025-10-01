@@ -3,6 +3,8 @@ const  State  = require('../../models/state.model');
 const  County  = require('../../models/county.model');
 const { ErrorHandler } = require('../../utils/error-handler');
 const CONSTANT_ENUM = require('../../helper/constant-enums.js');
+const {getLeadCountByCampaignId} = require('../../services/lead/lead.service.js');
+const Lead = require('../../models/lead.model.js'); 
 
 const createCampaign = async (data) => {
   try {
@@ -74,33 +76,33 @@ const updateCampaign = async (campaignId, userId, role, updateData) => {
   }
 };
 
-const getCampaignsByUserId = async (page = 1, limit = 10, user_id) => {
-  try {
-    const skip = (page - 1) * limit;
+// const getCampaignsByUserId = async (page = 1, limit = 10, user_id) => {
+//   try {
+//     const skip = (page - 1) * limit;
 
-    const filter = { user_id };
+//     const filter = { user_id };
 
-    const [campaigns, total] = await Promise.all([
-      Campaign.find(filter)
-        .skip(skip)
-        .limit(limit)
-        .sort({ createdAt: -1 }),
-      Campaign.countDocuments(filter),
-    ]);
+//     const [campaigns, total] = await Promise.all([
+//       Campaign.find(filter)
+//         .skip(skip)
+//         .limit(limit)
+//         .sort({ createdAt: -1 }),
+//       Campaign.countDocuments(filter),
+//     ]);
 
-    return {
-      data: campaigns,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
-  } catch (error) {
-    throw new ErrorHandler(500, error.message || 'Failed to fetch campaigns');
-  }
-};
+//     return {
+//       data: campaigns,
+//       meta: {
+//         total,
+//         page,
+//         limit,
+//         totalPages: Math.ceil(total / limit),
+//       },
+//     };
+//   } catch (error) {
+//     throw new ErrorHandler(500, error.message || 'Failed to fetch campaigns');
+//   }
+// };
 
 // const getCampaigns = async (page = 1, limit = 10, user_id) => {
 //   try {
@@ -131,6 +133,47 @@ const getCampaignsByUserId = async (page = 1, limit = 10, user_id) => {
 //   }
 // };
 // Admin usage: filters is an object
+
+
+const getCampaignsByUserId = async (page = 1, limit = 10, user_id) => {
+  try {
+    const skip = (page - 1) * limit;
+
+    const filter = { user_id };
+
+    const [campaigns, total] = await Promise.all([
+      Campaign.find(filter)
+        .skip(skip)
+        .limit(limit)
+        .sort({ createdAt: -1 })
+        .lean(), // Use lean for better performance
+      Campaign.countDocuments(filter),
+    ]);
+
+    // 👇 Add lead counts for each campaign
+    const enrichedCampaigns = await Promise.all(
+      campaigns.map(async (campaign) => {
+        const leadCount = await Lead.countDocuments({ campaign_id: campaign._id });
+        return {
+          ...campaign,
+          leadCount,
+        };
+      })
+    );
+
+    return {
+      data: enrichedCampaigns,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  } catch (error) {
+    throw new ErrorHandler(500, error.message || 'Failed to fetch campaigns');
+  }
+};
 
 const stateCache = {};
 const getCampaigns = async (page = 1, limit = 10, filters = {}) => {
@@ -198,7 +241,9 @@ const getCampaigns = async (page = 1, limit = 10, filters = {}) => {
   }
 };
 const getCampaignById = async (campaignId, userId) => {
-  const campaign = await Campaign.findOne({ _id: campaignId, user_id: userId }).lean();
+  const campaign = await Campaign.findOne({ _id: campaignId, user_id: userId })
+    .populate('user_id', 'name email')
+    .lean();
 
   if (!campaign) {
     throw new ErrorHandler(404, 'Campaign not found or access denied');
