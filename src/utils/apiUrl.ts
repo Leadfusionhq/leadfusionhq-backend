@@ -126,6 +126,11 @@ export const LEADS_API = {
   GET_LEADS_BY_CAMPAIGN:`${LEADS_API_BASE}/`,
   
   GET_LEADS_BY_CLIENT:`${LEADS_API_BASE}/client`,
+
+  RETURN_LEAD:`${LEADS_API_BASE}/return`,
+  GET_RETURN_LEADS: `${LEADS_API_BASE}/getReturnLeads`,
+  APPROVE_RETURN_LEAD: `${LEADS_API_BASE}/returns/approve`,
+  REJECT_RETURN_LEAD: `${LEADS_API_BASE}/returns/reject`,
 };
 
 /** ::::::::::::::::::utilities ROUTES :::::::::::::::::: */

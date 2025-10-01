@@ -9,6 +9,7 @@ import DataTable, { TableColumn } from "react-data-table-component";
 import { Skeleton, Box, Button, Typography } from "@mui/material";
 import Link from 'next/link';
 import { useRouter } from "next/navigation";
+import { toast } from "react-toastify";
 
 // Define Lead type
 type Lead = {
@@ -42,6 +43,9 @@ type Lead = {
   language: string;
   geography: string;
   delivery: string;
+  return_status: 'Not Returned' | 'Pending' | 'Approved' | 'Rejected';
+  return_attempts: number;
+  max_return_attempts: number;
 };
 
 type ApiResponse = {
@@ -130,6 +134,9 @@ export default function LeadTable() {
     language: "",
     geography: "",
     delivery: "",
+    return_status: 'Not Returned',
+    return_attempts: 0,
+    max_return_attempts: 2,
   }));
 
   const formatStatus = (status: string | undefined | null) => {
@@ -171,6 +178,64 @@ export default function LeadTable() {
   const handleView = (row: Lead) => {
     router.push(`/dashboard/leads/${row._id}`);
   };
+
+  const handleReturn = async (row: Lead) => {
+    const currentStatus = (row.return_status || 'Not Returned').trim();
+    console.log(currentStatus);
+    
+    if ((row.return_attempts || 0) >= (row.max_return_attempts || 2)) {
+      toast.warning("You have reached the maximum return attempts for this lead.");
+      return;
+    }
+    
+    if (currentStatus !== 'Not Returned' && currentStatus !== 'Rejected') {
+      toast.warning("This lead has already been marked for return.");
+      return;
+    }
+
+
+
+    try {
+      setLoading(true);
+      console.log("Return request for lead:", row);
+
+      const payload = {
+        lead_id: row._id,
+        return_status: 'Pending', 
+      };
+
+      const response = (await axiosWrapper(
+        "post",
+        LEADS_API.RETURN_LEAD,
+        payload,
+        token ?? undefined
+      )) as ApiResponse;
+
+      console.log("Return Lead Response:", response);
+
+      // setLeads((prevLeads) =>
+      //   prevLeads.map((lead) =>
+      //     lead.lead_id === row.lead_id
+      //       ? {
+      //           ...lead,
+      //           return_status: 'Pending', 
+      //           return_attempts: (lead.return_attempts || 0) + 1,
+      //         }
+      //       : lead
+      //   )
+      // );
+
+      toast.success("Lead return request submitted successfully!");
+    } catch (err: any) {
+      console.error("Failed to return lead:", err);
+      const message = err?.response?.data?.message || err?.message || "Failed to submit return request. Please try again.";
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
 
   // Columns for the lead table
   const columns: TableColumn<Lead>[] = [
@@ -295,19 +360,6 @@ export default function LeadTable() {
           />
         ) : (
           <div className="flex gap-2">
-            {/* <Button
-              className="!bg-[#838383] !text-white hover:!bg-[#6b6b6b]"
-              size="small"
-              sx={{
-                fontSize: "12px",
-                minWidth: "60px",
-                height: "28px",
-                textTransform: "capitalize",
-              }}
-              onClick={() => handleEdit(row)}
-            >
-              Edit
-            </Button> */}
             <Button
               className="!bg-white !text-[#838383] border border-[#838383] hover:!bg-[#f4f4f4]"
               size="small"
@@ -320,6 +372,20 @@ export default function LeadTable() {
               onClick={() => handleView(row)}
             >
               View
+            </Button>
+
+            <Button
+              className="!bg-[#838383] !text-white hover:!bg-[#6b6b6b]"
+              size="small"
+              sx={{
+                fontSize: "12px",
+                minWidth: "60px",
+                height: "28px",
+                textTransform: "capitalize",
+              }}
+              onClick={() => handleReturn(row)}
+            >
+              Return
             </Button>
           </div>
         ),
