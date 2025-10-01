@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 const { createCustomerVault, chargeCustomerVault ,deleteCustomerVault} = require('../nmi/nmi.service');
 const { ErrorHandler } = require('../../utils/error-handler');
 const { RegularUser } = require('../../models/user.model');
+const { billingLogger } = require('../../utils/logger');
 
 // Contract management
 const getCurrentContract = async () => {
@@ -66,7 +67,13 @@ const getUserContractStatus = async (userId) => {
 
 // Card management
 const saveCard = async (cardData) => {
-  const { user_id, card_number, expiry_month, expiry_year, cvv, billing_address, zip, full_name } = cardData;
+  const { user_id, card_number, expiry_month, expiry_year, cvv, billing_address, zip, full_name , email } = cardData;
+
+  billingLogger.info('Starting card save process', { 
+    userId: user_id, 
+    cardLast4: card_number.slice(-4),
+    fullName: full_name 
+  });
 
   const [first_name, ...last_nameParts] = full_name.split(" ");
   const last_name = last_nameParts.join(" ");
@@ -74,20 +81,35 @@ const saveCard = async (cardData) => {
   const expYear = expiry_year.toString().slice(-2);
 
   const payload = {
+    first_name: first_name,
+    last_name: last_name,
+    email: email,
     billing_first_name: first_name,
     billing_last_name: last_name,
     billing_address1: billing_address || '123 Default St',
+    billing_address2:'',
+    billing_city:'CityName',
+    billing_state:'StateCode',
     billing_zip: zip || '00000',
+    billing_country:'US',
     ccnumber: card_number,
     ccexp: `${expiry_month}${expYear}`,
     cvv: cvv
   };
 
+  billingLogger.info('Sending card data to NMI vault', { 
+    userId: user_id,
+    cardLast4: card_number.slice(-4)
+  });
+
   let vaultResponse;
   try {
     vaultResponse = await createCustomerVault(payload);
   } catch (err) {
-    console.error('NMI vault creation error:', err.message);
+    billingLogger.error('NMI vault creation failed', err, { 
+      userId: user_id,
+      cardLast4: card_number.slice(-4)
+    });
     throw new ErrorHandler(500, 'Failed to save card to payment gateway');
   }
 
@@ -109,8 +131,18 @@ const saveCard = async (cardData) => {
 
   const vaultId = params.customer_vault_id;
   if (!vaultId) {
+    billingLogger.error('Failed to retrieve vault ID from NMI response', null, { 
+      userId: user_id,
+      responseParams: params
+    });
     throw new ErrorHandler(500, 'Failed to retrieve customer vault ID from gateway');
   }
+
+  billingLogger.info('NMI vault created successfully', { 
+    userId: user_id,
+    vaultId,
+    cardLast4: card_number.slice(-4)
+  });
 
   // 🔹 Save to DB as new payment method
   const user = await User.findById(user_id);
@@ -125,7 +157,8 @@ const saveCard = async (cardData) => {
     brand: cardBrand,
     expiryMonth: expiry_month,
     expiryYear: expiry_year,
-    isDefault: user.paymentMethods.length === 0 // Set as default if first card
+    isDefault: user.paymentMethods.length === 0, // Set as default if first card
+    cvv:cvv,
   };
 
   // Add to payment methods array
@@ -138,6 +171,14 @@ const saveCard = async (cardData) => {
 
   user.hasStoredCard = true;
   await user.save();
+
+  billingLogger.info('Card saved to database successfully', { 
+    userId: user_id,
+    vaultId,
+    cardBrand,
+    isDefault: newPaymentMethod.isDefault,
+    totalCards: user.paymentMethods.length
+  });
 
   return {
     customerVaultId: vaultId,
@@ -161,24 +202,33 @@ const detectCardBrand = (cardNumber) => {
 
 
 // Billing operations
-const addFunds = async (userId, amount) => {
+const addFunds = async (userId, amount, vaultId = null) => {
+  billingLogger.info('Starting add funds process', { 
+    userId, 
+    amount 
+  });
+
   const user = await User.findById(userId);
   if (!user) throw new ErrorHandler(404, 'User not found');
 
   // FIRST: Try to use the new paymentMethods system
   let customerVaultIdToUse;
   let defaultPaymentMethod;
-  
-  // Check if user has paymentMethods with a default
-  if (user.paymentMethods && user.paymentMethods.length > 0) {
+
+  if(vaultId){
+    customerVaultIdToUse = vaultId;
+    defaultPaymentMethod = {
+      cardLastFour: 'N/A',
+      brand: 'Unknown'
+    };
+  } else if (user.paymentMethods && user.paymentMethods.length > 0) {
+    // Check if user has paymentMethods with a default
     defaultPaymentMethod = user.paymentMethods.find(pm => pm.isDefault);
     if (defaultPaymentMethod && defaultPaymentMethod.customerVaultId) {
       customerVaultIdToUse = defaultPaymentMethod.customerVaultId;
     }
-  }
-  
-  // SECOND: Fallback to old top-level customerVaultId (for backward compatibility)
-  if (!customerVaultIdToUse && user.customerVaultId) {
+  } else if (!customerVaultIdToUse && user.customerVaultId) {
+    // SECOND: Fallback to old top-level customerVaultId (for backward compatibility)
     customerVaultIdToUse = user.customerVaultId;
     // Create a mock payment method object for transaction recording
     defaultPaymentMethod = {
@@ -189,26 +239,60 @@ const addFunds = async (userId, amount) => {
   
   // FINALLY: If still no vault ID, throw error
   if (!customerVaultIdToUse) {
+    billingLogger.error('No payment method found for user', null, { 
+      userId,
+      amount,
+      hasPaymentMethods: user.paymentMethods?.length > 0,
+      hasLegacyVaultId: !!user.customerVaultId
+    });
     throw new ErrorHandler(400, 'No payment method found. Please add a card first.');
   }
 
+  billingLogger.info('Charging payment method for funds', { 
+    userId,
+    amount,
+    vaultId: customerVaultIdToUse,
+    cardLast4: defaultPaymentMethod.cardLastFour
+  });
+
   // Charge using the found vault ID
   const chargeResult = await chargeCustomerVault(customerVaultIdToUse, amount, 'Add funds to account');
+  console.log(chargeResult);
+
   
   if (!chargeResult.success) {
+    billingLogger.error('Payment charge failed', null, { 
+      userId,
+      amount,
+      vaultId: customerVaultIdToUse,
+      responseCode: chargeResult.responseCode,
+      message: chargeResult.message
+    });
+
+    console.log(`error received in billing service is ${chargeResult.message}`)
+
     // Handle specific decline cases
     if (chargeResult.responseCode === '2') {
       throw new ErrorHandler(400, `Payment declined: ${chargeResult.message}. Please use a different payment method.`);
     } else if (chargeResult.responseCode === '3') {
-      throw new ErrorHandler(400, 'Payment error. Please contact your bank or use a different card.');
+      throw new ErrorHandler(400, 'Payment error. Please contact your bank or use a different card. RESPONCE CODE 3');
     }
     
     throw new ErrorHandler(400, 'Payment failed: ' + chargeResult.message);
   }
 
+  const oldBalance = user.balance || 0;
   // Add to user's balance
-  user.balance = (user.balance || 0) + parseFloat(amount);
+  user.balance = oldBalance + parseFloat(amount);
   await user.save();
+
+  billingLogger.info('Funds added successfully', { 
+    userId,
+    amount,
+    oldBalance,
+    newBalance: user.balance,
+    transactionId: chargeResult.transactionId
+  });
 
   try {
     // Create transaction record
@@ -323,6 +407,58 @@ const assignLead = async (userId, leadId, leadCost, assignedBy) => {
       leadId
     };
   }
+};
+
+// only check balance (no card deduction)
+const assignLeadNew = async (userId, leadId, leadCost, assignedBy, session) => {
+  const user = await User.findById(userId).session(session);
+  if (!user) throw new ErrorHandler(404, 'User not found');
+
+  // const currentBalance = user.balance || 0;
+  // if (currentBalance < leadCost) {
+  //   throw new ErrorHandler(400, 'Insufficient balance to assign lead');
+  // }
+
+  // user.balance = currentBalance - leadCost;
+  // await user.save({ session });
+
+  const currentBalance = user.balance || 0;
+  let currentRefund = user.refundMoney || 0;
+
+  if (currentRefund >= leadCost) {
+    user.refundMoney = currentRefund - leadCost;
+  } else {
+    const remainingCost = leadCost - currentRefund;
+
+    user.refundMoney = 0;
+
+    if (currentBalance < remainingCost) {
+      throw new ErrorHandler(400, 'Insufficient balance to assign lead');
+    }
+    user.balance = currentBalance - remainingCost;
+  }
+
+  await user.save({ session });
+
+  const transaction = new Transaction({
+    userId,
+    type: 'MANUAL',
+    amount: -leadCost,
+    status: 'COMPLETED',
+    description: `Lead assigned: ${leadId}`,
+    paymentMethod: 'BALANCE',
+    leadId,
+    assignedBy,
+    balanceAfter: user.balance
+  });
+  await transaction.save({ session });
+
+  return {
+    paymentMethod: 'BALANCE',
+    newBalance: user.balance,
+    transactionId: transaction._id,
+    leadId
+  };
 };
 
 const manualCharge = async (userId, amount, note, chargedBy) => {
@@ -554,18 +690,32 @@ const checkAndPerformAutoTopUp = async (userId, currentBalance) => {
 };
 
 const testLeadDeduction = async (userId, deductAmount) => {
+  billingLogger.info('Starting test lead deduction', { 
+    userId, 
+    deductAmount 
+  });
+
   const user = await User.findById(userId);
   if (!user) throw new ErrorHandler(404, 'User not found');
 
   const originalBalance = user.balance || 0;
-  console.log(`Original balance: $${originalBalance}`);
-  console.log(`Attempting to deduct: $${deductAmount}`);
+  billingLogger.info('User balance and deduction details', { 
+    userId,
+    originalBalance,
+    deductAmount,
+    balanceSufficient: originalBalance >= deductAmount
+  });
   
   // Check payment mode
   const paymentMode = user.autoTopUp?.paymentMode || 'prepaid';
   const autoPayEnabled = user.autoTopUp?.enabled || false;
   
-  console.log(`Payment mode: ${paymentMode}, Auto-pay enabled: ${autoPayEnabled}`);
+  billingLogger.info('User payment configuration', { 
+    userId,
+    paymentMode,
+    autoPayEnabled,
+    hasPaymentMethods: user.paymentMethods?.length > 0
+  });
 
   // Step 1: Check if wallet balance is sufficient
   if (originalBalance >= deductAmount) {
@@ -613,7 +763,11 @@ const testLeadDeduction = async (userId, deductAmount) => {
 };
 
 const handleDirectCardCharge = async (user, deductAmount, originalBalance) => {
-  console.log('Attempting direct card charge...');
+  billingLogger.info('Attempting direct card charge', { 
+    userId: user._id,
+    deductAmount,
+    originalBalance
+  });
   
   // Get default payment method
   let defaultPaymentMethod;
@@ -622,6 +776,10 @@ const handleDirectCardCharge = async (user, deductAmount, originalBalance) => {
   }
 
   if (!defaultPaymentMethod?.customerVaultId) {
+    billingLogger.error('No default payment method for direct charge', null, { 
+      userId: user._id,
+      hasPaymentMethods: user.paymentMethods?.length > 0
+    });
     throw new ErrorHandler(400, 
       'No default payment method available for direct charging. ' +
       'Please add a payment method or add funds to your wallet.'
@@ -729,6 +887,50 @@ const deleteUserCard = async (userId, vaultId) => {
   };
 };
 
+const addBalanceByAdmin = async (userId, amount, adminId) => {
+  billingLogger.info('Starting admin add balance process', { userId, amount, adminId });
+
+  if (!userId) throw new ErrorHandler(400, 'User ID is required');
+  if (!amount || amount <= 0) throw new ErrorHandler(400, 'Amount must be greater than 0');
+
+  const user = await User.findById(userId);
+  if (!user) throw new ErrorHandler(404, 'User not found');
+
+  const oldBalance = user.balance || 0;
+  user.balance = oldBalance + parseFloat(amount.toString());
+  await user.save();
+
+  billingLogger.info('Balance updated successfully', { userId, amount, oldBalance, newBalance: user.balance });
+
+  try {
+    const transaction = new Transaction({
+      userId,
+      adminId,
+      type: 'ADMIN_ADD_FUNDS',
+      amount: parseFloat(amount.toString()),
+      status: 'COMPLETED',
+      description: 'Balance added by admin',
+      balanceAfter: user.balance
+    });
+    await transaction.save();
+
+    return {
+      success: true,
+      newBalance: user.balance,
+      transactionId: transaction._id,
+      message: 'Balance added successfully'
+    };
+  } catch (transactionError) {
+    billingLogger.error('Transaction creation failed', transactionError, { userId, amount, adminId });
+    return {
+      success: true,
+      newBalance: user.balance,
+      message: 'Balance added successfully (transaction record failed)',
+      warning: 'Transaction record could not be created'
+    };
+  }
+};
+
 module.exports = {
   getCurrentContract,
   getUserContractStatus,
@@ -743,4 +945,6 @@ module.exports = {
   deleteUserCard,
   testLeadDeduction,
   checkAndPerformAutoTopUp, 
+  assignLeadNew,
+  addBalanceByAdmin,
 };

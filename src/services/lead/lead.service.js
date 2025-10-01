@@ -6,11 +6,17 @@ const { ErrorHandler } = require('../../utils/error-handler');
 const CONSTANT_ENUM = require('../../helper/constant-enums.js');
 const { addCSVProcessingJob, getJobStatus } = require('../../queue/csvProcessor');
 const mongoose = require('mongoose');
+const { User } = require('../../models/user.model.js');
 
-const createLead = async (data) => {
+const createLead = async (data,  options = {}) => {
   try {
-    const newLead = await Lead.create(data);
-    const populatedLead = await Lead.findById(newLead._id).populate('campaign_id', 'user_id').exec();
+    const { session } = options;
+
+    const newLead = await Lead.create([data], { session });
+    const populatedLead = await Lead.findById(newLead[0]._id)
+    .populate('campaign_id', 'user_id')
+    .session(session || null) 
+    .exec();
 
     return populatedLead;
   } catch (error) {
@@ -89,19 +95,37 @@ const getLeadByUserId = async (page = 1, limit = 10, user_id) => {
 };
 
 const getLeadById = async (leadId, userId) => {
-  const lead = await Lead.findOne({ _id: leadId, user_id: userId }).lean();
+  // const lead = await Lead.findOne({ _id: leadId, user_id: userId }).lean();
+  // console.log('userId',userId)
+  // console.log('leadId',leadId)
+  // console.log(lead)
+  // if (!lead) {
+  //   throw new ErrorHandler(404, 'Lead not found or access denied');
+  // }
 
-  if (!lead) {
+  // return lead;
+
+  const lead = await Lead.findOne({ _id: leadId })
+  .populate({
+    path: 'campaign_id',
+  })
+  .lean();
+
+  if (!lead || String(lead.campaign_id?.user_id) !== String(userId)) {
     throw new ErrorHandler(404, 'Lead not found or access denied');
   }
 
   return lead;
+
 };
 
 const getLeadByIdForAdmin = async (leadId) => {
   const lead = await Lead.findById(leadId)
     .populate('user_id', 'name email')
     .populate('address.state', 'name abbreviation')
+    .populate({
+      path: 'campaign_id',
+    })
     .lean();
 
   if (!lead) {
@@ -287,6 +311,273 @@ const getUserProcessingJobs = async (userId, page = 1, limit = 10) => {
   }
 };
 
+const validatePrepaidCampaignBalanceOld = async (campaign_id, leadPrice = 10) => {
+
+  try {
+
+    const campaign = await Campaign.findById(campaign_id);
+    if (!campaign) {
+      throw new ErrorHandler(404, 'Campaign not found');
+    }
+
+    if (campaign.payment_type === 'prepaid') {
+      const campaignUser = await User.findById(campaign.user_id);
+
+      if (!campaignUser) {
+        throw new ErrorHandler(404, 'Campaign user not found');
+      }
+
+      console.log(`User Balance: ${campaignUser.balance}, Lead Price: ${leadPrice}`);
+
+      if (campaignUser.balance < leadPrice) {
+        throw new ErrorHandler(400, 'Insufficient balance to create lead');
+      }
+    }
+
+    return campaign;
+  } catch (error) {
+    if (error instanceof ErrorHandler) {
+      throw error;
+    }
+    throw new ErrorHandler(500, error.message || 'Failed to validate campaign balance');
+  }
+};
+const getLeadCountByCampaignId = async (campaign_id) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(campaign_id)) {
+      throw new ErrorHandler(400, 'Invalid campaign ID');
+    }
+
+    const count = await Lead.countDocuments({ campaign_id });
+
+    return {
+      campaign_id,
+      totalLeads: count
+    };
+  } catch (error) {
+    throw new ErrorHandler(500, error.message || 'Failed to count leads for campaign');
+  }
+};
+
+const validatePrepaidCampaignBalance = async (campaign_id) => {
+  try {
+
+    const campaign = await Campaign.findById(campaign_id);
+    if (!campaign) {
+      throw new ErrorHandler(404, 'Campaign not found');
+    }
+
+    const leadCost = campaign.bid_price || 0;
+    if (leadCost <= 0) {
+      throw new ErrorHandler(400, 'Campaign has invalid bid_price');
+    }
+
+    if (campaign.payment_type === 'prepaid') {
+      const campaignUser = await User.findById(campaign.user_id);
+      if (!campaignUser) {
+        throw new ErrorHandler(404, 'Campaign user not found');
+      }
+
+      const totalAvailable = (campaignUser.balance || 0) + (campaignUser.refundMoney || 0);
+
+      console.log(
+        `User Balance: ${campaignUser.balance}, Refund Money: ${campaignUser.refundMoney}, Lead Price: ${leadCost}`
+      );
+
+      if (totalAvailable < leadCost) {
+        throw new ErrorHandler(400, 'Insufficient funds to create lead');
+      }
+
+      return { campaignData: campaign, user: campaignUser, leadCost };
+    }
+
+    return { campaignData: campaign, leadCost };
+  } catch (error) {
+    if (error instanceof ErrorHandler) {
+      throw error;
+    }
+    throw new ErrorHandler(500, error.message || 'Failed to validate campaign balance');
+  }
+};
+
+const getCampaignByLead = async (leadId) => {
+  try {
+
+    const lead = await Lead.findById(leadId).lean();
+    if (!lead) {
+      throw new ErrorHandler(404, 'Lead not found');
+    }
+
+    const campaignId = lead.campaign_id;
+    if (!campaignId) {
+      throw new ErrorHandler(400, 'Lead does not have a campaign associated');
+    }
+
+    const campaign = await Campaign.findById(campaignId).lean();
+    if (!campaign) {
+      throw new ErrorHandler(404, 'Campaign not found for this lead');
+    }
+
+    return campaign;
+  } catch (error) {
+    throw new ErrorHandler(error.statusCode || 500, error.message || 'Failed to get campaign');
+  }
+};
+
+const returnLead = async (leadId, returnStatus) => {
+  try {
+    const lead = await Lead.findById(leadId);
+
+    if (!lead) {
+      throw new ErrorHandler(404, 'Lead not found');
+    }
+
+    const currentStatus = lead.return_status ?? 'Not Returned';
+    const attempts = lead.return_attempts ?? 0;
+    const maxAttempts = lead.max_return_attempts ?? 2;
+
+    if (currentStatus !== 'Not Returned' && currentStatus !== 'Rejected' ) {
+      throw new ErrorHandler(400, 'This lead has already been marked for return');
+    }
+
+    if (attempts >= maxAttempts) {
+      throw new ErrorHandler(400, 'Maximum return attempts reached for this lead');
+    }
+
+    lead.return_status = returnStatus; 
+    lead.return_attempts = attempts + 1;
+
+    await lead.save();
+
+    return lead.toObject();
+    
+  } catch (error) {
+    throw new ErrorHandler(
+      error.statusCode || 500,
+      error.message || 'Failed to process return request'
+    );
+  }
+};
+
+const getReturnLeads = async (page = 1, limit = 10) => {
+  try {
+    const skip = (page - 1) * limit;
+
+    const query = {
+      return_status: 'Pending',
+    };
+
+    const [leads, total] = await Promise.all([
+      Lead.find(query)
+        .populate('campaign_id', 'campaign_id name status lead_type exclusivity language geography delivery user_id note')
+        .populate('user_id', 'name email')
+        .populate('address.state', 'name abbreviation')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Lead.countDocuments(query),
+    ]);
+
+    return {
+      data: leads,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  } catch (error) {
+    console.error('Error in getReturnLeads:', error);
+    throw new ErrorHandler(500, error.message || 'Failed to fetch return leads');
+  }
+};
+
+const rejectReturnLead = async (leadId, returnStatus) => {
+  try {
+
+    const lead = await Lead.findById(leadId);
+
+    if (!lead) {
+      throw new ErrorHandler(404, 'Lead not found');
+    }
+
+    const currentStatus = lead.return_status ?? 'Not Returned';
+    if (currentStatus !== 'Pending') {
+      throw new ErrorHandler(400, 'Lead return is not pending and cannot be rejected');
+    }
+
+    lead.return_status = returnStatus;       
+
+    await lead.save();
+
+    return lead.toObject(); 
+  } catch (error) {
+    throw new ErrorHandler(
+      error.statusCode || 500,
+      error.message || 'Failed to reject return request'
+    );
+  }
+};
+const approveReturnLead = async(leadId, returnStatus) => {
+  try {
+
+    const lead = await Lead.findById(leadId);
+
+    if (!lead) {
+      throw new ErrorHandler(404, 'Lead not found');
+    }
+
+    const currentStatus = lead.return_status ?? 'Not Returned';
+    if (currentStatus !== 'Pending') {
+      throw new ErrorHandler(400, 'Lead return is not pending and cannot be approved');
+    }
+
+    const campaign = await Campaign.findById(lead.campaign_id);
+    if (!campaign) {
+      throw new ErrorHandler(404, 'Campaign not found for this lead');
+    }
+
+    const { bid_price = 0, user_id } = campaign;
+
+    if (!user_id) {
+      throw new ErrorHandler(400, 'Campaign is missing user_id');
+    }
+
+    const user = await User.findById(user_id);
+    if (!user) {
+      throw new ErrorHandler(404, 'User not found for this campaign');
+    }
+
+    let refundedAmount = 0;
+    if (bid_price > 0) {
+      user.refundMoney = (user.refundMoney || 0) + bid_price;
+      await user.save();
+      refundedAmount = bid_price;
+    }
+
+    lead.return_status = returnStatus;
+    await lead.save();
+
+    return {
+      lead: lead.toObject(),
+      refund: refundedAmount > 0 
+        ? {
+            user_id: user._id,
+            refunded_amount: refundedAmount,
+            total_refund: user.refundMoney,
+          }
+        : null, 
+    };
+  } catch (error) {
+    throw new ErrorHandler(
+      error.statusCode || 500,
+      error.message || 'Failed to approve return request'
+    );
+  }
+};
+
 module.exports = {
   createLead,
   getLeads,
@@ -298,4 +589,12 @@ module.exports = {
   getProcessingStatus,
   getUserProcessingJobs,
   validateCSVFormat,
+  validatePrepaidCampaignBalance,
+  returnLead,
+  getReturnLeads,
+  rejectReturnLead,
+  approveReturnLead,
+  getLeadCountByCampaignId,
+  getCampaignByLead,
+
 };

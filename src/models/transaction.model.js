@@ -12,7 +12,7 @@ const transactionSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['ADD_FUNDS', 'WITHDRAWAL', 'TRANSFER', 'REFUND', 'MANUAL', 'AUTO', 'DEDUCTION','TEST_DEDUCTION'],
+    enum: ['ADD_FUNDS', 'WITHDRAWAL', 'TRANSFER', 'REFUND', 'MANUAL', 'AUTO', 'DEDUCTION','TEST_DEDUCTION','ADMIN_ADD_FUNDS'],
     required: true,
   },
   status: {
@@ -26,7 +26,7 @@ const transactionSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['CARD', 'BANK_TRANSFER', 'PAYPAL', 'OTHER'],
+    enum: ['CARD', 'BANK_TRANSFER', 'PAYPAL', 'OTHER', 'BALANCE'],
   },
   transactionId: {
     type: String,

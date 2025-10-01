@@ -152,6 +152,11 @@ paymentMethods: [{
     type: Boolean,
     default: false
   },
+  cvv: {
+    type: String,
+    required: false,
+    default: null  
+  },
   createdAt: {
     type: Date,
     default: Date.now
@@ -165,12 +170,15 @@ hasStoredCard: {
   type: Boolean,
   default: false
 },
-
-  // 💰 Billing
-  balance: {
-    type: Number,
-    default: 0,
-  },
+balance: {
+  type: Number,
+  default: 0,
+},
+refundMoney: {
+  type: Number,
+  default: 0,
+  min: 0,
+},
 // In regularUserSchema
 // In your user model where autoTopUp is defined
 // In the user schema, update the autoTopUp object:

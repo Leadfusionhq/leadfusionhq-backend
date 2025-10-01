@@ -10,6 +10,10 @@ const CONSTANT_ENUM = require('../../helper/constant-enums.js');
 
 const API = {
     CREATE_LEAD: '/',
+    RETURN_LEAD: '/return',
+    GET_RETURN_LEADS:'/getReturnLeads',
+    APPROVE_RETURN_LEAD:'/returns/approve',
+    REJECT_RETURN_LEAD:'/returns/reject',
     UPLOAD_CSV: '/upload-csv',
     VALIDATE_CSV: '/validate-csv',
     GET_ALL_LEADS: '/',
@@ -65,6 +69,29 @@ leadRouter.post(
     API.CREATE_LEAD,
     celebrate(LeadSchema.createLead),
     leadController.createLead
+);
+
+leadRouter.post(
+    API.RETURN_LEAD,
+    celebrate(LeadSchema.returnLead),
+    leadController.returnLead
+);
+
+leadRouter.get(
+    API.GET_RETURN_LEADS, 
+    leadController.getReturnLeads
+);
+
+leadRouter.patch(
+  API.REJECT_RETURN_LEAD,                 
+  celebrate(LeadSchema.rejectReturnLead),
+  leadController.rejectReturnLead
+);
+
+leadRouter.patch(
+  API.APPROVE_RETURN_LEAD,                 
+  celebrate(LeadSchema.approveReturnLead),
+  leadController.approveReturnLead
 );
 
 leadRouter.get(

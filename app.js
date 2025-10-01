@@ -31,6 +31,9 @@ const feedbackRoutes  = require('./src/routes/feedback/feedback.routes');
 const billingRoutes  = require('./src/routes/billing/billing.route');
 const geocodingRouter=require(`./src/routes/geocoding/geocoding.routes`);
 const testRoutes = require('./src/routes/test/email-routes');
+const billingLogTestRoutes = require('./src/routes/test/billing-log-test');
+const logsRoutes = require('./src/routes/logs/logs.routes');
+const smsRoutes = require('./src/routes/sms/sms.route');
 
 
 app.use(cors());
@@ -60,6 +63,7 @@ app.use(`/${config.server.route}/chats`, chatRoutes);
 app.use(`/${config.server.route}/utilities`, utilityRoutes);
 app.use(`/${config.server.route}/ghl`, ghlRoutes);
 app.use(`/${config.server.route}/test`, testRoutes);
+app.use(`/${config.server.route}/test`, billingLogTestRoutes);
 
 
 /** ::::::::::::::::::faq routes:::::::::::::::::: */
@@ -75,6 +79,11 @@ app.use(`/${config.server.route}/billing`, billingRoutes);
 /** ::::::::::::::::::geocoding routes:::::::::::::::::: */
 app.use(`/${config.server.route}/geocoding`, geocodingRouter);
 
+/** ::::::::::::::::::logs routes:::::::::::::::::: */
+app.use(`/${config.server.route}/logs`, logsRoutes);
+
+/** ::::::::::::::::::logs routes:::::::::::::::::: */
+app.use(`/${config.server.route}/sms`, smsRoutes);
 
 app.use(errors());
 

@@ -4,16 +4,21 @@ const BillingServices = require('../../services/billing/billing.service.js');
 const { ErrorHandler } = require('../../utils/error-handler');
 const { getPaginationParams, extractFilters } = require('../../utils/pagination');
 const { User } = require('../../models/user.model');
+const { billingLogger } = require('../../utils/logger');
 
 // Contract management
 const getCurrentContract = wrapAsync(async (req, res) => {
+    billingLogger.info('Getting current contract');
     const contract = await BillingServices.getCurrentContract();
+    billingLogger.info('Current contract retrieved successfully');
     return sendResponse(res, { contract }, 'Current contract retrieved successfully');
 });
 
 const getContractStatus = wrapAsync(async (req, res) => {
     const user_id = req.user._id;
+    billingLogger.info('Getting contract status for user', { userId: user_id });
     const status = await BillingServices.getUserContractStatus(user_id);
+    billingLogger.info('Contract status retrieved successfully', { userId: user_id, status });
     return sendResponse(res, { status }, 'Contract status retrieved successfully');
 });
 
@@ -21,11 +26,26 @@ const acceptContract = wrapAsync(async (req, res) => {
     const user_id = req.user._id;
     const { version, ipAddress } = req.body;
     
+    billingLogger.info('User attempting to accept contract', { 
+        userId: user_id, 
+        version, 
+        ipAddress 
+    });
+    
     try {
         const result = await BillingServices.acceptContract(user_id, version, ipAddress);
+        billingLogger.info('Contract accepted successfully', { 
+            userId: user_id, 
+            version, 
+            result 
+        });
         return sendResponse(res, { result }, 'Contract accepted successfully', 201);
     } catch (err) {
-        console.error(`Failed to accept contract:`, err.message);
+        billingLogger.error('Failed to accept contract', err, { 
+            userId: user_id, 
+            version, 
+            ipAddress 
+        });
         throw new ErrorHandler(500, 'Failed to accept contract. Please try again later.');
     }
 });
@@ -33,19 +53,29 @@ const acceptContract = wrapAsync(async (req, res) => {
 // Card management
 const saveCard = wrapAsync(async (req, res) => {
     const user_id = req.user._id;
+    const email = req.user.email;
     
     // const contractStatus = await BillingServices.getUserContractStatus(user_id);
     // if (!contractStatus.hasAcceptedLatest) {
     //     throw new ErrorHandler(400, 'You must accept the latest contract before saving payment information.');
     // }
     
-    const cardData = { ...req.body, user_id };
+    const cardData = { ...req.body, user_id , email};
+    
+    billingLogger.info('User attempting to save card', { 
+        userId: user_id,
+        cardLast4: req.body.ccnumber ? req.body.ccnumber.slice(-4) : 'N/A'
+    });
 
     try {
         const data = await BillingServices.saveCard(cardData);
+        billingLogger.info('Card details saved successfully', { 
+            userId: user_id,
+            vaultId: data.customerVaultId 
+        });
         return sendResponse(res, { data }, 'Your card details have been saved', 201);
     } catch (err) {
-        console.error(`Failed to save card:`, err.message);
+        billingLogger.error('Failed to save card', err, { userId: user_id });
         throw new ErrorHandler(500, 'Failed to save your card details. Please try again later.');
     }
 });
@@ -101,11 +131,24 @@ const getCards = wrapAsync(async (req, res) => {
     const user_id = req.user._id;
     const { deductAmount } = req.body;
     
+    billingLogger.info('Testing auto top-up for user', { 
+        userId: user_id, 
+        deductAmount 
+    });
+    
     try {
       const result = await BillingServices.testLeadDeduction(user_id, deductAmount);
+      billingLogger.info('Auto top-up test completed', { 
+          userId: user_id, 
+          deductAmount, 
+          result: result.message 
+      });
       return sendResponse(res, { result }, result.message);
     } catch (err) {
-      console.error(`Failed to process lead deduction:`, err.message);
+      billingLogger.error('Failed to process lead deduction', err, { 
+          userId: user_id, 
+          deductAmount 
+      });
       
       // Pass through the specific error message for insufficient funds
       if (err.statusCode === 400) {
@@ -120,20 +163,41 @@ const getCards = wrapAsync(async (req, res) => {
 
 // Billing operations
 const addFunds = wrapAsync(async (req, res) => {
+    console.log(req.body);
+    
     const user_id = req.user._id;
-    const { amount } = req.body;
+    const { amount, vaultId} = req.body;
+    
+    billingLogger.info('User attempting to add funds', { 
+        userId: user_id, 
+        amount 
+    });
     
     // Check if user has accepted the latest contract
     const contractStatus = await BillingServices.getUserContractStatus(user_id);
     if (!contractStatus.hasAcceptedLatest) {
+        billingLogger.warn('User tried to add funds without accepting contract', { 
+            userId: user_id, 
+            amount 
+        });
         throw new ErrorHandler(400, 'You must accept the latest contract before adding funds.');
     }
     
     try {
-        const result = await BillingServices.addFunds(user_id, amount);
+        const result = await BillingServices.addFunds(user_id, amount , vaultId);
+        billingLogger.info('Funds added successfully', { 
+            userId: user_id, 
+            amount, 
+            transactionId: result.transactionId 
+        });
         return sendResponse(res, { result }, 'Funds added successfully', 201);
     } catch (err) {
-        console.error(`Failed to add funds:`, err.message);
+        billingLogger.error('Failed to add funds', err, { 
+            userId: user_id, 
+            amount 
+        });
+
+        console.log(`error received in billing controller is ${err.message}`)
         
         // Check if it's a payment decline (400 error) and pass through the message
         if (err.statusCode === 400) {
