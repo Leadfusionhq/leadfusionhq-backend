@@ -256,6 +256,7 @@ const sendLeadAssignEmail = async ({ to, name, leadName, assignedBy, leadDetails
     email,
     address = {},
     lead_id,
+    note,
     _id,
   } = leadData;
   const fullName = `${first_name || ''} ${last_name || ''}`.trim() || 'N/A';
@@ -296,6 +297,7 @@ const sendLeadAssignEmail = async ({ to, name, leadName, assignedBy, leadDetails
       <li><strong style="color: #1C1C1C;">Lead ID:</strong> ${lead_id}</li>
       <li><strong>Campaign:</strong> ${campaignName}</li>
       <li><strong>View Lead</strong> ${link}</li>
+      <li><strong>Note</strong> ${note}</li>
     </ul>
     <br />
   `;

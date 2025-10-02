@@ -62,6 +62,12 @@ const baseUserSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
+  
+  rememberMe: {
+    type: Boolean,
+    default: true,
+  },
+  
   verificationToken: {
     type: String,
     default: '',
