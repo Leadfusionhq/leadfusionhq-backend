@@ -10,8 +10,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
-import { Skeleton, Box, Button, Typography } from "@mui/material";
-
+import { Skeleton, Box, Button, Typography, IconButton, Menu, MenuItem } from "@mui/material";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
 
 type User = {
     _id: string;
@@ -32,9 +32,7 @@ type ApiResponse = {
     limit: number;
     totalCount: number;
     totalPages: number;
-  };
-
-
+};
 
 export default function UserTable() {
     const [users, setUsers] = useState<User[]>([]); 
@@ -44,48 +42,33 @@ export default function UserTable() {
     const [pagination, setPagination] = useState<{ page: number; limit: number }>({
         page: 1,
         limit: 6,
-      });
+    });
 
     const [totalRows, setTotalRows] = useState<number>(0);
 
     const token = useSelector((state: RootState) => state.auth.token);
     const router = useRouter();
 
-    // useEffect(() => {
-    //     const fetchData = async () => {
-    //         try {
-    //             setLoading(true);
-    //             const response = await axiosWrapper('get', API_URL.GET_ALL_USERS, {}, token ?? undefined) as { data: User[] };
-    //             setUsers(response.data);
-    //         } catch (err) {
-    //               console.error('Unable to get users:', err);
-    //         } finally {
-    //             setLoading(false);
-    //         }
-    //     };
-    //     fetchData();
-    // }, [token]);
+    const fetchUsers = useCallback(
+        async (pageNumber:number,pageSize:number) => {
+            try {
+                setLoading(true);
+                setError(null);
 
-   const fetchUsers=useCallback(
-    async (pageNumber:number,pageSize:number)=>{
-        try{
-            setLoading(true);
-            setError(null);
+                const params = new URLSearchParams({
+                    page: pageNumber.toString(),
+                    limit: pageSize.toString(),
+                });
 
-            const params= new URLSearchParams({
-                page: pageNumber.toString(),
-                limit: pageSize.toString(),
-            });
+                const response = (await axiosWrapper(
+                    "get",
+                    `${API_URL.GET_ALL_USERS}?${params.toString()}`,
+                    {},
+                    token ?? undefined
+                )) as ApiResponse;
 
-            const response = (await axiosWrapper(
-                "get",
-                `${API_URL.GET_ALL_USERS}?${params.toString()}`,
-                {},
-                token ?? undefined
-              )) as ApiResponse;
-
-              setUsers(response.data); 
-              setTotalRows(response.totalCount); 
+                setUsers(response.data); 
+                setTotalRows(response.totalCount); 
             }
             catch (err) {
                 console.error("Unable to get users:", err);
@@ -93,17 +76,17 @@ export default function UserTable() {
             } finally {
                 setLoading(false);
             }
-    },
-    [token]);
+        },
+        [token]
+    );
 
     useEffect(() => {
         if (token) {
           fetchUsers(pagination.page, pagination.limit);
         }
-      }, [token, pagination.page, pagination.limit, fetchUsers]);
+    }, [token, pagination.page, pagination.limit, fetchUsers]);
 
-
-      const loadingSkeletonRows: User[] = Array.from({ length: pagination.limit }).map(
+    const loadingSkeletonRows: User[] = Array.from({ length: pagination.limit }).map(
         (_, i) => ({
           _id: `skeleton-${i}`,
           name: "",
@@ -113,10 +96,7 @@ export default function UserTable() {
           companyName: "",
           image: "",
         })
-      );
-
-
-
+    );
 
     const formatDate = (dateString: string): string => {
         const date = new Date(dateString);
@@ -133,7 +113,6 @@ export default function UserTable() {
         return date.toLocaleString('en-US', options);
     };
 
-
     const handleEdit = (row: User) => {
         router.push(`/admin/user-management/user/${row._id}/edit`);
     };
@@ -143,9 +122,14 @@ export default function UserTable() {
       router.push(`/admin/user-management/user/${row._id}/addBalance`);
     }
 
+    const handleAddCampaign = (row:User) =>{
+      // console.log(row._id);
+      router.push(`/admin/campaigns/user/${row._id}/add`);
+    }
+
     const handleDelete = async (row: User) => {
-    const confirmation = window.confirm(`Are you sure you want to delete ${row.name}?`);
-    if (!confirmation) return;
+        const confirmation = window.confirm(`Are you sure you want to delete ${row.name}?`);
+        if (!confirmation) return;
         try {
             setLoading(true);
 
@@ -159,20 +143,26 @@ export default function UserTable() {
         }
     };
 
+    // State for action menu
+    const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
+    const [menuRow, setMenuRow] = useState<User | null>(null);
+
+    const isMenuOpen = Boolean(menuAnchorEl);
+
+    const handleMenuClick = (
+      event: React.MouseEvent<HTMLButtonElement>,
+      row: User
+    ) => {
+      setMenuAnchorEl(event.currentTarget);
+      setMenuRow(row);
+    };
+
+    const handleMenuClose = () => {
+      setMenuAnchorEl(null);
+      setMenuRow(null);
+    };
 
     const columns: TableColumn<User>[] = [
-        // {
-        //     name: 'User ID',
-      
-        //     selector: (row: User) => `# ${row._id}`,
-        //     cell: (row) =>
-        //         row._id.startsWith("skeleton") ? (
-        //         <Skeleton variant="text" width={100} />
-        //         ) : (
-        //         `# ${row._id}`
-        //         ),
-        //     sortable: true, 
-        // },
         {
             name: 'User Profile',
             cell: (row) =>
@@ -244,58 +234,12 @@ export default function UserTable() {
             row._id.startsWith("skeleton") ? (
               <Skeleton variant="rectangular" width={80} height={30} />
             ) : (
-              <div style={{ display: "flex", gap: "6px" }}>
-                <Button
-                  className="!bg-white !text-[#838383] hover:!bg-[#f5f5f5] border border-[#838383]"
-                  size="small"
-                  sx={{
-                    fontSize: "11px",
-                    minWidth: "50px",
-                    height: "26px",
-                    padding: "0px 6px",
-                    textTransform: "capitalize",
-                    fontWeight: 500,
-                  }}
-                  onClick={() => handleAddBalance(row)}
-                >
-                  +Add
-                </Button>
-
-                <Button
-                  className="!bg-[#838383] !text-white hover:!bg-[#6b6b6b]"
-                  size="small"
-                  sx={{
-                    fontSize: "11px",
-                    minWidth: "50px",
-                    height: "26px",
-                    padding: "0px 6px",
-                    textTransform: "capitalize",
-                    fontWeight: 500,
-                  }}
-                  onClick={() => handleEdit(row)}
-                >
-                  Edit
-                </Button>
-        
-                <Button
-                  className="!bg-white !text-[#838383] hover:!bg-[#f5f5f5] border border-[#838383]"
-                  size="small"
-                  sx={{
-                    fontSize: "11px",
-                    minWidth: "50px",
-                    height: "26px",
-                    padding: "0px 6px",
-                    textTransform: "capitalize",
-                    fontWeight: 500,
-                  }}
-                  onClick={() => handleDelete(row)}
-                >
-                  Delete
-                </Button>
-              </div>
+              <IconButton size="small" onClick={(e) => handleMenuClick(e, row)}>
+                <MoreVertIcon />
+              </IconButton>
             ),
-          minWidth: "160px",
-          maxWidth: "180px",
+          minWidth: "80px",
+          maxWidth: "100px",
         },
     ];
 
@@ -323,9 +267,6 @@ export default function UserTable() {
         },
     };
 
-
-
-
     return (
         <>
         <div className="">
@@ -341,24 +282,68 @@ export default function UserTable() {
 
             <DataTable
                 columns={columns}
-                data={loading ? loadingSkeletonRows : users} // ✅ Switch to skeleton when loading
-                
+                data={loading ? loadingSkeletonRows : users} 
                 pagination
-
-                paginationServer // ✅ Server-side pagination
-                paginationTotalRows={totalRows} // ✅ Needed to show correct page count
-                paginationDefaultPage={pagination.page} // ✅ Controlled page state
-
+                paginationServer
+                paginationTotalRows={totalRows}
+                paginationDefaultPage={pagination.page} 
                 paginationPerPage={pagination.limit}
-
                 paginationRowsPerPageOptions={[6, 10, 15, 20]}
-                onChangePage={(page) => setPagination((prev) => ({ ...prev, page }))} // ✅ Update page
-                onChangeRowsPerPage={(newLimit, page) => setPagination({ page, limit: newLimit })} // ✅ Update limit
+                onChangePage={(page) => setPagination((prev) => ({ ...prev, page }))} 
+                onChangeRowsPerPage={(newLimit, page) => setPagination({ page, limit: newLimit })} 
                 customStyles={customStyles}
                 highlightOnHover
                 striped
                 dense
             />
+
+            {/* Action menu */}
+            <Menu
+              anchorEl={menuAnchorEl}
+              open={isMenuOpen}
+              onClose={handleMenuClose}
+              anchorOrigin={{
+                vertical: "bottom",
+                horizontal: "right",
+              }}
+              transformOrigin={{
+                vertical: "top",
+                horizontal: "right",
+              }}
+            >
+              <MenuItem
+                onClick={() => {
+                  if (menuRow) handleAddBalance(menuRow);
+                  handleMenuClose();
+                }}
+              >
+                Add Balance
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  if (menuRow) handleAddCampaign(menuRow);
+                  handleMenuClose();
+                }}
+              >
+                Add Campaign
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  if (menuRow) handleEdit(menuRow);
+                  handleMenuClose();
+                }}
+              >
+                Edit User Account
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  if (menuRow) handleDelete(menuRow);
+                  handleMenuClose();
+                }}
+              >
+                Delete User Account
+              </MenuItem>
+            </Menu>
         </div>
         </>
     );
