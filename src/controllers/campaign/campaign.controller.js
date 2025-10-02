@@ -15,6 +15,16 @@ const createCampaign = wrapAsync(async (req, res) => {
     const  result  = await CampaignServices.createCampaign(campaignData);
     sendResponse(res, { result }, 'campaign has been create succefully', 201);
 });
+const createCampaignByAdmin = wrapAsync(async (req, res) => {
+    const { userId } = req.params;
+    const user_id = userId;
+
+    const campaign_id = await generateUniqueCampaignId();
+    const campaignData = { ...req.body, user_id , campaign_id };
+    const  result  = await CampaignServices.createCampaign(campaignData);
+    sendResponse(res, { result }, 'campaign has been create succefully', 201);
+});
+
 const updateCampaign = wrapAsync(async (req, res) => {
   const { _id: user_id, role } = req.user;
   const { campaignId } = req.params;
@@ -116,6 +126,7 @@ const quickSearchCampaigns = wrapAsync(async (req, res) => {
 });
 module.exports = {
     createCampaign,
+    createCampaignByAdmin,
     getCampaigns,
     getCampaignById,
     updateCampaign,
