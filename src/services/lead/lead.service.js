@@ -367,8 +367,13 @@ const validatePrepaidCampaignBalance = async (campaign_id) => {
       throw new ErrorHandler(404, 'Campaign not found');
     }
 
-    const leadCost = campaign.bid_price || 0;
-    if (leadCost <= 0) {
+    // const leadCost = campaign.bid_price || 0;
+    // if (leadCost <= 0) {
+    //   throw new ErrorHandler(400, 'Campaign has invalid bid_price');
+    // }
+    const leadCost = Number(campaign.bid_price) || 0;
+
+    if (leadCost < 0) {
       throw new ErrorHandler(400, 'Campaign has invalid bid_price');
     }
 
