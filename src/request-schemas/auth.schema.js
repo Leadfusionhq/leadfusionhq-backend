@@ -35,7 +35,7 @@ const loginWithEmail = {
       'string.email': 'Email must be a valid email address',
       'any.required': 'Email is required',
     }),
-    
+    rememberMe: Joi.boolean().optional().default(false),
     password: Joi.string().min(6).required().messages({
       'string.min': 'Password must be at least 6 characters',
       'any.required': 'Password is required',

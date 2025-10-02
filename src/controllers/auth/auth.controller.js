@@ -25,7 +25,9 @@ const registerUser = wrapAsync(async (req, res) => {
 });
 
 const loginWithEmail = wrapAsync(async (req, res) => {
-    const { email: rawEmail, password ,role: requestedRole} = req.body;
+    // const { email: rawEmail, password ,role: requestedRole} = req.body;
+    const { email: rawEmail, password, role: requestedRole, rememberMe = false } = req.body;
+
     const email = rawEmail.toLowerCase();
 
     const user = await UserServices.getUserByEmail(email, true);
@@ -42,7 +44,13 @@ const loginWithEmail = wrapAsync(async (req, res) => {
 
     if (!(await user.comparePassword(password))) throw new ErrorHandler(400, 'Incorrect email or password');
 
-    const token = TOKEN_GEN.generateToken(user._id, user.role, '72h');
+    const tokenExpiration = rememberMe ? '30d' : '24h'; 
+    // const token = TOKEN_GEN.generateToken(user._id, user.role, '72h');
+    // const token = TOKEN_GEN.generateToken(user._id, user.role, tokenExpiration);
+    const token = TOKEN_GEN.generateToken(user._id, user.role, tokenExpiration, rememberMe);
+
+    const tokenExpiryTimestamp = Date.now() + (rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000);
+
     const safeUser = await UserServices.getUserByID(user._id);
     // const filteredUser = {
     //     id: safeUser._id,
@@ -51,7 +59,13 @@ const loginWithEmail = wrapAsync(async (req, res) => {
     //     role: safeUser.role,
     // };
 
-    sendResponse(res, { user: safeUser, token }, 'Login successful');
+    // sendResponse(res, { user: safeUser, token }, 'Login successful');
+    sendResponse(res, { 
+        user: safeUser, 
+        token,
+        tokenExpiry: tokenExpiryTimestamp,
+        rememberMe 
+    }, 'Login successful');
     
 });
 

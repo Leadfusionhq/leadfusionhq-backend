@@ -34,6 +34,7 @@ const createLead = wrapAsync(async (req, res) => {
             // const leadCost = campaign.bid_price || 0;
             
             // const campaignData = await LeadServices.validatePrepaidCampaignBalance(campaign_id, leadCost);
+        
         const { campaign_id } = req.body;
         const user_id = req.user._id;
         const {campaignData, leadCost} = await LeadServices.validatePrepaidCampaignBalance(campaign_id);
