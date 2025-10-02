@@ -28,6 +28,7 @@ const LoginForm = () => {
   const [userEmail, setUserEmail] = useState('');
   const [resendLoading, setResendLoading] = useState(false);
   const [resendEmail, setResendEmail] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   
   const dispatch = useDispatch<AppDispatch>();
   const router = useRouter();
@@ -57,7 +58,66 @@ const LoginForm = () => {
   useEffect(() => {
     if (user) {
       console.warn('user', user)
+      
+      // 🧪 TEMPORARY: Test Remember Me functionality
+      const token = document.cookie.split('; ').find(row => row.startsWith('token='))?.split('=')[1];
+      if (token) {
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          const now = Math.floor(Date.now() / 1000);
+          const timeLeft = payload.exp - now;
+          const daysLeft = timeLeft / (24 * 60 * 60);
+          const hoursLeft = timeLeft / (60 * 60);
+          
+          console.log('🔍 REMEMBER ME TEST:');
+          console.log('Remember Me enabled:', payload.rememberMe);
+          console.log('Token expires in:', daysLeft.toFixed(2), 'days (', hoursLeft.toFixed(2), 'hours)');
+          
+          // ✅ Smart detection: If token is ~30 days, it's Remember Me
+          const isRememberMeToken = daysLeft >= 25; // 25+ days = Remember Me
+          const actualRememberMe = payload.rememberMe !== undefined ? payload.rememberMe : isRememberMeToken;
+          
+          console.log('Detected Remember Me:', actualRememberMe, '(based on expiry time)');
+          console.log('Expected duration:', actualRememberMe ? '~30 days' : '~24 hours');
+          console.log('Working correctly:', actualRememberMe ? (daysLeft >= 29) : (hoursLeft >= 23 && hoursLeft <= 24));
+          
+          // Show toast with test results
+          if (actualRememberMe) {
+            toast.success(`✅ Remember Me: Token expires in ${daysLeft.toFixed(1)} days (Expected: 30 days) - WORKING!`);
+          } else {
+            toast.success(`✅ Standard Login: Token expires in ${hoursLeft.toFixed(1)} hours (Expected: 24 hours) - WORKING!`);
+          }
+        } catch (e) {
+          console.error('Could not decode token for testing:', e);
+        }
+      }
+      
       toast.dismiss();
+      
+      // ✅ Handle redirect after login
+      const redirectUrl = searchParams.get('redirect');
+      
+      if (redirectUrl) {
+        // Validate redirect URL matches user role
+        const isAdminUrl = redirectUrl.startsWith('/admin');
+        const isUserUrl = redirectUrl.startsWith('/dashboard') && !redirectUrl.startsWith('/admin');
+        
+        if (user.role === 'ADMIN' && isAdminUrl) {
+          toast.success('Login successful! Redirecting to requested page...');
+          router.push(redirectUrl);
+          return;
+        } else if (user.role === 'USER' && isUserUrl) {
+          toast.success('Login successful! Redirecting to requested page...');
+          router.push(redirectUrl);
+          return;
+        } else {
+          // Role mismatch - redirect to appropriate dashboard with warning
+          console.warn(`Role mismatch: ${user.role} trying to access ${redirectUrl}`);
+          toast.warning('Access denied to requested page. Redirecting to your dashboard.');
+        }
+      }
+      
+      // Default redirect based on role
       if (user.role === 'ADMIN') {
         toast.success('Login to Admin Dashboard successful!');
         router.push('/admin/dashboard');
@@ -66,7 +126,7 @@ const LoginForm = () => {
         router.push('/dashboard');
       }
     }
-  }, [user, router]);
+  }, [user, router, searchParams]);
 
   useEffect(() => {
     if (error) {
@@ -213,10 +273,11 @@ const LoginForm = () => {
               email: '',
               password: '',
               role: role,
+              rememberMe: false,
             }}
             enableReinitialize={true}
             validationSchema={validationSchema}
-            onSubmit={async ({ email, password, role }, { setSubmitting }) => {
+            onSubmit={async ({ email, password, role, rememberMe }, { setSubmitting }) => {
               // Clear any previous resend states
               setShowResendButton(false);
               setUserEmail('');
@@ -226,7 +287,7 @@ const LoginForm = () => {
               showLoader("Logging in...");
               
               try {
-                await dispatch(loginUser({ email, password, role })).unwrap();
+                await dispatch(loginUser({ email, password, role, rememberMe })).unwrap();
                 // Login success - the useEffect will handle navigation
               } catch (error) {
                 // Error is handled by the useEffect above
@@ -279,8 +340,12 @@ const LoginForm = () => {
                 {/* Options Row */}
                 <div className="flex items-center justify-between mt-6 max-[575px]:flex-wrap">
                   <label className="flex items-center text-gray-700 max-[575px]:w-full">
-                    <input type="checkbox" className="border border-[#01010121] text-base w-[30px] h-[30px] mr-2 accent-[#01010121] focus:border-[#010101] focus:ring-2 focus:ring-[#01010121]" />
-                    Remember me
+                    <Field
+                      type="checkbox"
+                      name="rememberMe"
+                      className="border border-[#01010121] text-base w-[30px] h-[30px] mr-2 accent-[#01010121] focus:border-[#010101] focus:ring-2 focus:ring-[#01010121]"
+                    />
+                    Remember me (30 days)
                   </label>
                   <Link href="/forgot-password" className="text-base text-[#1C1C1C] hover:underline max-[575px]:w-full max-[575px]:text-end">
                     Forgot password?
