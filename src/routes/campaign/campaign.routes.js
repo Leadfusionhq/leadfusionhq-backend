@@ -9,6 +9,7 @@ const CONSTANT_ENUM = require('../../helper/constant-enums.js');
 
 const API = {
     CREATE_CAMPAIGN: '/',
+    CREATE_CAMPAIGN_BY_ADMIN:'/:userId/add',
     GET_ALL_CAMPAIGNS:'/',
     QUICK_SEARCH: '/quick-search',    
     GET_CAMPAIGN:'/:campaignId',
@@ -51,6 +52,12 @@ campaignRouter.post(
     celebrate(CampaignSchema.createCampaign),
     campaignController.createCampaign
 );
+campaignRouter.post(
+    API.CREATE_CAMPAIGN_BY_ADMIN,
+    celebrate(CampaignSchema.createCampaignByAdmin),
+    campaignController.createCampaignByAdmin
+);
+
 campaignRouter.put( 
     API.UPDATE_CAMPAIGN,
     celebrate(CampaignSchema.updateCampaign), 
