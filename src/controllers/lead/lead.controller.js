@@ -20,7 +20,8 @@ const { User } = require('../../models/user.model.js');
 // Create single lead
 
 const createLead = wrapAsync(async (req, res) => {
-
+    console.log('reqreq')
+    console.log(req);
     const session = await mongoose.startSession();
     session.startTransaction();
 
