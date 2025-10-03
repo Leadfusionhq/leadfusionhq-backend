@@ -26,6 +26,7 @@ import {
   CalendarToday,
   Edit,
   ArrowBack,
+  Map,
 } from "@mui/icons-material";
 
 import axiosWrapper from "@/utils/api";
@@ -43,12 +44,20 @@ type LeadData = {
   address: {
     street: string;
     city: string;
-    state: {
-      abbreviation: string;
-      _id: string;
-      name: string;
-    };
+    // When backend populates state, it's an object; otherwise it's an ObjectId string
+    state:
+      | {
+          abbreviation: string;
+          _id: string;
+          name: string;
+        }
+      | string;
     zip_code: string;
+    coordinates?: {
+      lat: number;
+      lng: number;
+    };
+    place_id?: string;
   };
   campaign_id: {
     _id: string;
@@ -74,6 +83,31 @@ const ViewLeads = () => {
 
   const [leadData, setLeadData] = useState<LeadData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isGoogleLoaded, setIsGoogleLoaded] = useState(false);
+
+  // Load Google Maps API
+  useEffect(() => {
+    const loadGoogleMaps = () => {
+      if (window.google && window.google.maps) {
+        setIsGoogleLoaded(true);
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`;
+      script.async = true;
+      script.defer = true;
+      script.onload = () => {
+        setIsGoogleLoaded(true);
+      };
+      script.onerror = () => {
+        console.error('Failed to load Google Maps API');
+      };
+      document.head.appendChild(script);
+    };
+
+    loadGoogleMaps();
+  }, []);
 
   useEffect(() => {
     const fetchLead = async () => {
@@ -103,6 +137,78 @@ const ViewLeads = () => {
 
     fetchLead();
   }, [leadIdString, token]);
+
+  // Initialize Google Map when data is loaded
+  useEffect(() => {
+    if (leadData?.address?.coordinates && isGoogleLoaded) {
+      const initializeMap = () => {
+        const mapElement = document.getElementById(`map-${leadData._id}`);
+        if (!mapElement) return;
+
+        const coords = leadData.address.coordinates;
+        if (!coords) return;
+        const { lat, lng } = coords;
+        
+        const map = new window.google.maps.Map(mapElement, {
+          center: { lat, lng },
+          zoom: 15,
+          mapTypeId: window.google.maps.MapTypeId.ROADMAP,
+          styles: [
+            {
+              featureType: "poi",
+              elementType: "labels",
+              stylers: [{ visibility: "off" }]
+            }
+          ]
+        });
+
+        // Add marker
+        const marker = new window.google.maps.Marker({
+          position: { lat, lng },
+          map: map,
+          title: `${leadData.first_name} ${leadData.last_name}`,
+          animation: window.google.maps.Animation.DROP,
+          icon: {
+            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+              <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="16" cy="16" r="12" fill="#1976d2" stroke="white" stroke-width="2"/>
+                <text x="16" y="20" text-anchor="middle" fill="white" font-size="16" font-weight="bold">📍</text>
+              </svg>
+            `),
+            scaledSize: new window.google.maps.Size(32, 32),
+            anchor: new window.google.maps.Point(16, 16)
+          }
+        });
+
+        // Add info window
+        const stateLabel =
+          typeof leadData.address.state === 'string'
+            ? leadData.address.state
+            : leadData.address.state.abbreviation;
+        const infoWindow = new window.google.maps.InfoWindow({
+          content: `
+            <div style="padding: 8px; font-family: Arial, sans-serif;">
+              <h3 style="margin: 0 0 8px 0; color: #1976d2;">${leadData.first_name} ${leadData.last_name}</h3>
+              <p style="margin: 0; color: #666; font-size: 14px;">
+                📍 ${leadData.address.street}<br>
+                ${leadData.address.city}, ${stateLabel} ${leadData.address.zip_code}
+              </p>
+            </div>
+          `
+        });
+
+        marker.addListener('click', () => {
+          infoWindow.open(map, marker);
+        });
+
+        // Auto-open info window
+        infoWindow.open(map, marker);
+      };
+
+      // Small delay to ensure DOM is ready
+      setTimeout(initializeMap, 100);
+    }
+  }, [leadData, isGoogleLoaded]);
 
   const formatStatus = (status: string) => {
     if (!status) return "N/A";
@@ -252,14 +358,85 @@ const ViewLeads = () => {
               {leadData.address?.state && (
                 <DetailRow
                   label="State"
-                  value={`${leadData.address.state.name} (${leadData.address.state.abbreviation})`}
+                  value={
+                    typeof leadData.address.state === 'string'
+                      ? leadData.address.state
+                      : `${leadData.address.state.name} (${leadData.address.state.abbreviation})`
+                  }
                 />
               )}
               {leadData.address?.zip_code && <DetailRow label="Zip Code" value={leadData.address.zip_code} />}
               {leadData.geography && <DetailRow label="Geography" value={leadData.geography} />}
+              {(() => {
+                const coords = leadData.address?.coordinates;
+                return coords ? (
+                  <DetailRow 
+                    label="Coordinates" 
+                    value={`${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`} 
+                  />
+                ) : null;
+              })()}
             </Stack>
           </InfoCard>
         </div>
+
+        {/* Google Map Display */}
+        {leadData.address?.coordinates && (
+          <div className="col-span-12">
+            <Card elevation={2} sx={{ height: '100%' }}>
+              <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+                <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2 }}>
+                  <Avatar sx={{ bgcolor: 'success.main', width: 32, height: 32 }}>
+                    <Map fontSize="small" />
+                  </Avatar>
+                  <Typography variant="h6" color="primary.main" fontWeight={600}>
+                    Location on Map
+                  </Typography>
+                </Stack>
+                {!isGoogleLoaded ? (
+                  <div 
+                    style={{ 
+                      height: '400px', 
+                      width: '100%', 
+                      borderRadius: '8px',
+                      border: '1px solid #e0e0e0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: '#f5f5f5'
+                    }}
+                  >
+                    <div style={{ textAlign: 'center' }}>
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                      <Typography variant="body2" color="text.secondary">
+                        Loading Google Map...
+                      </Typography>
+                    </div>
+                  </div>
+                ) : (
+                  <div 
+                    id={`map-${leadData._id}`}
+                    style={{ 
+                      height: '400px', 
+                      width: '100%', 
+                      borderRadius: '8px',
+                      border: '1px solid #e0e0e0'
+                    }}
+                  />
+                )}
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 2, textAlign: 'center' }}>
+                  {(() => {
+                    const stateLabel =
+                      typeof leadData.address.state === 'string'
+                        ? leadData.address.state
+                        : leadData.address.state.abbreviation;
+                    return `📍 ${leadData.address.street}, ${leadData.address.city}, ${stateLabel} ${leadData.address.zip_code}`;
+                  })()}
+                </Typography>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Campaign Information */}
         <div className="col-span-12 md:col-span-6">
@@ -371,7 +548,12 @@ const ViewLeads = () => {
                 </div>
                 <div className="col-span-6 sm:col-span-3 text-center">
                   <Typography variant="h4" fontWeight={700} sx={{ fontSize: { xs: '1.5rem', sm: '2.125rem' } }}>
-                    {leadData.address?.state?.abbreviation || 'N/A'}
+                    {(() => {
+                      const st = leadData.address?.state as unknown;
+                      return typeof st === 'string'
+                        ? st
+                        : (st as { abbreviation?: string })?.abbreviation || 'N/A';
+                    })()}
                   </Typography>
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
                     Location

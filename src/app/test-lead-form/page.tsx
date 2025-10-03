@@ -99,7 +99,7 @@ const TestLeadFormPage: React.FC = () => {
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
                   <h3 className="font-semibold text-blue-800 mb-3">🧪 Testing Instructions:</h3>
                   <ol className="text-sm text-blue-700 space-y-2">
-                    <li><strong>1.</strong> Type "123 Main St, New York" in the address field</li>
+                    <li><strong>1.</strong> Type &quot;123 Main St, New York&quot; in the address field</li>
                     <li><strong>2.</strong> Select an address from Google suggestions</li>
                     <li><strong>3.</strong> Watch the fields below auto-fill with street, city, state, ZIP</li>
                     <li><strong>4.</strong> Check the debug section to see the complete data</li>

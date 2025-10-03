@@ -78,7 +78,29 @@ const LeadForm = ({
       initialValues={initialValues}
       enableReinitialize={true}
       validationSchema={LeadValidationSchema}
-      onSubmit={onSubmit}
+      onSubmit={(values, formikHelpers) => {
+        console.log('🚀 Submitting lead form with complete data:', values);
+        console.log('📍 Address coordinates:', values.address?.coordinates);
+        console.log('🆔 Address place ID:', values.address?.place_id);
+
+        // Transform payload to match backend expectations
+        const transformed = {
+          ...values,
+          address: {
+            ...values.address,
+            // Backend expects ObjectId string, not the full state object
+            state: (values.address as any)?.state?._id || (values.address as any)?.state || null,
+            // Ensure coordinates and place_id are included if present
+            coordinates: values.address?.coordinates
+              ? { lat: values.address.coordinates.lat, lng: values.address.coordinates.lng }
+              : undefined,
+            place_id: values.address?.place_id || undefined,
+          },
+        } as typeof initialLeadValues;
+
+        console.log('📦 Transformed payload (for API):', transformed);
+        onSubmit(transformed, formikHelpers);
+      }}
     >
       {({ isSubmitting, errors, touched ,values,setFieldValue,}) => (
 
@@ -269,6 +291,8 @@ const LeadForm = ({
           onAddressSelect={(addressData) => {
             if (addressData) {
               console.log('✅ Google address selected with components:', addressData);
+              console.log('📍 Coordinates being saved:', addressData.coordinates);
+              console.log('🆔 Place ID being saved:', addressData.placeId);
               
               // Auto-select state in dropdown
               const selectedState = stateOptions.find(
@@ -279,6 +303,18 @@ const LeadForm = ({
               if (selectedState) {
                 setFieldValue('address.state', selectedState);
                 console.log('✅ Auto-selected state:', selectedState);
+              }
+              
+              // Ensure coordinates are properly set
+              if (addressData.coordinates) {
+                console.log('✅ Setting coordinates:', addressData.coordinates);
+                setFieldValue('address.coordinates', addressData.coordinates);
+              }
+              
+              // Ensure place ID is properly set
+              if (addressData.placeId) {
+                console.log('✅ Setting place ID:', addressData.placeId);
+                setFieldValue('address.place_id', addressData.placeId);
               }
             }
           }}
@@ -326,6 +362,42 @@ const LeadForm = ({
                 errorMessage={touched?.address?.zip_code && errors?.address?.zip_code}
               />
             </div>
+            
+            {/* Debug Section - Remove in production */}
+            {(values.address as any)?.coordinates || (values.address as any)?.place_id ? (
+              <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h4 className="text-sm font-semibold text-blue-800 mb-2">📍 Google Address Data (Debug)</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                  {(values.address as any)?.coordinates && (
+                    <div>
+                      <span className="font-medium text-blue-700">Coordinates:</span>
+                      <div className="text-blue-600">
+                        {(() => {
+                          const c = (values.address as any).coordinates as { lat?: number; lng?: number };
+                          return (
+                            <>
+                              Lat: {typeof c?.lat === 'number' ? c.lat.toFixed(6) : '-'}<br/>
+                              Lng: {typeof c?.lng === 'number' ? c.lng.toFixed(6) : '-'}
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  )}
+                  {(values.address as any)?.place_id && (
+                    <div>
+                      <span className="font-medium text-blue-700">Place ID:</span>
+                      <div className="text-blue-600 break-all">
+                        {(values.address as any).place_id as string}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="mt-2 text-xs text-blue-500">
+                  ✅ This data will be saved to the database for Google Maps display
+                </div>
+              </div>
+            ) : null}
           </div>
 
           {/* Additional Information Section */}

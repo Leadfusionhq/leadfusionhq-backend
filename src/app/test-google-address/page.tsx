@@ -98,10 +98,10 @@ const TestGoogleAddressPage: React.FC = () => {
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
               <h3 className="font-semibold text-yellow-800 mb-3">🧪 How to Test:</h3>
               <ul className="text-sm text-yellow-700 space-y-2">
-                <li><strong>1. Type Test:</strong> Start typing "123 Main" and see US suggestions appear</li>
+                <li><strong>1. Type Test:</strong> Start typing &quot;123 Main&quot; and see US suggestions appear</li>
                 <li><strong>2. Current Location:</strong> Click the location icon to get your precise address</li>
                 <li><strong>3. Keyboard Navigation:</strong> Use arrow keys to navigate suggestions, Enter to select</li>
-                <li><strong>4. US Only:</strong> Try typing international addresses - they won't appear</li>
+                <li><strong>4. US Only:</strong> Try typing international addresses - they won&apos;t appear</li>
                 <li><strong>5. Accuracy Test:</strong> Compare current location result with your actual address</li>
               </ul>
             </div>
