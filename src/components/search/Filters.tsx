@@ -15,7 +15,7 @@ interface SearchResponse {
   count: number;
   campaignCount: number;
   adjustedCount: number;
-  boberdooData: any[];
+  boberdooCount: number;
 }
 
 export default function Filters() {
@@ -144,7 +144,7 @@ export default function Filters() {
       setResults(res.count);
       setCampaignCount(res.campaignCount);
       setAvailableCount(res.adjustedCount);
-      setBoberdooCount(res.boberdooData?.length || 0);
+      setBoberdooCount(res.boberdooCount || 0);
       hideLoader();
     } catch (err) {
       console.error("Search failed:", err);
