@@ -14,15 +14,17 @@ interface User {
 interface LoginResponse {
   token: string;
   user: User;
+  tokenExpiry?: number;
+  rememberMe?: boolean;
 }
 
-export const loginUser = createAsyncThunk<LoginResponse, { email: string; password: string; role: string}>(
+export const loginUser = createAsyncThunk<LoginResponse & { rememberMe: boolean }, { email: string; password: string; role: string; rememberMe?: boolean }>(
   'auth/loginUser',
-  async ({ email, password, role }, { rejectWithValue }) => {
+  async ({ email, password, role, rememberMe = false }, { rejectWithValue }) => {
     try {
-      const { data } = await axios.post<LoginResponse>(API_URL.LOGIN_USER, { email, password, role });
-      saveToken(data.token);
-      return data;
+      const { data } = await axios.post<LoginResponse>(API_URL.LOGIN_USER, { email, password, role, rememberMe });
+      saveToken(data.token, rememberMe);
+      return { ...data, rememberMe };
     } catch (err: unknown) {
       console.log('err', err);
       

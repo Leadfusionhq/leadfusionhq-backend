@@ -15,23 +15,26 @@ interface UserJwtPayload {
   isActive: boolean;
 }
 
-const generateToken = (user: UserJwtPayload) => {
+const generateToken = (user: UserJwtPayload, rememberMe: boolean = false) => {
+  const expiresIn = rememberMe ? '30d' : '24h';
+  
   return jwt.sign(
     { 
       id: user._id, 
       name: user.name, 
       email: user.email, 
       role: user.role,
-      isActive: user.isActive
+      isActive: user.isActive,
+      rememberMe
     },
     JWT_SECRET,
-    { expiresIn: '1h' } // Token expires in 1 hour
+    { expiresIn }
   );
 };
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, password, role } = await req.json()
+    const { email, password, role, rememberMe = false } = await req.json()
 
     // Input Validation
     if (!email || !password) {
@@ -84,20 +87,40 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
     }
 
-    // Generate JWT Token
-    const token = generateToken(user)
+    // Generate JWT Token with remember me support
+    const token = generateToken(user, rememberMe)
+    const tokenExpiration = rememberMe ? '30d' : '24h'
+    const tokenExpiryTimestamp = Date.now() + (rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000)
 
-    return NextResponse.json({
+    // Create response with secure cookie
+    const response = NextResponse.json({
       message: 'Login successful',
       token,
-      tokenExpiration: '1h', // Fix: should be '1h' not '1d'
+      tokenExpiration,
+      tokenExpiry: tokenExpiryTimestamp,
       user: {
-        id: user._id,
+        _id: user._id,
         name: user.name,
         email: user.email,
         role: user.role,
+        phoneNumber: user.phoneNumber,
+        address: user.address,
+        dob: user.dob,
+        balance: user.balance,
+        avatar: user.avatar
       },
     }, { status: 200 })
+
+    // Set secure HTTP-only cookie as backup
+    response.cookies.set('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: rememberMe ? 30 * 24 * 60 * 60 : 24 * 60 * 60, // 30 days or 24 hours in seconds
+      path: '/'
+    })
+
+    return response
 
   } catch (error: unknown) {
     console.error('Error in POST /api/auth/login:', error)

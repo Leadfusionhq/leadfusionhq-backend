@@ -4,7 +4,7 @@ import { FormikInput, FormikTextarea, CustomFormikAsyncSelect, FormikSelect } fr
 import { LeadValidationSchema } from "@/request-schemas/lead-schema";
 import { StateOption } from "@/types/campaign";
 import { initialLeadValues } from "@/constants/initialLeadValues";
-import FormikAddressInput from '@/components/common/AddressAutocomplete';
+import FormikGoogleAddressInput from '@/components/common/FormikGoogleAddressInput';
 
 
 type LeadFormProps = {
@@ -78,7 +78,29 @@ const LeadForm = ({
       initialValues={initialValues}
       enableReinitialize={true}
       validationSchema={LeadValidationSchema}
-      onSubmit={onSubmit}
+      onSubmit={(values, formikHelpers) => {
+        console.log('🚀 Submitting lead form with complete data:', values);
+        console.log('📍 Address coordinates:', values.address?.coordinates);
+        console.log('🆔 Address place ID:', values.address?.place_id);
+
+        // Transform payload to match backend expectations
+        const transformed = {
+          ...values,
+          address: {
+            ...values.address,
+            // Backend expects ObjectId string, not the full state object
+            state: (values.address as any)?.state?._id || (values.address as any)?.state || null,
+            // Ensure coordinates and place_id are included if present
+            coordinates: values.address?.coordinates
+              ? { lat: values.address.coordinates.lat, lng: values.address.coordinates.lng }
+              : undefined,
+            place_id: values.address?.place_id || undefined,
+          },
+        } as typeof initialLeadValues;
+
+        console.log('📦 Transformed payload (for API):', transformed);
+        onSubmit(transformed, formikHelpers);
+      }}
     >
       {({ isSubmitting, errors, touched ,values,setFieldValue,}) => (
 
@@ -250,23 +272,50 @@ const LeadForm = ({
             /> */}
 
 
-        <FormikAddressInput
+        <FormikGoogleAddressInput
           name="address.full_address"
-          label="Full Address"
-          placeholder="Enter complete address"
+          label="Full Address (Google Auto-Fill)"
+          placeholder="Start typing your US address..."
           errorMessage={
             touched?.address?.full_address ? errors?.address?.full_address : undefined
           }
-          country="us" // <-- Remove this line to search globally
           showCurrentLocation={true}
+          autoFillFields={{
+            street: 'address.street',
+            city: 'address.city',
+            state: 'address.state',
+            zipCode: 'address.zip_code',
+            coordinates: 'address.coordinates',
+            placeId: 'address.place_id'
+          }}
           onAddressSelect={(addressData) => {
             if (addressData) {
-              setFieldValue('address.coordinates', addressData.coordinates);
-              setFieldValue('address.place_id', addressData.placeId);
-              // setFieldValue('address.street', addressData.street);
-              // setFieldValue('address.city', addressData.city);
-              // setFieldValue('address.state', addressData.state);
-              // setFieldValue('address.zip_code', addressData.postalCode);
+              console.log('✅ Google address selected with components:', addressData);
+              console.log('📍 Coordinates being saved:', addressData.coordinates);
+              console.log('🆔 Place ID being saved:', addressData.placeId);
+              
+              // Auto-select state in dropdown
+              const selectedState = stateOptions.find(
+                state => state.abbreviation === addressData.addressComponents.state ||
+                         state.name.toLowerCase() === addressData.addressComponents.state?.toLowerCase()
+              );
+              
+              if (selectedState) {
+                setFieldValue('address.state', selectedState);
+                console.log('✅ Auto-selected state:', selectedState);
+              }
+              
+              // Ensure coordinates are properly set
+              if (addressData.coordinates) {
+                console.log('✅ Setting coordinates:', addressData.coordinates);
+                setFieldValue('address.coordinates', addressData.coordinates);
+              }
+              
+              // Ensure place ID is properly set
+              if (addressData.placeId) {
+                console.log('✅ Setting place ID:', addressData.placeId);
+                setFieldValue('address.place_id', addressData.placeId);
+              }
             }
           }}
         />
@@ -275,14 +324,14 @@ const LeadForm = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
               <FormikInput
                 name="address.street"
-                label="Street Address *"
-                placeholder="Enter street address"
+                label="Street Address * (Auto-filled)"
+                placeholder="Will be auto-filled from Google address"
                 errorMessage={touched?.address?.street && errors?.address?.street}
               />
               <FormikInput
                 name="address.city"
-                label="City *"
-                placeholder="Enter city"
+                label="City * (Auto-filled)"
+                placeholder="Will be auto-filled from Google address"
                 errorMessage={touched?.address?.city && errors?.address?.city}
               />
             </div>
@@ -297,10 +346,10 @@ const LeadForm = ({
                 ) : (
                   <CustomFormikAsyncSelect
                     name="address.state"
-                    label="State *"
+                    label="State * (Auto-selected)"
                     loadOptions={loadStates}
                     defaultOptions={stateOptions.slice(0, 50)}
-                    placeholder="Search and select a state"
+                    placeholder="Will be auto-selected from Google address"
                     cacheOptions={true}
                   />
                 )}
@@ -308,11 +357,47 @@ const LeadForm = ({
 
               <FormikInput
                 name="address.zip_code"
-                label="Zip Code *"
-                placeholder="Enter zip code"
+                label="Zip Code * (Auto-filled)"
+                placeholder="Will be auto-filled from Google address"
                 errorMessage={touched?.address?.zip_code && errors?.address?.zip_code}
               />
             </div>
+            
+            {/* Debug Section - Remove in production */}
+            {(values.address as any)?.coordinates || (values.address as any)?.place_id ? (
+              <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h4 className="text-sm font-semibold text-blue-800 mb-2">📍 Google Address Data (Debug)</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                  {(values.address as any)?.coordinates && (
+                    <div>
+                      <span className="font-medium text-blue-700">Coordinates:</span>
+                      <div className="text-blue-600">
+                        {(() => {
+                          const c = (values.address as any).coordinates as { lat?: number; lng?: number };
+                          return (
+                            <>
+                              Lat: {typeof c?.lat === 'number' ? c.lat.toFixed(6) : '-'}<br/>
+                              Lng: {typeof c?.lng === 'number' ? c.lng.toFixed(6) : '-'}
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  )}
+                  {(values.address as any)?.place_id && (
+                    <div>
+                      <span className="font-medium text-blue-700">Place ID:</span>
+                      <div className="text-blue-600 break-all">
+                        {(values.address as any).place_id as string}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="mt-2 text-xs text-blue-500">
+                  ✅ This data will be saved to the database for Google Maps display
+                </div>
+              </div>
+            ) : null}
           </div>
 
           {/* Additional Information Section */}

@@ -23,7 +23,8 @@ interface AuthState {
   success: boolean;
   message: string | null;
   isLoggedIn: boolean;
-
+  rememberMe: boolean;
+  tokenExpiry: number | null;
 }
 
 const initialState: AuthState = {
@@ -34,6 +35,8 @@ const initialState: AuthState = {
   success: false,
   message: null,
   isLoggedIn: false,
+  rememberMe: false,
+  tokenExpiry: null,
 };
 
 const authSlice = createSlice({
@@ -48,6 +51,8 @@ const authSlice = createSlice({
       state.success = false;
       state.message = null;
       state.isLoggedIn = false;
+      state.rememberMe = false;
+      state.tokenExpiry = null;
     },
     clearError(state) {
       state.error = null;
@@ -75,11 +80,13 @@ const authSlice = createSlice({
         state.error = null;
         state.isLoggedIn = false;
       })
-      .addCase(loginUser.fulfilled, (state, action: PayloadAction<{ token: string; user: User }>) => {
+      .addCase(loginUser.fulfilled, (state, action: PayloadAction<{ token: string; user: User; rememberMe?: boolean; tokenExpiry?: number }>) => {
         state.loading = false;
         state.token = action.payload.token;
         state.user = action.payload.user;
         state.isLoggedIn = true;
+        state.rememberMe = action.payload.rememberMe || false;
+        state.tokenExpiry = action.payload.tokenExpiry || null;
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;

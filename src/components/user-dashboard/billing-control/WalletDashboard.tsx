@@ -9,7 +9,7 @@ import { BILLING_API } from "@/utils/apiUrl";
 import { API_URL } from "@/utils/apiUrl";
 import { Trash2 } from 'lucide-react';
 import ConfirmDialog from '@/components/common/ConfirmDialog';
-import BillingAddressAutocomplete from '@/components/common/BillingAddressAutocomplete';
+import GoogleBillingAddressAutocomplete from '@/components/common/GoogleBillingAddressAutocomplete';
 
 // Enhanced TypeScript interfaces
 interface Card {
@@ -1302,12 +1302,20 @@ const WalletDashboard: React.FC = () => {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Billing Address <span className="text-red-500">*</span>
+                        Billing Address (Google Powered) <span className="text-red-500">*</span>
                       </label>
-                      <BillingAddressAutocomplete
+                      <GoogleBillingAddressAutocomplete
                         value={cardForm.billing_address}
-                        onChange={(val) => handleCardFormChange('billing_address', val)}
-                        placeholder="123 Main Street, City, State"
+                        onChange={(val, details) => {
+                          handleCardFormChange('billing_address', val);
+                          
+                          // Auto-fill ZIP code if available
+                          if (details?.addressComponents?.zipCode) {
+                            handleCardFormChange('zip', details.addressComponents.zipCode);
+                            console.log('✅ Auto-filled ZIP code:', details.addressComponents.zipCode);
+                          }
+                        }}
+                        placeholder="Start typing your US billing address..."
                         errorMessage={cardFormErrors.billing_address}
                         showCurrentLocation
                       />
@@ -1315,7 +1323,7 @@ const WalletDashboard: React.FC = () => {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        ZIP Code <span className="text-red-500">*</span>
+                        ZIP Code (Auto-filled) <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="text"
@@ -1324,7 +1332,7 @@ const WalletDashboard: React.FC = () => {
                         className={`w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 ${
                           cardFormErrors.zip ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-gray-500 focus:ring-gray-500'
                         }`}
-                        placeholder="12345"
+                        placeholder="Will be auto-filled from address selection"
                       />
                       {cardFormErrors.zip && (
                         <p className="mt-1 text-sm text-red-600">{cardFormErrors.zip}</p>
