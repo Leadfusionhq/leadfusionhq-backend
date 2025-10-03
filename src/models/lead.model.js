@@ -160,7 +160,23 @@ const leadSchema = new mongoose.Schema({
       minlength: 5,
       maxlength: 10,
       trim: true
-    }
+    },
+    coordinates: {
+      lat: {
+        type: Number,
+        min: -90,
+        max: 90
+      },
+      lng: {
+        type: Number,
+        min: -180,
+        max: 180
+      }
+    },
+    place_id: {
+      type: String,
+      required: false,
+    },
   },
   
   // Additional Information

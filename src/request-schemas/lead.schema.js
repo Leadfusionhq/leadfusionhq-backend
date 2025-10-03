@@ -87,6 +87,11 @@ const createLead = {
       }),
 
       zip: Joi.string().min(5).max(10).allow('').optional(),
+      coordinates: Joi.object({
+        lat: Joi.number().min(-90).max(90).optional(),
+        lng: Joi.number().min(-180).max(180).optional(),
+      }).optional(),
+      place_id: Joi.string().allow('').optional(),
     }).required(),
 
     // Additional information
@@ -153,6 +158,11 @@ const updateLead = {
       state: Joi.string().hex().length(24).optional(),
       zip_code: Joi.string().min(5).max(10).optional(),
       zip: Joi.string().min(5).max(10).allow('').optional(),
+      coordinates: Joi.object({
+        lat: Joi.number().min(-90).max(90).optional(),
+        lng: Joi.number().min(-180).max(180).optional(),
+      }).optional(),
+      place_id: Joi.string().allow('').optional(),
     }).optional(),
 
     // Additional information
