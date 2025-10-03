@@ -5,6 +5,8 @@ import { SEARCH_API } from "@/utils/apiUrl";
 import axiosWrapper from "@/utils/api";
 import { useLoader } from "@/context/LoaderContext";
 
+const NEXT_PUBLIC_CSV_API_TOKEN = process.env.NEXT_PUBLIC_CSV_API_TOKEN;
+
 interface FilterResponse {
   zips?: string[];
   counties?: string[];
@@ -44,7 +46,9 @@ export default function Filters() {
         setLoadingState(true);
         const res = (await axiosWrapper(
           "get",
-          SEARCH_API.FILTER_STATES
+          SEARCH_API.FILTER_STATES,
+          undefined,
+          NEXT_PUBLIC_CSV_API_TOKEN
         )) as FilterResponse;
         setStates(res.states || []);
       } catch (err) {
@@ -71,7 +75,9 @@ export default function Filters() {
         setLoadingZip(true);
         const res = (await axiosWrapper(
           "get",
-          `${SEARCH_API.FILTER_ZIPS}?state=${selectedState}`
+          `${SEARCH_API.FILTER_ZIPS}?state=${selectedState}`,
+          undefined,
+          NEXT_PUBLIC_CSV_API_TOKEN
         )) as FilterResponse;
 
         setZips(res.zips || []);
@@ -99,10 +105,15 @@ export default function Filters() {
     const fetchCounties = async () => {
       setLoadingCounties(true);
       try {
-        const res = (await axiosWrapper("post", SEARCH_API.FILTER_COUNTIES, {
-          state: selectedState,
-          zips: selectedZips,
-        })) as { counties: string[] };
+        const res = (await axiosWrapper(
+          "post",
+          SEARCH_API.FILTER_COUNTIES,
+          {
+            state: selectedState,
+            zips: selectedZips,
+          },
+          NEXT_PUBLIC_CSV_API_TOKEN
+        )) as { counties: string[] };
 
         setCounties(res.counties || []);
         setSelectedCounties([]);
@@ -138,7 +149,8 @@ export default function Filters() {
       const res = (await axiosWrapper(
         "post",
         SEARCH_API.SEARCH_QUERIES,
-        payload
+        payload,
+        NEXT_PUBLIC_CSV_API_TOKEN
       )) as SearchResponse;
 
       setResults(res.count);
