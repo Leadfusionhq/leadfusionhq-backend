@@ -45,6 +45,7 @@ type LeadData = {
     street: string;
     city: string;
     // When backend populates state, it's an object; otherwise it's an ObjectId string
+    full_address?: string;
     state:
       | {
           abbreviation: string;
@@ -84,7 +85,8 @@ const ViewLeads = () => {
   const [leadData, setLeadData] = useState<LeadData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isGoogleLoaded, setIsGoogleLoaded] = useState(false);
-
+  const [mapError, setMapError] = useState<string | null>(null);
+  
   // Load Google Maps API
   useEffect(() => {
     const loadGoogleMaps = () => {
@@ -139,76 +141,172 @@ const ViewLeads = () => {
   }, [leadIdString, token]);
 
   // Initialize Google Map when data is loaded
-  useEffect(() => {
-    if (leadData?.address?.coordinates && isGoogleLoaded) {
-      const initializeMap = () => {
-        const mapElement = document.getElementById(`map-${leadData._id}`);
-        if (!mapElement) return;
+// Initialize Google Map when data is loaded
+useEffect(() => {
+  if (!leadData || !isGoogleLoaded) return;
 
-        const coords = leadData.address.coordinates;
-        if (!coords) return;
-        const { lat, lng } = coords;
-        
-        const map = new window.google.maps.Map(mapElement, {
-          center: { lat, lng },
-          zoom: 15,
-          mapTypeId: window.google.maps.MapTypeId.ROADMAP,
-          styles: [
-            {
-              featureType: "poi",
-              elementType: "labels",
-              stylers: [{ visibility: "off" }]
-            }
-          ]
-        });
+  const initializeMap = async () => {
+    const mapElement = document.getElementById(`map-${leadData._id}`);
+    if (!mapElement) return;
 
-        // Add marker
-        const marker = new window.google.maps.Marker({
-          position: { lat, lng },
-          map: map,
-          title: `${leadData.first_name} ${leadData.last_name}`,
-          animation: window.google.maps.Animation.DROP,
-          icon: {
-            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-              <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="16" cy="16" r="12" fill="#1976d2" stroke="white" stroke-width="2"/>
-                <text x="16" y="20" text-anchor="middle" fill="white" font-size="16" font-weight="bold">📍</text>
-              </svg>
-            `),
-            scaledSize: new window.google.maps.Size(32, 32),
-            anchor: new window.google.maps.Point(16, 16)
-          }
-        });
+    try {
+      const geocoder = new window.google.maps.Geocoder();
+      let mapCenter: { lat: number; lng: number } | null = null;
+      let geocodeMethod = '';
 
-        // Add info window
+      // 🔥 PRIORITY 1: Use coordinates (lat/lng) if available
+      if (leadData.address?.coordinates?.lat && leadData.address?.coordinates?.lng) {
+        mapCenter = {
+          lat: leadData.address.coordinates.lat,
+          lng: leadData.address.coordinates.lng,
+        };
+        geocodeMethod = 'coordinates';
+        console.log('✅ Using coordinates for map:', mapCenter);
+      }
+      // 🔥 PRIORITY 2: Use place_id if available
+      else if (leadData.address?.place_id) {
+        console.log('🆔 Attempting to geocode by place_id:', leadData.address.place_id);
+        try {
+          const result = await new Promise<google.maps.GeocoderResult>((resolve, reject) => {
+            geocoder.geocode({ placeId: leadData.address.place_id }, (results, status) => {
+              if (status === 'OK' && results && results[0]) {
+                resolve(results[0]);
+              } else {
+                reject(new Error(`Geocode by place_id failed: ${status}`));
+              }
+            });
+          });
+          mapCenter = {
+            lat: result.geometry.location.lat(),
+            lng: result.geometry.location.lng(),
+          };
+          geocodeMethod = 'place_id';
+          console.log('✅ Geocoded by place_id:', mapCenter);
+        } catch (err) {
+          console.warn('⚠️ place_id geocoding failed, trying full_address:', err);
+        }
+      }
+      
+      // 🔥 PRIORITY 3: Use full_address if available
+      if (!mapCenter && leadData.address?.full_address) {
+        console.log('📍 Attempting to geocode by full_address:', leadData.address.full_address);
+        try {
+          const result = await new Promise<google.maps.GeocoderResult>((resolve, reject) => {
+            geocoder.geocode({ address: leadData.address.full_address }, (results, status) => {
+              if (status === 'OK' && results && results[0]) {
+                resolve(results[0]);
+              } else {
+                reject(new Error(`Geocode by full_address failed: ${status}`));
+              }
+            });
+          });
+          mapCenter = {
+            lat: result.geometry.location.lat(),
+            lng: result.geometry.location.lng(),
+          };
+          geocodeMethod = 'full_address';
+          console.log('✅ Geocoded by full_address:', mapCenter);
+        } catch (err) {
+          console.warn('⚠️ full_address geocoding failed, trying street address:', err);
+        }
+      }
+
+      // 🔥 PRIORITY 4: Use street + city + state + zip
+      if (!mapCenter) {
         const stateLabel =
           typeof leadData.address.state === 'string'
             ? leadData.address.state
             : leadData.address.state.abbreviation;
-        const infoWindow = new window.google.maps.InfoWindow({
-          content: `
-            <div style="padding: 8px; font-family: Arial, sans-serif;">
-              <h3 style="margin: 0 0 8px 0; color: #1976d2;">${leadData.first_name} ${leadData.last_name}</h3>
-              <p style="margin: 0; color: #666; font-size: 14px;">
-                📍 ${leadData.address.street}<br>
-                ${leadData.address.city}, ${stateLabel} ${leadData.address.zip_code}
-              </p>
-            </div>
-          `
-        });
+        const constructedAddress = `${leadData.address.street}, ${leadData.address.city}, ${stateLabel} ${leadData.address.zip_code}`;
+        console.log('📍 Attempting to geocode by constructed address:', constructedAddress);
+        try {
+          const result = await new Promise<google.maps.GeocoderResult>((resolve, reject) => {
+            geocoder.geocode({ address: constructedAddress }, (results, status) => {
+              if (status === 'OK' && results && results[0]) {
+                resolve(results[0]);
+              } else {
+                reject(new Error(`Geocode by constructed address failed: ${status}`));
+              }
+            });
+          });
+          mapCenter = {
+            lat: result.geometry.location.lat(),
+            lng: result.geometry.location.lng(),
+          };
+          geocodeMethod = 'constructed_address';
+          console.log('✅ Geocoded by constructed address:', mapCenter);
+        } catch (err) {
+          console.error('❌ All geocoding methods failed:', err);
+          setMapError('Could not locate address on map');
+          return;
+        }
+      }
 
-        marker.addListener('click', () => {
-          infoWindow.open(map, marker);
-        });
+      if (!mapCenter) {
+        setMapError('No valid location data available');
+        return;
+      }
 
-        // Auto-open info window
+      // 🗺️ Initialize the map
+      const map = new window.google.maps.Map(mapElement, {
+        center: mapCenter,
+        zoom: 15,
+        mapTypeId: window.google.maps.MapTypeId.ROADMAP,
+        styles: [
+          {
+            featureType: "poi",
+            elementType: "labels",
+            stylers: [{ visibility: "off" }]
+          }
+        ]
+      });
+
+      // 📍 Add marker
+      const marker = new window.google.maps.Marker({
+        position: mapCenter,
+        map: map,
+        title: `${leadData.first_name} ${leadData.last_name}`,
+        animation: window.google.maps.Animation.DROP,
+      });
+
+      // 💬 Add info window
+      const stateLabel =
+        typeof leadData.address.state === 'string'
+          ? leadData.address.state
+          : leadData.address.state.abbreviation;
+      const infoWindow = new window.google.maps.InfoWindow({
+        content: `
+          <div style="padding: 8px; font-family: Arial, sans-serif;">
+            <h3 style="margin: 0 0 8px 0; color: #1976d2;">${leadData.first_name} ${leadData.last_name}</h3>
+            <p style="margin: 0; color: #666; font-size: 14px;">
+              📍 ${leadData.address.street}<br>
+              ${leadData.address.city}, ${stateLabel} ${leadData.address.zip_code}
+            </p>
+           
+          </div>
+        `
+      });
+
+      marker.addListener('click', () => {
         infoWindow.open(map, marker);
-      };
+      });
 
-      // Small delay to ensure DOM is ready
-      setTimeout(initializeMap, 100);
+      // Auto-open info window after a small delay
+      setTimeout(() => {
+        infoWindow.open(map, marker);
+      }, 500);
+
+      setMapError(null);
+    } catch (error) {
+      console.error('❌ Map initialization error:', error);
+      setMapError('Error initializing map');
     }
-  }, [leadData, isGoogleLoaded]);
+  };
+
+  // Small delay to ensure DOM is ready
+  setTimeout(initializeMap, 100);
+}, [leadData, isGoogleLoaded]);
+
 
   const formatStatus = (status: string) => {
     if (!status) return "N/A";
@@ -381,7 +479,7 @@ const ViewLeads = () => {
         </div>
 
         {/* Google Map Display */}
-        {leadData.address?.coordinates && (
+        {(leadData.address?.coordinates || leadData.address?.place_id || leadData.address?.full_address || leadData.address?.street) && (
           <div className="col-span-12">
             <Card elevation={2} sx={{ height: '100%' }}>
               <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
@@ -410,6 +508,26 @@ const ViewLeads = () => {
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
                       <Typography variant="body2" color="text.secondary">
                         Loading Google Map...
+                      </Typography>
+                    </div>
+                  </div>
+                ) : mapError ? (
+                  <div 
+                    style={{ 
+                      height: '400px', 
+                      width: '100%', 
+                      borderRadius: '8px',
+                      border: '1px solid #ffcccc',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: '#fff5f5'
+                    }}
+                  >
+                    <div style={{ textAlign: 'center', color: '#cc0000' }}>
+                      <Typography variant="h6">⚠️ {mapError}</Typography>
+                      <Typography variant="body2" sx={{ mt: 1 }}>
+                        Address data may be incomplete
                       </Typography>
                     </div>
                   </div>
@@ -524,53 +642,68 @@ const ViewLeads = () => {
 
         {/* Quick Stats Summary */}
         <div className="col-span-12">
-          <Card elevation={2} sx={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
+          <Card
+            elevation={2}
+            sx={{
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white',
+            }}
+          >
             <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
               <Typography variant="h6" fontWeight={600} sx={{ mb: 3 }}>
                 Quick Stats
               </Typography>
               <div className="grid grid-cols-12 gap-4 sm:gap-6">
-                <div className="col-span-6 sm:col-span-3 text-center">
-                  <Typography variant="h4" fontWeight={700} sx={{ fontSize: { xs: '1.5rem', sm: '2.125rem' } }}>
+                {/* Status */}
+                <div className="col-span-12 sm:col-span-4 text-center">
+                  <Typography
+                    variant="h4"
+                    fontWeight={700}
+                    sx={{ fontSize: { xs: '1.5rem', sm: '2.125rem' } }}
+                  >
                     {formatStatus(leadData.status)}
                   </Typography>
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
                     Status
                   </Typography>
                 </div>
-                <div className="col-span-6 sm:col-span-3 text-center">
-                  <Typography className="uppercase" variant="h4" fontWeight={700} sx={{ fontSize: { xs: '1.5rem', sm: '2.125rem' } }}>
+
+                {/* Delivery */}
+                <div className="col-span-12 sm:col-span-4 text-center">
+                  <Typography
+                    className="uppercase"
+                    variant="h4"
+                    fontWeight={700}
+                    sx={{ fontSize: { xs: '1.5rem', sm: '2.125rem' } }}
+                  >
                     {leadData.delivery || 'N/A'}
                   </Typography>
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
                     Delivery
                   </Typography>
                 </div>
-                <div className="col-span-6 sm:col-span-3 text-center">
-                  <Typography variant="h4" fontWeight={700} sx={{ fontSize: { xs: '1.5rem', sm: '2.125rem' } }}>
+
+                {/* Location */}
+                <div className="col-span-12 sm:col-span-4 text-center">
+                  <Typography
+                    variant="h4"
+                    fontWeight={700}
+                    sx={{ fontSize: { xs: '1.5rem', sm: '2.125rem' } }}
+                  >
                     {(() => {
-                      const st = leadData.address?.state as unknown;
-                      return typeof st === 'string'
-                        ? st
-                        : (st as { abbreviation?: string })?.abbreviation || 'N/A';
+                      const st = leadData.address?.state;
+                      return typeof st === 'string' ? st : st?.abbreviation || 'N/A';
                     })()}
                   </Typography>
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
                     Location
                   </Typography>
                 </div>
-                <div className="col-span-6 sm:col-span-3 text-center">
-                  <Typography variant="h4" fontWeight={700} sx={{ fontSize: { xs: '1.5rem', sm: '2.125rem' } }}>
-                    {leadData.language || 'N/A'}
-                  </Typography>
-                  <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    Language
-                  </Typography>
-                </div>
               </div>
             </CardContent>
           </Card>
         </div>
+
       </div>
     </Box>
   );

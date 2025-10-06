@@ -78,27 +78,47 @@ const LeadForm = ({
       initialValues={initialValues}
       enableReinitialize={true}
       validationSchema={LeadValidationSchema}
+      // In LeadForm.tsx
+
       onSubmit={(values, formikHelpers) => {
         console.log('🚀 Submitting lead form with complete data:', values);
         console.log('📍 Address coordinates:', values.address?.coordinates);
         console.log('🆔 Address place ID:', values.address?.place_id);
 
-        // Transform payload to match backend expectations
+        // 🔥 IMPROVED: Transform payload with better handling
         const transformed = {
           ...values,
           address: {
             ...values.address,
-            // Backend expects ObjectId string, not the full state object
-            state: (values.address as any)?.state?._id || (values.address as any)?.state || null,
-            // Ensure coordinates and place_id are included if present
-            coordinates: values.address?.coordinates
-              ? { lat: values.address.coordinates.lat, lng: values.address.coordinates.lng }
-              : undefined,
-            place_id: values.address?.place_id || undefined,
+            // Backend expects ObjectId string
+            state: (values.address as any)?.state?._id || 
+                  (values.address as any)?.state?.value || 
+                  (values.address as any)?.state || 
+                  null,
+            
+            // 🔥 CRITICAL: Only include if valid
+            ...(values.address?.coordinates?.lat !== undefined && 
+                values.address?.coordinates?.lng !== undefined
+              ? {
+                  coordinates: {
+                    lat: Number(values.address.coordinates.lat),
+                    lng: Number(values.address.coordinates.lng),
+                  },
+                }
+              : {}),
+            
+            // 🔥 CRITICAL: Only include if exists
+            ...(values.address?.place_id
+              ? { place_id: values.address.place_id }
+              : {}),
           },
         } as typeof initialLeadValues;
 
         console.log('📦 Transformed payload (for API):', transformed);
+        console.log('📦 Address in payload:', transformed.address);
+        console.log('📍 Coordinates in payload:', transformed.address?.coordinates);
+        console.log('🆔 Place ID in payload:', transformed.address?.place_id);
+        
         onSubmit(transformed, formikHelpers);
       }}
     >

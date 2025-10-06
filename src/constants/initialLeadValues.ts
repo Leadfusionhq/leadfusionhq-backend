@@ -1,19 +1,21 @@
+// constants/initialLeadValues.ts
 "use client";
 import { StateOption } from "@/types/campaign";
 
-// constants/initialLeadValues.ts
-
-type Coordinates = { lat: number; lng: number };
+type Coordinates = { 
+  lat: number | undefined; 
+  lng: number | undefined; 
+};
 
 type LeadAddressInitial = {
   full_address: string;
   street: string;
   city: string;
-  state: StateOption | null;
+  state: StateOption | string | null; // Allow string for API responses
   zip_code: string;
   zip: string;
-  coordinates: Coordinates | null | undefined;
-  place_id: string | undefined;
+  coordinates?: Coordinates | null; // Make it optional
+  place_id?: string | null; // Make it optional
 };
 
 type LeadInitialValues = {
@@ -58,7 +60,7 @@ export const initialLeadValues: LeadInitialValues = {
   
   // Contact information
   phone_number: '', // *
-  phone: '', // Legacy field, can be synced with phone_number
+  phone: '', // Legacy field
   email: '',
   
   // Property information
@@ -78,14 +80,16 @@ export const initialLeadValues: LeadInitialValues = {
     full_address: '', // *
     street: '', // *
     city: '', // *
-    state: null, // * (ObjectId reference)
+    state: null, // * (ObjectId reference or StateOption)
     zip_code: '', // *
-    zip: '', // Legacy field, synced with zip_code
-    coordinates: null, // Google Maps coordinates { lat, lng }
-    place_id: '' // Google Places API place ID
+    zip: '', // Legacy field
+    coordinates: undefined, // 🔥 Changed from null to undefined
+    place_id: undefined // 🔥 Changed from '' to undefined
   },
   
   // Additional information
   note: '',
   source: 'manual'
 };
+
+export type { LeadInitialValues, LeadAddressInitial, Coordinates };
