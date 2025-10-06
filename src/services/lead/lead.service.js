@@ -8,18 +8,65 @@ const { addCSVProcessingJob, getJobStatus } = require('../../queue/csvProcessor'
 const mongoose = require('mongoose');
 const { User } = require('../../models/user.model.js');
 
-const createLead = async (data,  options = {}) => {
+// services/lead.service.js
+
+const createLead = async (data, options = {}) => {
   try {
     const { session } = options;
 
+    // 🔥 LOG: Check incoming data
+    console.log('📥 createLead service received data:', JSON.stringify(data, null, 2));
+    console.log('📍 Incoming coordinates:', data.address?.coordinates);
+    console.log('🆔 Incoming place_id:', data.address?.place_id);
+
+    // 🔥 FIX: Ensure coordinates are properly formatted
+    if (data.address?.coordinates) {
+      const { lat, lng } = data.address.coordinates;
+      
+      if (lat !== undefined && lng !== undefined && 
+          lat !== null && lng !== null &&
+          lat !== '' && lng !== '') {
+        data.address.coordinates = {
+          lat: Number(lat),
+          lng: Number(lng)
+        };
+        console.log('✅ Coordinates formatted:', data.address.coordinates);
+      } else {
+        // Remove incomplete coordinates
+        delete data.address.coordinates;
+        console.log('⚠️ Incomplete coordinates removed');
+      }
+    }
+
+    // 🔥 FIX: Ensure place_id is preserved
+    if (data.address?.place_id !== undefined) {
+      if (data.address.place_id && data.address.place_id.trim() !== '') {
+        console.log('✅ Place ID preserved:', data.address.place_id);
+      } else {
+        delete data.address.place_id;
+        console.log('⚠️ Empty place_id removed');
+      }
+    }
+
+    console.log('📤 Data being saved to MongoDB:', JSON.stringify(data, null, 2));
+
+    // Create lead
     const newLead = await Lead.create([data], { session });
+    
+    // Populate and return
     const populatedLead = await Lead.findById(newLead[0]._id)
-    .populate('campaign_id', 'user_id')
-    .session(session || null) 
-    .exec();
+      .populate('campaign_id')
+      .populate('address.state')
+      .session(session || null)
+      .exec();
+
+    console.log('✅ Lead created successfully');
+    console.log('📍 Saved coordinates:', populatedLead.address?.coordinates);
+    console.log('🆔 Saved place_id:', populatedLead.address?.place_id);
 
     return populatedLead;
   } catch (error) {
+    console.error('❌ createLead error:', error);
     throw new ErrorHandler(500, error.message || 'Failed to create lead');
   }
 };
@@ -109,6 +156,7 @@ const getLeadById = async (leadId, userId) => {
   .populate({
     path: 'campaign_id',
   })
+  .populate('address.state', 'name abbreviation')
   .lean();
 
   if (!lead || String(lead.campaign_id?.user_id) !== String(userId)) {
@@ -143,18 +191,93 @@ const updateLead = async (leadId, userId, role, updateData) => {
       filter.user_id = userId;
     }
 
+    // 🔥 LOG: Check incoming update data
+    console.log('📥 updateLead service received data:', JSON.stringify(updateData, null, 2));
+    console.log('📍 Incoming coordinates:', updateData.address?.coordinates);
+    console.log('🆔 Incoming place_id:', updateData.address?.place_id);
+
+    // 🔥 FIX: Handle nested address updates properly
+    if (updateData.address) {
+      // Get existing lead
+      const existingLead = await Lead.findOne(filter);
+      
+      if (!existingLead) {
+        throw new ErrorHandler(404, 'Lead not found or access denied');
+      }
+
+      // Merge address fields
+      const mergedAddress = {
+        ...existingLead.address.toObject(),
+        ...updateData.address,
+      };
+
+      // 🔥 FIX: Handle coordinates update
+      if (updateData.address.coordinates !== undefined) {
+        if (updateData.address.coordinates === null) {
+          // Explicitly remove coordinates
+          mergedAddress.coordinates = undefined;
+          console.log('⚠️ Coordinates removed');
+        } else {
+          const { lat, lng } = updateData.address.coordinates;
+          
+          if (lat !== undefined && lng !== undefined && 
+              lat !== null && lng !== null &&
+              lat !== '' && lng !== '') {
+            mergedAddress.coordinates = {
+              lat: Number(lat),
+              lng: Number(lng)
+            };
+            console.log('✅ Coordinates updated:', mergedAddress.coordinates);
+          } else {
+            // Keep existing coordinates if new ones are incomplete
+            mergedAddress.coordinates = existingLead.address.coordinates;
+            console.log('⚠️ Incomplete coordinates, keeping existing');
+          }
+        }
+      }
+
+      // 🔥 FIX: Handle place_id explicitly
+      if (updateData.address.place_id !== undefined) {
+        if (updateData.address.place_id && updateData.address.place_id.trim() !== '') {
+          mergedAddress.place_id = updateData.address.place_id;
+          console.log('✅ Place ID updated:', mergedAddress.place_id);
+        } else {
+          mergedAddress.place_id = undefined;
+          console.log('⚠️ Place ID removed (empty)');
+        }
+      }
+
+      updateData.address = mergedAddress;
+    }
+
+    console.log('📤 Update data being saved:', JSON.stringify(updateData, null, 2));
+
+    // Update lead
     const updatedLead = await Lead.findOneAndUpdate(
       filter,
-      updateData,
-      { new: true, runValidators: true }
-    ).lean();
+      { 
+        ...updateData,
+        updatedAt: Date.now()
+      },
+      { 
+        new: true,
+        runValidators: true,
+      }
+    )
+    .populate('address.state')
+    .populate('campaign_id');
 
     if (!updatedLead) {
-      throw new ErrorHandler(404, 'lead not found or access denied');
+      throw new ErrorHandler(404, 'Lead not found or access denied');
     }
+
+    console.log('✅ Lead updated successfully');
+    console.log('📍 Updated coordinates:', updatedLead.address?.coordinates);
+    console.log('🆔 Updated place_id:', updatedLead.address?.place_id);
 
     return updatedLead;
   } catch (error) {
+    console.error('❌ updateLead error:', error);
     throw new ErrorHandler(error.statusCode || 500, error.message || 'Failed to update lead');
   }
 };

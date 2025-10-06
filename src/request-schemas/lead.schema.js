@@ -87,11 +87,20 @@ const createLead = {
       }),
 
       zip: Joi.string().min(5).max(10).allow('').optional(),
+
       coordinates: Joi.object({
-        lat: Joi.number().min(-90).max(90).optional(),
-        lng: Joi.number().min(-180).max(180).optional(),
-      }).optional(),
-      place_id: Joi.string().allow('').optional(),
+        lat: Joi.number().min(-90).max(90).required().messages({
+          'number.base': 'Latitude must be a number',
+        }),
+        lng: Joi.number().min(-180).max(180).required().messages({
+          'number.base': 'Longitude must be a number',
+        }),
+      }).optional().allow(null), // ✅ Allow null or complete object
+      
+      // 🔥 FIX: Allow place_id to be stored
+      place_id: Joi.string().allow('', null).optional(),
+    
+
     }).required(),
 
     // Additional information
@@ -161,8 +170,9 @@ const updateLead = {
       coordinates: Joi.object({
         lat: Joi.number().min(-90).max(90).optional(),
         lng: Joi.number().min(-180).max(180).optional(),
-      }).optional(),
-      place_id: Joi.string().allow('').optional(),
+      }).optional().allow(null),
+      
+      place_id: Joi.string().allow('', null).optional(),
     }).optional(),
 
     // Additional information
