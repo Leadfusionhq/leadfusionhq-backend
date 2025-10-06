@@ -4,148 +4,294 @@ import { useState, useEffect } from "react";
 import { SEARCH_API } from "@/utils/apiUrl";
 import axiosWrapper from "@/utils/api";
 import { useLoader } from "@/context/LoaderContext";
+
+const NEXT_PUBLIC_CSV_API_TOKEN = process.env.NEXT_PUBLIC_CSV_API_TOKEN;
+
+interface FilterResponse {
+  zips?: string[];
+  counties?: string[];
+  states?: string[];
+}
+
 interface SearchResponse {
   count: number;
   campaignCount: number;
   adjustedCount: number;
+  boberdooCount: number;
 }
 
 export default function Filters() {
-  const [counties, setCounties] = useState<string[]>([]);
+  const [states, setStates] = useState<string[]>([]);
   const [zips, setZips] = useState<string[]>([]);
-  const [cities, setCities] = useState<string[]>([]);
+  const [counties, setCounties] = useState<string[]>([]);
+  const [loadingState, setLoadingState] = useState<boolean>(true);
+  const [loadingZip, setLoadingZip] = useState<boolean>(true);
+  const [loadingCounties, setLoadingCounties] = useState<boolean>(true);
 
-  const [selectedCounty, setSelectedCounty] = useState<string>("");
-  const [selectedZip, setSelectedZip] = useState<string>("");
-  const [selectedCity, setSelectedCity] = useState<string>("");
+  const [selectedState, setSelectedState] = useState<string>("");
+  const [selectedZips, setSelectedZips] = useState<string[]>([]);
+  const [selectedCounties, setSelectedCounties] = useState<string[]>([]);
 
   const [results, setResults] = useState<number | null>(null);
   const [campaignCount, setCampaignCount] = useState<number | null>(null);
   const [available, setAvailableCount] = useState<number | null>(null);
+  const [boberdooCount, setBoberdooCount] = useState<number | null>(null);
+
   const { showLoader, hideLoader } = useLoader();
 
-  // Fetch filter data on mount
+  // Step 1: Fetch all states on mount
   useEffect(() => {
-    const fetchFilters = async () => {
+    const fetchStates = async () => {
       try {
-        const res = (await axiosWrapper("get", SEARCH_API.FILTER_QUERIES)) as {
-          data: { Zip?: string; counties?: string | null; State?: string }[];
-        };
-        if (!Array.isArray(res?.data)) {
-          throw new Error("Invalid response format: expected an array");
-        }
-        const uniqueCounties = Array.from(
-          new Set(res?.data.map((d) => d.counties).filter(Boolean))
-        ) as string[];
-
-        const uniqueZips = Array.from(
-          new Set(res?.data.map((d) => d.Zip).filter(Boolean))
-        ) as string[];
-
-        const uniqueCities = Array.from(
-          new Set(res?.data.map((d) => d.State).filter(Boolean) as string[])
-        ).sort((a, b) => a.localeCompare(b)) as string[];
-
-        setCounties(uniqueCounties);
-        setZips(uniqueZips);
-        setCities(uniqueCities);
+        setLoadingState(true);
+        const res = (await axiosWrapper(
+          "get",
+          SEARCH_API.FILTER_STATES,
+          undefined,
+          NEXT_PUBLIC_CSV_API_TOKEN
+        )) as FilterResponse;
+        setStates(res.states || []);
       } catch (err) {
-        console.error("Error fetching filters:", err);
+        console.error("Error fetching states:", err);
+      } finally {
+        setLoadingState(false);
       }
     };
-    fetchFilters();
+    fetchStates();
   }, []);
 
-  const handleSearch = async () => {
-    if (!selectedCounty && !selectedZip && !selectedCity) {
-      alert("Select the filter first");
+  // Step 2: Fetch zips when a state is selected
+  useEffect(() => {
+    if (!selectedState) {
+      setZips([]);
+      setSelectedZips([]);
+      setCounties([]);
+      setSelectedCounties([]);
       return;
     }
+
+    const fetchZips = async () => {
+      try {
+        setLoadingZip(true);
+        const res = (await axiosWrapper(
+          "get",
+          `${SEARCH_API.FILTER_ZIPS}?state=${selectedState}`,
+          undefined,
+          NEXT_PUBLIC_CSV_API_TOKEN
+        )) as FilterResponse;
+
+        setZips(res.zips || []);
+        setSelectedZips([]);
+        setCounties([]);
+        setSelectedCounties([]);
+      } catch (err) {
+        console.error("Error fetching zips:", err);
+      } finally {
+        setLoadingZip(false);
+      }
+    };
+
+    fetchZips();
+  }, [selectedState]);
+
+  // Step 3: Fetch counties when zips are selected
+  useEffect(() => {
+    if (selectedZips.length === 0 || !selectedState) {
+      setCounties([]);
+      setSelectedCounties([]);
+      return;
+    }
+
+    const fetchCounties = async () => {
+      setLoadingCounties(true);
+      try {
+        const res = (await axiosWrapper(
+          "post",
+          SEARCH_API.FILTER_COUNTIES,
+          {
+            state: selectedState,
+            zips: selectedZips,
+          },
+          NEXT_PUBLIC_CSV_API_TOKEN
+        )) as { counties: string[] };
+
+        setCounties(res.counties || []);
+        setSelectedCounties([]);
+      } catch (err) {
+        console.error("Error fetching counties:", err);
+      } finally {
+        setLoadingCounties(false);
+      }
+    };
+
+    fetchCounties();
+  }, [selectedState, selectedZips]);
+
+  // Search handler
+  const handleSearch = async () => {
+    if (
+      !selectedState ||
+      selectedZips.length === 0 ||
+      selectedCounties.length === 0
+    ) {
+      alert("Please select state, zip(s), and county(s) first");
+      return;
+    }
+
     try {
       showLoader();
       const payload = {
-        county: selectedCounty || undefined,
-        zip: selectedZip || undefined,
-        city: selectedCity || undefined,
+        state: selectedState,
+        zips: selectedZips,
+        counties: selectedCounties,
       };
 
       const res = (await axiosWrapper(
         "post",
         SEARCH_API.SEARCH_QUERIES,
         payload,
-        undefined
+        NEXT_PUBLIC_CSV_API_TOKEN
       )) as SearchResponse;
-      if (res) {
-        setResults(res?.count ?? 0);
-        setCampaignCount(res?.campaignCount ?? 0);
-        setAvailableCount(res?.adjustedCount ?? 0);
-        hideLoader();
-      }
+
+      setResults(res.count);
+      setCampaignCount(res.campaignCount);
+      setAvailableCount(res.adjustedCount);
+      setBoberdooCount(res.boberdooCount || 0);
+      hideLoader();
     } catch (err) {
       console.error("Search failed:", err);
       hideLoader();
     }
   };
 
-  const handleZipChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  // Multi-select handlers for zips and counties
+  const handleZipSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
-
-    if (value && !selectedZip.split(",").includes(value)) {
-      setSelectedZip((prev) => (prev ? `${prev},${value}` : value));
+    if (value && !selectedZips.includes(value)) {
+      setSelectedZips((prev) => [...prev, value]);
     }
   };
 
-  const handleRemove = (zip: string) => {
-    const updated = selectedZip
-      .split(",")
-      .filter((z) => z !== zip)
-      .join(",");
-    setSelectedZip(updated);
+  const handleZipRemove = (zip: string) => {
+    setSelectedZips(selectedZips.filter((z) => z !== zip));
   };
 
-  const handleCountyChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleCountySelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
-
-    if (value && !selectedCounty.split(",").includes(value)) {
-      setSelectedCounty((prev) => (prev ? `${prev},${value}` : value));
+    if (value && !selectedCounties.includes(value)) {
+      setSelectedCounties((prev) => [...prev, value]);
     }
   };
 
-  const handleCountyRemove = (zip: string) => {
-    const updated = selectedCounty
-      .split(",")
-      .filter((z) => z !== zip)
-      .join(",");
-    setSelectedCounty(updated);
+  const handleCountyRemove = (county: string) => {
+    setSelectedCounties(selectedCounties.filter((c) => c !== county));
   };
 
   return (
     <div className="layout_admin flex flex-col gap-6 p-6 w-full max-w-3xl mx-auto">
       <h2 className="text-2xl font-semibold text-gray-800">Data Query</h2>
-      <p className="text-gray-500 text-sm">
-        Select county, zip code, or state to check available data counts.
-      </p>
 
       <div className="bg-white shadow-md rounded-2xl p-6 flex flex-col gap-4">
+        {/* State Dropdown */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            County
+            State
           </label>
+
           <select
-            value={selectedCounty}
-            onChange={handleCountyChange}
+            value={selectedState}
+            onChange={(e) => setSelectedState(e.target.value)}
             className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+            disabled={loadingState}
           >
-            <option value="">Select County</option>
-            {counties.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
+            {loadingState ? (
+              <option value="">Loading State...</option>
+            ) : (
+              <>
+                <option value="">Select State</option>
+                {states.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </>
+            )}
           </select>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {selectedCounty &&
-              selectedCounty.split(",").map((county) => (
+        </div>
+
+        {/* Zip Dropdown */}
+        {selectedState && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Zip
+            </label>
+            <select
+              value=""
+              onChange={handleZipSelect}
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+              disabled={loadingZip}
+            >
+              {loadingZip ? (
+                <option value="">Loading Zip...</option>
+              ) : (
+                <>
+                  <option value="">Select Zip</option>
+                  {zips.map((z) => (
+                    <option key={z} value={z}>
+                      {z}
+                    </option>
+                  ))}
+                </>
+              )}
+            </select>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {selectedZips.map((zip) => (
+                <div
+                  key={zip}
+                  className="flex items-center bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm"
+                >
+                  {zip}
+                  <button
+                    type="button"
+                    onClick={() => handleZipRemove(zip)}
+                    className="ml-2 text-red-500 hover:text-red-700"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* County Dropdown */}
+        {selectedZips.length > 0 && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              County
+            </label>
+
+            <select
+              value=""
+              onChange={handleCountySelect}
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+              disabled={loadingCounties}
+            >
+              {loadingCounties ? (
+                <option value="">Loading County...</option>
+              ) : (
+                <>
+                  <option value="">Select County</option>
+                  {counties.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </>
+              )}
+            </select>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {selectedCounties.map((county) => (
                 <div
                   key={county}
                   className="flex items-center bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm"
@@ -160,62 +306,9 @@ export default function Filters() {
                   </button>
                 </div>
               ))}
+            </div>
           </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Zip
-          </label>
-          <select
-            value={selectedZip}
-            onChange={handleZipChange}
-            className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-          >
-            <option value="">Select Zip</option>
-            {zips.map((z) => (
-              <option key={z} value={z}>
-                {z}
-              </option>
-            ))}
-          </select>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {selectedZip &&
-              selectedZip.split(",").map((zip) => (
-                <div
-                  key={zip}
-                  className="flex items-center bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm"
-                >
-                  {zip}
-                  <button
-                    type="button"
-                    onClick={() => handleRemove(zip)}
-                    className="ml-2 text-red-500 hover:text-red-700"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            State
-          </label>
-          <select
-            value={selectedCity}
-            onChange={(e) => setSelectedCity(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-          >
-            <option value="">Select State</option>
-            {cities.map((city) => (
-              <option key={city} value={city}>
-                {city}
-              </option>
-            ))}
-          </select>
-        </div>
+        )}
 
         <button
           onClick={handleSearch}
@@ -232,6 +325,7 @@ export default function Filters() {
             <li>{results.toLocaleString()} total records found</li>
             <li>{available?.toLocaleString()} available records</li>
             <li>{campaignCount?.toLocaleString()} campaign records</li>
+            <li>{boberdooCount?.toLocaleString()} boberdoo records</li>
           </ul>
         </div>
       )}

@@ -159,9 +159,10 @@ export const CSV_API = {
 const SEARCH_API_BASE = `${API_IMPORT_BASE}/filters`;
 
 export const SEARCH_API = {
-  FILTER_QUERIES: `${SEARCH_API_BASE}/filteringdata`,
+  FILTER_STATES: `${SEARCH_API_BASE}/states`,
+  FILTER_ZIPS: `${SEARCH_API_BASE}/zips`,
+  FILTER_COUNTIES: `${SEARCH_API_BASE}/counties`,
   SEARCH_QUERIES: `${SEARCH_API_BASE}/count`,
-
 };
 
 
