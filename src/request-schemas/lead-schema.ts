@@ -158,8 +158,31 @@ export const LeadValidationSchema = Yup.object().shape({
       .trim()
       .min(5, 'Zip must be at least 5 characters')
       .max(10, 'Zip must be at most 10 characters')
-      .matches(/^[0-9-]*$/, 'Zip must contain only numbers and dashes')
-  }),
+      .matches(/^[0-9-]*$/, 'Zip must contain only numbers and dashes'),
+          // 🔥 ADD: Coordinates validation
+      coordinates: Yup.object()
+        .shape({
+          lat: Yup.number()
+            .min(-90, 'Latitude must be between -90 and 90')
+            .max(90, 'Latitude must be between -90 and 90')
+            .required('Latitude is required when coordinates are provided'),
+          lng: Yup.number()
+            .min(-180, 'Longitude must be between -180 and 180')
+            .max(180, 'Longitude must be between -180 and 180')
+            .required('Longitude is required when coordinates are provided'),
+        })
+        .nullable()
+        .optional()
+        .default(undefined),
+
+      // 🔥 ADD: Place ID validation
+      place_id: Yup.string()
+        .trim()
+        .nullable()
+        .optional()
+        .default(undefined),
+    }),
+
   
   // Additional information - Optional fields
   note: Yup.string()

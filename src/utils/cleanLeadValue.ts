@@ -20,13 +20,28 @@ export const cleanLeadValues = (values: typeof initialLeadValues) => {
       ? (values.address.state as StateOption).value || (values.address.state as StateOption)._id || ""
       : values.address.state
     : "";
+
+  // 🔥 FIX: Handle coordinates properly
+  const coordinates = values.address?.coordinates?.lat && values.address?.coordinates?.lng
+    ? {
+        lat: Number(values.address.coordinates.lat),
+        lng: Number(values.address.coordinates.lng),
+      }
+    : undefined;
+
+  // 🔥 FIX: Handle place_id properly
+  const placeId = values.address?.place_id && values.address.place_id.trim() !== ''
+    ? values.address.place_id
+    : undefined;
+
+  console.log('🧹 cleanLeadValues - Coordinates:', coordinates);
+  console.log('🧹 cleanLeadValues - Place ID:', placeId);
   
   return {
     // Required fields
-    // campaign_id: values.campaign_id._id,
     campaign_id: typeof values.campaign_id === 'object'
-  ? (values.campaign_id as { _id: string })._id
-  : values.campaign_id,
+      ? (values.campaign_id as { _id: string })._id
+      : values.campaign_id,
 
     first_name: values.first_name,
     last_name: values.last_name,
@@ -54,7 +69,7 @@ export const cleanLeadValues = (values: typeof initialLeadValues) => {
     ...(values.apttype && { apttype: values.apttype }),
     ...(values.aptnbr && { aptnbr: values.aptnbr }),
     
-    // Address object
+    // 🔥 FIXED: Address object with coordinates and place_id
     address: {
       full_address: values.address.full_address,
       street: values.address.street,
@@ -62,6 +77,12 @@ export const cleanLeadValues = (values: typeof initialLeadValues) => {
       state: stateValue,
       zip_code: values.address.zip_code,
       ...(values.address.zip && { zip: values.address.zip }),
+      
+      // 🔥 CRITICAL: Include coordinates if valid
+      ...(coordinates && { coordinates }),
+      
+      // 🔥 CRITICAL: Include place_id if exists
+      ...(placeId && { place_id: placeId }),
     },
     
     // Additional information
