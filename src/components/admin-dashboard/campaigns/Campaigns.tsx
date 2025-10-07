@@ -6,13 +6,14 @@ import axiosWrapper from "@/utils/api";
 import { useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
 import DataTable, { TableColumn } from "react-data-table-component";
-import { Skeleton, Box, Button, Typography, FormControl, InputLabel, Select, MenuItem, Popover, IconButton, Chip, Stack } from "@mui/material";
+import { Skeleton, Box, Button, Typography, FormControl, InputLabel, Select, MenuItem, Popover, IconButton, Chip, Stack,Menu } from "@mui/material";
 import FilterListIcon from '@mui/icons-material/FilterList';
 import ClearIcon from '@mui/icons-material/Clear';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import customStyles from '@/components/common/dataTableStyles';
 import { STATUS, LEAD_TYPE, EXCLUSIVITY, LANGUAGE } from "@/constants/enums";
+import MoreVertIcon from '@mui/icons-material/MoreVert';
 
 // Define User type
 type User = {
@@ -90,6 +91,23 @@ export default function CampaignTable() {
   const router = useRouter();
   const token = useSelector((state: RootState) => state.auth.token);
   const [states, setStates] = useState<StateOption[]>([]);
+  const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
+const [menuRow, setMenuRow] = useState<Campaign | null>(null);
+const isMenuOpen = Boolean(menuAnchorEl);
+
+const handleMenuClick = (event: React.MouseEvent<HTMLButtonElement>, row: Campaign) => {
+  setMenuAnchorEl(event.currentTarget);
+  setMenuRow(row);
+};
+const handleMenuClose = () => {
+  setMenuAnchorEl(null);
+  setMenuRow(null);
+};
+
+// optional: navigate to Leads filtered by campaign
+const handleViewLeads = (row: Campaign) => {
+  router.push(`/admin/leads?campaign_id=${row._id}`);
+};
 
 
 
@@ -340,63 +358,20 @@ const leadTypes = Object.values(LEAD_TYPE);
       minWidth: "80px",
     },
     {
-      name: "Actions",
+      name: "Action",
+      button: true,
       cell: (row) =>
         row._id.startsWith("skeleton") ? (
-          <Skeleton variant="rectangular" width={150} height={30} animation="wave" />
+          <Skeleton variant="rectangular" width={80} height={30} />
         ) : (
-          <div className="flex flex-wrap gap-2">
-            {/* View Button */}
-            <Button
-           
-              className="!bg-white !text-[#838383] hover:!bg-[#f5f5f5] border border-[#838383]"
-              size="small"
-              sx={{
-                fontSize: "12px",
-                minWidth: "60px",
-                height: "28px",
-                textTransform: "capitalize",
-              }}
-              onClick={() => handleView(row)}
-            >
-              View
-            </Button>
-    
-            {/* Edit Button */}
-            <Button
-              className="!bg-[#838383] !text-white hover:!bg-[#6b6b6b]"
-              size="small"
-              sx={{
-                fontSize: "12px",
-                minWidth: "60px",
-                height: "28px",
-                textTransform: "capitalize",
-              }}
-              onClick={() => handleEdit(row)}
-            >
-              Edit
-            </Button>
-    
-            {/* Add Button */}
-            <Button
-              className="!bg-gray-100 !text-gray-700 hover:!bg-gray-200"
-              size="small"
-              sx={{
-                fontSize: "12px",
-                minWidth: "60px",
-                height: "28px",
-                textTransform: "capitalize",
-              }}
-              onClick={() => handleAddLead(row)}
-            >
-              Add
-            </Button>
-          </div>
+          <IconButton size="small" onClick={(e) => handleMenuClick(e, row)}>
+            <MoreVertIcon />
+          </IconButton>
         ),
+      minWidth: "80px",
+      maxWidth: "100px",
       ignoreRowClick: true,
       allowOverflow: true,
-      button: true,
-      minWidth: "200px", // adjust so all buttons fit without scrolling
     }
     
   ];
@@ -686,6 +661,47 @@ const leadTypes = Object.values(LEAD_TYPE);
           ) : null
         }
       />
+      <Menu
+      anchorEl={menuAnchorEl}
+      open={isMenuOpen}
+      onClose={handleMenuClose}
+      anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+      transformOrigin={{ vertical: "top", horizontal: "right" }}
+    >
+      <MenuItem
+        onClick={() => {
+          if (menuRow) handleView(menuRow);
+          handleMenuClose();
+        }}
+      >
+        View
+      </MenuItem>
+      <MenuItem
+        onClick={() => {
+          if (menuRow) handleEdit(menuRow);
+          handleMenuClose();
+        }}
+      >
+        Edit
+      </MenuItem>
+      <MenuItem
+        onClick={() => {
+          if (menuRow) handleAddLead(menuRow);
+          handleMenuClose();
+        }}
+      >
+        Add Lead
+      </MenuItem>
+      {/* Optional: View Leads list filtered by this campaign */}
+      <MenuItem
+        onClick={() => {
+          if (menuRow) handleViewLeads(menuRow);
+          handleMenuClose();
+        }}
+      >
+        View Leads
+      </MenuItem>
+    </Menu>
     </Box>
   );
 }
