@@ -5,6 +5,10 @@ const { ErrorHandler } = require('../../utils/error-handler');
 const { getPaginationParams, extractFilters } = require('../../utils/pagination');
 const { User } = require('../../models/user.model');
 const { billingLogger } = require('../../utils/logger');
+const dayjs = require('dayjs');
+
+
+const { getRevenueFromNmi, getRefundsFromNmi } = require('../../services/nmi/nmi.service'); // import
 
 // Contract management
 const getCurrentContract = wrapAsync(async (req, res) => {
@@ -21,6 +25,45 @@ const getContractStatus = wrapAsync(async (req, res) => {
     billingLogger.info('Contract status retrieved successfully', { userId: user_id, status });
     return sendResponse(res, { status }, 'Contract status retrieved successfully');
 });
+
+
+// ✅ Add this controller
+const getRevenueFromGateway = wrapAsync(async (req, res) => {
+    const { range = 'mtd', start, end, includeRefunds = '0' } = req.query;
+  
+    let from = dayjs().startOf('month');
+    let to = dayjs().endOf('day');
+    if (range === 'today') { from = dayjs().startOf('day'); to = dayjs().endOf('day'); }
+    if (range === '7d') { from = dayjs().subtract(6, 'day').startOf('day'); to = dayjs().endOf('day'); }
+    if (range === '30d') { from = dayjs().subtract(29, 'day').startOf('day'); to = dayjs().endOf('day'); }
+    if (range === 'custom' && start && end) {
+      from = dayjs(start).startOf('day');
+      to = dayjs(end).endOf('day');
+    }
+  
+    const { totalAmount: sales, count: salesCount } = await getRevenueFromNmi({ start: from, end: to });
+  
+    let refunds = 0;
+    let refundCount = 0;
+    if (includeRefunds === '1') {
+      const r = await getRefundsFromNmi({ start: from, end: to });
+      refunds = r.totalAmount;
+      refundCount = r.count;
+    }
+  
+    const totalAmount = sales - refunds;
+  
+    return sendResponse(res, {
+      totalAmount,
+      sales,
+      refunds,
+      salesCount,
+      refundCount,
+      from: from.toISOString(),
+      to: to.toISOString()
+    }, 'Revenue fetched successfully');
+  });
+  
 
 const acceptContract = wrapAsync(async (req, res) => {
     const user_id = req.user._id;
@@ -305,4 +348,5 @@ module.exports = {
     setDefaultCard,
     deleteCard,
     testAutoTopUp,
+    getRevenueFromGateway,
 };

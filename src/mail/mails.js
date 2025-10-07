@@ -243,7 +243,7 @@ const sendTestMail = async (toEmail) => {
     throw err;
   }
 };
-const sendLeadAssignEmail = async ({ to, name, leadName, assignedBy, leadDetailsUrl, campaignName , leadData,realleadId}) => {
+const sendLeadAssignEmail = async ({ to, name, leadName, assignedBy, leadDetailsUrl, campaignName , leadData,realleadId ,subject}) => {
   
   const recipients = Array.isArray(to) 
     ? to 
@@ -311,11 +311,14 @@ const sendLeadAssignEmail = async ({ to, name, leadName, assignedBy, leadDetails
     // footerText: 'If you have any questions or need assistance, please contact your manager or support team.',
     // warningText: 'Do not share lead or campaign information outside the organization.',
   });
+    // Use the subject passed in; fallback if not provided
+    const finalSubject = (subject && subject.trim()) || `New Lead Assigned in "${campaignName}"`;
+
 
   return resend.emails.send({
     from: FROM_EMAIL,
     to: recipients,
-    subject: `New Lead Assigned in "${campaignName}"`,
+    subject: finalSubject,
     html,
   });
 };

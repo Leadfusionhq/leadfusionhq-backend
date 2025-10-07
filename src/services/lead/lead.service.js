@@ -75,9 +75,14 @@ const getLeads = async (page = 1, limit = 10, filters = {}) => {
   try {
     const skip = (page - 1) * limit;
 
+    const normalizeId = (val) => String(val).split('|')[0]; // trims any accidental "|…"
+
     const query = {
       ...(filters.campaign_id && { campaign_id: filters.campaign_id }),
+      ...(filters.status && { status: filters.status }),
+      ...(filters.state && { 'address.state': normalizeId(filters.state) }),
     };
+    
 
     const [leads, total] = await Promise.all([
       Lead.find(query)
@@ -106,39 +111,34 @@ const getLeads = async (page = 1, limit = 10, filters = {}) => {
   }
 };
 
-const getLeadByUserId = async (page = 1, limit = 10, user_id) => {
-  try {
-    const skip = (page - 1) * limit;
+const getLeadByUserId = async (page = 1, limit = 10, user_id, filters = {}) => {
+  const skip = (page - 1) * limit;
+  const campaigns = await Campaign.find({ user_id }).select('_id');
+  if (!campaigns.length) {
+    return { data: [], meta: { total: 0, page, limit, totalPages: 0 } };
+  }
 
-    const campaigns = await Campaign.find({ user_id }).select('_id');
+  const normalizeId = (val) => String(val).split('|')[0];
 
-    if (!campaigns.length) {
-      return { data: [], meta: { total: 0, page, limit, totalPages: 0 } };
-    }
+  const baseQuery = { campaign_id: { $in: campaigns.map(c => c._id) } };
+  if (filters.status) baseQuery.status = filters.status;
+  if (filters.state) baseQuery['address.state'] = normalizeId(filters.state);
 
-    const leads = await Lead.find({ campaign_id: { $in: campaigns.map(c => c._id) } })
-      .skip(skip)
-      .limit(limit)
+  const [leads, total] = await Promise.all([
+    Lead.find(baseQuery)
       .populate('campaign_id', 'campaign_id name status lead_type exclusivity language geography delivery user_id note')
       .populate('address.state', 'name abbreviation')
       .sort({ createdAt: -1 })
-      .lean();
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    Lead.countDocuments(baseQuery),
+  ]);
 
-    const total = await Lead.countDocuments({ campaign_id: { $in: campaigns.map(c => c._id) } });
-
-    return {
-      data: leads,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
-  } catch (error) {
-    console.error('Error in getLeadsByUserId:', error);
-    throw new ErrorHandler(500, error.message || 'Failed to fetch leads');
-  }
+  return {
+    data: leads,
+    meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+  };
 };
 
 const getLeadById = async (leadId, userId) => {
