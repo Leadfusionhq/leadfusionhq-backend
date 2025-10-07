@@ -70,6 +70,7 @@ const createLead = wrapAsync(async (req, res) => {
             console.log("Campaign after populate:", campaign?.name, campaign?.delivery);
             if (campaign?.delivery?.method?.includes('email') && campaign?.delivery?.email?.addresses) {
                 try {
+                    const emailSubjectFromCampaign = campaign?.delivery?.email?.subject?.trim();
                     await MAIL_HANDLER.sendLeadAssignEmail({
                         to: campaign.delivery.email.addresses,
                         name: campaign?.name || 'Campaign User',
@@ -79,6 +80,8 @@ const createLead = wrapAsync(async (req, res) => {
                         campaignName: campaign?.name,
                         leadData:leadData,
                         realleadId: result._id,
+                        // NEW: pass subject from campaign (with fallback)
+                        subject: emailSubjectFromCampaign || `New Lead Assigned in "${campaign?.name || 'Campaign'}"`,
                     });
                     console.log(`Lead assignment email sent to ${campaign.delivery.email.addresses}`);
                 } catch (err) {
@@ -138,13 +141,16 @@ const getLeads = wrapAsync(async (req, res) => {
     const isAdmin = req.user.role === CONSTANT_ENUM.USER_ROLE.ADMIN;
 
     let data;
-    if (isAdmin) {
-        const allowedFilterKeys = ['campaign_id', 'status', 'state'];
-        const filters = extractFilters(req.query, allowedFilterKeys);
-        data = await LeadServices.getLeads(page, limit, filters);
-    } else {
-        data = await LeadServices.getLeadByUserId(page, limit, user._id);
-    }
+// after
+if (isAdmin) {
+    const allowedFilterKeys = ['campaign_id', 'status', 'state'];
+    const filters = extractFilters(req.query, allowedFilterKeys);
+    data = await LeadServices.getLeads(page, limit, filters);
+  } else {
+    const allowedFilterKeys = ['campaign_id', 'status', 'state'];
+    const filters = extractFilters(req.query, allowedFilterKeys);
+    data = await LeadServices.getLeadByUserId(page, limit, user._id, filters);
+  }
 
     sendResponse(res, data, "Leads fetched successfully", 200);
 });

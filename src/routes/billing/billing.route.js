@@ -23,7 +23,8 @@ const API = {
   GET_CARDS: '/cards', // NEW
   SET_DEFAULT_CARD: '/cards/default', // NEW
   DELETE_CARD: '/cards/:vaultId' ,
-  TEST_AUTO_TOPUP: '/test-auto-topup'
+  TEST_AUTO_TOPUP: '/test-auto-topup',
+  REVENUE_FROM_NMI: '/revenue-from-nmi',
 };
 
 // Info endpoint for Billing API
@@ -68,7 +69,10 @@ billingRouter.get(API.BILLING_INFO, (req, res) => {
 
 billingRouter.use(
     checkAuth,
-    authorizedRoles([CONSTANT_ENUM.USER_ROLE.USER])
+    authorizedRoles([
+      CONSTANT_ENUM.USER_ROLE.ADMIN,
+      CONSTANT_ENUM.USER_ROLE.USER
+  ])
 );
 
 // billingRouter.get(
@@ -136,6 +140,12 @@ billingRouter.post(
     API.AUTO_TOP_UP,
     celebrate(BillingSchema.toggleAutoTopUp),
     billingController.toggleAutoTopUp
+);
+billingRouter.get(
+  API.REVENUE_FROM_NMI,
+  // checkAuth,
+  // authorizedRoles([CONSTANT_ENUM.USER_ROLE.ADMIN]),
+  billingController.getRevenueFromGateway
 );
 billingRouter.get(API.GET_CARDS, billingController.getCards);
 billingRouter.post(API.SET_DEFAULT_CARD, billingController.setDefaultCard);

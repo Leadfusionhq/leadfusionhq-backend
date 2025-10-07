@@ -6,6 +6,12 @@ const { createCustomerVault, chargeCustomerVault ,deleteCustomerVault} = require
 const { ErrorHandler } = require('../../utils/error-handler');
 const { RegularUser } = require('../../models/user.model');
 const { billingLogger } = require('../../utils/logger');
+const NMI_QUERY_URL = process.env.NMI_QUERY_URL;
+const SECURITY_KEY = process.env.NMI_SECURITY_KEY;
+const dayjs = require('dayjs');
+const fetchWrapper = require('../../utils/fetchWrapper');
+
+const formatForNmi = (d) => dayjs(d).format('MM/DD/YYYY');
 
 // Contract management
 const getCurrentContract = async () => {
@@ -931,6 +937,28 @@ const addBalanceByAdmin = async (userId, amount, adminId) => {
   }
 };
 
+const getRevenueFromNmi = async ({ start, end }) => {
+  const payload = {
+  security_key: SECURITY_KEY,
+  report_type: 'transaction',
+  start_date: formatForNmi(start),
+  end_date: formatForNmi(end),
+  action_type: 'sale',
+  response: '1',
+  output: 'json',
+  };
+  
+  const resp = await fetchWrapper('POST', NMI_QUERY_URL, payload, null, false, true);
+  const data = typeof resp === 'string' ? JSON.parse(resp) : resp;
+  
+  const records = data?.records?.record || data?.record || [];
+  const totalAmount = records.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0);
+  
+  return { totalAmount, count: records.length, raw: data };
+  };
+  
+  
+
 module.exports = {
   getCurrentContract,
   getUserContractStatus,
@@ -947,4 +975,5 @@ module.exports = {
   checkAndPerformAutoTopUp, 
   assignLeadNew,
   addBalanceByAdmin,
+  getRevenueFromNmi,
 };
