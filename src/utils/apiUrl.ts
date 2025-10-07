@@ -237,6 +237,7 @@ export const BILLING_API = {
     AUTO_TOPUP: `${BILLING_API_BASE}/auto-topup/toggle`,
     TEST_AUTO_TOPUP: `${BILLING_API_BASE}/test-auto-topup`, 
     GET_BALANCE: `${BILLING_API_BASE}/balance`,
+    REVENUE_FROM_NMI: `${BILLING_API_BASE}/revenue-from-nmi`,
 };
 
 

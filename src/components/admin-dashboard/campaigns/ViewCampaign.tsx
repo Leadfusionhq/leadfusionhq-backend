@@ -6,6 +6,9 @@ import axiosWrapper from "@/utils/api";
 import { CAMPAIGNS_API } from "@/utils/apiUrl";
 import { useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
+import { FormatListBulleted } from "@mui/icons-material";
+import { LEADS_API } from "@/utils/apiUrl";
+
 import { 
   Skeleton, 
   Typography, 
@@ -100,6 +103,7 @@ type Campaign = {
   updatedAt: string;
 };
 
+
 const getStatusColor = (status: string) => {
   switch (status?.toLowerCase()) {
     case 'active': return 'success';
@@ -143,6 +147,8 @@ export default function CampaignDetailPage() {
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [leadCount, setLeadCount] = useState<number | null>(null);
+  const [leadCountLoading, setLeadCountLoading] = useState<boolean>(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -181,12 +187,51 @@ export default function CampaignDetailPage() {
     }
   }, [campaignId, token]);
 
+  useEffect(() => {
+    const id = Array.isArray(campaignId) ? campaignId[0] : campaignId;
+    if (!id || !token) return;
+  
+    const fetchLeadCount = async () => {
+      try {
+        setLeadCountLoading(true);
+        // Use limit=1 to minimize payload; meta.total has the count
+        const params = new URLSearchParams({
+          page: "1",
+          limit: "1",
+          campaign_id: id, // IMPORTANT: use Mongo _id, not campaign_id string
+        });
+  
+        const res = await axiosWrapper(
+          "get",
+          `${LEADS_API.GET_ALL_LEADS}?${params.toString()}`,
+          {},
+          token ?? undefined
+        ) as { meta?: { total?: number } };
+  
+        setLeadCount(res?.meta?.total ?? 0);
+      } catch (e) {
+        console.error("Failed to fetch lead count", e);
+        setLeadCount(0);
+      } finally {
+        setLeadCountLoading(false);
+      }
+    };
+  
+    fetchLeadCount();
+  }, [campaignId, token]);
+
   const handleEdit = (id:any) => {
     router.push(`/admin/campaigns/${id}/edit`);
   };
   const handleAddLead = (id:any) => {
     router.push(`/admin/campaigns/${id}/leads/add`);
   };
+  // + add (near handleEdit / handleAddLead)
+const handleViewLeads = (id: string) => {
+  // pass the Mongo _id of the campaign
+  router.push(`/admin/leads?campaign_id=${id}`);
+};
+
   if (loading) {
     return (
       <Box sx={{ p: { xs: 2, sm: 3, md: 4 } }}>
@@ -245,15 +290,18 @@ export default function CampaignDetailPage() {
             <Typography variant="body2" sx={{ opacity: 0.8 }}>
               Created: {formatDate(campaign.createdAt)}
             </Typography>
+
           </Box>
           <Stack direction="row" spacing={1}>
-            <IconButton sx={{ color: 'white' }}>
-              <Edit onClick={() => handleEdit(campaign._id)}/>
+            <IconButton sx={{ color: 'white' }} onClick={() => handleViewLeads(campaign._id)} title="View Leads">
+              <FormatListBulleted />
             </IconButton>
-            <IconButton sx={{ color: 'white' }}>
-              <Add onClick={() => handleAddLead(campaign._id)} />
+            <IconButton sx={{ color: 'white' }} onClick={() => handleEdit(campaign._id)} title="Edit Campaign">
+              <Edit />
             </IconButton>
-            
+            <IconButton sx={{ color: 'white' }} onClick={() => handleAddLead(campaign._id)} title="Add Lead">
+              <Add />
+            </IconButton>
           </Stack>
         </Stack>
       </Paper>
@@ -463,14 +511,14 @@ export default function CampaignDetailPage() {
                 Quick Stats
               </Typography>
               <div className="grid grid-cols-12 gap-4 sm:gap-6">
-                {/* <div className="col-span-6 sm:col-span-3 text-center">
+                <div className="col-span-6 sm:col-span-3 text-center">
                   <Typography variant="h4" fontWeight={700} sx={{ fontSize: { xs: '1.5rem', sm: '2.125rem' } }}>
-                    ${campaign.bid_price?.toFixed(2) || '0.00'}
+                    {leadCountLoading ? '...' : (leadCount ?? 0)}
                   </Typography>
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    Bid Price
+                    Total Leads
                   </Typography>
-                </div> */}
+                </div>
                 <div className="col-span-6 sm:col-span-3 text-center">
                   <Typography variant="h4" fontWeight={700} sx={{ fontSize: { xs: '1.5rem', sm: '2.125rem' } }}>
                     {campaign.status || 'N/A'}
