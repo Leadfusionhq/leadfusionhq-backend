@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import axiosWrapper from "@/utils/api";
 import { Supabase_CAMPAIGNS_API } from "@/utils/apiUrl";
+import { useLoader } from "@/context/LoaderContext";
 
 export default function CampaignsTable({ token }: { token?: string }) {
   const [campaigns, setCampaigns] = useState<any[]>([]);
@@ -11,6 +12,7 @@ export default function CampaignsTable({ token }: { token?: string }) {
   const [selectedState, setSelectedState] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const { showLoader, hideLoader } = useLoader();
 
   const fetchCampaignOptions = useCallback(async () => {
     try {
@@ -28,6 +30,7 @@ export default function CampaignsTable({ token }: { token?: string }) {
       console.error("Failed to fetch campaign options", e);
     } finally {
       setLoading(false);
+      hideLoader();
     }
   }, [token]);
 
@@ -70,9 +73,7 @@ export default function CampaignsTable({ token }: { token?: string }) {
 
   if (loading)
     return (
-      <p className="text-center py-6 text-gray-500 animate-pulse">
-        Loading campaigns...
-      </p>
+      showLoader()
     );
 
   return (
