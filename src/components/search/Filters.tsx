@@ -226,14 +226,21 @@ export default function Filters() {
             isDisabled={loadingZip}
             isLoading={loadingZip}
             isMulti
-            options={zips.map((z) => ({ value: z, label: z }))} // ✅ convert string array to { value, label }
-            value={selectedZips.map((z) => ({ value: z, label: z }))} // ✅ correct multi-value binding
+            options={zips.map((z) => ({ value: z, label: z }))}
+            value={selectedZips.map((z) => ({ value: z, label: z }))} 
             onChange={(selectedOptions) =>
               setSelectedZips(selectedOptions ? selectedOptions.map((o) => o.value) : [])
             }
             placeholder={loadingZip ? "Loading Zips..." : "Select Zip(s)"}
             isClearable
             isSearchable
+            onInputChange={(inputValue, actionMeta) => {
+              if (actionMeta.action === "input-change") {
+                // Only allow numbers
+                const numericInput = inputValue.replace(/[^0-9]/g, "");
+                return numericInput;
+              }
+            }}
           />
         </div>
         
@@ -250,8 +257,8 @@ export default function Filters() {
             isDisabled={loadingCounties}
             isLoading={loadingCounties}
             isMulti
-            options={counties.map((c) => ({ value: c, label: c }))} // ✅ convert string[] -> object[]
-            value={selectedCounties.map((c) => ({ value: c, label: c }))} // ✅ correct binding for multi
+            options={counties.map((c) => ({ value: c, label: c }))}
+            value={selectedCounties.map((c) => ({ value: c, label: c }))}
             onChange={(selectedOptions) =>
               setSelectedCounties(
                 selectedOptions ? selectedOptions.map((o) => o.value) : []

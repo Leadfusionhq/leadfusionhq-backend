@@ -4,8 +4,9 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import axiosWrapper from "@/utils/api";
 import { Supabase_CAMPAIGNS_API } from "@/utils/apiUrl";
 import { useLoader } from "@/context/LoaderContext";
+const NEXT_PUBLIC_CSV_API_TOKEN = process.env.NEXT_PUBLIC_CSV_API_TOKEN;
 
-export default function CampaignsTable({ token }: { token?: string }) {
+export default function CampaignsTable() {
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
@@ -21,7 +22,7 @@ export default function CampaignsTable({ token }: { token?: string }) {
         "get",
         `${Supabase_CAMPAIGNS_API.GET_ALL_CAMPAIGNS}`,
         {},
-        token ?? undefined
+        NEXT_PUBLIC_CSV_API_TOKEN
       )) as { campaigns: any[] };
       if (res) {
         setCampaigns(res.campaigns ?? []);
@@ -32,7 +33,7 @@ export default function CampaignsTable({ token }: { token?: string }) {
       setLoading(false);
       hideLoader();
     }
-  }, [token]);
+  }, []);
 
   useEffect(() => {
     fetchCampaignOptions();
