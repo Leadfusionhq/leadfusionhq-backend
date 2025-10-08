@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { SEARCH_API } from "@/utils/apiUrl";
 import axiosWrapper from "@/utils/api";
 import { useLoader } from "@/context/LoaderContext";
+import Select from "react-select";
 
 const NEXT_PUBLIC_CSV_API_TOKEN = process.env.NEXT_PUBLIC_CSV_API_TOKEN;
 
@@ -198,116 +199,69 @@ export default function Filters() {
             State
           </label>
 
-          <select
-            value={selectedState}
-            onChange={(e) => setSelectedState(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-            disabled={loadingState}
-          >
-            {loadingState ? (
-              <option value="">Loading State...</option>
-            ) : (
-              <>
-                <option value="">Select State</option>
-                {states.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </>
-            )}
-          </select>
+          <Select
+            isDisabled={loadingState}
+            isLoading={loadingState}
+            options={states.map((s) => ({ value: s, label: s }))}
+            value={
+              selectedState
+                ? { value: selectedState, label: selectedState }
+                : null
+            }
+            onChange={(option) => setSelectedState(option ? option.value : "")}
+            placeholder={loadingState ? "Loading States..." : "Select State"}
+            isClearable
+            isSearchable
+          />
         </div>
 
         {/* Zip Dropdown */}
         {selectedState && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Zip
-            </label>
-            <select
-              value=""
-              onChange={handleZipSelect}
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-              disabled={loadingZip}
-            >
-              {loadingZip ? (
-                <option value="">Loading Zip...</option>
-              ) : (
-                <>
-                  <option value="">Select Zip</option>
-                  {zips.map((z) => (
-                    <option key={z} value={z}>
-                      {z}
-                    </option>
-                  ))}
-                </>
-              )}
-            </select>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {selectedZips.map((zip) => (
-                <div
-                  key={zip}
-                  className="flex items-center bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm"
-                >
-                  {zip}
-                  <button
-                    type="button"
-                    onClick={() => handleZipRemove(zip)}
-                    className="ml-2 text-red-500 hover:text-red-700"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Zip
+          </label>
+        
+          <Select
+            isDisabled={loadingZip}
+            isLoading={loadingZip}
+            isMulti
+            options={zips.map((z) => ({ value: z, label: z }))} // ✅ convert string array to { value, label }
+            value={selectedZips.map((z) => ({ value: z, label: z }))} // ✅ correct multi-value binding
+            onChange={(selectedOptions) =>
+              setSelectedZips(selectedOptions ? selectedOptions.map((o) => o.value) : [])
+            }
+            placeholder={loadingZip ? "Loading Zips..." : "Select Zip(s)"}
+            isClearable
+            isSearchable
+          />
+        </div>
+        
         )}
 
         {/* County Dropdown */}
         {selectedZips.length > 0 && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              County
-            </label>
-
-            <select
-              value=""
-              onChange={handleCountySelect}
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-              disabled={loadingCounties}
-            >
-              {loadingCounties ? (
-                <option value="">Loading County...</option>
-              ) : (
-                <>
-                  <option value="">Select County</option>
-                  {counties.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </>
-              )}
-            </select>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {selectedCounties.map((county) => (
-                <div
-                  key={county}
-                  className="flex items-center bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm"
-                >
-                  {county}
-                  <button
-                    type="button"
-                    onClick={() => handleCountyRemove(county)}
-                    className="ml-2 text-red-500 hover:text-red-700"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            County
+          </label>
+        
+          <Select
+            isDisabled={loadingCounties}
+            isLoading={loadingCounties}
+            isMulti
+            options={counties.map((c) => ({ value: c, label: c }))} // ✅ convert string[] -> object[]
+            value={selectedCounties.map((c) => ({ value: c, label: c }))} // ✅ correct binding for multi
+            onChange={(selectedOptions) =>
+              setSelectedCounties(
+                selectedOptions ? selectedOptions.map((o) => o.value) : []
+              )
+            }
+            placeholder={loadingCounties ? "Loading Counties..." : "Select Counties"}
+            isClearable
+            isSearchable
+          />
+        </div>
         )}
 
         <button
