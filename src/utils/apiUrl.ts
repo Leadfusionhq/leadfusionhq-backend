@@ -112,6 +112,14 @@ export const CAMPAIGNS_API = {
   
 };
 
+/** ::::::::::::::::::Supabase CAMPAIGNS ROUTES :::::::::::::::::: */
+const Supabase_CAMPAIGNS_API_BASE = `${API_IMPORT_BASE}/supacampaigns`;
+
+export const Supabase_CAMPAIGNS_API = {
+  GET_ALL_CAMPAIGNS: `${Supabase_CAMPAIGNS_API_BASE}/`,
+};
+
+
 /** ::::::::::::::::::LEADS ROUTES :::::::::::::::::: */
 
 const LEADS_API_BASE = `${API_BASE}/leads`;

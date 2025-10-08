@@ -99,7 +99,12 @@ export const adminSidebarItems: SidebarItem[] = [
     icon: '/images/icons/search.svg',
     link: '/search',
   },
-
+  {
+    id: 'supacampaign',
+    name: 'supacampaign',
+    icon: '/images/icons/campaigns.svg',
+    link: '/supacampaign',
+  },
 
 ];
 
