@@ -703,15 +703,6 @@ const sendTransactionEmail = async ({
     </table>
   `;
 
-  // ----- Download button -----
-  const downloadButton = `
-    <div style="text-align:center; margin: 12px 0 0;">
-      <a href="${downloadUrl}"
-         style="display:inline-block; padding: 10px 18px; background: #204D9D; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 13px;">
-        Download Receipt (PDF)
-      </a>
-    </div>
-  `;
 
   // Assemble body (no greeting, no intro sentence, no badge, no extra CTA)
   const body = `

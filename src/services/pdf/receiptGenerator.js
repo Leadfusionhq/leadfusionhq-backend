@@ -1,6 +1,7 @@
 const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
+const axios = require('axios');
 
 /**
  * Generate Transaction Receipt PDF (Leadfusionhq)
@@ -11,7 +12,7 @@ const path = require('path');
  * - Mobile mode (A5 stacked) supported with `mobile: true`
  * - Footer is STICKY at absolute bottom (divider + single thanks line only)
  */
-const generateTransactionReceipt = async ({
+const generateTransactionReceipt = async({
   transactionId,
   userName,
   userEmail,
@@ -34,7 +35,7 @@ const generateTransactionReceipt = async ({
   // mobile-friendly layout (A5 stacked)
   mobile = false
 }) => {
-  return new Promise((resolve, reject) => {
+  return new Promise(async(resolve, reject) => {
     try {
       // ---------- INIT ----------
       const doc = new PDFDocument({
@@ -104,12 +105,39 @@ const generateTransactionReceipt = async ({
         const logoY = mobile ? 14 : 16;
         const logoH = mobile ? 36 : 50;
         let drew = false;
-        if (logoBuffer) { doc.image(logoBuffer, contentLeft, logoY, { height: logoH }); drew = true; }
-        else if (logoPath && fs.existsSync(logoPath)) { doc.image(logoPath, contentLeft, logoY, { height: logoH }); drew = true; }
-        else {
-          const def = path.join(process.cwd(), 'public', 'images', 'logo.png');
-          if (fs.existsSync(def)) { doc.image(def, contentLeft, logoY, { height: logoH }); drew = true; }
+      
+        if (logoBuffer) {
+          doc.image(logoBuffer, contentLeft, logoY, { height: logoH });
+          drew = true;
+        } else if (logoPath) {
+          if (/^https?:\/\//i.test(logoPath)) {
+            // 🔹 Remote logo (auto-fetch)
+            try {
+              const { data: remoteLogoBuffer } = await axios.get(logoPath, {
+                responseType: 'arraybuffer'
+              });
+              doc.image(remoteLogoBuffer, contentLeft, logoY, { height: logoH });
+              drew = true;
+            } catch (fetchErr) {
+              console.warn('⚠️ Failed to fetch remote logo:', fetchErr.message);
+            }
+          } else if (fs.existsSync(logoPath)) {
+            // 🔹 Local path
+            doc.image(logoPath, contentLeft, logoY, { height: logoH });
+            drew = true;
+          }
         }
+      
+        // 🔹 Fallback local default
+        if (!drew) {
+          const def = path.join(process.cwd(), 'public', 'images', 'logo.png');
+          if (fs.existsSync(def)) {
+            doc.image(def, contentLeft, logoY, { height: logoH });
+            drew = true;
+          }
+        }
+      
+        // 🔹 If still no logo, draw placeholder circle
         if (!drew) doc.circle(contentLeft + 18, logoY + logoH / 2, mobile ? 11 : 14).fill('#000000');
       } catch (_) {}
 
