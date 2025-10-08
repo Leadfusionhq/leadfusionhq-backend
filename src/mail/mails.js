@@ -711,7 +711,6 @@ const sendTransactionEmail = async ({
     ${lineItemTable}
     ${totalsBlock}
     ${metaBlock}
-    ${downloadButton}
   `;
 
   const html = createEmailTemplate({
