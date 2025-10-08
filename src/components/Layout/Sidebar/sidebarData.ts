@@ -101,7 +101,7 @@ export const adminSidebarItems: SidebarItem[] = [
   },
   {
     id: 'supacampaign',
-    name: 'supacampaign',
+    name: 'SupaCampaign',
     icon: '/images/icons/campaigns.svg',
     link: '/supacampaign',
   },
