@@ -211,7 +211,8 @@ const detectCardBrand = (cardNumber) => {
 const addFunds = async (userId, amount, vaultId = null) => {
   billingLogger.info('Starting add funds process', { 
     userId, 
-    amount 
+    amount,
+    vaultId 
   });
 
   const user = await User.findById(userId);
@@ -220,26 +221,36 @@ const addFunds = async (userId, amount, vaultId = null) => {
   // FIRST: Try to use the new paymentMethods system
   let customerVaultIdToUse;
   let defaultPaymentMethod;
+  let paymentMethodDisplay = 'Card';
 
-  if(vaultId){
+  if (vaultId) {
+    // Use the provided vaultId
     customerVaultIdToUse = vaultId;
-    defaultPaymentMethod = {
-      cardLastFour: 'N/A',
-      brand: 'Unknown'
-    };
+    
+    // Find the payment method details
+    const selectedPaymentMethod = user.paymentMethods.find(pm => pm.customerVaultId === vaultId);
+    if (selectedPaymentMethod) {
+      defaultPaymentMethod = selectedPaymentMethod;
+      paymentMethodDisplay = `${selectedPaymentMethod.brand || 'Card'} •••• ${selectedPaymentMethod.cardLastFour}`;
+    } else {
+      defaultPaymentMethod = {
+        cardLastFour: 'N/A',
+        brand: 'Card'
+      };
+    }
   } else if (user.paymentMethods && user.paymentMethods.length > 0) {
     // Check if user has paymentMethods with a default
     defaultPaymentMethod = user.paymentMethods.find(pm => pm.isDefault);
     if (defaultPaymentMethod && defaultPaymentMethod.customerVaultId) {
       customerVaultIdToUse = defaultPaymentMethod.customerVaultId;
+      paymentMethodDisplay = `${defaultPaymentMethod.brand || 'Card'} •••• ${defaultPaymentMethod.cardLastFour}`;
     }
   } else if (!customerVaultIdToUse && user.customerVaultId) {
     // SECOND: Fallback to old top-level customerVaultId (for backward compatibility)
     customerVaultIdToUse = user.customerVaultId;
-    // Create a mock payment method object for transaction recording
     defaultPaymentMethod = {
       cardLastFour: 'N/A',
-      brand: 'Unknown'
+      brand: 'Card'
     };
   }
   
@@ -258,14 +269,19 @@ const addFunds = async (userId, amount, vaultId = null) => {
     userId,
     amount,
     vaultId: customerVaultIdToUse,
-    cardLast4: defaultPaymentMethod.cardLastFour
+    cardLast4: defaultPaymentMethod.cardLastFour,
+    paymentMethod: paymentMethodDisplay
   });
 
-  // Charge using the found vault ID
-  const chargeResult = await chargeCustomerVault(customerVaultIdToUse, amount, 'Add funds to account');
-  console.log(chargeResult);
+  // ✅ Charge using the found vault ID
+  const chargeResult = await chargeCustomerVault(
+    customerVaultIdToUse, 
+    amount, 
+    `Add funds to account - ${user.email}`
+  );
 
-  
+  console.log('Charge result:', chargeResult);
+
   if (!chargeResult.success) {
     billingLogger.error('Payment charge failed', null, { 
       userId,
@@ -275,42 +291,44 @@ const addFunds = async (userId, amount, vaultId = null) => {
       message: chargeResult.message
     });
 
-    console.log(`error received in billing service is ${chargeResult.message}`)
+    console.log(`Error received in billing service: ${chargeResult.message}`);
 
     // Handle specific decline cases
     if (chargeResult.responseCode === '2') {
       throw new ErrorHandler(400, `Payment declined: ${chargeResult.message}. Please use a different payment method.`);
     } else if (chargeResult.responseCode === '3') {
-      throw new ErrorHandler(400, 'Payment error. Please contact your bank or use a different card. RESPONCE CODE 3');
+      throw new ErrorHandler(400, 'Payment error. Please contact your bank or use a different card.');
     }
     
     throw new ErrorHandler(400, 'Payment failed: ' + chargeResult.message);
   }
 
   const oldBalance = user.balance || 0;
-  // Add to user's balance
-  user.balance = oldBalance + parseFloat(amount);
+  const newBalance = oldBalance + parseFloat(amount);
+  
+  // ✅ Add to user's balance
+  user.balance = newBalance;
   await user.save();
 
   billingLogger.info('Funds added successfully', { 
     userId,
     amount,
     oldBalance,
-    newBalance: user.balance,
+    newBalance,
     transactionId: chargeResult.transactionId
   });
 
   try {
-    // Create transaction record
+    // ✅ Create transaction record
     const transaction = new Transaction({
       userId,
       type: 'ADD_FUNDS',
       amount: parseFloat(amount),
       status: 'COMPLETED',
-      description: 'Funds added to account',
+      description: `Funds added via ${paymentMethodDisplay}`,
       paymentMethod: 'CARD',
       transactionId: chargeResult.transactionId,
-      balanceAfter: user.balance,
+      balanceAfter: newBalance,
       // Store payment method details for reference
       paymentMethodDetails: {
         lastFour: defaultPaymentMethod.cardLastFour,
@@ -320,24 +338,39 @@ const addFunds = async (userId, amount, vaultId = null) => {
     });
     await transaction.save();
 
+    // ✅ Return complete data for email
     return {
       success: true,
-      newBalance: user.balance,
+      transactionId: transaction._id.toString(), // MongoDB transaction ID
+      nmiTransactionId: chargeResult.transactionId, // NMI gateway transaction ID
+      newBalance: newBalance,
+      oldBalance: oldBalance,
+      amount: parseFloat(amount),
+      paymentMethod: chargeResult.paymentMethod || paymentMethodDisplay, // ✅ Use NMI response if available
+      cardType: chargeResult.cardType || defaultPaymentMethod.brand,
+      last4: chargeResult.last4 || defaultPaymentMethod.cardLastFour,
       customerVaultId: customerVaultIdToUse,
-      transactionId: transaction._id,
-      paymentTransactionId: chargeResult.transactionId,
       message: 'Funds added successfully'
     };
 
   } catch (transactionError) {
-    console.error('Transaction creation error:', transactionError);
+    billingLogger.error('Transaction creation error', transactionError, { userId, amount });
     
     // Even if transaction recording fails, the payment was successful
+    // Generate a fallback transaction ID
+    const fallbackTxnId = `TXN-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+    
     return {
       success: true,
-      newBalance: user.balance,
+      transactionId: fallbackTxnId,
+      nmiTransactionId: chargeResult.transactionId,
+      newBalance: newBalance,
+      oldBalance: oldBalance,
+      amount: parseFloat(amount),
+      paymentMethod: chargeResult.paymentMethod || paymentMethodDisplay,
+      cardType: chargeResult.cardType || defaultPaymentMethod.brand,
+      last4: chargeResult.last4 || defaultPaymentMethod.cardLastFour,
       customerVaultId: customerVaultIdToUse,
-      paymentTransactionId: chargeResult.transactionId,
       message: 'Funds added successfully (transaction record failed)',
       warning: 'Transaction record could not be created'
     };

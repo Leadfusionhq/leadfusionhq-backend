@@ -130,6 +130,8 @@ const createCustomerVault = async (cardInfo) => {
   }
 };
 
+// In nmi.service.js - Update chargeCustomerVault function
+
 const chargeCustomerVault = async (customerVaultId, amount, description = '') => {
   billingLogger.info('Starting NMI charge process', { 
     vaultId: customerVaultId,
@@ -138,10 +140,7 @@ const chargeCustomerVault = async (customerVaultId, amount, description = '') =>
   });
 
   if (!SECURITY_KEY) {
-    billingLogger.error('NMI security key not configured', null, { 
-      vaultId: customerVaultId,
-      amount
-    });
+    billingLogger.error('NMI security key not configured');
     return {
       success: false,
       message: 'Payment configuration error: Missing security key'
@@ -149,27 +148,32 @@ const chargeCustomerVault = async (customerVaultId, amount, description = '') =>
   }
 
   if (!NMI_API_URL || !NMI_API_URL.startsWith('http')) {
-    billingLogger.error('NMI API URL not configured properly', null, { 
-      vaultId: customerVaultId,
-      amount,
-      apiUrl: NMI_API_URL
-    });
+    billingLogger.error('NMI API URL not configured properly');
     return {
       success: false,
       message: 'Payment configuration error: Invalid API URL'
     };
   }
 
-  const uniqueOrderId = `ORDER-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-
+  // ✅ Get card details for response
   const result = await User.aggregate([
     { $unwind: "$paymentMethods" },
     { $match: { "paymentMethods.customerVaultId": customerVaultId } },
-    { $project: { _id: 0, cvv: "$paymentMethods.cvv" } }
+    { 
+      $project: { 
+        _id: 0, 
+        cvv: "$paymentMethods.cvv",
+        cardLastFour: "$paymentMethods.cardLastFour", // ✅ Use consistent field name
+        brand: "$paymentMethods.brand" // ✅ Use consistent field name
+      } 
+    }
   ]);
+  
   const cvv = result.length > 0 ? result[0].cvv : null;
+  const cardType = result.length > 0 ? result[0].brand : 'Card';
+  const last4 = result.length > 0 ? result[0].cardLastFour : '****';
 
-  if(cvv == null){
+  if (cvv == null) {
     return {
       success: false,
       message: 'Update Your Card Details'
@@ -181,17 +185,13 @@ const chargeCustomerVault = async (customerVaultId, amount, description = '') =>
     type: 'sale',
     customer_vault_id: customerVaultId,
     amount: amount.toFixed(2),
-    // currency: 'USD', 
-    // orderid: uniqueOrderId, 
     order_description: description || 'Customer charge',
-    // test_mode: '1',
-    cvv:cvv,
+    cvv: cvv,
   };
   
   billingLogger.info('Sending charge request to NMI', { 
     vaultId: customerVaultId,
-    amount: amount.toFixed(2),
-    description
+    amount: amount.toFixed(2)
   });
 
   try {
@@ -200,28 +200,21 @@ const chargeCustomerVault = async (customerVaultId, amount, description = '') =>
       NMI_API_URL,
       payload,
       null,
-      false,  // no N8N header
-      true    // formEncoded = true
+      false,
+      true
     );
 
-    billingLogger.info('NMI charge response received', { 
-      vaultId: customerVaultId,
-      amount: amount.toFixed(2),
-      responseLength: response ? response.length : 0
-    });
+    billingLogger.info('NMI charge response received');
     
-    // Handle the response correctly - it's a string, not an object with .data
     let responseText;
     if (typeof response === 'string') {
       responseText = response;
     } else if (response && typeof response === 'object') {
-      // If it's an object, try to get the text content
       responseText = response.data || response.text || JSON.stringify(response);
     } else {
       responseText = String(response);
     }
 
-    // Parse the response
     const responseMatch = responseText.match(/response=(\d+)/);
     const responseCode = responseMatch ? responseMatch[1] : null;
     
@@ -231,31 +224,29 @@ const chargeCustomerVault = async (customerVaultId, amount, description = '') =>
     const responseTextMatch = responseText.match(/responsetext=([^&\s]+)/);
     const responseMessage = responseTextMatch ? decodeURIComponent(responseTextMatch[1].replace(/\+/g, ' ')) : '';
 
-    // Response code 1 = Approved, 2 = Declined, 3 = Error
     const success = responseCode === '1';
 
     billingLogger.info('NMI charge processed', { 
-      vaultId: customerVaultId,
-      amount: amount.toFixed(2),
       success,
       responseCode,
       transactionId,
       message: responseMessage
     });
 
+    // ✅ Return complete data including card details
     return {
       success,
       transactionId,
       responseCode,
       message: responseMessage,
-      rawResponse: responseText
+      rawResponse: responseText,
+      paymentMethod: `${cardType} •••• ${last4}`, // ✅ Formatted display
+      cardType: cardType, // ✅ Card brand
+      last4: last4 // ✅ Last 4 digits
     };
 
   } catch (error) {
-    billingLogger.error('NMI charge request failed', error, { 
-      vaultId: customerVaultId,
-      amount: amount.toFixed(2)
-    });
+    billingLogger.error('NMI charge request failed', error);
     return {
       success: false,
       message: 'Payment processing failed',

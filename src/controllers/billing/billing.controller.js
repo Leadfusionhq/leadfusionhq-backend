@@ -8,6 +8,9 @@ const { billingLogger } = require('../../utils/logger');
 const dayjs = require('dayjs');
 
 
+const MAIL_HANDLER = require('../../mail/mails');
+
+
 const { getRevenueFromNmi, getRefundsFromNmi } = require('../../services/nmi/nmi.service'); // import
 
 // Contract management
@@ -174,75 +177,93 @@ const getCards = wrapAsync(async (req, res) => {
     const user_id = req.user._id;
     const { deductAmount } = req.body;
     
-    billingLogger.info('Testing auto top-up for user', { 
-        userId: user_id, 
-        deductAmount 
-    });
+    billingLogger.info('Testing auto top-up for user', { userId: user_id, deductAmount });
     
     try {
-      const result = await BillingServices.testLeadDeduction(user_id, deductAmount);
-      billingLogger.info('Auto top-up test completed', { 
-          userId: user_id, 
-          deductAmount, 
-          result: result.message 
-      });
-      return sendResponse(res, { result }, result.message);
+        const result = await BillingServices.testLeadDeduction(user_id, deductAmount);
+        
+        // ✅ Send auto top-up email if triggered
+        if (result.autoTopUpTriggered) {
+            try {
+                const user = await User.findById(user_id);
+                await MAIL_HANDLER.sendAutoTopUpEmail({
+                    to: user.email,
+                    userName: user.name,
+                    amount: result.topUpAmount,
+                    transactionId: result.topUpTransactionId,
+                    triggerReason: `Balance below threshold after lead deduction`,
+                    newBalance: result.newBalance,
+                    threshold: result.threshold || 50
+                });
+                billingLogger.info('Auto top-up email sent', { userId: user_id });
+            } catch (emailErr) {
+                billingLogger.error('Failed to send auto top-up email', emailErr);
+            }
+        }
+
+        billingLogger.info('Auto top-up test completed', { 
+            userId: user_id, 
+            deductAmount, 
+            result: result.message 
+        });
+        
+        return sendResponse(res, { result }, result.message);
     } catch (err) {
-      billingLogger.error('Failed to process lead deduction', err, { 
-          userId: user_id, 
-          deductAmount 
-      });
-      
-      // Pass through the specific error message for insufficient funds
-      if (err.statusCode === 400) {
-        throw new ErrorHandler(400, err.message);
-      }
-      
-      throw new ErrorHandler(500, 'Failed to process lead deduction. Please try again later.');
+        billingLogger.error('Failed to process lead deduction', err, { userId: user_id, deductAmount });
+        
+        if (err.statusCode === 400) {
+            throw new ErrorHandler(400, err.message);
+        }
+        
+        throw new ErrorHandler(500, 'Failed to process lead deduction. Please try again later.');
     }
-  });
+});
+
 
 
 
 // Billing operations
+// Update addFunds function
 const addFunds = wrapAsync(async (req, res) => {
-    console.log(req.body);
-    
     const user_id = req.user._id;
-    const { amount, vaultId} = req.body;
+    const { amount, vaultId } = req.body;
     
-    billingLogger.info('User attempting to add funds', { 
-        userId: user_id, 
-        amount 
-    });
+    billingLogger.info('User attempting to add funds', { userId: user_id, amount });
     
-    // Check if user has accepted the latest contract
     const contractStatus = await BillingServices.getUserContractStatus(user_id);
     if (!contractStatus.hasAcceptedLatest) {
-        billingLogger.warn('User tried to add funds without accepting contract', { 
-            userId: user_id, 
-            amount 
-        });
+        billingLogger.warn('User tried to add funds without accepting contract', { userId: user_id, amount });
         throw new ErrorHandler(400, 'You must accept the latest contract before adding funds.');
     }
     
     try {
-        const result = await BillingServices.addFunds(user_id, amount , vaultId);
+        const result = await BillingServices.addFunds(user_id, amount, vaultId);
         billingLogger.info('Funds added successfully', { 
             userId: user_id, 
             amount, 
             transactionId: result.transactionId 
         });
+
+        // ✅ Send funds added email
+        try {
+            const user = await User.findById(user_id);
+            await MAIL_HANDLER.sendFundsAddedEmail({
+                to: user.email,
+                userName: user.name,
+                amount: amount,
+                transactionId: result.transactionId,
+                paymentMethod: result.paymentMethod || 'Card',
+                newBalance: result.newBalance
+            });
+            billingLogger.info('Funds added email sent', { userId: user_id });
+        } catch (emailErr) {
+            billingLogger.error('Failed to send funds added email', emailErr);
+        }
+
         return sendResponse(res, { result }, 'Funds added successfully', 201);
     } catch (err) {
-        billingLogger.error('Failed to add funds', err, { 
-            userId: user_id, 
-            amount 
-        });
-
-        console.log(`error received in billing controller is ${err.message}`)
+        billingLogger.error('Failed to add funds', err, { userId: user_id, amount });
         
-        // Check if it's a payment decline (400 error) and pass through the message
         if (err.statusCode === 400) {
             throw new ErrorHandler(400, err.message);
         }

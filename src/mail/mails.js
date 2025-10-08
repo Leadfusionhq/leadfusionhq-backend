@@ -4,6 +4,7 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 const FROM_EMAIL = 'Leadfusionhq <noreply@leadfusionhq.com>';
 
+const { generateTransactionReceipt } = require('../services/pdf/receiptGenerator');
 
 const createEmailTemplate = ({
   title = '',
@@ -28,9 +29,9 @@ const createEmailTemplate = ({
     <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-image: url('${process.env.UI_LINK}/images/log_bg.png'); background-size: cover; background-position: center; padding: 50px 0; min-height: 100vh;">
       <tr>
         <td align="center">
-          <table cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0px 4px 12px rgba(0,0,0,0.1); margin: 0 auto;">
+          <table cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; background: #ffffff; border-radius: 20px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.15); margin: 0 auto;">
             
-            <!-- Logo Header -->
+            <!-- ✅✅✅ EXACT ORIGINAL LOGO HEADER - ZERO CHANGES ✅✅✅ -->
             <tr>
               <td align="center" style="padding: 40px 20px; background: linear-gradient(to right, #204D9D, #306A64, #204D9D);">
                 <img
@@ -43,7 +44,7 @@ const createEmailTemplate = ({
               </td>
             </tr>
 
-            <!-- Content -->
+            <!-- ==================== MAIN CONTENT ==================== -->
             <tr>
               <td style="padding: 40px 30px; font-family: Arial, sans-serif; color: #1C1C1C;">
                 
@@ -51,7 +52,7 @@ const createEmailTemplate = ({
                 
                 ${greeting ? `<h3 style="margin: 0 0 20px; font-size: 18px; text-align: center; color: #333;">${greeting}</h3>` : ''}
                 
-                ${mainText ? `<p style="font-size: 16px; line-height: 24px; text-align: center; margin: 20px 0;">${mainText}</p>` : ''}
+                ${mainText ? `<div style="font-size: 16px; line-height: 24px; text-align: center; margin: 20px 0;">${mainText}</div>` : ''}
 
                 ${highlightedContent ? `
                 <!-- Highlighted Content (OTP, Password, etc.) -->
@@ -219,16 +220,17 @@ const sendTestMail = async (toEmail) => {
     const html = createEmailTemplate({
       title: 'Test Email',
       greeting: 'Hello Developer!',
-      mainText: 'This is a test email to verify that your email service is working correctly.',
-      highlightedContent: 'SUCCESS',
-      highlightLabel: 'Test Status',
-      footerText: 'Email service is functioning properly.'
+      mainText: 'Logo test email',
+      footerText: 'Testing logo display'
     });
+
+    console.log('HTML generated:', html.substring(0, 500)); // Log first 500 chars
+    console.log('Logo URL:', `${process.env.UI_LINK}/images/logo.png`);
 
     const { data, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: toEmail,
-      subject: 'Test Email from Node.js',
+      subject: 'Test Email - Logo Check',
       html,
     });
 
@@ -243,7 +245,8 @@ const sendTestMail = async (toEmail) => {
     throw err;
   }
 };
-const sendLeadAssignEmail = async ({ to, name, leadName, assignedBy, leadDetailsUrl, campaignName , leadData,realleadId ,subject}) => {
+
+const sendLeadAssignEmail = async ({ to, name, leadName, assignedBy, leadDetailsUrl, campaignName, leadData, realleadId, subject }) => {
   
   const recipients = Array.isArray(to) 
     ? to 
@@ -259,12 +262,17 @@ const sendLeadAssignEmail = async ({ to, name, leadName, assignedBy, leadDetails
     note,
     _id,
   } = leadData;
-  const fullName = `${first_name || ''} ${last_name || ''}`.trim() || 'N/A';
-  const telLink = phone_number ? `<a href="tel:${phone_number}">${phone_number}</a>` : 'N/A';
-  const emailAddr = email || 'N/A';
-  // const fullAddress = `${address.full_address || ''}, ${address.city || ''}, ${address.zip_code || ''}`.trim() || 'N/A';
 
-   const addressParts = [
+  const fullName = `${first_name || ''} ${last_name || ''}`.trim() || 'N/A';
+  const emailDisplay = email || 'N/A';
+
+  // ✅ Phone with black clickable link
+  const phoneDisplay = phone_number 
+    ? `<a href="tel:${phone_number}" style="color: #000; text-decoration: none;">${phone_number}</a>` 
+    : 'N/A';
+
+  // ✅ Address parts
+  const addressParts = [
     address.street,
     address?.full_address,
     address.city,
@@ -272,48 +280,116 @@ const sendLeadAssignEmail = async ({ to, name, leadName, assignedBy, leadDetails
     address.zip_code
   ].filter(Boolean); 
   
-  const fullAddress = addressParts.length > 0 
-    ? addressParts.join(', ') 
-    : 'N/A';
-
-  const Address = `
-    <a href="https://maps.google.com/?q=${encodeURIComponent(address?.full_address)}" target="_blank" rel="noopener noreferrer">
-      ${address?.full_address}
-    </a>
-  `;
-  const link = `
-    <a href="https://www.leadfusionhq.com/dashboard/leads/${realleadId}" target="_blank" rel="noopener noreferrer">
-      https://www.leadfusionhq.com/dashboard/leads/${realleadId}
-    </a>
-  `;
-  // const link = `https://www.leadfusionhq.com/dashboard/leads/${lead_id}`;
+  const fullAddress = addressParts.length > 0 ? addressParts.join(', ') : 'N/A';
   
+  // ✅ Address with black Google Maps link
+  const addressDisplay = fullAddress !== 'N/A'
+    ? `<a href="https://maps.google.com/?q=${encodeURIComponent(fullAddress)}" target="_blank" rel="noopener noreferrer" style="color: #000; text-decoration: none;">${fullAddress}</a>`
+    : fullAddress;
+
+  const leadDetailsLink = `https://www.leadfusionhq.com/dashboard/leads/${realleadId}`;
+  
+  // ✅ Gmail-style table layout - everything left-aligned
   const mainText = `
-    <ul>
-      <li><strong style="color: #1C1C1C;">Full Name:</strong> ${fullName}</li>
-      <li><strong style="color: #1C1C1C;">Phone:</strong> ${telLink}</li>
-      <li><strong style="color: #1C1C1C;">Email:</strong> <a href="mailto:${emailAddr}">${emailAddr}</a></li>
-      <li><strong style="color: #1C1C1C;">Address:</strong> ${Address}</li>
-      <li><strong style="color: #1C1C1C;">Lead ID:</strong> ${lead_id}</li>
-      <li><strong>Campaign:</strong> ${campaignName}</li>
-      <li><strong>View Lead</strong> ${link}</li>
-      <li><strong>Note</strong> ${note}</li>
-    </ul>
-    <br />
+    <div style="max-width: 600px; margin: 0; padding: 0;">
+      <table cellpadding="0" cellspacing="0" border="0" style="width: 100%; font-family: Arial, sans-serif; font-size: 14px; border: 1px solid #ddd; border-radius: 4px; background: #fff;">
+        <tr>
+          <td style="padding: 15px;">
+            
+            <table cellpadding="0" cellspacing="0" border="0" style="width: 100%; border-collapse: collapse;">
+              
+              <tr>
+                <td style="padding: 5px 10px 5px 0; vertical-align: top; width: 90px; text-align: left;">
+                  <strong style="color: #555;">Name:</strong>
+                </td>
+                <td style="padding: 5px 0; vertical-align: top; text-align: left; color: #333;">
+                  ${fullName}
+                </td>
+              </tr>
+              
+              <tr>
+                <td style="padding: 5px 10px 5px 0; vertical-align: top; width: 90px; text-align: left;">
+                  <strong style="color: #555;">Phone:</strong>
+                </td>
+                <td style="padding: 5px 0; vertical-align: top; text-align: left; color: #333;">
+                  ${phoneDisplay}
+                </td>
+              </tr>
+              
+              <tr>
+                <td style="padding: 5px 10px 5px 0; vertical-align: top; width: 90px; text-align: left;">
+                  <strong style="color: #555;">Email:</strong>
+                </td>
+                <td style="padding: 5px 0; vertical-align: top; text-align: left; color: #333; word-break: break-word;">
+                  ${emailDisplay}
+                </td>
+              </tr>
+              
+              <tr>
+                <td style="padding: 5px 10px 5px 0; vertical-align: top; width: 90px; text-align: left;">
+                  <strong style="color: #555;">Address:</strong>
+                </td>
+                <td style="padding: 5px 0; vertical-align: top; text-align: left; color: #333; line-height: 1.4;">
+                  ${addressDisplay}
+                </td>
+              </tr>
+              
+              <tr>
+                <td style="padding: 5px 10px 5px 0; vertical-align: top; width: 90px; text-align: left;">
+                  <strong style="color: #555;">Lead ID:</strong>
+                </td>
+                <td style="padding: 5px 0; vertical-align: top; text-align: left; color: #333;">
+                  ${lead_id}
+                </td>
+              </tr>
+              
+              <tr>
+                <td style="padding: 5px 10px 5px 0; vertical-align: top; width: 90px; text-align: left;">
+                  <strong style="color: #555;">Campaign:</strong>
+                </td>
+                <td style="padding: 5px 0; vertical-align: top; text-align: left; color: #333;">
+                  ${campaignName}
+                </td>
+              </tr>
+              
+              ${note ? `
+              <tr>
+                <td style="padding: 5px 10px 5px 0; vertical-align: top; width: 90px; text-align: left;">
+                  <strong style="color: #555;">Note:</strong>
+                </td>
+                <td style="padding: 5px 0; vertical-align: top; text-align: left; color: #333;">
+                  ${note}
+                </td>
+              </tr>` : ''}
+              
+              <tr>
+                <td colspan="2" style="padding: 10px 0 5px 0; border-top: 1px solid #eee;">
+                </td>
+              </tr>
+              
+              <tr>
+                <td style="padding: 5px 10px 5px 0; vertical-align: top; width: 90px; text-align: left;">
+                  <strong style="color: #555;">View Lead:</strong>
+                </td>
+                <td style="padding: 5px 0; vertical-align: top; text-align: left; color: #333; word-break: break-all;">
+                  ${leadDetailsLink}
+                </td>
+              </tr>
+              
+            </table>
+            
+          </td>
+        </tr>
+      </table>
+    </div>
   `;
 
   const html = createEmailTemplate({
     title: 'New Lead Assigned',
-    // greeting: `${name},`,
-    mainText:mainText,
-    // buttonText: 'View Lead Details',
-    // buttonUrl: leadDetailsUrl,
-    // footerText: 'If you have any questions or need assistance, please contact your manager or support team.',
-    // warningText: 'Do not share lead or campaign information outside the organization.',
+    mainText: mainText,
   });
-    // Use the subject passed in; fallback if not provided
-    const finalSubject = (subject && subject.trim()) || `New Lead Assigned in "${campaignName}"`;
 
+  const finalSubject = (subject && subject.trim()) || `New Lead Assigned in "${campaignName}"`;
 
   return resend.emails.send({
     from: FROM_EMAIL,
@@ -322,6 +398,7 @@ const sendLeadAssignEmail = async ({ to, name, leadName, assignedBy, leadDetails
     html,
   });
 };
+
 const sendLeadReturnEmail = async ({ adminEmails, lead, campaign, returnedBy, returnStatus }) => {
   const {
     first_name,
@@ -333,11 +410,14 @@ const sendLeadReturnEmail = async ({ adminEmails, lead, campaign, returnedBy, re
   } = lead;
   
   const fullName = `${first_name || ''} ${last_name || ''}`.trim() || 'N/A';
-  const telLink = phone_number ? `<a href="tel:${phone_number}">${phone_number}</a>` : 'N/A';
-  const emailAddr = email || 'N/A';
-  // const fullAddress = `${address.full_address || ''}, ${address.city || ''}, ${address.zip_code || ''}`.trim() || 'N/A';
+  const emailDisplay = email || 'N/A';
 
+  // ✅ Phone with black clickable link
+  const phoneDisplay = phone_number 
+    ? `<a href="tel:${phone_number}" style="color: #000; text-decoration: none;">${phone_number}</a>` 
+    : 'N/A';
 
+  // ✅ Address parts
   const addressParts = [
     address.street,
     address.full_address,
@@ -346,39 +426,97 @@ const sendLeadReturnEmail = async ({ adminEmails, lead, campaign, returnedBy, re
     address.zip_code
   ].filter(Boolean); 
   
-  const fullAddress = addressParts.length > 0 
-    ? addressParts.join(', ') 
-    : 'N/A';
-
-  const Address = `
-    <a href="https://maps.google.com/?q=${encodeURIComponent(fullAddress)}" target="_blank" rel="noopener noreferrer">
-      ${fullAddress}
-    </a>
-  `;
+  const fullAddress = addressParts.length > 0 ? addressParts.join(', ') : 'N/A';
+  
+  // ✅ Address with black Google Maps link
+  const addressDisplay = fullAddress !== 'N/A'
+    ? `<a href="https://maps.google.com/?q=${encodeURIComponent(fullAddress)}" target="_blank" rel="noopener noreferrer" style="color: #000; text-decoration: none;">${fullAddress}</a>`
+    : fullAddress;
 
   const mainText = `
-    A lead <strong>${lead_id}</strong> has been returned by <strong>${returnedBy}</strong>.
-    <br /><br />
-    <strong>Return Status:</strong> <span style="color: #dc2626;">${returnStatus}</span>
-    <br /><br />
-    <strong>Lead Details:</strong>
-    <ul>
-      <li><strong style="color: #1C1C1C;">Full Name:</strong> ${fullName}</li>
-      <li><strong style="color: #1C1C1C;">Phone:</strong> ${telLink}</li>
-      <li><strong style="color: #1C1C1C;">Email:</strong> <a href="mailto:${emailAddr}">${emailAddr}</a></li>
-      <li><strong style="color: #1C1C1C;">Address:</strong> ${Address}</li>
-      <li><strong style="color: #1C1C1C;">Lead ID:</strong> ${lead_id}</li>
-      <li><strong>Campaign:</strong> ${campaign?.name || 'N/A'}</li>
-    </ul>
-    <br />
-    Please review the returned lead and take necessary action.
+    <div style="max-width: 600px; margin: 0; padding: 0;">
+      
+      <div style="margin: 0 0 15px 0; padding: 12px; background: #fee; border-left: 4px solid #dc2626; color: #333; border-radius: 4px; font-size: 14px; text-align: left;">
+        <strong>Lead ${lead_id}</strong> returned by <strong>${returnedBy}</strong> • Status: <strong>${returnStatus}</strong>
+      </div>
+
+      <table cellpadding="0" cellspacing="0" border="0" style="width: 100%; font-family: Arial, sans-serif; font-size: 14px; border: 1px solid #ddd; border-radius: 4px; background: #fff;">
+        <tr>
+          <td style="padding: 15px;">
+            
+            <table cellpadding="0" cellspacing="0" border="0" style="width: 100%; border-collapse: collapse;">
+              
+              <tr>
+                <td style="padding: 5px 10px 5px 0; vertical-align: top; width: 90px; text-align: left;">
+                  <strong style="color: #555;">Name:</strong>
+                </td>
+                <td style="padding: 5px 0; vertical-align: top; text-align: left; color: #333;">
+                  ${fullName}
+                </td>
+              </tr>
+              
+              <tr>
+                <td style="padding: 5px 10px 5px 0; vertical-align: top; width: 90px; text-align: left;">
+                  <strong style="color: #555;">Phone:</strong>
+                </td>
+                <td style="padding: 5px 0; vertical-align: top; text-align: left; color: #333;">
+                  ${phoneDisplay}
+                </td>
+              </tr>
+              
+              <tr>
+                <td style="padding: 5px 10px 5px 0; vertical-align: top; width: 90px; text-align: left;">
+                  <strong style="color: #555;">Email:</strong>
+                </td>
+                <td style="padding: 5px 0; vertical-align: top; text-align: left; color: #333; word-break: break-word;">
+                  ${emailDisplay}
+                </td>
+              </tr>
+              
+              <tr>
+                <td style="padding: 5px 10px 5px 0; vertical-align: top; width: 90px; text-align: left;">
+                  <strong style="color: #555;">Address:</strong>
+                </td>
+                <td style="padding: 5px 0; vertical-align: top; text-align: left; color: #333; line-height: 1.4;">
+                  ${addressDisplay}
+                </td>
+              </tr>
+              
+              <tr>
+                <td style="padding: 5px 10px 5px 0; vertical-align: top; width: 90px; text-align: left;">
+                  <strong style="color: #555;">Lead ID:</strong>
+                </td>
+                <td style="padding: 5px 0; vertical-align: top; text-align: left; color: #333;">
+                  ${lead_id}
+                </td>
+              </tr>
+              
+              <tr>
+                <td style="padding: 5px 10px 5px 0; vertical-align: top; width: 90px; text-align: left;">
+                  <strong style="color: #555;">Campaign:</strong>
+                </td>
+                <td style="padding: 5px 0; vertical-align: top; text-align: left; color: #333;">
+                  ${campaign?.name || 'N/A'}
+                </td>
+              </tr>
+              
+            </table>
+            
+          </td>
+        </tr>
+      </table>
+
+      <div style="margin: 15px 0 0 0; padding: 12px; background: #fef3c7; border-left: 4px solid #f59e0b; color: #333; border-radius: 4px; font-size: 14px; text-align: left;">
+        <strong>⚡ Action Required:</strong> Please review and take necessary action.
+      </div>
+      
+    </div>
   `;
 
   const html = createEmailTemplate({
     title: 'Lead Returned',
     greeting: 'Admin,',
     mainText: mainText,
-    footerText: 'If you have any questions or need assistance, please contact support.',
   });
 
   return resend.emails.send({
@@ -389,6 +527,615 @@ const sendLeadReturnEmail = async ({ adminEmails, lead, campaign, returnedBy, re
   });
 };
 
+
+// Add these new email functions to your existing emailService.js
+const sendTransactionEmail = async ({ 
+  to, 
+  userName, 
+  transactionType, 
+  amount, 
+  transactionId, 
+  date, 
+  newBalance, 
+  description = '',
+  metadata = {} 
+}) => {
+  const formattedAmount = Math.abs(Number(amount || 0)).toFixed(2);
+
+  // Optional metadata (keeps signature unchanged)
+  const userEmail     = metadata.userEmail || to;
+  const oldBalance    = metadata.oldBalance;
+  const paymentMethod = metadata.payment_type || '';
+  const placeOfSupply = metadata.placeOfSupply || 'San Francisco, CA 94102';
+
+  // 1) Generate PDF receipt to attach
+  let receiptBuffer = null;
+  try {
+    receiptBuffer = await generateTransactionReceipt({
+      transactionId,
+      userName,
+      userEmail,
+      transactionType,
+      amount: Number(amount || 0),
+      date,
+      newBalance: Number(newBalance || 0),
+      oldBalance: oldBalance !== undefined ? Number(oldBalance) : undefined,
+      description,
+      paymentMethod,
+      companyName: 'Leadfusionhq',
+      companyAddress: '123 Business Street, Suite 100',
+      companyCity: 'San Francisco, CA 94102',
+      companyPhone: '+1 (555) 123-4567',
+      companyEmail: 'support@leadfusionhq.com',
+      companyWebsite: 'www.leadfusionhq.com'
+    });
+  } catch (e) {
+    console.error('Receipt PDF generation failed:', e.message);
+  }
+
+  // 2) Public download URL (served by your route)
+  const downloadUrl = `${process.env.BACKEND_LINK}/billing/receipts/${encodeURIComponent(transactionId)}`;
+
+  // Hard truncate description (email clients may ignore CSS ellipsis)
+  const rawDesc = (description || transactionType || 'Transaction').trim();
+  const maxDescChars = 90;
+  const truncatedDesc = rawDesc.length > maxDescChars ? (rawDesc.slice(0, maxDescChars - 1) + '…') : rawDesc;
+  const dateShort = (date && String(date).split(',')[0]) || date || '';
+
+  // Divider right under the title (Transaction Receipt)
+  const dividerUnderTitle = `
+    <div style="height:1px; background:#e5e7eb; margin:8px 0 16px 0;"></div>
+  `;
+
+  // ----- Invoice Meta (Billed To flush-left; Invoice No/Date right) -----
+  const invoiceMeta = `
+    <table width="100%" cellpadding="0" cellspacing="0" border="0"
+      style="border-collapse:collapse; margin:0; font-family: Arial, sans-serif;">
+      <tr>
+        <!-- Left column: Billed To (flush-left) -->
+        <td valign="top" align="left"
+          style="padding:0; margin:0; vertical-align:top; width:50%;">
+          <table cellpadding="0" cellspacing="0" border="0" style="margin:0; padding:0;">
+            <tr>
+              <td style="font-size:12px; color:#555;">Billed To</td>
+            </tr>
+            <tr>
+              <td style="font-size:13px; color:#111; font-weight:bold;">${userName || 'Customer'}</td>
+            </tr>
+            <tr>
+              <td style="font-size:12px; color:#555;">${userEmail || ''}</td>
+            </tr>
+          </table>
+        </td>
+
+        <!-- Right column: Invoice meta -->
+        <td valign="top" align="right"
+          style="padding:0; margin:0; vertical-align:top; width:50%;">
+          <table width="100%" cellpadding="0" cellspacing="0" border="0"
+            style="border-collapse:collapse; margin:0;">
+            <tr>
+              <td align="right" style="font-size:12px; color:#555;">Invoice No</td>
+            </tr>
+            <tr>
+              <td align="right" style="font-size:12px; color:#111; font-weight:bold;">${transactionId}</td>
+            </tr>
+            <tr>
+              <td align="right" style="font-size:12px; color:#555; padding-top:8px;">Invoice Date</td>
+            </tr>
+            <tr>
+              <td align="right" style="font-size:12px; color:#111; font-weight:bold;">${date}</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  `;
+
+
+  // ----- Strict line-items table (like PDF) -----
+  const lineItemTable = `
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse; border:1px solid #e5e7eb; table-layout:fixed; font-family: Arial, sans-serif; margin-top:8px;">
+      <colgroup>
+        <col style="width:92px; max-width:92px; min-width:92px;" />
+        <col style="width:auto;" />
+        <col style="width:82px; max-width:82px; min-width:82px;" />
+        <col style="width:90px; max-width:90px; min-width:90px;" />
+        <col style="width:90px; max-width:90px; min-width:90px;" />
+      </colgroup>
+      <thead>
+        <tr style="background-color:#f7f7f7;">
+          <th align="left"  style="padding:8px 6px; font-size:12px; color:#444; font-weight:bold; border-bottom:1px solid #e5e7eb;">Date</th>
+          <th align="left"  style="padding:8px 6px; font-size:12px; color:#444; font-weight:bold; border-bottom:1px solid #e5e7eb;">Description</th>
+          <th align="right" style="padding:8px 6px; font-size:12px; color:#444; font-weight:bold; border-bottom:1px solid #e5e7eb;">Rate</th>
+          <th align="right" style="padding:8px 6px; font-size:12px; color:#444; font-weight:bold; border-bottom:1px solid #e5e7eb;">Amount</th>
+          <th align="right" style="padding:8px 6px; font-size:12px; color:#444; font-weight:bold; border-bottom:1px solid #e5e7eb;">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td align="left"  style="padding:8px 6px; font-size:12px; color:#111; border-bottom:1px solid #e5e7eb; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${dateShort || ''}</td>
+          <td align="left"  style="padding:8px 6px; font-size:12px; color:#111; border-bottom:1px solid #e5e7eb; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${truncatedDesc}</td>
+          <td align="right" style="padding:8px 6px; font-size:12px; color:#111; border-bottom:1px solid #e5e7eb;">$${formattedAmount}</td>
+          <td align="right" style="padding:8px 6px; font-size:12px; color:#111; border-bottom:1px solid #e5e7eb;">$${formattedAmount}</td>
+          <td align="right" style="padding:8px 6px; font-size:12px; color:#111; border-bottom:1px solid #e5e7eb;">$${formattedAmount}</td>
+        </tr>
+      </tbody>
+    </table>
+  `;
+
+  // ----- Totals -----
+  const totalsBlock = `
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse; margin-top:10px; font-family: Arial, sans-serif;">
+      <tr>
+        <td width="60%"></td>
+        <td width="40%">
+          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+            <tr>
+              <td align="left"  style="padding:6px 0; font-size:12px; color:#111;">SUBTOTAL:</td>
+              <td align="right" style="padding:6px 0; font-size:12px; color:#111;">$${formattedAmount}</td>
+            </tr>
+            <tr>
+              <td align="left"  style="padding:6px 0; font-size:12px; color:#111;">TAX (0%):</td>
+              <td align="right" style="padding:6px 0; font-size:12px; color:#111;">$0.00</td>
+            </tr>
+            <tr>
+              <td colspan="2" style="border-top:1px solid #e5e7eb; height:1px; line-height:1px; font-size:0;"></td>
+            </tr>
+            <tr>
+              <td align="left"  style="padding:6px 0; font-size:12px; color:#111; font-weight:bold;">TOTAL:</td>
+              <td align="right" style="padding:6px 0; font-size:12px; color:#111; font-weight:bold;">$${formattedAmount}</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  `;
+
+  // ----- Meta lines -----
+  const metaBlock = `
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse; margin-top:12px; font-family: Arial, sans-serif;">
+      <tr>
+        <td style="font-size:12px; color:#555;">Payment Method: ${paymentMethod || 'N/A'}</td>
+      </tr>
+      <tr>
+        <td style="font-size:12px; color:#555;">Place of Supply: ${placeOfSupply}</td>
+      </tr>
+    </table>
+  `;
+
+  // ----- Download button -----
+  const downloadButton = `
+    <div style="text-align:center; margin: 12px 0 0;">
+      <a href="${downloadUrl}"
+         style="display:inline-block; padding: 10px 18px; background: #204D9D; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 13px;">
+        Download Receipt (PDF)
+      </a>
+    </div>
+  `;
+
+  // Assemble body (no greeting, no intro sentence, no badge, no extra CTA)
+  const body = `
+    ${dividerUnderTitle}
+    ${invoiceMeta}
+    ${lineItemTable}
+    ${totalsBlock}
+    ${metaBlock}
+    ${downloadButton}
+  `;
+
+  const html = createEmailTemplate({
+    title: 'Transaction Receipt',
+    greeting: '',        // remove Hello name
+    mainText: body,
+    // Remove header CTA
+    // buttonText: undefined,
+    // buttonUrl: undefined,
+    footerText: 'If you have any questions about this transaction, please contact our support team.'
+  });
+
+  const payload = {
+    from: FROM_EMAIL,
+    to,
+    subject: `Transaction Receipt - ${transactionType}`,
+    html
+  };
+
+  if (receiptBuffer) {
+    payload.attachments = [
+      { filename: `receipt-${transactionId}.pdf`, content: receiptBuffer }
+    ];
+  }
+
+  return resend.emails.send(payload);
+};
+
+
+
+
+
+/**
+ * Send Funds Added Email
+ */
+const sendFundsAddedEmail = async ({ 
+  to, 
+  userName, 
+  amount, 
+  transactionId, 
+  paymentMethod,
+  newBalance 
+}) => {
+  const date = new Date().toLocaleString('en-US', { 
+    dateStyle: 'medium', 
+    timeStyle: 'short' 
+  });
+
+  return sendTransactionEmail({
+    to,
+    userName,
+    transactionType: 'Manual Recharge',
+    amount: parseFloat(amount),
+    transactionId,
+    date,
+    newBalance,
+    description: `Payment via ${paymentMethod || 'Card'}`,
+    metadata: { paymentMethod }
+  });
+};
+
+/**
+ * Send Auto Top-Up Email
+ */
+const sendAutoTopUpEmail = async ({ 
+  to, 
+  userName, 
+  amount, 
+  transactionId, 
+  triggerReason,
+  newBalance,
+  threshold 
+}) => {
+  const date = new Date().toLocaleString('en-US', { 
+    dateStyle: 'medium', 
+    timeStyle: 'short' 
+  });
+
+  const autoTopUpDetails = `
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0; background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%); border-radius: 10px; border-left: 5px solid #f97316; padding: 20px;">
+      <tr>
+        <td>
+          <table width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td style="padding-bottom: 10px;">
+                <span style="font-size: 24px;">🔄</span>
+                <strong style="font-size: 16px; color: #9a3412; margin-left: 10px;">Auto Top-Up Triggered</strong>
+              </td>
+            </tr>
+            <tr>
+              <td style="font-size: 14px; color: #7c2d12; line-height: 22px;">
+                Your balance fell below <strong>$${parseFloat(threshold).toFixed(2)}</strong>. 
+                We've automatically added <strong>$${parseFloat(amount).toFixed(2)}</strong> to your account.
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  `;
+
+  return sendTransactionEmail({
+    to,
+    userName,
+    transactionType: 'Auto Top-Up',
+    amount: parseFloat(amount),
+    transactionId,
+    date,
+    newBalance,
+    description: triggerReason || `Balance below threshold ($${parseFloat(threshold).toFixed(2)})`,
+    metadata: { threshold, triggerReason }
+  });
+};
+
+/**
+ * Send Lead Payment Email
+ */
+const sendLeadPaymentEmail = async ({ 
+  to, 
+  userName, 
+  leadCost, 
+  leadId,
+  leadName,
+  campaignName,
+  payment_type,
+  transactionId, 
+  newBalance,
+  leadData = {}
+}) => {
+  const date = new Date().toLocaleString('en-US', { 
+    dateStyle: 'medium', 
+    timeStyle: 'short' 
+  });
+
+  const {
+    first_name = '',
+    last_name = '',
+    phone_number = '',
+    email = '',
+    address = {}
+  } = leadData;
+
+  const fullName = `${first_name} ${last_name}`.trim() || leadName || 'N/A';
+  
+  const addressParts = [
+    address.street,
+    address?.full_address,
+    address.city,
+    address.state?.name || address.state, 
+    address.zip_code
+  ].filter(Boolean);
+  
+  const fullAddress = addressParts.length > 0 ? addressParts.join(', ') : 'N/A';
+
+  const leadDetailsSection = `
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 25px 0; background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); border-radius: 12px; border: 2px solid #3b82f6; overflow: hidden;">
+      <tr>
+        <td style="padding: 20px 25px;">
+          <table width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td style="padding-bottom: 15px; text-align: center;">
+                <span style="font-size: 28px;">🎯</span>
+                <div style="display: inline-block; margin-left: 10px; font-size: 16px; font-weight: 700; color: #1e40af;">Lead Assigned</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 0; border-bottom: 1px solid rgba(59, 130, 246, 0.2);">
+                <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td style="font-weight: 600; color: #1e3a8a; width: 35%;">👤 Name:</td>
+                    <td style="color: #1e40af; font-weight: 600; text-align: right;">${fullName}</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            ${phone_number ? `
+            <tr>
+              <td style="padding: 10px 0; border-bottom: 1px solid rgba(59, 130, 246, 0.2);">
+                <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td style="font-weight: 600; color: #1e3a8a; width: 35%;">📞 Phone:</td>
+                    <td style="text-align: right;"><a href="tel:${phone_number}" style="color: #2563eb; text-decoration: none;">${phone_number}</a></td>
+                  </tr>
+                </table>
+              </td>
+            </tr>` : ''}
+            ${email ? `
+            <tr>
+              <td style="padding: 10px 0; border-bottom: 1px solid rgba(59, 130, 246, 0.2);">
+                <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td style="font-weight: 600; color: #1e3a8a; width: 35%;">📧 Email:</td>
+                    <td style="text-align: right;"><a href="mailto:${email}" style="color: #2563eb; text-decoration: none; font-size: 13px; word-break: break-all;">${email}</a></td>
+                  </tr>
+                </table>
+              </td>
+            </tr>` : ''}
+            <tr>
+              <td style="padding: 10px 0; border-bottom: 1px solid rgba(59, 130, 246, 0.2);">
+                <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td style="font-weight: 600; color: #1e3a8a; width: 35%;">🆔 Lead ID:</td>
+                    <td style="color: #1e40af; text-align: right; font-family: 'Courier New', monospace; font-size: 13px;">${leadId}</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 0;">
+                <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td style="font-weight: 600; color: #1e3a8a; width: 35%;">🎯 Campaign:</td>
+                    <td style="color: #1e40af; font-weight: 600; text-align: right;">${campaignName}</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  `;
+
+  return sendTransactionEmail({
+    to,
+    userName,
+    transactionType: 'Lead Assignment',
+    amount: -parseFloat(leadCost),
+    transactionId,
+    date,
+    newBalance,
+    description: `Lead ${leadId} assigned to ${campaignName}`,
+    metadata: { 
+      leadId, 
+      campaignName,
+      payment_type,
+      leadCost,
+      customSection: leadDetailsSection
+    }
+  });
+};
+
+/**
+ * Send Low Balance Warning
+ */
+const sendLowBalanceWarning = async ({ 
+  to, 
+  userName, 
+  currentBalance, 
+  threshold 
+}) => {
+  const warningContent = `
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 30px 0; background: linear-gradient(135deg, #fef3c7 0%, #fde68
+    a 100%); border-radius: 12px; border: 2px solid #f59e0b; overflow: hidden;">
+      <tr>
+        <td style="padding: 30px;">
+          <table width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td style="text-align: center; padding-bottom: 20px;">
+                <div style="font-size: 60px; margin-bottom: 10px;">⚠️</div>
+                <h3 style="margin: 0; color: #92400e; font-size: 20px; font-weight: 700;">Low Balance Alert</h3>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 15px 0; text-align: center;">
+                <p style="margin: 0; font-size: 15px; color: #78350f; line-height: 24px;">
+                  Your account balance has fallen below the minimum threshold.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 20px 0;">
+                <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: white; border-radius: 8px; overflow: hidden;">
+                  <tr>
+                    <td style="padding: 15px 20px; border-bottom: 1px solid #fde68a;">
+                      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                        <tr>
+                          <td style="font-weight: 600; color: #78350f; width: 50%;">Current Balance:</td>
+                          <td style="color: #dc2626; font-weight: 900; text-align: right; font-size: 24px;">$${parseFloat(currentBalance).toFixed(2)}</td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 15px 20px;">
+                      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                        <tr>
+                          <td style="font-weight: 600; color: #78350f; width: 50%;">Minimum Threshold:</td>
+                          <td style="color: #92400e; font-weight: 700; text-align: right; font-size: 18px;">$${parseFloat(threshold).toFixed(2)}</td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 0; text-align: center;">
+                <p style="margin: 0; font-size: 14px; color: #92400e; font-weight: 600;">
+                  ⚡ Please add funds to continue receiving leads.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  `;
+
+  const html = createEmailTemplate({
+    title: 'Low Balance Alert',
+    greeting: `Hello ${userName}!`,
+    mainText: warningContent,
+    buttonText: 'Add Funds Now',
+    buttonUrl: `${process.env.UI_LINK}/dashboard/billing`,
+    warningText: 'Your lead assignments may be paused if balance reaches $0.00',
+    footerText: 'To avoid service interruption, please recharge your account as soon as possible.'
+  });
+
+  return resend.emails.send({
+    from: FROM_EMAIL,
+    to,
+    subject: '⚠️ Low Balance Warning - Add Funds to Continue',
+    html,
+  });
+};
+
+/**
+ * Send Insufficient Balance Email
+ */
+const sendInsufficientBalanceEmail = async ({ 
+  to, 
+  userName, 
+  requiredAmount, 
+  currentBalance,
+  leadId,
+  campaignName 
+}) => {
+  const insufficientContent = `
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 30px 0; background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); border-radius: 12px; border: 2px solid #dc2626; overflow: hidden;">
+      <tr>
+        <td style="padding: 30px;">
+          <table width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td style="text-align: center; padding-bottom: 20px;">
+                <div style="font-size: 60px; margin-bottom: 10px;">🚫</div>
+                <h3 style="margin: 0; color: #991b1b; font-size: 20px; font-weight: 700;">Insufficient Balance</h3>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 15px 0; text-align: center;">
+                <p style="margin: 0; font-size: 15px; color: #7f1d1d; line-height: 24px;">
+                  Unable to assign lead <strong>${leadId}</strong> to campaign <strong>"${campaignName}"</strong>
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 20px 0;">
+                <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: white; border-radius: 8px; overflow: hidden;">
+                  <tr>
+                    <td style="padding: 15px 20px; border-bottom: 1px solid #fecaca;">
+                      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                        <tr>
+                          <td style="font-weight: 600; color: #7f1d1d; width: 50%;">Required Amount:</td>
+                          <td style="color: #dc2626; font-weight: 900; text-align: right; font-size: 22px;">$${parseFloat(requiredAmount).toFixed(2)}</td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 15px 20px; border-bottom: 1px solid #fecaca;">
+                      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                        <tr>
+                          <td style="font-weight: 600; color: #7f1d1d; width: 50%;">Current Balance:</td>
+                          <td style="color: #991b1b; font-weight: 700; text-align: right; font-size: 20px;">$${parseFloat(currentBalance).toFixed(2)}</td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 15px 20px; background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);">
+                      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                        <tr>
+                          <td style="font-weight: 700; color: #1e3a8a; width: 50%;">Amount Needed:</td>
+                          <td style="color: #2563eb; font-weight: 900; text-align: right; font-size: 24px;">$${parseFloat(requiredAmount - currentBalance).toFixed(2)}</td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  `;
+
+  const html = createEmailTemplate({
+    title: 'Transaction Failed',
+    greeting: `Hello ${userName}!`,
+    mainText: insufficientContent,
+    buttonText: 'Add Funds Now',
+    buttonUrl: `${process.env.UI_LINK}/dashboard/billing`,
+    warningText: 'Your campaign is currently paused. Add funds immediately to resume receiving leads.',
+    footerText: 'If you have any questions, please contact our support team.'
+  });
+
+  return resend.emails.send({
+    from: FROM_EMAIL,
+    to,
+    subject: '❌ Transaction Failed - Insufficient Balance',
+    html,
+  });
+};
 
 module.exports = {
   createEmailTemplate,
@@ -401,4 +1148,11 @@ module.exports = {
   sendTestMail,
   sendLeadAssignEmail,
   sendLeadReturnEmail,
+    // ✅ New Transaction Email Functions
+    sendTransactionEmail,
+    sendFundsAddedEmail,
+    sendAutoTopUpEmail,
+    sendLeadPaymentEmail,
+    sendLowBalanceWarning,
+    sendInsufficientBalanceEmail,
 };
