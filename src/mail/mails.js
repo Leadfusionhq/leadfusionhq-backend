@@ -546,8 +546,8 @@ const sendTransactionEmail = async ({
   const userEmail     = metadata.userEmail || to;
   const oldBalance    = metadata.oldBalance;
   const paymentMethod = metadata.payment_type || '';
-  const placeOfSupply = metadata.placeOfSupply || 'San Francisco, CA 94102';
-
+  const placeOfSupply = metadata.fullAddress || 'No Address ';
+  const logoPath = `${(process.env.UI_LINK || '').replace(/\/+$/, '')}/images/logo.png`;
   // 1) Generate PDF receipt to attach
   let receiptBuffer = null;
   try {
@@ -562,10 +562,11 @@ const sendTransactionEmail = async ({
       oldBalance: oldBalance !== undefined ? Number(oldBalance) : undefined,
       description,
       paymentMethod,
+      logoPath: logoPath,
       companyName: 'Leadfusionhq',
-      companyAddress: '123 Business Street, Suite 100',
-      companyCity: 'San Francisco, CA 94102',
-      companyPhone: '+1 (555) 123-4567',
+      companyAddress:'525 NJ-73 Suite 104',
+      companyCity: placeOfSupply,
+      companyPhone: '+1 (609) 707-6818',
       companyEmail: 'support@leadfusionhq.com',
       companyWebsite: 'www.leadfusionhq.com'
     });
@@ -836,6 +837,7 @@ const sendLeadPaymentEmail = async ({
   leadName,
   campaignName,
   payment_type,
+  full_address,
   transactionId, 
   newBalance,
   leadData = {}
@@ -863,7 +865,7 @@ const sendLeadPaymentEmail = async ({
     address.zip_code
   ].filter(Boolean);
   
-  const fullAddress = addressParts.length > 0 ? addressParts.join(', ') : 'N/A';
+  const fullAddress = full_address ?? 'N/A';
 
   const leadDetailsSection = `
     <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 25px 0; background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); border-radius: 12px; border: 2px solid #3b82f6; overflow: hidden;">
@@ -947,6 +949,7 @@ const sendLeadPaymentEmail = async ({
       leadId, 
       campaignName,
       payment_type,
+      fullAddress,
       leadCost,
       customSection: leadDetailsSection
     }

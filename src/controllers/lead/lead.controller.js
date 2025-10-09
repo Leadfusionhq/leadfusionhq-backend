@@ -60,6 +60,7 @@ const createLead = wrapAsync(async (req, res) => {
                 leadName: `${result.first_name} ${result.last_name}`.trim(),
                 campaignName: campaign.name,
                 payment_type:campaign.payment_type,
+                full_address:result.address.full_address,
                 transactionId: billingResult.transactionId,
                 newBalance: billingResult.newBalance,
                 leadData: {

@@ -24,9 +24,9 @@ const generateTransactionReceipt = async({
   description = '',
   paymentMethod = '',
   companyName = 'Leadfusionhq',
-  companyAddress = '123 Business Street, Suite 100',
-  companyCity = 'San Francisco, CA 94102',
-  companyPhone = '+1 (555) 123-4567',
+  companyAddress = '525 NJ-73 Suite 104',
+  companyCity = 'Marlton, NJ 08053',
+  companyPhone = '+1 (609) 707-6818',
   companyEmail = 'support@leadfusionhq.com',
   companyWebsite = 'www.leadfusionhq.com',
   // optional logo
@@ -284,7 +284,7 @@ const generateTransactionReceipt = async({
         doc.fillColor(colors.dim).font('Helvetica').fontSize(9);
         doc.text(`Payment Method: ${paymentMethod || 'N/A'}`, contentLeft, doc.y);
         doc.y += 10;
-        doc.text(`Place of Supply: ${companyCity}`, contentLeft, doc.y);
+      
 
       } else {
         // MOBILE stacked
@@ -338,7 +338,7 @@ const generateTransactionReceipt = async({
         reserveBottomForFooter();
         doc.fillColor(colors.dim).font('Helvetica').fontSize(9);
         doc.text(`Payment Method: ${paymentMethod || 'N/A'}`, leftX, doc.y); doc.y += 10;
-        doc.text(`Place of Supply: ${companyCity}`, leftX, doc.y);
+     
       }
 
       // ---------- STICKY FOOTER (bottom-anchored, minimal) ----------

@@ -6,6 +6,12 @@ const { getPaginationParams, extractFilters } = require('../../utils/pagination'
 const { User } = require('../../models/user.model');
 const { billingLogger } = require('../../utils/logger');
 const dayjs = require('dayjs');
+const path = require('path');
+const { URL } = require('url');
+
+const { generateTransactionReceipt } = require('../../services/pdf/receiptGenerator');
+
+const Transaction = require('../../models/transaction.model');
 
 
 const MAIL_HANDLER = require('../../mail/mails');
@@ -354,6 +360,69 @@ const toggleAutoTopUp = wrapAsync(async (req, res) => {
     }
   });
 
+  // Build a sensible logoPath from env or local fallback
+const getLogoPath = () => {
+    // Highest priority: explicit company logo URL
+    if (process.env.COMPANY_LOGO_URL) return process.env.COMPANY_LOGO_URL;
+  
+    // Next: UI_LINK + /images/logo.png
+    if (process.env.UI_LINK) {
+      try {
+        return new URL('/images/logo.png', process.env.UI_LINK).toString();
+      } catch (_) { /* ignore */ }
+    }
+  
+    // Fallback to local file (if running on a server with the asset available)
+    return path.join(process.cwd(), 'public', 'images', 'logo.png');
+  };
+  
+  const getReceipt = async (req, res, next) => {
+    try {
+      const { txnId } = req.params;
+      const mobile = req.query.mobile === '1';
+      const download = req.query.download !== '0'; // default to download; use ?download=0 for inline
+  
+      // Find by custom transaction_id or by ObjectId
+      let txn = await Transaction.findOne({ transaction_id: txnId }).lean();
+      if (!txn) txn = await Transaction.findById(txnId).lean();
+      if (!txn) return res.status(404).json({ message: 'Receipt not found' });
+  
+      const userId = txn.userId || txn.user_id;
+      const user = userId ? await User.findById(userId).lean() : null;
+  
+      const logoPath = getLogoPath();
+  
+      const pdf = await generateTransactionReceipt({
+        transactionId: txn.transaction_id || String(txn._id),
+        userName: user?.name || 'Customer',
+        userEmail: user?.email || '',
+        transactionType: txn.description || txn.type || 'Transaction',
+        amount: Number(txn.amount || 0),
+        date: new Date(txn.createdAt || Date.now()).toLocaleString(),
+        newBalance: txn.balance_after ?? txn.balanceAfter ?? 0,
+        oldBalance: txn.balance_before ?? txn.balanceBefore ?? undefined,
+        description: txn.description || '',
+        paymentMethod: txn.paymentMethodDetails
+          ? `${txn.paymentMethodDetails.brand || 'Card'} •••• ${txn.paymentMethodDetails.lastFour || ''}`
+          : (txn.paymentMethod || ''),
+        logoPath, // <- pass your logo
+        mobile
+      });
+  
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader(
+        'Content-Disposition',
+        `${download ? 'attachment' : 'inline'}; filename="receipt-${txnId}.pdf"`
+      );
+      res.setHeader('Cache-Control', 'private, max-age=60');
+  
+      return res.send(pdf);
+    } catch (err) {
+      return next(err);
+    }
+  };
+  
+
 module.exports = {
     getCurrentContract,
     getContractStatus,
@@ -370,4 +439,5 @@ module.exports = {
     deleteCard,
     testAutoTopUp,
     getRevenueFromGateway,
+    getReceipt,
 };
