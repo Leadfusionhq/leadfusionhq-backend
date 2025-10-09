@@ -6,7 +6,7 @@ import { Supabase_CAMPAIGNS_API } from "@/utils/apiUrl";
 import { useLoader } from "@/context/LoaderContext";
 const NEXT_PUBLIC_CSV_API_TOKEN = process.env.NEXT_PUBLIC_CSV_API_TOKEN;
 
-export default function CampaignsTable() {
+export default function SupabaseCampaigns() {
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
@@ -17,7 +17,7 @@ export default function CampaignsTable() {
 
   const fetchCampaignOptions = useCallback(async () => {
     try {
-      setLoading(true);
+      showLoader()
       const res = (await axiosWrapper(
         "get",
         `${Supabase_CAMPAIGNS_API.GET_ALL_CAMPAIGNS}`,
@@ -71,11 +71,6 @@ export default function CampaignsTable() {
     setStartDate("");
     setEndDate("");
   };
-
-  if (loading)
-    return (
-      showLoader()
-    );
 
   return (
     <div className="p-8 bg-white rounded-2xl shadow-sm w-full">
