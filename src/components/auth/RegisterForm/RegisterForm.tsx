@@ -356,7 +356,7 @@ const RegisterForm = () => {
                       </div>
 
                       {/* Debug Section */}
-                      {(values.address?.coordinates?.lat || values.address?.place_id) && (
+                      {/* {(values.address?.coordinates?.lat || values.address?.place_id) && (
                         <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs">
                           <div className="font-semibold text-blue-800 mb-1">📍 Google Data Captured</div>
                           {values.address?.coordinates?.lat && (
@@ -369,7 +369,8 @@ const RegisterForm = () => {
                               Place ID: {values.address.place_id}
                             </div>
                           )}
-                        </div> )}                  {/* Terms and Conditions */}
+                        </div> )}            */}
+                               {/* Terms and Conditions */}
                   <div className="flex items-start gap-2 mt-2 w-full max-w-[520px]">
                     <Field
                       type="checkbox"
