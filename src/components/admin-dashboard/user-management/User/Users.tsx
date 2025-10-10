@@ -12,7 +12,7 @@ import { useRouter } from 'next/navigation';
 
 import { Skeleton, Box, Button, Typography, IconButton, Menu, MenuItem } from "@mui/material";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
-
+import { toast } from 'react-toastify';
 type User = {
     _id: string;
     name: string;
@@ -24,6 +24,14 @@ type User = {
     zipCode?: string;
     image?: string;
     balance?: number;
+    integrations?: {
+      boberdoo?: {
+          external_id?: string | null;
+          sync_status?: 'PENDING' | 'SUCCESS' | 'FAILED' | 'NOT_SYNCED';
+          last_sync_at?: string | null;
+          last_error?: string | null;
+      };
+  };
 };
 
 type ApiResponse = {
@@ -33,6 +41,29 @@ type ApiResponse = {
     totalCount: number;
     totalPages: number;
 };
+
+type SyncBoberdooResponse = {
+  message?: string;
+  success?: boolean;
+  externalId?: string;
+  error?: string;
+  data?: any;
+  alreadySynced?: boolean;
+  result?: {
+    success?: boolean;
+    error?: string;
+    externalId?: string;
+    data?: {
+      response?: {
+        result?:string;
+        errors?: {
+          error?: string | string[];
+        };
+      };
+    };
+  };
+};
+
 
 export default function UserTable() {
     const [users, setUsers] = useState<User[]>([]); 
@@ -142,6 +173,122 @@ export default function UserTable() {
             setLoading(false);
         }
     };
+
+    const handleSyncBoberdoo = async (row: User) => {
+      const toastId = toast.loading(`Syncing ${row.name} to Boberdoo...`);
+    
+      try {
+        const url = API_URL.SYNC_BOMBERDO.replace(':userId', row._id);
+        const response = await axiosWrapper('post', url, {}, token ?? undefined) as SyncBoberdooResponse;
+    
+        console.log('📊 Boberdoo sync response:', response);
+    
+        // ✅ Extract error from nested structure
+        let errorMessage: string | null = null;
+    
+        // Check result.data.response.errors.error (array format)
+        if (response?.result?.data?.response?.errors?.error) {
+          const errors = response.result.data.response.errors.error;
+          if (Array.isArray(errors)) {
+            errorMessage = errors.join('; ');
+          } else {
+            errorMessage = String(errors);
+          }
+        }
+    
+        // Check result.error
+        if (!errorMessage && response?.result?.error) {
+          errorMessage = response.result.error;
+        }
+    
+        // Check if result.success is explicitly false
+        if (response?.result?.success === false || errorMessage) {
+          throw new Error(errorMessage || response?.message || 'Sync failed');
+        }
+    
+        // Check top-level success flag
+        if (response?.success === false) {
+          throw new Error(response?.error || response?.message || 'Sync failed');
+        }
+    
+        // Already synced
+        if (response?.alreadySynced) {
+          toast.update(toastId, {
+            render: '✓ User is already synced to Boberdoo',
+            type: 'info',
+            isLoading: false,
+            autoClose: 3000,
+          });
+          return;
+        }
+    
+        // Check if we have an external ID (indicates success)
+        if (response?.result?.externalId || response?.externalId) {
+          toast.update(toastId, {
+            render: response?.message || '✓ User synced to Boberdoo successfully!',
+            type: 'success',
+            isLoading: false,
+            autoClose: 3000,
+          });
+          
+          // Refresh user list
+          await fetchUsers(pagination.page, pagination.limit);
+          return;
+        }
+    
+        // If no external ID and no error, treat as ambiguous
+        toast.update(toastId, {
+          render: response?.message || 'Sync completed with unknown status',
+          type: 'warning',
+          isLoading: false,
+          autoClose: 3000,
+        });
+        
+        await fetchUsers(pagination.page, pagination.limit);
+    
+      } catch (err: any) {
+        console.error('❌ Boberdoo sync error:', err);
+        
+        // ✅ Extract detailed error message
+        let errorMessage = 'Failed to sync user to Boberdoo';
+        
+        // Priority order for error messages
+        if (err?.message) {
+          errorMessage = err.message;
+        } else if (err?.response?.data?.result?.data?.response?.errors?.error) {
+          const errors = err.response.data.result.data.response.errors.error;
+          errorMessage = Array.isArray(errors) ? errors.join('; ') : String(errors);
+        } else if (err?.response?.data?.error) {
+          errorMessage = err.response.data.error;
+        } else if (err?.response?.data?.message) {
+          errorMessage = err.response.data.message;
+        }
+    
+        // ✅ Show detailed error in toast
+        toast.update(toastId, {
+          render: (
+            <div>
+              <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
+                Failed to sync to Boberdoo
+              </div>
+              <div style={{ fontSize: '12px', opacity: 0.9 }}>
+                {errorMessage}
+              </div>
+            </div>
+          ),
+          type: 'error',
+          isLoading: false,
+          autoClose: 7000,
+        });
+      }
+    };
+
+        // ✅ Helper function to check if user is already synced
+        const isSyncedToBoberdoo = (user: User): boolean => {
+          return Boolean(user.integrations?.boberdoo?.external_id);
+        };
+    
+    
 
     // State for action menu
     const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
@@ -335,6 +482,17 @@ export default function UserTable() {
               >
                 Edit User Account
               </MenuItem>
+              {menuRow && !isSyncedToBoberdoo(menuRow) && (
+                <MenuItem 
+                  onClick={() => { 
+                    if (menuRow) handleSyncBoberdoo(menuRow); 
+                    handleMenuClose(); 
+                  }}
+                
+                >
+                Sync to Boberdoo
+                </MenuItem>
+              )}
               <MenuItem
                 onClick={() => {
                   if (menuRow) handleDelete(menuRow);
