@@ -116,7 +116,7 @@ export const CAMPAIGNS_API = {
 const Supabase_CAMPAIGNS_API_BASE = `${API_IMPORT_BASE}/supacampaigns`;
 
 export const Supabase_CAMPAIGNS_API = {
-  GET_ALL_CAMPAIGNS: `${Supabase_CAMPAIGNS_API_BASE}/`,
+  GET_ALL_CAMPAIGNS: `${Supabase_CAMPAIGNS_API_BASE}`,
 };
 
 
