@@ -8,21 +8,38 @@ const TOKEN_GEN = require('../../helper/generate-token');
 const { ErrorHandler } = require('../../utils/error-handler');
 const { randomNumberGenerate, isEmpty } = require('../../utils/utils');
 const OTP = require('../../models/otp.model');
+const { syncUserToBoberdooById } = require('../../services/boberdoo/boberdoo.service');
+
+// const registerUser = wrapAsync(async (req, res) => {
+//     const userPayload = req.body;
+
+//     const { user } = await AuthService.registerUser(userPayload);
+
+//     MAIL_HANDLER.sendVerificationEmail({
+//         to: user?.email,
+//         name: user?.name,
+//         token: user?.verificationToken,
+//     });
+
+
+//     sendResponse(res, { user }, 'Success! Please verify your email to activate your account.', 201);
+// });
 
 const registerUser = wrapAsync(async (req, res) => {
     const userPayload = req.body;
-
+  
     const { user } = await AuthService.registerUser(userPayload);
-
+  
+    // ✅ ONLY send verification email - NO Boberdoo sync yet
     MAIL_HANDLER.sendVerificationEmail({
-        to: user?.email,
-        name: user?.name,
-        token: user?.verificationToken,
-    });
-
-
+      to: user?.email,
+      name: user?.name,
+      token: user?.verificationToken,
+    }).catch((e) => console.error('❌ Verification email error:', e.message));
+  
     sendResponse(res, { user }, 'Success! Please verify your email to activate your account.', 201);
-});
+  });
+
 
 const loginWithEmail = wrapAsync(async (req, res) => {
     // const { email: rawEmail, password ,role: requestedRole} = req.body;
@@ -91,21 +108,32 @@ const verifyEmail = wrapAsync(async (req, res) => {
     }
     
     const user = await AuthService.verifyEmailService(token);
-    
-    try {
-        const n8nAccount = await N8nServices.createSubAccount(user);
-        console.log('n8nAccount',n8nAccount)
-        if (n8nAccount?.user?.id) {
-            user.n8nUserId = n8nAccount.user.id;
-            await user.save();
-        } else {
-            console.warn(`No n8n user ID returned for email ${user.email}`);
-        }
 
-    } catch (err) {
-        console.error(`Failed to create n8n sub-account for ${user.email}`, err.message);
-    }
+    console.log('✅ Email verified for user:', user.email);
+  
+    // ✅ FIRE-AND-FORGET: Boberdoo sync (only after email verification)
+    (async () => {
+      try {
+        console.log('🚀 Starting Boberdoo sync for verified user:', user._id);
+        const result = await syncUserToBoberdooById(user._id);
+        console.log('✅ Boberdoo sync (verify):', result);
+      } catch (err) {
+        console.error('❌ Boberdoo sync exception (verify):', err.message);
+      }
+    })();
+    // try {
+    //     const n8nAccount = await N8nServices.createSubAccount(user);
+    //     console.log('n8nAccount',n8nAccount)
+    //     if (n8nAccount?.user?.id) {
+    //         user.n8nUserId = n8nAccount.user.id;
+    //         await user.save();
+    //     } else {
+    //         console.warn(`No n8n user ID returned for email ${user.email}`);
+    //     }
 
+    // } catch (err) {
+    //     console.error(`Failed to create n8n sub-account for ${user.email}`, err.message);
+    // }
     console.warn('user',user)
     sendResponse(res, {}, 'Email successfully verified');
 

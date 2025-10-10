@@ -16,7 +16,8 @@ const API = {
 
     ACCEPT_CONTRACT: '/:userId/contract/accept',
     GET_CONTRACT_STATUS: '/:userId/contract/status',
-    CHECK_CONTRACT: '/:userId/contract/check'
+    CHECK_CONTRACT: '/:userId/contract/check',
+    SYNC_BOMBERDO:'/:userId/boberdoo/resync',
 };
 
 // Apply authentication to all routes
@@ -74,5 +75,11 @@ userRouter.post(API.CHECK_CONTRACT,
     authorizedRoles([CONSTANT_ENUM.USER_ROLE.ADMIN, CONSTANT_ENUM.USER_ROLE.USER]),
     UserController.checkContractAcceptance
 );
+// below existing imports and middlewares
+userRouter.post(
+    API.SYNC_BOMBERDO,
+    authorizedRoles([CONSTANT_ENUM.USER_ROLE.ADMIN, CONSTANT_ENUM.USER_ROLE.USER]),
+    UserController.resyncBoberdoo
+  );
 
 module.exports = userRouter;

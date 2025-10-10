@@ -5,15 +5,47 @@ const { ErrorHandler } = require('../../utils/error-handler');
 const CONSTANT_ENUM = require('../../helper/constant-enums.js');
 const {getLeadCountByCampaignId} = require('../../services/lead/lead.service.js');
 const Lead = require('../../models/lead.model.js'); 
+const { sendToN8nWebhook } = require('../../services/n8n/webhookService.js');
+
+// const createCampaign = async (data) => {
+//   try {
+//     const newCampaign = await Campaign.create(data);
+//     return newCampaign;
+//   } catch (error) {
+//     throw new ErrorHandler(500, error.message || 'Failed to create campaign');
+//   }
+// };
 
 const createCampaign = async (data) => {
   try {
+    // Create campaign in database first
     const newCampaign = await Campaign.create(data);
+    
+    // Populate state and user to get their names
+    const populatedCampaign = await Campaign.findById(newCampaign._id)
+      .populate('geography.state', 'name abbreviation')
+      .populate('user_id', 'name email')
+      .lean();
+    
+    // Send webhook notification AFTER save with populated data (non-blocking)
+    const resultforN8n = await sendToN8nWebhook(populatedCampaign);
+    
+    console.log('📊 N8N Webhook Result:', resultforN8n);
+    
+    if (resultforN8n.success) {
+      console.log('✓ n8n webhook notification sent for campaign:', populatedCampaign.campaign_id);
+      console.log('✓ Response data:', resultforN8n.data);
+    } else {
+      console.warn('✗ n8n webhook notification failed:', populatedCampaign.campaign_id, resultforN8n.error);
+    }
+    
     return newCampaign;
   } catch (error) {
     throw new ErrorHandler(500, error.message || 'Failed to create campaign');
   }
 };
+
+
 // const updateCampaign = async (campaignId, userId, updateData) => {
 //   try {
 //     const updatedCampaign = await Campaign.findOneAndUpdate(
