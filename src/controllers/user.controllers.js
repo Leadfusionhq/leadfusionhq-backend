@@ -4,9 +4,9 @@ const { sendResponse } = require('../utils/response');
 const { ErrorHandler } = require('../utils/error-handler');
 const UserServices = require('../services/user.service');
 const N8nServices = require('../services/n8n/n8n.automation.service');
-
+const { syncUserToBoberdooById } = require('../services/boberdoo/boberdoo.service');
 const MAIL_HANDLER = require('../mail/mails');
-
+const CONSTANT_ENUM = require('../helper/constant-enums.js');
 
 const getAllUsers = wrapAsync(async (req, res) => {
     const data = await UserServices.getAllUsersService(); 
@@ -124,6 +124,20 @@ const checkContractAcceptance = wrapAsync(async (req, res) => {
   }, 'Contract acceptance check completed.', 200);
 });
 
+const resyncBoberdoo = wrapAsync(async (req, res) => {
+  const { userId } = req.params;
+
+  // Guard: allow self or admin
+  if (
+    req.user.role !== CONSTANT_ENUM.USER_ROLE.ADMIN &&
+    String(req.user._id) !== String(userId)
+  ) {
+    throw new ErrorHandler(403, 'Forbidden');
+  }
+
+  const result = await syncUserToBoberdooById(userId);
+  sendResponse(res, { result }, 'Boberdoo resync attempted', 200);
+});
 module.exports = {
  getAllUsers,
  getAllAdmins,
@@ -133,5 +147,6 @@ module.exports = {
  deleteUser,
  acceptContract,
  getContractStatus,
- checkContractAcceptance
+ checkContractAcceptance,
+ resyncBoberdoo
 };

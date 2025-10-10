@@ -1,7 +1,7 @@
 const { wrapAsync } = require('../../utils/wrap-async');
 const { sendResponse } = require('../../utils/response');
 const CampaignServices = require('../../services/campaign/campaign.service');
-const N8NCampaignServices = require('../../services/n8n/n8n.campaign.service');
+const { sendToN8nWebhook } = require('../../services/n8n/webhookService.js');
 const { ErrorHandler } = require('../../utils/error-handler');
 const { randomNumberGenerate, isEmpty } = require('../../utils/utils');
 const { getPaginationParams , extractFilters} = require('../../utils/pagination');
@@ -15,6 +15,7 @@ const createCampaign = wrapAsync(async (req, res) => {
     const  result  = await CampaignServices.createCampaign(campaignData);
     sendResponse(res, { result }, 'campaign has been create succefully', 201);
 });
+
 const createCampaignByAdmin = wrapAsync(async (req, res) => {
     const { userId } = req.params;
     const user_id = userId;
