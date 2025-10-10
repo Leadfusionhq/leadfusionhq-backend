@@ -78,3 +78,30 @@ export interface CampaignFormValues {
   };
   note: string;
 }
+
+
+interface Campaign {
+  id: number;
+  name: string;
+  description?: string;
+  state?: string;
+  contactCount?: number;
+  created_at?: string;
+  [key: string]: unknown;
+}
+
+interface Pagination {
+  currentPage: number;
+  totalPages: number;
+  totalCount: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
+}
+export interface CampaignResponse {
+  data: never[];
+  pagination: null;
+  campaigns: {
+    data: Campaign[];
+    pagination: Pagination;
+  };
+}

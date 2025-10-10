@@ -4,102 +4,75 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import axiosWrapper from "@/utils/api";
 import { Supabase_CAMPAIGNS_API } from "@/utils/apiUrl";
 import { useLoader } from "@/context/LoaderContext";
+import { CampaignResponse } from "../../../types/campaign";
 const NEXT_PUBLIC_CSV_API_TOKEN = process.env.NEXT_PUBLIC_CSV_API_TOKEN;
 
-interface Campaign {
-  id: number;
-  name: string;
-  description?: string;
-  state?: string;
-  contactCount?: number;
-  created_at?: string;
-  [key: string]: unknown;
-}
-
-interface Pagination {
-  currentPage: number;
-  totalPages: number;
-  totalCount: number;
-  hasNextPage: boolean;
-  hasPrevPage: boolean;
-  nextPage: number | null;
-  prevPage: number | null;
-}
-interface CampaignResponse {
-  data: never[];
-  pagination: null;
-  campaigns: {
-    data: Campaign[];
-    pagination: Pagination;
-  };
-}
 export default function SupabaseCampaigns() {
   const [campaigns, setCampaigns] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [selectedState, setSelectedState] = useState("");
   const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
   const { showLoader, hideLoader } = useLoader();
   const [pagination, setPagination] = useState<any>(null);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
-  const fetchCampaignOptions = useCallback(async (page: number) => {
-    try {
-      showLoader()
-      const res = (await axiosWrapper(
-        "get",
-        `${Supabase_CAMPAIGNS_API.GET_ALL_CAMPAIGNS}/${page}`,
-        {},
-        NEXT_PUBLIC_CSV_API_TOKEN
-      )) as { campaigns: CampaignResponse };
-      if (res) {
-        setCampaigns(res.campaigns.data ?? []);
-        setPagination(res.campaigns.pagination ?? null);
+  const fetchCampaignOptions = useCallback(
+    async (search: string) => {
+      try {
+        showLoader()
+        const data = {
+          page,
+          page_size:pageSize || 10,
+          search: search || null,
+          state_filter: selectedState || null,
+          date: startDate ||  null
+        };
+
+        const res = (await axiosWrapper(
+          "post",
+          `${Supabase_CAMPAIGNS_API.GET_ALL_CAMPAIGNS}/`,
+          data,
+          NEXT_PUBLIC_CSV_API_TOKEN
+        )) as { campaigns: CampaignResponse };
+
+        if (res?.campaigns) {
+          setCampaigns(res.campaigns.data ?? []);
+          setPagination(res.campaigns.pagination ?? null);
+        }
+      } catch (e) {
+        console.error("Failed to fetch campaign options", e);
+      } finally {
+        hideLoader();
       }
-    } catch (e) {
-      console.error("Failed to fetch campaign options", e);
-    } finally {
-      setLoading(false);
-      hideLoader();
-    }
-  }, []);
+    },
+    [page,pageSize, selectedState, startDate]
+  );
 
   useEffect(() => {
-    fetchCampaignOptions(page);
-  }, [page,fetchCampaignOptions]);
+    fetchCampaignOptions(search);
+  }, [fetchCampaignOptions]);
 
+  useEffect(() => {
+   
+    const handler = setTimeout(() => {
+      fetchCampaignOptions(search);
+    }, 1000);
+  
+    return () => clearTimeout(handler);
+  }, [search]);
+  
   const stateOptions = useMemo(() => {
     const uniqueStates = Array.from(
-      new Set(campaigns.map((c) => c.state).filter(Boolean))
+      new Set(campaigns.map((c) => c.campaign_state).filter(Boolean))
     );
     return uniqueStates.sort();
   }, [campaigns]);
-
-  const filteredCampaigns = useMemo(() => {
-    return campaigns.filter((c) => {
-      const matchesSearch =
-        !search ||
-        c.name?.toLowerCase().includes(search.toLowerCase()) ||
-        c.state?.toLowerCase().includes(search.toLowerCase());
-
-      const matchesState = !selectedState || c.state === selectedState;
-
-      const campaignDate = c.created_at ? new Date(c.created_at) : null;
-      const matchesStart =
-        !startDate || (campaignDate && campaignDate >= new Date(startDate));
-      const matchesEnd =
-        !endDate || (campaignDate && campaignDate <= new Date(endDate));
-
-      return matchesSearch && matchesState && matchesStart && matchesEnd;
-    });
-  }, [campaigns, search, selectedState, startDate, endDate]);
 
   const handleReset = () => {
     setSearch("");
     setSelectedState("");
     setStartDate("");
-    setEndDate("");
   };
 
   const handleNextPage = useCallback(() => {
@@ -167,25 +140,15 @@ export default function SupabaseCampaigns() {
         </div>
 
         {/* Date Filters */}
-        <div className="flex flex-col md:flex-row gap-2 w-full lg:w-2/5">
+        <div className="flex flex-col md:flex-row gap-2 w-full md:w-1/5">
           <div className="flex flex-col w-full">
             <label className="text-sm font-medium text-gray-600 mb-1">
-              From
+              Date
             </label>
             <input
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-            />
-          </div>
-
-          <div className="flex flex-col w-full">
-            <label className="text-sm font-medium text-gray-600 mb-1">To</label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
               className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
             />
           </div>
@@ -207,15 +170,16 @@ export default function SupabaseCampaigns() {
             <tr>
               <th className="px-6 py-3 text-left">ID</th>
               <th className="px-6 py-3 text-left">Name</th>
-              <th className="px-6 py-3 text-left">Messages</th>
-              <th className="px-6 py-3 text-left">Description</th>
               <th className="px-6 py-3 text-left">State</th>
               <th className="px-6 py-3 text-left">Contacts</th>
-              <th className="px-6 py-3 text-left">Created At</th>
+              <th className="px-6 py-3 text-left">Confirmed Addresses</th>
+              <th className="px-6 py-3 text-left">Replied</th>
+              <th className="px-6 py-3 text-left">Failed Messages</th>
+              <th className="px-6 py-3 text-left">Created Date</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {filteredCampaigns.length === 0 ? (
+            {campaigns.length === 0 ? (
               <tr>
                 <td
                   colSpan={5}
@@ -225,39 +189,38 @@ export default function SupabaseCampaigns() {
                 </td>
               </tr>
             ) : (
-              filteredCampaigns.map((campaign) => (
+              campaigns.map((campaign) => (
                 <tr
-                  key={campaign.id}
+                  key={campaign.campaign_id}
                   className="hover:bg-gray-50 transition-colors"
                 >
-                  <td className="px-6 py-3">{campaign.id || "—"}</td>
+                  <td className="px-6 py-3">{campaign.campaign_id || "—"}</td>
                   <td className="px-6 py-3 flex items-center gap-3">
                     <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-gray-600 font-semibold">
-                      {campaign.name?.[0]?.toUpperCase() || "?"}
+                      {campaign.campaign_name?.[0]?.toUpperCase() || "?"}
                     </div>
-                    <span className="font-medium">{campaign.name}</span>
+                    <span className="font-medium">
+                      {campaign.campaign_name}
+                    </span>
                   </td>
-                  <td className="px-6 py-3">{campaign.message_templates.Message1 || "—"},{campaign.message_templates.Message2 || "—"}</td>
-                  <td className="px-6 py-3">{campaign.description || "—"}</td>
-                  <td className="px-6 py-3">{campaign.state || "—"}</td>
-                  <td className="px-6 py-3">{campaign.contactCount}</td>
-                  <td className="px-6 py-3 text-gray-600">
-                    {campaign.created_at
-                      ? new Date(campaign.created_at).toLocaleString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })
-                      : "—"}
+                  <td className="px-6 py-3">
+                    {campaign.campaign_state || "—"}
                   </td>
+                  <td className="px-6 py-3">{campaign.total_contacts}</td>
+                  <td className="px-6 py-3">{campaign.confirmed_addresses}</td>
+                  <td className="px-6 py-3">{campaign.replied}</td>
+                  <td className="px-6 py-3">{campaign.failed_messages}</td>
+                  <td className="px-6 py-3">{campaign.created_at}</td>
                 </tr>
               ))
             )}
           </tbody>
         </table>
       </div>
+
       {pagination && (
-        <div className="flex items-center justify-between mt-6">
+        <div className="flex items-center justify-between mt-6 gap-4">
+          {/* Previous Button */}
           <button
             onClick={handlePrevPage}
             disabled={!pagination.hasPrevPage}
@@ -270,12 +233,32 @@ export default function SupabaseCampaigns() {
             ← Previous
           </button>
 
+          {/* Page Info */}
           <span className="text-sm text-gray-600">
             Page <strong>{pagination.currentPage}</strong> of{" "}
             <strong>{pagination.totalPages}</strong> ({pagination.totalCount}{" "}
             total)
           </span>
 
+          {/* Page Size Selector */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600">Page size:</span>
+            {[5, 10, 20, 50].map((size) => (
+              <button
+                key={size}
+                onClick={() => setPageSize(size)}
+                className={`px-2 py-1 rounded-lg text-sm font-medium ${
+                  pageSize === size
+                    ? "bg-blue-500 text-white"
+                    : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                }`}
+              >
+                {size}
+              </button>
+            ))}
+          </div>
+
+          {/* Next Button */}
           <button
             onClick={handleNextPage}
             disabled={!pagination.hasNextPage}
