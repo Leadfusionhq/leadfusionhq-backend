@@ -19,7 +19,7 @@ export const API_URL = {
     UPDATE_USER: `${USER_API_BASE}/:userId`,
     GET_USER_BY_ID: `${USER_API_BASE}/:userId`,
     DELETE_USER_BY_ID: `${USER_API_BASE}/:userId`,
-
+    SYNC_BOMBERDO:`${USER_API_BASE}/:userId/boberdoo/resync`,
 
     ACCEPT_CONTRACT:`${USER_API_BASE}/:userId/contract/accept`,
     CHECK_CONTRACT:`${USER_API_BASE}/:userId/contract/status`,

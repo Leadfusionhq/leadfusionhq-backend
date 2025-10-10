@@ -8,7 +8,7 @@ import { authorizedRoles } from '@/middleware/authorized-roles';
 
 export async function POST(req: NextRequest) {
   try {
-    const { name, email, password, role, phoneNumber } = await req.json();
+    const { name, email, password, role, phoneNumber,  companyName,address } = await req.json();
 
     const validationResponse = validateUserSchema({
       name,
@@ -16,6 +16,8 @@ export async function POST(req: NextRequest) {
       password,
       role,
       phoneNumber,
+      companyName,
+      address
     });
 
     if (validationResponse instanceof NextResponse) {
