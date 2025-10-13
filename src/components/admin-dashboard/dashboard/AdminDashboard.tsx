@@ -356,7 +356,7 @@ export default function AdminDashboard() {
           </div>
           
           {/* Global Date Filter */}
-          <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg shadow-sm border border-gray-200">
+          {/* <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg shadow-sm border border-gray-200">
             <Calendar className="w-4 h-4 text-gray-500" />
             <select
               className="text-sm border-0 focus:ring-0 text-gray-700 font-medium"
@@ -367,7 +367,7 @@ export default function AdminDashboard() {
               <option value="30d">Last 30 Days</option>
               <option value="mtd">Month to Date</option>
             </select>
-          </div>
+          </div> */}
         </div>
       </div>
 
