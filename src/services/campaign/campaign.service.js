@@ -6,7 +6,8 @@ const CONSTANT_ENUM = require('../../helper/constant-enums.js');
 const {getLeadCountByCampaignId} = require('../../services/lead/lead.service.js');
 const Lead = require('../../models/lead.model.js'); 
 const { sendToN8nWebhook } = require('../../services/n8n/webhookService.js');
-
+const { createCampaignInBoberdoo } = require('../boberdoo/boberdoo.service');
+const { User } = require('../../models/user.model');
 // const createCampaign = async (data) => {
 //   try {
 //     const newCampaign = await Campaign.create(data);
@@ -20,25 +21,65 @@ const createCampaign = async (data) => {
   try {
     // Create campaign in database first
     const newCampaign = await Campaign.create(data);
-    
+
     // Populate state and user to get their names
     const populatedCampaign = await Campaign.findById(newCampaign._id)
       .populate('geography.state', 'name abbreviation')
-      .populate('user_id', 'name email')
+      .populate('user_id', 'name email integrations.boberdoo.external_id')
       .lean();
-    
-    // Send webhook notification AFTER save with populated data (non-blocking)
-    const resultforN8n = await sendToN8nWebhook(populatedCampaign);
-    
-    console.log('📊 N8N Webhook Result:', resultforN8n);
-    
-    if (resultforN8n.success) {
-      console.log('✓ n8n webhook notification sent for campaign:', populatedCampaign.campaign_id);
-      console.log('✓ Response data:', resultforN8n.data);
+
+    // Get the user's Boberdoo partner ID
+    const user = await User.findById(data.user_id).lean();
+    const partnerId = user?.integrations?.boberdoo?.external_id;
+
+    if (partnerId) {
+      // Update sync status to pending
+      await Campaign.findByIdAndUpdate(newCampaign._id, {
+        $set: {
+          boberdoo_sync_status: 'PENDING',
+          boberdoo_last_sync_at: new Date()
+        }
+      });
+
+      // Sync to Boberdoo
+      const boberdooResult = await createCampaignInBoberdoo(populatedCampaign, partnerId);
+      
+      if (boberdooResult.success) {
+        // Update campaign with Boberdoo filter set ID
+        await Campaign.findByIdAndUpdate(newCampaign._id, {
+          $set: {
+            boberdoo_filter_set_id: boberdooResult.filterSetId,
+            boberdoo_sync_status: 'SUCCESS',
+            boberdoo_last_sync_at: new Date(),
+            boberdoo_last_error: null
+          }
+        });
+        console.log(`✓ Campaign ${newCampaign.campaign_id} synced to Boberdoo with filter_set_ID: ${boberdooResult.filterSetId}`);
+      } else {
+        // Update with error status
+        await Campaign.findByIdAndUpdate(newCampaign._id, {
+          $set: {
+            boberdoo_sync_status: 'FAILED',
+            boberdoo_last_sync_at: new Date(),
+            boberdoo_last_error: boberdooResult.error
+          }
+        });
+        console.warn(`✗ Failed to sync campaign ${newCampaign.campaign_id} to Boberdoo: ${boberdooResult.error}`);
+      }
     } else {
-      console.warn('✗ n8n webhook notification failed:', populatedCampaign.campaign_id, resultforN8n.error);
+      console.warn(`⚠ User ${data.user_id} doesn't have a Boberdoo partner ID, skipping sync`);
+      await Campaign.findByIdAndUpdate(newCampaign._id, {
+        $set: {
+          boberdoo_sync_status: 'FAILED',
+          boberdoo_last_error: 'User does not have a Boberdoo partner ID'
+        }
+      });
     }
-    
+
+    // Send webhook notification (your existing code)
+    const resultforN8n = await sendToN8nWebhook(populatedCampaign);
+    console.log('📊 N8N Webhook Result:', resultforN8n);
+
     return newCampaign;
   } catch (error) {
     throw new ErrorHandler(500, error.message || 'Failed to create campaign');

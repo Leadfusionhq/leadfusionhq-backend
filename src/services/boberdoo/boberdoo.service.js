@@ -8,6 +8,11 @@ const API_URL = (process.env.BOBERDOO_API_URL || 'https://leadfusionhq.leadporta
 const API_KEY = (process.env.BOBERDOO_API_KEY || '').trim();
 const CREATE_ACTION = 'createNewPartner'; // fixed here
 
+const CAMPAIGN_API_URL = process.env.BOBERDOO_CAMPAIGN_API_URL;
+const CAMPAIGN_API_KEY = process.env.BOBERDOO_CAMPAIGN_API_KEY;
+const CREATE_CAMPAIGN_ACTION = 'insertUpdateFilterSet';
+
+
 const TIMEOUT_MS = Number(process.env.BOBERDOO_TIMEOUT_MS || 15000);
 
 // Hardcoded valid defaults (no env needed for these)
@@ -325,4 +330,88 @@ async function syncUserToBoberdooById(userId) {
   }
 }
 
-module.exports = { syncUserToBoberdooById };
+
+// Create or insert a campaign in Boberdoo
+async function createCampaignInBoberdoo(campaignData, partnerId) {
+  try {
+    // Map project enum to Boberdoo lead type integer
+    const leadTypeId = CONSTANT_ENUM.BOBERDOO_LEAD_TYPE_MAP[campaignData.lead_type];
+    if (!leadTypeId) {
+      return {
+        success: false,
+        error: `Invalid lead type: ${campaignData.lead_type}`
+      };
+    }
+
+    // Prepare payload for Boberdoo API
+    const payload = {
+      Key: CAMPAIGN_API_KEY,
+      API_Action: CREATE_CAMPAIGN_ACTION,
+      Format: 'json', // Always request JSON response
+      Mode: 'insert',
+      Partner_ID: partnerId,
+      TYPE: leadTypeId, // Correct field name for lead type
+      Filter_Set_Name: campaignData.name,
+      Filter_Set_Price: campaignData.bid_price || 0,
+      Accepted_Sources: campaignData.accepted_sources?.join(',') || '-all-', // Default to all
+      Match_Priority: campaignData.match_priority || 5,
+      Hourly_Limit: campaignData.hourly_limit ?? 0,
+      Daily_Limit: campaignData.daily_limit ?? 0,
+      Weekly_Limit: campaignData.weekly_limit ?? 0,
+      Monthly_Limit: campaignData.monthly_limit ?? 0,
+      Accept_Only_Reprocessed_Leads: 'Yes',
+      Filter_Set_Status: campaignData.status === 'ACTIVE' ? 1 : 0
+    };
+
+    console.log('[boberdoo] Creating campaign:', {
+      name: campaignData.name,
+      partnerId,
+      price: payload.Filter_Set_Price,
+      leadType: payload.TYPE
+    });
+
+    // Send request
+    const response = await axios.post(CAMPAIGN_API_URL, null, {
+      params: payload,
+      timeout: TIMEOUT_MS,
+      validateStatus: () => true
+    });
+
+    // Parse response safely
+    const data = typeof response.data === 'string' ? safeJson(response.data) : response.data;
+
+    // Success check
+    if (data?.response?.status === 'Success' && data?.response?.filter_set_ID) {
+      return {
+        success: true,
+        filterSetId: data.response.filter_set_ID,
+        data
+      };
+    }
+
+    // Extract errors if any
+    const errors = toErrorList(data).join('; ');
+    return {
+      success: false,
+      error: errors || 'Failed to create campaign in Boberdoo',
+      data
+    };
+
+  } catch (error) {
+    console.error('[boberdoo] Campaign creation error:', error.message);
+    return {
+      success: false,
+      error: error.message || 'Failed to create campaign in Boberdoo'
+    };
+  }
+}
+
+
+
+
+
+
+module.exports = { 
+  syncUserToBoberdooById
+  ,createCampaignInBoberdoo
+ };
