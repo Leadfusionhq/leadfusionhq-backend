@@ -135,6 +135,26 @@ const campaignSchema = new mongoose.Schema({
 
   note: { type: String, maxlength: 500 },
 
+   // Add Boberdoo integration fields
+   boberdoo_filter_set_id: {
+    type: String,
+    sparse: true,
+    index: true
+  },
+  boberdoo_sync_status: {
+    type: String,
+    enum: ['PENDING', 'SUCCESS', 'FAILED', 'NOT_SYNCED'],
+    default: 'NOT_SYNCED'
+  },
+  boberdoo_last_sync_at: {
+    type: Date,
+    default: null
+  },
+  boberdoo_last_error: {
+    type: String,
+    default: null
+  },
+
   createdAt: { 
     type: Date, 
     default: Date.now,

@@ -13,6 +13,16 @@ const LEAD_TYPE = {
   SIDING: 'SIDING',
   WINDOWS: 'WINDOWS',
 };
+const BOBERDOO_LEAD_TYPE_MAP = {
+  SOLAR_RESIDENTIAL: 33, // replace with actual ID
+  ROOFING: 35,           // replace with actual ID
+  SOLAR_COMMERCIAL: 33,
+  POWER_WASHING: 36,
+  ROOF_REJUVENATION: 37,
+  GUTTERS: 38,
+  SIDING: 39,
+  WINDOWS: 40,
+};
 
 const EXCLUSIVITY = {
   EXCLUSIVE: 'EXCLUSIVE',         // Lead sold to only 1 buyer
@@ -65,6 +75,7 @@ const PAYMENT_TYPE = {
 module.exports = {
   USER_ROLE,
   LEAD_TYPE,
+  BOBERDOO_LEAD_TYPE_MAP,
   EXCLUSIVITY,
   STATUS,
   DAYS_OF_WEEK,

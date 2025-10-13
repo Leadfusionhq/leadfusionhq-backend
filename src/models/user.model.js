@@ -144,6 +144,31 @@ baseUserSchema.pre('save', async function(next) {
     next(err);
   }
 });
+baseUserSchema.pre('findOneAndUpdate', async function(next) {
+  const update = this.getUpdate();
+
+  if (update.password) {
+    const salt = await bcrypt.genSalt(SALT_ROUNDS);
+    update.password = await bcrypt.hash(update.password, salt);
+    this.setUpdate(update);
+  }
+
+  next();
+});
+
+
+baseUserSchema.pre('findByIdAndUpdate', async function(next) {
+  const update = this.getUpdate();
+
+  if (update.password) {
+    const salt = await bcrypt.genSalt(SALT_ROUNDS);
+    update.password = await bcrypt.hash(update.password, salt);
+    this.setUpdate(update);
+  }
+
+  next();
+});
+
 
 // Method to compare passwords
 baseUserSchema.methods.comparePassword = async function(candidatePassword) {
