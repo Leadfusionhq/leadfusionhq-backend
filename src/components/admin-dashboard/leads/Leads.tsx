@@ -15,7 +15,8 @@ import FilterListIcon from '@mui/icons-material/FilterList';
 import ClearIcon from '@mui/icons-material/Clear';
 import { useSearchParams } from "next/navigation";
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-
+import ConfirmDialog from '@/components/common/ConfirmDialog';
+import { toast } from 'react-toastify';
 
 // Define Lead type
 type Lead = {
@@ -129,6 +130,57 @@ export default function LeadTable() {
     const handleMenuClose = () => {
       setMenuAnchorEl(null);
       setMenuRow(null);
+    };
+    const [deleteDialog, setDeleteDialog] = useState({
+      open: false,
+      lead: null as Lead | null,
+    });
+    
+    const handleDelete = (row: Lead) => {
+      setDeleteDialog({ open: true, lead: row });
+      handleMenuClose();
+    };
+    
+    const confirmDelete = async () => {
+      if (!deleteDialog.lead) return;
+    
+      try {
+        const response = await axiosWrapper(
+          "delete",
+          LEADS_API.DELETE_LEAD.replace(':leadId', deleteDialog.lead._id),
+          {},
+          token ?? undefined
+        ) as { 
+          result: { 
+            deleted: boolean;
+            lead_id: string;
+            message: string;
+          };
+          message: string;
+        };
+        
+        // ✅ Check if deletion was successful
+        if (response.result?.deleted) {
+          toast.success(response.message || response.result.message || 'Lead deleted successfully');
+          
+          // Close dialog
+          setDeleteDialog({ open: false, lead: null });
+          
+          // Refresh the table
+          fetchLeads(
+            pagination.page,
+            pagination.limit,
+            selectedCampaign,
+            selectedStatus,
+            selectedState
+          );
+        } else {
+          toast.error('Failed to delete lead');
+        }
+      } catch (err: any) {
+        console.error('Failed to delete lead:', err);
+        toast.error(err?.response?.data?.message || err?.message || 'Failed to delete lead');
+      }
     };
 
   const token = useSelector((state: RootState) => state.auth.token);
@@ -496,6 +548,8 @@ const hasFilters = !!(selectedCampaign || selectedStatus || selectedState);
   };
 
   return (
+    <>
+   
     <Box sx={{ padding: 2 }}>
       <div className="flex justify-between items-center pb-[30px]">
         <h3 className="text-[24px] text-[#1C1C1C] text-[Inter] font-semibold">List of Leads</h3>
@@ -590,7 +644,16 @@ const hasFilters = !!(selectedCampaign || selectedStatus || selectedState);
         >
           Edit
         </MenuItem>
-
+        {/* ✅ ADD THIS */}
+        <MenuItem
+          onClick={() => {
+            if (menuRow) handleDelete(menuRow);
+            handleMenuClose();
+          }}
+          sx={{ color: 'error.main' }}
+        >
+          Delete
+        </MenuItem>
         {/* Optional: add more lead actions here */}
         {/* <MenuItem onClick={() => { ... }}>Return Lead</MenuItem> */}
         {/* <MenuItem onClick={() => { ... }}>Delete Lead</MenuItem> */}
@@ -645,5 +708,13 @@ const hasFilters = !!(selectedCampaign || selectedStatus || selectedState);
       </Stack>
     </Popover>
     </Box>
+    <ConfirmDialog
+    open={deleteDialog.open}
+    title="Delete Lead"
+    message={`Are you sure you want to delete lead "${deleteDialog.lead?.first_name} ${deleteDialog.lead?.last_name}"? This action cannot be undone.`}
+    onConfirm={confirmDelete}
+    onCancel={() => setDeleteDialog({ open: false, lead: null })}
+  /> 
+  </>
   );
 }

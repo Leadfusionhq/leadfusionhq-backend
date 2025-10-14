@@ -109,7 +109,7 @@ export const CAMPAIGNS_API = {
   QUICK_SEARCH: `${CAMPAIGNS_API_BASE}/quick-search`,
   SEARCH_CAMPAIGNS: `${CAMPAIGNS_API_BASE}/search`,
   UPLOAD_CSV: `${CAMPAIGNS_API_BASE}/upload-csv`,
-  
+  DELETE_CAMPAIGN: `${CAMPAIGNS_API_BASE}/:campaignId`, 
 };
 
 /** ::::::::::::::::::LEADS ROUTES :::::::::::::::::: */
@@ -127,7 +127,7 @@ export const LEADS_API = {
   GET_LEADS_BY_CAMPAIGN:`${LEADS_API_BASE}/`,
   
   GET_LEADS_BY_CLIENT:`${LEADS_API_BASE}/client`,
-
+  DELETE_LEAD: `${LEADS_API_BASE}/:leadId`,  
   RETURN_LEAD:`${LEADS_API_BASE}/return`,
   GET_RETURN_LEADS: `${LEADS_API_BASE}/getReturnLeads`,
   APPROVE_RETURN_LEAD: `${LEADS_API_BASE}/returns/approve`,
