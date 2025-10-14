@@ -1,109 +1,202 @@
-const winston = require('winston');
-const path = require('path');
+const Log = require('../models/Log');
 
-// Create logs directory if it doesn't exist
-const fs = require('fs');
-const logsDir = path.join(__dirname, '../../logs');
-if (!fs.existsSync(logsDir)) {
-    fs.mkdirSync(logsDir, { recursive: true });
-}
+// Database logger helper function
+const saveToDatabase = async (logData) => {
+    try {
+        await Log.create({
+            level: logData.level.toUpperCase(),
+            message: logData.message,
+            logType: logData.logType || 'combined',
+            module: logData.module || 'GENERAL',
+            userId: logData.userId?.toString() || null,
+            metadata: logData.metadata || {},
+            rawLog: logData.rawLog,
+            timestamp: new Date()
+        });
+    } catch (error) {
+        // Silent fail - don't break the app if DB logging fails
+        console.error('Failed to save log to database:', error.message);
+    }
+};
 
-// Define log format
-const logFormat = winston.format.combine(
-    winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-    winston.format.errors({ stack: true }),
-    winston.format.printf(({ timestamp, level, message, stack, ...meta }) => {
-        let log = `${timestamp} [${level.toUpperCase()}]: ${message}`;
-        
-        // Add stack trace for errors
-        if (stack) {
-            log += `\n${stack}`;
-        }
-        
-        // Add metadata if present
-        if (Object.keys(meta).length > 0) {
-            log += `\nMetadata: ${JSON.stringify(meta, null, 2)}`;
-        }
-        
-        return log;
-    })
-);
+// Console logger (for development only)
+const consoleLog = (level, message, data = {}) => {
+    if (process.env.NODE_ENV !== 'production') {
+        const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
+        console.log(`[${timestamp}] [${level}] ${message}`, data);
+    }
+};
 
-// Create Winston logger
-const logger = winston.createLogger({
-    level: process.env.LOG_LEVEL || 'info',
-    format: logFormat,
-    transports: [
-        // Write all logs to combined.log
-        new winston.transports.File({ 
-            filename: path.join(logsDir, 'combined.log'),
-            maxsize: 5242880, // 5MB
-            maxFiles: 5
-        }), 
-        
-        // Write error logs to error.log
-        new winston.transports.File({ 
-            filename: path.join(logsDir, 'error.log'), 
-            level: 'error',
-            maxsize: 5242880, // 5MB
-            maxFiles: 5
-        }),
-        
-        // Write billing specific logs
-        new winston.transports.File({ 
-            filename: path.join(logsDir, 'billing.log'),
-            level: 'info',
-            maxsize: 5242880, // 5MB
-            maxFiles: 5,
-            format: winston.format.combine(
-                winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-                winston.format.printf(({ timestamp, level, message, service, ...meta }) => {
-                    if (service === 'billing') {
-                        let log = `${timestamp} [${level.toUpperCase()}] [BILLING]: ${message}`;
-                        if (Object.keys(meta).length > 0) {
-                            log += `\nData: ${JSON.stringify(meta, null, 2)}`;
-                        }
-                        return log;
-                    }
-                    return false; // Don't log non-billing messages to billing.log
-                })
-            )
-        })
-    ]
-});
-
-// Add console transport for development
-if (process.env.NODE_ENV !== 'production') {
-    logger.add(new winston.transports.Console({
-        format: winston.format.combine(
-            winston.format.colorize(),
-            winston.format.simple()
-        )
-    }));
-}
-
-// Create billing-specific logger
+// Billing Logger
 const billingLogger = {
     info: (message, data = {}) => {
-        logger.info(message, { service: 'billing', ...data });
+        consoleLog('INFO', `[BILLING] ${message}`, data);
+        
+        saveToDatabase({
+            level: 'INFO',
+            message,
+            logType: 'billing',
+            module: 'BILLING',
+            userId: data.user_id,
+            metadata: data,
+            rawLog: `[INFO] [BILLING]: ${message}`
+        });
     },
     error: (message, error = null, data = {}) => {
-        const logData = { service: 'billing', ...data };
-        if (error) {
-            logData.error = error.message || error;
-            logData.stack = error.stack;
-        }
-        logger.error(message, logData);
+        consoleLog('ERROR', `[BILLING] ${message}`, { ...data, error: error?.message });
+        
+        saveToDatabase({
+            level: 'ERROR',
+            message,
+            logType: 'error',
+            module: 'BILLING',
+            userId: data.user_id,
+            metadata: { ...data, error: error?.message, stack: error?.stack },
+            rawLog: `[ERROR] [BILLING]: ${message}`
+        });
     },
     warn: (message, data = {}) => {
-        logger.warn(message, { service: 'billing', ...data });
+        consoleLog('WARN', `[BILLING] ${message}`, data);
+        
+        saveToDatabase({
+            level: 'WARN',
+            message,
+            logType: 'billing',
+            module: 'BILLING',
+            userId: data.user_id,
+            metadata: data,
+            rawLog: `[WARN] [BILLING]: ${message}`
+        });
     },
     debug: (message, data = {}) => {
-        logger.debug(message, { service: 'billing', ...data });
+        consoleLog('DEBUG', `[BILLING] ${message}`, data);
+        
+        saveToDatabase({
+            level: 'DEBUG',
+            message,
+            logType: 'billing',
+            module: 'BILLING',
+            userId: data.user_id,
+            metadata: data,
+            rawLog: `[DEBUG] [BILLING]: ${message}`
+        });
+    }
+};
+
+// Lead Logger
+const leadLogger = {
+    info: (message, data = {}) => {
+        consoleLog('INFO', `[LEAD] ${message}`, data);
+        
+        saveToDatabase({
+            level: 'INFO',
+            message,
+            logType: 'combined',
+            module: 'LEAD',
+            userId: data.user_id,
+            metadata: data,
+            rawLog: `[INFO] [LEAD]: ${message}`
+        });
+    },
+    error: (message, error = null, data = {}) => {
+        consoleLog('ERROR', `[LEAD] ${message}`, { ...data, error: error?.message });
+        
+        saveToDatabase({
+            level: 'ERROR',
+            message,
+            logType: 'error',
+            module: 'LEAD',
+            userId: data.user_id,
+            metadata: { ...data, error: error?.message, stack: error?.stack },
+            rawLog: `[ERROR] [LEAD]: ${message}`
+        });
+    },
+    warn: (message, data = {}) => {
+        consoleLog('WARN', `[LEAD] ${message}`, data);
+        
+        saveToDatabase({
+            level: 'WARN',
+            message,
+            logType: 'combined',
+            module: 'LEAD',
+            userId: data.user_id,
+            metadata: data,
+            rawLog: `[WARN] [LEAD]: ${message}`
+        });
+    },
+    debug: (message, data = {}) => {
+        consoleLog('DEBUG', `[LEAD] ${message}`, data);
+        
+        saveToDatabase({
+            level: 'DEBUG',
+            message,
+            logType: 'combined',
+            module: 'LEAD',
+            userId: data.user_id,
+            metadata: data,
+            rawLog: `[DEBUG] [LEAD]: ${message}`
+        });
+    }
+};
+
+// General Logger (for other modules)
+const logger = {
+    info: (message, data = {}) => {
+        consoleLog('INFO', message, data);
+        
+        saveToDatabase({
+            level: 'INFO',
+            message,
+            logType: 'combined',
+            module: data.module || 'GENERAL',
+            userId: data.user_id,
+            metadata: data,
+            rawLog: `[INFO]: ${message}`
+        });
+    },
+    error: (message, error = null, data = {}) => {
+        consoleLog('ERROR', message, { ...data, error: error?.message });
+        
+        saveToDatabase({
+            level: 'ERROR',
+            message,
+            logType: 'error',
+            module: data.module || 'GENERAL',
+            userId: data.user_id,
+            metadata: { ...data, error: error?.message, stack: error?.stack },
+            rawLog: `[ERROR]: ${message}`
+        });
+    },
+    warn: (message, data = {}) => {
+        consoleLog('WARN', message, data);
+        
+        saveToDatabase({
+            level: 'WARN',
+            message,
+            logType: 'combined',
+            module: data.module || 'GENERAL',
+            userId: data.user_id,
+            metadata: data,
+            rawLog: `[WARN]: ${message}`
+        });
+    },
+    debug: (message, data = {}) => {
+        consoleLog('DEBUG', message, data);
+        
+        saveToDatabase({
+            level: 'DEBUG',
+            message,
+            logType: 'combined',
+            module: data.module || 'GENERAL',
+            userId: data.user_id,
+            metadata: data,
+            rawLog: `[DEBUG]: ${message}`
+        });
     }
 };
 
 module.exports = {
     logger,
-    billingLogger
+    billingLogger,
+    leadLogger
 };

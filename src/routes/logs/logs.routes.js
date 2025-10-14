@@ -1,7 +1,7 @@
 const express = require('express');
 const logsRouter = express.Router();
 const logsController = require('../../controllers/logs/logs.controller');
-
+const Log = require('../../models/Log');  // ADD THIS LINE
 const API = {
   LOGS_INFO: '/',
   BILLING_LOGS: '/billing',
@@ -12,7 +12,12 @@ const API = {
   CLEAR_BILLING: '/clear/billing',
   CLEAR_COMBINED: '/clear/combined',
   CLEAR_ERRORS: '/clear/errors',
-  CLEAR_ALL: '/clear/all'
+  CLEAR_ALL: '/clear/all',
+
+  SYNC_LOGS: '/sync/:logType',  // NEW
+  SYNC_ALL: '/sync'              // NEW
+
+
 };
 
  
@@ -54,6 +59,13 @@ logsRouter.delete(API.CLEAR_ERRORS, logsController.clearErrorLogs);
 // Clear all logs
 // DELETE /api/logs/clear/all
 logsRouter.delete(API.CLEAR_ALL, logsController.clearAllLogs);
+
+// POST /api/logs/sync/billing
+logsRouter.post(API.SYNC_LOGS, logsController.syncLogs);
+
+// Sync all logs to database
+// POST /api/logs/sync
+logsRouter.post(API.SYNC_ALL, logsController.syncAllLogs);
 
 
 // Info endpoint for Logs API

@@ -14,7 +14,8 @@ const API = {
     QUICK_SEARCH: '/quick-search',    
     GET_CAMPAIGN:'/:campaignId',
     UPDATE_CAMPAIGN:'/:campaignId',
-    SEARCH_CAMPAIGNS: '/search',    
+    SEARCH_CAMPAIGNS: '/search',   
+    DELETE_CAMPAIGN:'/:campaignId' 
 };
 campaignRouter.use(
     checkAuth,
@@ -63,6 +64,9 @@ campaignRouter.put(
     celebrate(CampaignSchema.updateCampaign), 
     campaignController.updateCampaign
 );
-
+campaignRouter.delete(
+    API.DELETE_CAMPAIGN,
+    campaignController.deleteCampaign
+);
 
 module.exports = campaignRouter;
