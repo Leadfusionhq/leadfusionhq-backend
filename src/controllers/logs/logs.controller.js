@@ -2,7 +2,7 @@ const { wrapAsync } = require('../../utils/wrap-async');
 const { sendResponse } = require('../../utils/response');
 const LogsService = require('../../services/logs/logs.service');
 const { ErrorHandler } = require('../../utils/error-handler');
-
+const Log = require('../../models/Log');  // ADD THIS LINE
 // Get billing logs
 const getBillingLogs = wrapAsync(async (req, res) => {
     const { page = 1, limit = 50, search } = req.query;
@@ -88,6 +88,33 @@ const clearAllLogs = wrapAsync(async (req, res) => {
     const result = await LogsService.clearAllLogFiles();
     return sendResponse(res, result, result.message);
 });
+// Sync specific log type to database
+const syncLogs = wrapAsync(async (req, res) => {
+    const { logType } = req.params;
+    
+    const result = await LogsService.syncFileLogsToDatabase(logType);
+    
+    return sendResponse(res, result, `${logType} logs synced successfully`);
+});
+
+// Sync all logs to database
+const syncAllLogs = wrapAsync(async (req, res) => {
+    const logTypes = ['billing', 'combined', 'error'];
+    const results = [];
+    let totalSynced = 0;
+    
+    for (const logType of logTypes) {
+        const result = await LogsService.syncFileLogsToDatabase(logType);
+        results.push({ logType, ...result });
+        totalSynced += result.synced || 0;
+    }
+    
+    return sendResponse(res, {
+        results,
+        totalSynced,
+        message: `Synced ${totalSynced} logs to database`
+    }, 'All logs synced successfully');
+});
 
 module.exports = {
     getBillingLogs,
@@ -98,5 +125,7 @@ module.exports = {
     clearBillingLogs,
     clearCombinedLogs,
     clearErrorLogs,
-    clearAllLogs
+    clearAllLogs,
+    syncLogs,      // NEW
+    syncAllLogs    // NEW
 };

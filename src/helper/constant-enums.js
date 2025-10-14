@@ -15,8 +15,8 @@ const LEAD_TYPE = {
 };
 const BOBERDOO_LEAD_TYPE_MAP = {
   SOLAR_RESIDENTIAL: 33, // replace with actual ID
-  ROOFING: 35,           // replace with actual ID
-  SOLAR_COMMERCIAL: 33,
+  ROOFING: 34,           // replace with actual ID
+  SOLAR_COMMERCIAL: 35,
   POWER_WASHING: 36,
   ROOF_REJUVENATION: 37,
   GUTTERS: 38,

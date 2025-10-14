@@ -109,5 +109,9 @@ leadRouter.put(
     celebrate(LeadSchema.updateLead), 
     leadController.updateLead
 );
-
+// Add this route in lead.route.js (before module.exports)
+leadRouter.delete(
+    API.DELETE_LEAD,  // '/:leadId'
+    leadController.deleteLead
+);
 module.exports = leadRouter;

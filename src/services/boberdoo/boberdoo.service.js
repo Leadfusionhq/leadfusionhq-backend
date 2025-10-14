@@ -406,6 +406,94 @@ async function createCampaignInBoberdoo(campaignData, partnerId) {
   }
 }
 
+// Update an existing campaign in Boberdoo
+async function updateCampaignInBoberdoo(campaignData, filterSetId, partnerId) {
+  try {
+    const leadTypeId = CONSTANT_ENUM.BOBERDOO_LEAD_TYPE_MAP[campaignData.lead_type];
+    if (!leadTypeId) {
+      return {
+        success: false,
+        error: `Invalid lead type: ${campaignData.lead_type}`
+      };
+    }
+
+    if (!filterSetId) {
+      return {
+        success: false,
+        error: 'Filter_Set_ID is required for update'
+      };
+    }
+
+    console.log(`\n🔄 Syncing campaign ${campaignData._id || campaignData.campaign_id} to Boberdoo (update)...`);
+
+    // Prepare payload for update
+    const payload = {
+      Key: CAMPAIGN_API_KEY,
+      API_Action: CREATE_CAMPAIGN_ACTION,
+      Format: 'json',
+      Mode: 'update',
+      TYPE: leadTypeId,
+      Filter_Set_ID: filterSetId,
+      Partner_ID: partnerId,
+      Filter_Set_Name: campaignData.name,
+      Filter_Set_Price: campaignData.bid_price || 0,
+      Accepted_Sources: campaignData.accepted_sources?.join(',') || '-all-',
+      Match_Priority: campaignData.match_priority || 5,
+      Hourly_Limit: campaignData.hourly_limit ?? 0,
+      Daily_Limit: campaignData.daily_limit ?? 0,
+      Weekly_Limit: campaignData.weekly_limit ?? 0,
+      Monthly_Limit: campaignData.monthly_limit ?? 0,
+      Accept_Only_Reprocessed_Leads: 'Yes',
+      Filter_Set_Status: campaignData.status === 'ACTIVE' ? 1 : 0
+    };
+
+    console.log('[boberdoo] Updating campaign:', {
+      filterSetId,
+      name: campaignData.name,
+      partnerId,
+      price: payload.Filter_Set_Price,
+      leadType: payload.TYPE
+    });
+
+    // Send update request
+    const response = await axios.post(CAMPAIGN_API_URL, null, {
+      params: payload,
+      timeout: TIMEOUT_MS,
+      validateStatus: () => true
+    });
+
+    console.log('[boberdoo] Raw API response:', response.data);
+
+    const data = typeof response.data === 'string' ? safeJson(response.data) : response.data;
+
+    // Check success
+    if (data?.response?.status === 'Success') {
+      console.log(`✅ Campaign ${campaignData._id || campaignData.campaign_id} updated successfully in Boberdoo`);
+      return {
+        success: true,
+        filterSetId,
+        data
+      };
+    }
+
+    const errors = toErrorList(data).join('; ');
+    console.warn(`❌ Failed to update campaign ${campaignData._id || campaignData.campaign_id} in Boberdoo: ${errors}`);
+
+    return {
+      success: false,
+      error: errors || 'Failed to update campaign in Boberdoo',
+      data
+    };
+
+  } catch (error) {
+    console.error('[boberdoo] Campaign update error:', error.message);
+    return {
+      success: false,
+      error: error.message || 'Failed to update campaign in Boberdoo'
+    };
+  }
+}
+
 
 
 
@@ -413,5 +501,6 @@ async function createCampaignInBoberdoo(campaignData, partnerId) {
 
 module.exports = { 
   syncUserToBoberdooById
-  ,createCampaignInBoberdoo
+  ,createCampaignInBoberdoo,
+  updateCampaignInBoberdoo
  };

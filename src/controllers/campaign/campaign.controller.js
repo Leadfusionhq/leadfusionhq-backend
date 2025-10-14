@@ -125,6 +125,16 @@ const quickSearchCampaigns = wrapAsync(async (req, res) => {
 
     sendResponse(res, { data }, "Quick search completed successfully", 200);
 });
+const deleteCampaign = wrapAsync(async (req, res) => {
+  const { _id: user_id, role } = req.user;
+  const { campaignId } = req.params;
+
+  const result = await CampaignServices.deleteCampaign(campaignId, user_id, role);
+  
+  sendResponse(res, { result }, result.message, 200);
+});
+
+
 module.exports = {
     createCampaign,
     createCampaignByAdmin,
@@ -133,4 +143,5 @@ module.exports = {
     updateCampaign,
     searchCampaigns,
     quickSearchCampaigns, 
+    deleteCampaign
 };

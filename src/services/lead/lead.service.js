@@ -650,7 +650,6 @@ const rejectReturnLead = async (leadId, returnStatus) => {
 };
 const approveReturnLead = async(leadId, returnStatus) => {
   try {
-
     const lead = await Lead.findById(leadId);
 
     if (!lead) {
@@ -678,11 +677,10 @@ const approveReturnLead = async(leadId, returnStatus) => {
       throw new ErrorHandler(404, 'User not found for this campaign');
     }
 
-    let refundedAmount = 0;
+    // ✅ Add refund directly to user balance
     if (bid_price > 0) {
-      user.refundMoney = (user.refundMoney || 0) + bid_price;
+      user.balance = (user.balance || 0) + bid_price;
       await user.save();
-      refundedAmount = bid_price;
     }
 
     lead.return_status = returnStatus;
@@ -690,19 +688,52 @@ const approveReturnLead = async(leadId, returnStatus) => {
 
     return {
       lead: lead.toObject(),
-      refund: refundedAmount > 0 
-        ? {
-            user_id: user._id,
-            refunded_amount: refundedAmount,
-            total_refund: user.refundMoney,
-          }
-        : null, 
+      message: bid_price > 0 
+        ? `Refund of $${bid_price} added to user balance. New balance: $${user.balance}`
+        : 'Lead return approved',
     };
   } catch (error) {
     throw new ErrorHandler(
       error.statusCode || 500,
       error.message || 'Failed to approve return request'
     );
+  }
+};
+
+// Permanent delete lead
+const deleteLead = async (leadId, userId, role) => {
+  try {
+    // Non-admin users can only delete their own leads
+    if (role !== CONSTANT_ENUM.USER_ROLE.ADMIN) {
+      // Get lead's campaign to check ownership
+      const lead = await Lead.findById(leadId).populate('campaign_id');
+      
+      if (!lead) {
+        throw new ErrorHandler(404, 'Lead not found');
+      }
+      
+      if (lead.campaign_id.user_id.toString() !== userId.toString()) {
+        throw new ErrorHandler(403, 'Access denied: You can only delete your own leads');
+      }
+    }
+
+    // Permanently delete the lead
+    const deletedLead = await Lead.findByIdAndDelete(leadId);
+
+    if (!deletedLead) {
+      throw new ErrorHandler(404, 'Lead not found');
+    }
+
+    console.log(`✅ Lead ${leadId} permanently deleted by user ${userId}`);
+    
+    return {
+      deleted: true,
+      lead_id: leadId,
+      message: 'Lead permanently deleted from database'
+    };
+  } catch (error) {
+    console.error('❌ deleteLead error:', error);
+    throw new ErrorHandler(error.statusCode || 500, error.message || 'Failed to delete lead');
   }
 };
 
@@ -724,5 +755,5 @@ module.exports = {
   approveReturnLead,
   getLeadCountByCampaignId,
   getCampaignByLead,
-
+  deleteLead
 };
