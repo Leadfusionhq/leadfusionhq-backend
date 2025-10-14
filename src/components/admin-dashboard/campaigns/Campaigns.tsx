@@ -14,6 +14,8 @@ import { useRouter } from 'next/navigation';
 import customStyles from '@/components/common/dataTableStyles';
 import { STATUS, LEAD_TYPE, EXCLUSIVITY, LANGUAGE } from "@/constants/enums";
 import MoreVertIcon from '@mui/icons-material/MoreVert';
+import { toast } from 'react-toastify';
+import ConfirmDialog from '@/components/common/ConfirmDialog';
 
 // Define User type
 type User = {
@@ -109,6 +111,60 @@ const handleViewLeads = (row: Campaign) => {
   router.push(`/admin/leads?campaign_id=${row._id}`);
 };
 
+
+const [deleteDialog, setDeleteDialog] = useState({
+  open: false,
+  campaign: null as Campaign | null,
+});
+
+const handleDelete = (row: Campaign) => {
+  setDeleteDialog({ open: true, campaign: row });
+  handleMenuClose();
+};
+
+const confirmDelete = async () => {
+  if (!deleteDialog.campaign) return;
+
+  try {
+    const response = await axiosWrapper(
+      "delete",
+      CAMPAIGNS_API.DELETE_CAMPAIGN.replace(':campaignId', deleteDialog.campaign._id),
+      {},
+      token ?? undefined
+    ) as { 
+      result: { 
+        deleted: boolean;
+        campaign_id: string;
+        leads_deleted: number;
+        message: string;
+      };
+      message: string;
+    };
+    
+    // ✅ Check if deletion was successful
+    if (response.result?.deleted) {
+      toast.success(response.message || response.result.message || 'Campaign deleted successfully');
+      
+      // Close dialog
+      setDeleteDialog({ open: false, campaign: null });
+      
+      // Refresh the table
+      fetchCampaigns(
+        pagination.page,
+        pagination.limit,
+        selectedUser,
+        selectedState,
+        selectedStatus,
+        selectedLeadType
+      );
+    } else {
+      toast.error('Failed to delete campaign');
+    }
+  } catch (err: any) {
+    console.error('Failed to delete campaign:', err);
+    toast.error(err?.response?.data?.message || err?.message || 'Failed to delete campaign');
+  }
+};
 
 
 
@@ -475,7 +531,9 @@ const leadTypes = Object.values(LEAD_TYPE);
   };
 
   return (
-    <Box sx={{ padding: 2 }}>
+    <>
+
+  <Box sx={{ padding: 2 }}>
       <div className="flex justify-between items-center pb-[30px]">
         <h3 className="text-[24px] text-[#1C1C1C] text-[Inter] font-semibold">List of Campaigns</h3>
         <IconButton aria-label="filter" onClick={handleFilterClick}>
@@ -701,7 +759,27 @@ const leadTypes = Object.values(LEAD_TYPE);
       >
         View Leads
       </MenuItem>
+      {/* ✅ ADD THIS */}
+      <MenuItem
+        onClick={() => {
+          if (menuRow) handleDelete(menuRow);
+          handleMenuClose();
+        }}
+        sx={{ color: 'error.main' }}
+      >
+        Delete
+      </MenuItem>
     </Menu>
-    </Box>
+  </Box>
+ 
+  <ConfirmDialog
+    open={deleteDialog.open}
+    title="Delete Campaign"
+    message={`Are you sure you want to delete campaign "${deleteDialog.campaign?.name}" and all its associated leads? This action cannot be undone.`}
+    onConfirm={confirmDelete}
+    onCancel={() => setDeleteDialog({ open: false, campaign: null })}
+  />    
+  </>
+
   );
 }

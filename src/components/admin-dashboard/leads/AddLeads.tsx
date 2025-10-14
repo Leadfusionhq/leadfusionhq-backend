@@ -69,9 +69,15 @@ const AddLeadPage = () => {
       toast.success(response?.message || "Lead added successfully!");
       resetForm();
       router.push("/admin/leads");
-    } catch (err) {
+    }catch (err: any) {
       console.error("Error adding lead:", err);
-      toast.error("An error occurred while adding the lead.");
+      
+      // ✅ CORRECT: axiosWrapper already extracts response.data
+      // So err = { error: true, message: "Insufficient funds..." }
+      const errorMessage = err?.message || "An error occurred while adding the lead.";
+      
+      console.error("Displaying error:", errorMessage);
+      toast.error(errorMessage);
     } finally {
       setSubmitting(false);
     }

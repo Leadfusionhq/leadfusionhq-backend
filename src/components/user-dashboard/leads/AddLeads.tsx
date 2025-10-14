@@ -54,22 +54,28 @@ const AddLeadPage = () => {
     { setSubmitting, resetForm }: { setSubmitting: (isSubmitting: boolean) => void; resetForm: () => void }
   ) => {
     const cleanedValues = cleanLeadValues(values);
-
+  
     try {
       setSubmitting(true);
-
+  
       const response = await axiosWrapper(
         "post",
         LEADS_API.CREATE_LEAD,
         cleanedValues,
         token ?? undefined
       ) as { message?: string };
-
+  
       toast.success(response?.message || "Lead added successfully!");
       resetForm();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error adding lead:", err);
-      toast.error("An error occurred while adding the lead.");
+      
+      // ✅ CORRECT: axiosWrapper already extracts response.data
+      // So err = { error: true, message: "Insufficient funds..." }
+      const errorMessage = err?.message || "An error occurred while adding the lead.";
+      
+      console.error("Displaying error:", errorMessage);
+      toast.error(errorMessage);
     } finally {
       setSubmitting(false);
     }
