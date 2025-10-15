@@ -896,8 +896,7 @@ export default function LogsTable() {
         }`}
         onConfirm={handleClearLogs}
         onCancel={() => setClearDialog(false)}
-        confirmText="Clear Logs"
-        cancelText="Cancel"
+       
       />
     </>
   );
