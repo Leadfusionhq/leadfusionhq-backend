@@ -3,7 +3,7 @@ const { sendResponse } = require('../../utils/response');
 const LeadServices = require('../../services/lead/lead.service.js');
 const NotificationServices = require('../../services/notification/notification.service');
 const { ErrorHandler } = require('../../utils/error-handler');
-const Lead = require('../../models/lead.model.js'); 
+const Lead = require('../../models/lead.model.js');
 const CONSTANT_ENUM = require('../../helper/constant-enums.js');
 const { randomNumberGenerate, isEmpty } = require('../../utils/utils');
 const { getPaginationParams, extractFilters } = require('../../utils/pagination');
@@ -89,16 +89,16 @@ const getLeads = wrapAsync(async (req, res) => {
     const isAdmin = req.user.role === CONSTANT_ENUM.USER_ROLE.ADMIN;
 
     let data;
-// after
-if (isAdmin) {
-    const allowedFilterKeys = ['campaign_id', 'status', 'state'];
-    const filters = extractFilters(req.query, allowedFilterKeys);
-    data = await LeadServices.getLeads(page, limit, filters);
-  } else {
-    const allowedFilterKeys = ['campaign_id', 'status', 'state'];
-    const filters = extractFilters(req.query, allowedFilterKeys);
-    data = await LeadServices.getLeadByUserId(page, limit, user._id, filters);
-  }
+    // after
+    if (isAdmin) {
+        const allowedFilterKeys = ['campaign_id', 'status', 'state'];
+        const filters = extractFilters(req.query, allowedFilterKeys);
+        data = await LeadServices.getLeads(page, limit, filters);
+    } else {
+        const allowedFilterKeys = ['campaign_id', 'status', 'state'];
+        const filters = extractFilters(req.query, allowedFilterKeys);
+        data = await LeadServices.getLeadByUserId(page, limit, user._id, filters);
+    }
 
     sendResponse(res, data, "Leads fetched successfully", 200);
 });
@@ -111,21 +111,183 @@ const getReturnLeads = wrapAsync(async (req, res) => {
     sendResponse(res, data, "Return leads fetched successfully", 200);
 });
 
+// ✅ Updated rejectReturnLead with logging
 const rejectReturnLead = wrapAsync(async (req, res) => {
-  const { lead_id, return_status } = req.body;
+    const { lead_id, return_status } = req.body;
+    
+    const logMeta = {
+        user_id: req?.user?._id,
+        user_role: req?.user?.role,
+        lead_id: lead_id,
+        return_status: return_status,
+        route: req.originalUrl,
+    };
 
-  result = await LeadServices.rejectReturnLead(lead_id, return_status);
+    try {
+        leadLogger.info('Starting lead return rejection process', logMeta);
 
-  sendResponse(res, result, 'Lead return rejected successfully', 200);
+        // Validate input
+        if (!lead_id || !return_status) {
+            leadLogger.warn('Missing required fields for lead return rejection', {
+                ...logMeta,
+                missingFields: {
+                    lead_id: !lead_id,
+                    return_status: !return_status
+                }
+            });
+            throw new ErrorHandler(400, 'Lead ID and return status are required');
+        }
+
+        // Get lead details before rejection
+        const lead = await Lead.findById(lead_id).populate('campaign_id user_id');
+        
+        if (!lead) {
+            leadLogger.error('Lead not found for rejection', logMeta);
+            throw new ErrorHandler(404, 'Lead not found');
+        }
+
+        leadLogger.info('Lead details retrieved for rejection', {
+            ...logMeta,
+            campaign_id: lead.campaign_id?._id,
+            owner_user_id: lead.user_id?._id,
+            current_return_status: lead.return_status
+        });
+
+        // Process rejection
+        const result = await LeadServices.rejectReturnLead(lead_id, return_status);
+
+        leadLogger.info('Lead return rejected successfully', {
+            ...logMeta,
+            previous_status: lead.return_status,
+            new_status: return_status,
+            result: result
+        });
+
+        // Optionally send notification to lead owner
+        try {
+            if (lead.user_id && lead.user_id.email) {
+                // You can add email notification here if needed
+                leadLogger.info('Lead owner notified of rejection', {
+                    ...logMeta,
+                    owner_email: lead.user_id.email
+                });
+            }
+        } catch (notificationErr) {
+            leadLogger.error('Failed to notify lead owner of rejection', notificationErr, {
+                ...logMeta,
+                error: notificationErr.message
+            });
+        }
+
+        leadLogger.info('Lead return rejection process completed', logMeta);
+        sendResponse(res, result, 'Lead return rejected successfully', 200);
+
+    } catch (err) {
+        leadLogger.error('Error during lead return rejection', err, {
+            ...logMeta,
+            error: err.message,
+            stack: err.stack
+        });
+        throw err;
+    }
 });
 
-const approveReturnLead = wrapAsync(async (req, res) =>{
+
+// ✅ Updated approveReturnLead with logging
+const approveReturnLead = wrapAsync(async (req, res) => {
     const { lead_id, return_status } = req.body;
+    
+    const logMeta = {
+        user_id: req?.user?._id,
+        user_role: req?.user?.role,
+        lead_id: lead_id,
+        return_status: return_status,
+        route: req.originalUrl,
+    };
 
-    result = await LeadServices.approveReturnLead(lead_id, return_status);
+    try {
+        leadLogger.info('Starting lead return approval process', logMeta);
 
-    sendResponse(res, result, 'Lead return approved successfully', 200);
-})
+        // Validate input
+        if (!lead_id || !return_status) {
+            leadLogger.warn('Missing required fields for lead return approval', {
+                ...logMeta,
+                missingFields: {
+                    lead_id: !lead_id,
+                    return_status: !return_status
+                }
+            });
+            throw new ErrorHandler(400, 'Lead ID and return status are required');
+        }
+
+        // Get lead details before approval
+        const lead = await Lead.findById(lead_id)
+            .populate('campaign_id')
+            .populate('user_id')
+            .populate('address.state');
+        
+        if (!lead) {
+            leadLogger.error('Lead not found for approval', logMeta);
+            throw new ErrorHandler(404, 'Lead not found');
+        }
+
+        leadLogger.info('Lead details retrieved for approval', {
+            ...logMeta,
+            campaign_id: lead.campaign_id?._id,
+            campaign_name: lead.campaign_id?.name,
+            owner_user_id: lead.user_id?._id,
+            owner_email: lead.user_id?.email,
+            current_return_status: lead.return_status,
+            return_reason: lead.return_reason
+        });
+
+        // Process approval
+        const result = await LeadServices.approveReturnLead(lead_id, return_status);
+
+        leadLogger.info('Lead return approved successfully', {
+            ...logMeta,
+            previous_status: lead.return_status,
+            new_status: return_status,
+            result: result
+        });
+
+        // Send notification to lead owner
+        try {
+            if (lead.user_id && lead.user_id.email) {
+                // You can add email notification here
+                leadLogger.info('Lead owner notified of approval', {
+                    ...logMeta,
+                    owner_email: lead.user_id.email,
+                    owner_name: lead.user_id.name
+                });
+
+                // Optional: Send email to lead owner
+                // await MAIL_HANDLER.sendLeadReturnApprovalEmail({
+                //     userEmail: lead.user_id.email,
+                //     userName: lead.user_id.name,
+                //     lead: lead,
+                //     campaign: lead.campaign_id
+                // });
+            }
+        } catch (notificationErr) {
+            leadLogger.error('Failed to notify lead owner of approval', notificationErr, {
+                ...logMeta,
+                error: notificationErr.message
+            });
+        }
+
+        leadLogger.info('Lead return approval process completed', logMeta);
+        sendResponse(res, result, 'Lead return approved successfully', 200);
+
+    } catch (err) {
+        leadLogger.error('Error during lead return approval', err, {
+            ...logMeta,
+            error: err.message,
+            stack: err.stack
+        });
+        throw err;
+    }
+});
 
 // Get single lead by ID
 const getLeadById = wrapAsync(async (req, res) => {
@@ -158,51 +320,120 @@ const updateLead = wrapAsync(async (req, res) => {
     sendResponse(res, { result }, 'Lead has been updated successfully', 200);
 });
 
-const returnLead = wrapAsync(async(req, res)=> {
-    console.log(req.body);
+const returnLead = wrapAsync(async (req, res) => {
+    const { lead_id, return_status, return_reason, return_comments } = req.body;
 
-    const { lead_id, return_status } = req.body;
+    const logMeta = {
+        user_id: req?.user?._id,
+        lead_id: lead_id,
+        return_status: return_status,
+        return_reason: return_reason,
+        route: req.originalUrl,
+    };
 
-    const result = await LeadServices.returnLead(lead_id, return_status);
-    const campaign = await LeadServices.getCampaignByLead(lead_id);
-
-    // const lead = await Lead.findById(lead_id); 
-    const lead = await Lead.findById(lead_id).populate('address.state');
-    
     try {
-        const adminUsers = await User.find({ role: 'ADMIN' }); 
-        
-        if (adminUsers && adminUsers.length > 0) {
-            const adminEmails = adminUsers.map(admin => admin.email).filter(Boolean);
-            
-            if (adminEmails.length > 0) {
-                await MAIL_HANDLER.sendLeadReturnEmail({
-                    adminEmails: adminEmails,
-                    lead: lead,
-                    campaign: campaign,
-                    returnedBy: req.user?.name || req.user?.email || 'User',
-                    returnStatus: return_status,
-                });
-                
-                console.log(`Lead return email sent to ${adminEmails.length} admin(s)`);
-            }
-        }
-    } catch (err) {
-        console.error('Failed to send lead return email to admins:', err.message);
-    }
+        leadLogger.info('Starting lead return process', logMeta);
 
-    sendResponse(res, { result }, 'Lead return request submitted successfully', 200);
+        // Validate input
+        if (!lead_id || !return_status) {
+            leadLogger.warn('Missing required fields for lead return', {
+                ...logMeta,
+                missingFields: {
+                    lead_id: !lead_id,
+                    return_status: !return_status
+                }
+            });
+            throw new ErrorHandler(400, 'Lead ID and return status are required');
+        }
+
+        // Process the return
+        const result = await LeadServices.returnLead(
+            lead_id,
+            return_status,
+            return_reason,
+            return_comments
+        );
+
+        leadLogger.info('Lead return processed successfully', {
+            ...logMeta,
+            result: result
+        });
+
+        // Get campaign and lead details
+        const campaign = await LeadServices.getCampaignByLead(lead_id);
+        const lead = await Lead.findById(lead_id).populate('address.state');
+
+        if (!lead) {
+            leadLogger.error('Lead not found after return process', logMeta);
+            throw new ErrorHandler(404, 'Lead not found');
+        }
+
+        leadLogger.info('Retrieved lead and campaign details', {
+            ...logMeta,
+            campaign_id: campaign?._id,
+            campaign_name: campaign?.name
+        });
+
+        // Send email notification to admins
+        try {
+            const adminUsers = await User.find({ role: 'ADMIN' });
+
+            if (adminUsers && adminUsers.length > 0) {
+                const adminEmails = adminUsers.map(admin => admin.email).filter(Boolean);
+
+                if (adminEmails.length > 0) {
+                    await MAIL_HANDLER.sendLeadReturnEmail({
+                        adminEmails: adminEmails,
+                        lead: lead,
+                        campaign: campaign,
+                        returnedBy: req.user?.name || req.user?.email || 'User',
+                        returnStatus: return_status,
+                        returnReason: return_reason,
+                        returnComments: return_comments,
+                    });
+
+                    leadLogger.info('Lead return email sent to admins', {
+                        ...logMeta,
+                        adminCount: adminEmails.length,
+                        adminEmails: adminEmails
+                    });
+                } else {
+                    leadLogger.warn('No valid admin emails found', logMeta);
+                }
+            } else {
+                leadLogger.warn('No admin users found in system', logMeta);
+            }
+        } catch (emailErr) {
+            leadLogger.error('Failed to send lead return email to admins', emailErr, {
+                ...logMeta,
+                error: emailErr.message,
+                stack: emailErr.stack
+            });
+            // Don't throw - email failure shouldn't break the return process
+        }
+
+        leadLogger.info('Lead return process completed successfully', logMeta);
+        sendResponse(res, { result }, 'Lead return request submitted successfully', 200);
+
+    } catch (err) {
+        leadLogger.error('Error during lead return process', err, {
+            ...logMeta,
+            error: err.message,
+            stack: err.stack
+        });
+        throw err;
+    }
 });
 
-    // Delete lead (soft delete or hard delete based on role)
-    const deleteLead = wrapAsync(async (req, res) => {
-        const { _id: user_id, role } = req.user;
-        const { leadId } = req.params;
-    
-        const result = await LeadServices.deleteLead(leadId, user_id, role);
-        console.log(res, { result }, 'Lead has been permanently deleted', 200);
-        sendResponse(res, { result }, 'Lead has been permanently deleted', 200);
-    });
+// Delete lead (soft delete or hard delete based on role)
+const deleteLead = wrapAsync(async (req, res) => {
+    const { _id: user_id, role } = req.user;
+    const { leadId } = req.params;
+
+    const result = await LeadServices.deleteLead(leadId, user_id, role);
+    console.log(res, { result }, 'Lead has been permanently deleted', 200);
+    sendResponse(res, { result }, 'Lead has been permanently deleted', 200);
+});
 
 // Validate CSV format and return sample data
 const validateCSV = wrapAsync(async (req, res) => {
@@ -212,10 +443,10 @@ const validateCSV = wrapAsync(async (req, res) => {
 
     try {
         const validation = await LeadServices.validateCSVFormat(req.file.path, 10);
-        
+
         // Clean up temp file after validation
         cleanupTempFile(req.file.path);
-        
+
         sendResponse(res, validation, 'CSV validation completed', 200);
     } catch (error) {
         // Clean up temp file on error
@@ -237,8 +468,8 @@ const uploadCSV = wrapAsync(async (req, res) => {
     // Parse column mapping
     let mappings;
     try {
-        mappings = typeof column_mapping === 'string' 
-            ? JSON.parse(column_mapping) 
+        mappings = typeof column_mapping === 'string'
+            ? JSON.parse(column_mapping)
             : column_mapping;
     } catch (error) {
         // Clean up uploaded file on error
@@ -248,11 +479,11 @@ const uploadCSV = wrapAsync(async (req, res) => {
 
     // Validate mappings before processing
     const requiredFields = [
-        'first_name', 'last_name', 'phone_number', 
+        'first_name', 'last_name', 'phone_number',
         'address.street', 'address.city', 'address.state', 'address.zip', 'campaign_id'
     ];
-        // sendResponse(res, { mappings }, 'CSV processing started successfully', 202);
-    
+    // sendResponse(res, { mappings }, 'CSV processing started successfully', 202);
+
     const mappedDbColumns = Object.values(mappings);
     const missingRequired = requiredFields.filter(field => !mappedDbColumns.includes(field));
 
@@ -263,7 +494,7 @@ const uploadCSV = wrapAsync(async (req, res) => {
 
     try {
         const data = await LeadServices.processCSVUpload(
-            req.file.path, 
+            req.file.path,
             user_id, // Admin can process for any campaign
             mappings
         );
@@ -308,7 +539,7 @@ const getProcessingJobs = wrapAsync(async (req, res) => {
         // Admin can see all processing jobs
         const JobStatus = require('../../models/jobStatus.model');
         const skip = (page - 1) * limit;
-        
+
         const [jobs, total] = await Promise.all([
             JobStatus.find({})
                 .populate('userId', 'name email')
@@ -342,7 +573,7 @@ const cancelProcessingJob = wrapAsync(async (req, res) => {
     const isAdmin = req.user.role === CONSTANT_ENUM.USER_ROLE.ADMIN;
 
     const JobStatus = require('../../models/jobStatus.model');
-    
+
     const filter = { _id: jobId };
     if (!isAdmin) {
         filter.userId = user_id;
@@ -386,7 +617,7 @@ const retryProcessingJob = wrapAsync(async (req, res) => {
     const isAdmin = req.user.role === CONSTANT_ENUM.USER_ROLE.ADMIN;
 
     const JobStatus = require('../../models/jobStatus.model');
-    
+
     const filter = { _id: jobId };
     if (!isAdmin) {
         filter.userId = user_id;
@@ -439,7 +670,7 @@ const getLeadsByCampaign = wrapAsync(async (req, res) => {
     const isAdmin = req.user.role === CONSTANT_ENUM.USER_ROLE.ADMIN;
 
     const filters = { campaign_id: campaignId };
-    
+
     let data;
     if (isAdmin) {
         data = await LeadServices.getLeads(page, limit, filters);
@@ -447,11 +678,11 @@ const getLeadsByCampaign = wrapAsync(async (req, res) => {
         // Verify user has access to this campaign
         const Campaign = require('../../models/campaign.model');
         const campaign = await Campaign.findById(campaignId);
-        
+
         if (!campaign || campaign.user_id.toString() !== user_id.toString()) {
             throw new ErrorHandler(403, 'Access denied to this campaign');
         }
-        
+
         data = await LeadServices.getLeads(page, limit, filters);
     }
 
@@ -482,9 +713,9 @@ const bulkUpdateLeads = wrapAsync(async (req, res) => {
         updatedAt: new Date()
     });
 
-    sendResponse(res, { 
+    sendResponse(res, {
         matchedCount: result.matchedCount,
-        modifiedCount: result.modifiedCount 
+        modifiedCount: result.modifiedCount
     }, 'Bulk update completed successfully', 200);
 });
 
@@ -495,11 +726,11 @@ const getLeadStats = wrapAsync(async (req, res) => {
     const { campaignId } = req.query;
 
     let matchFilter = {};
-    
+
     if (!isAdmin) {
         matchFilter.user_id = user_id;
     }
-    
+
     if (campaignId) {
         matchFilter.campaign_id = campaignId;
     }
@@ -593,7 +824,7 @@ const exportLeads = wrapAsync(async (req, res) => {
         });
 
         const csvString = csv.getHeaderString() + csv.stringifyRecords(leads);
-        
+
         res.setHeader('Content-Type', 'text/csv');
         res.setHeader('Content-Disposition', 'attachment; filename=leads-export.csv');
         res.send(csvString);

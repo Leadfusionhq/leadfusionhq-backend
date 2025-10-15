@@ -201,6 +201,20 @@ const returnLead = {
       .messages({
         'any.only': 'Return status must be "Pending"',
       }),
+      return_reason: Joi.string()
+      .valid(
+        'invalid_contact',
+        'duplicate',
+        'not_interested',
+        'wrong_location',
+        'poor_quality',
+        'other'
+      )
+      .required(),
+    return_comments: Joi.string()
+      .max(1000)
+      .allow('', null)
+      .optional(),
   }),
 };
 

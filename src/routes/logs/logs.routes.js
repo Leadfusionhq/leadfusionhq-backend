@@ -15,10 +15,16 @@ const API = {
   CLEAR_ALL: '/clear/all',
 
   SYNC_LOGS: '/sync/:logType',  // NEW
-  SYNC_ALL: '/sync'              // NEW
+  SYNC_ALL: '/sync'   ,           // NEW
 
-
+  
+  GET_ALL_LOGS: '/all',
+  GET_LOG_DETAIL: '/:id',
+ 
+  CLEAR_LOGS: '/clear',
+  EXPORT_LOGS: '/export',
 };
+
 
  
 
@@ -68,55 +74,55 @@ logsRouter.post(API.SYNC_LOGS, logsController.syncLogs);
 logsRouter.post(API.SYNC_ALL, logsController.syncAllLogs);
 
 
-// Info endpoint for Logs API
+// GET /api/logs/all?page=1&limit=50&level=error&source=AuthService&startDate=2024-01-01&endDate=2024-01-31&message=failed
+logsRouter.get(API.GET_ALL_LOGS, logsController.getAllLogs);
+
+// Get single log detail
+// GET /api/logs/:id
+logsRouter.get(API.GET_LOG_DETAIL, logsController.getLogDetail);
+
+// Get log statistics
+// GET /api/logs/stats
+logsRouter.get(API.STATS, logsController.getLogStats);
+
+// Clear logs with filters
+// DELETE /api/logs/clear?level=debug&beforeDate=2024-01-01
+logsRouter.delete(API.CLEAR_LOGS, logsController.clearLogs);
+
+// Export logs as CSV/JSON
+// GET /api/logs/export?format=csv&level=error
+logsRouter.get(API.EXPORT_LOGS, logsController.exportLogs);
+
+// Info endpoint
 logsRouter.get(API.LOGS_INFO, (req, res) => {
   res.json({
     message: 'LeadFusionHQ Logs API',
-    version: '1.0.0',
+    version: '2.0.0',
     siteURL: 'https://api.leadfusionhq.com',
     baseUrl: '/api/logs',
     endpoints: {
       logs: {
-        billingLogs: 'GET /api/logs/billing?page=1&limit=50&search=userId',
-        combinedLogs: 'GET /api/logs/combined?page=1&limit=50&search=error',
-        errorLogs: 'GET /api/logs/errors?page=1&limit=50',
-        searchLogs: 'GET /api/logs/search?query=payment&page=1&limit=50&logType=billing'
+        getAllLogs: 'GET /api/logs/all?page=1&limit=50&level=error&source=AuthService&startDate=2024-01-01&endDate=2024-01-31&message=failed',
+        getLogDetail: 'GET /api/logs/:id',
+        exportLogs: 'GET /api/logs/export?format=csv&level=error'
       },
       statistics: {
         getStats: 'GET /api/logs/stats'
       },
-      clear: {
-        clearBillingLogs: 'DELETE /api/logs/clear/billing',
-        clearCombinedLogs: 'DELETE /api/logs/clear/combined',
-        clearErrorLogs: 'DELETE /api/logs/clear/errors',
-        clearAllLogs: 'DELETE /api/logs/clear/all'
+      management: {
+        clearLogs: 'DELETE /api/logs/clear?level=debug&beforeDate=2024-01-01'
       }
     },
-    logTypes: {
-      billing: 'Billing-specific logs with [BILLING] tag',
-      combined: 'All application logs from all services',
-      error: 'Error logs only with stack traces'
-    },
+    logLevels: ['info', 'warn', 'error', 'debug'],
     queryParameters: {
       page: 'Page number for pagination (default: 1)',
-      limit: 'Number of logs per page (default: 50, max: 100)',
-      search: 'Search term to filter logs',
-      query: 'Search query for cross-file search',
-      logType: 'Log type for search: billing, combined, error, or all (default: all)'
-    },
-    security: {
-      auth: 'No authentication required - Public access',
-      roles: 'Open access for all users'
-    },
-    features: [
-      'Real-time log access',
-      'Pagination support',
-      'Search functionality',
-      'Cross-file search',
-      'Structured JSON responses',
-      'Log statistics and file info',
-      'Clear log files functionality'
-    ]
+      limit: 'Number of logs per page (default: 50, max: 200)',
+      level: 'Filter by log level: info, warn, error, debug',
+      source: 'Filter by source (e.g., AuthService, API-Gateway)',
+      message: 'Search in message field (case-insensitive)',
+      startDate: 'Filter logs from this date (ISO format)',
+      endDate: 'Filter logs until this date (ISO format)'
+    }
   });
 });
 module.exports = logsRouter;
