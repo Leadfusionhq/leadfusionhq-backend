@@ -12,6 +12,7 @@ interface ConfirmDialogProps {
   open: boolean;
   title?: string;
   message?: string;
+  
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -21,6 +22,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   title = "Confirm Action",
   message = "Are you sure you want to proceed?",
   onConfirm,
+
   onCancel,
 }) => {
   return (
