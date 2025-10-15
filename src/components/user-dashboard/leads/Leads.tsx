@@ -10,6 +10,7 @@ import { Skeleton, Box, Button, Typography } from "@mui/material";
 import Link from 'next/link';
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
+import ReturnFeedbackModal from "@/components/common/ReturnFeedbackModal";
 
 // Define Lead type
 type Lead = {
@@ -67,7 +68,8 @@ export default function LeadTable() {
   const [totalRows, setTotalRows] = useState<number>(0);
   const router = useRouter();
   const token = useSelector((state: RootState) => state.auth.token);
-
+  const [returnModalOpen, setReturnModalOpen] = useState(false);
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   // Fetch leads with pagination
   const fetchLeads = useCallback(
     async (pageNumber: number, pageSize: number) => {
@@ -235,6 +237,61 @@ export default function LeadTable() {
     }
   };
 
+  const handleReturnClick = (row: Lead) => {
+    const currentStatus = (row.return_status || 'Not Returned').trim();
+    
+    if ((row.return_attempts || 0) >= (row.max_return_attempts || 2)) {
+      toast.warning("You have reached the maximum return attempts for this lead.");
+      return;
+    }
+    
+    if (currentStatus !== 'Not Returned' && currentStatus !== 'Rejected') {
+      toast.warning("This lead has already been marked for return.");
+      return;
+    }
+
+    setSelectedLead(row);
+    setReturnModalOpen(true);
+  };
+
+  const handleReturnConfirm = async (leadId: string, reason: string, comments: string) => {
+    try {
+      setLoading(true);
+
+      const payload = {
+        lead_id: leadId,
+        return_status: 'Pending',
+        return_reason: reason,
+        return_comments: comments,
+      };
+
+      const response = await axiosWrapper(
+        "post",
+        LEADS_API.RETURN_LEAD,
+        payload,
+        token ?? undefined
+      ) as ApiResponse;
+
+      console.log("Return Lead Response:", response);
+
+      // Refresh the leads list
+      await fetchLeads(pagination.page, pagination.limit);
+
+      toast.success("Lead return request submitted successfully!");
+    } catch (err: any) {
+      console.error("Failed to return lead:", err);
+      const message = err?.response?.data?.message || err?.message || "Failed to submit return request. Please try again.";
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleReturnCancel = () => {
+    setReturnModalOpen(false);
+    setSelectedLead(null);
+  };
+
 
 
   // Columns for the lead table
@@ -383,7 +440,7 @@ export default function LeadTable() {
                 height: "28px",
                 textTransform: "capitalize",
               }}
-              onClick={() => handleReturn(row)}
+              onClick={() => handleReturnClick(row)}
             >
               Return
             </Button>
@@ -466,6 +523,15 @@ export default function LeadTable() {
             </Typography>
           ) : null
         }
+      />
+
+       {/* Return Feedback Modal */}
+       <ReturnFeedbackModal
+        open={returnModalOpen}
+        leadId={selectedLead?._id || ''}
+        leadName={selectedLead ? `${selectedLead.first_name} ${selectedLead.last_name}` : ''}
+        onConfirm={handleReturnConfirm}
+        onCancel={handleReturnCancel}
       />
     </Box>
   );

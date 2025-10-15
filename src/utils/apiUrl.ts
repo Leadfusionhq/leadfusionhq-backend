@@ -251,3 +251,13 @@ export const GEOCODING_API = {
     VALIDATE_ADDRESS: `${GEOCODING_API_BASE}/validate`,
     REVERSE_GEOCODE: `${GEOCODING_API_BASE}/reverse`,
 };
+
+const LOGS_API_Base = `${API_BASE}/logs`;
+
+export const LOGS_API = {
+  GET_ALL_LOGS: `${LOGS_API_Base}/all`,
+  GET_LOG_DETAIL: (id: string) => `${LOGS_API_Base}/${id}`,
+  GET_STATS: `${LOGS_API_Base}/stats`,
+  CLEAR_LOGS: `${LOGS_API_Base}/clear`,
+  EXPORT_LOGS: `${LOGS_API_Base}/export`,
+};

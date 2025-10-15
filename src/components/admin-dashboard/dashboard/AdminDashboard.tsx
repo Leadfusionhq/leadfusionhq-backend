@@ -5,11 +5,11 @@ import { useSelector } from 'react-redux';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Users, DollarSign, FileText, CheckCircle, XCircle, Calendar, TrendingUp } from 'lucide-react';
 import { Skeleton } from '@mui/material';
-
+import Link from 'next/link';
 import axiosWrapper from "@/utils/api";
 import { API_URL, BILLING_API, LEADS_API } from "@/utils/apiUrl";
 import { RootState } from '@/redux/store';
-
+import { Activity, AlertCircle } from 'lucide-react'
 interface DashboardStats {
   totalUsers: number;
   totalRevenue: number;
@@ -55,7 +55,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState<boolean>(true);
   const [revenueLoading, setRevenueLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Revenue and date range state
   const [revenueRange, setRevenueRange] = useState<'today' | '7d' | '30d' | 'mtd' | 'ytd' | 'all'>('mtd');
   const [revenueWindow, setRevenueWindow] = useState<{ from?: string; to?: string } | null>(null);
@@ -95,7 +95,7 @@ export default function AdminDashboard() {
   // Fetch revenue data separately to allow independent updates
   const fetchRevenue = async () => {
     if (!token) return;
-    
+
     setRevenueLoading(true);
     try {
       const revenueResp = await axiosWrapper(
@@ -104,17 +104,17 @@ export default function AdminDashboard() {
         {},
         token ?? undefined
       ) as RevenueResponse;
-      
+
       // Support both response shapes with proper typing
       const r = revenueResp?.data || revenueResp;
       const totalRevenue = Number(r?.totalAmount ?? 0);
-      
+
       setStats(prev => ({ ...prev, totalRevenue }));
-      setRevenueWindow({ 
-        from: r?.from || '', 
-        to: r?.to || '' 
+      setRevenueWindow({
+        from: r?.from || '',
+        to: r?.to || ''
       });
-      
+
       console.log('Revenue response:', r);
     } catch (err) {
       console.error('Error fetching revenue:', err);
@@ -221,10 +221,10 @@ export default function AdminDashboard() {
         });
 
         const chartData = chartDays.map((date) => {
-          const dayName = daysToShow <= 7 
+          const dayName = daysToShow <= 7
             ? date.toLocaleDateString('en-US', { weekday: 'short' })
             : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-          
+
           const dayStart = new Date(date);
           dayStart.setHours(0, 0, 0, 0);
           const dayEnd = new Date(date);
@@ -232,17 +232,17 @@ export default function AdminDashboard() {
 
           const qualifiedCount = leadsList.filter((lead: any) => {
             const leadDate = new Date(lead.createdAt);
-            return lead.status === 'active' && 
-                   leadDate >= dayStart && 
-                   leadDate <= dayEnd;
+            return lead.status === 'active' &&
+              leadDate >= dayStart &&
+              leadDate <= dayEnd;
           }).length;
 
           const disqualifiedCount = leadsList.filter((lead: any) => {
             const leadDate = new Date(lead.createdAt);
-            return lead.return_status && 
-                   lead.return_status !== 'Not Returned' && 
-                   leadDate >= dayStart && 
-                   leadDate <= dayEnd;
+            return lead.return_status &&
+              lead.return_status !== 'Not Returned' &&
+              leadDate >= dayStart &&
+              leadDate <= dayEnd;
           }).length;
 
           return {
@@ -354,7 +354,7 @@ export default function AdminDashboard() {
             </p>
 
           </div>
-          
+
           {/* Global Date Filter */}
           {/* <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg shadow-sm border border-gray-200">
             <Calendar className="w-4 h-4 text-gray-500" />
@@ -368,6 +368,13 @@ export default function AdminDashboard() {
               <option value="mtd">Month to Date</option>
             </select>
           </div> */}
+          {/* ✅ ADD THIS - View Logs Button */}
+          <Link href="/admin/logs">
+            <button className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors shadow-sm">
+              <Activity className="w-4 h-4" />
+              View Logs
+            </button>
+          </Link>
         </div>
       </div>
 
@@ -426,7 +433,7 @@ export default function AdminDashboard() {
             </p>
             {revenueWindow?.from && revenueWindow?.to && (
               <p className="text-xs text-gray-500 mt-2">
-                {new Date(revenueWindow.from).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - 
+                {new Date(revenueWindow.from).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} -
                 {' '}{new Date(revenueWindow.to).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
               </p>
             )}
@@ -477,9 +484,9 @@ export default function AdminDashboard() {
             <ResponsiveContainer width="100%" height={150}>
               <LineChart data={leadChartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis 
-                  dataKey="name" 
-                  tick={{ fontSize: 11 }} 
+                <XAxis
+                  dataKey="name"
+                  tick={{ fontSize: 11 }}
                   stroke="#94a3b8"
                   interval={leadDateRange === '30d' ? 4 : 0}
                 />
@@ -524,9 +531,9 @@ export default function AdminDashboard() {
             <ResponsiveContainer width="100%" height={150}>
               <LineChart data={leadChartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis 
-                  dataKey="name" 
-                  tick={{ fontSize: 11 }} 
+                <XAxis
+                  dataKey="name"
+                  tick={{ fontSize: 11 }}
                   stroke="#94a3b8"
                   interval={leadDateRange === '30d' ? 4 : 0}
                 />
