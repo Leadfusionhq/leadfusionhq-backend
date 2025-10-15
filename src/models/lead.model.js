@@ -211,6 +211,19 @@ const leadSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+    // ✅ ONLY ADD THESE TWO SIMPLE FIELDS
+    return_reason: {
+      type: String,
+      trim: true,
+      default: null
+    },
+    return_comments: {
+      type: String,
+      maxlength: 1000,
+      trim: true,
+      default: null
+    },
+    
   max_return_attempts: {
     type: Number,
     default: 2

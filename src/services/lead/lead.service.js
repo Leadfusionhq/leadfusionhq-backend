@@ -552,7 +552,7 @@ const getCampaignByLead = async (leadId) => {
   }
 };
 
-const returnLead = async (leadId, returnStatus) => {
+const returnLead = async (leadId, returnStatus, returnReason, returnComments) => {
   try {
     const lead = await Lead.findById(leadId);
 
@@ -564,7 +564,7 @@ const returnLead = async (leadId, returnStatus) => {
     const attempts = lead.return_attempts ?? 0;
     const maxAttempts = lead.max_return_attempts ?? 2;
 
-    if (currentStatus !== 'Not Returned' && currentStatus !== 'Rejected' ) {
+    if (currentStatus !== 'Not Returned' && currentStatus !== 'Rejected') {
       throw new ErrorHandler(400, 'This lead has already been marked for return');
     }
 
@@ -572,8 +572,11 @@ const returnLead = async (leadId, returnStatus) => {
       throw new ErrorHandler(400, 'Maximum return attempts reached for this lead');
     }
 
-    lead.return_status = returnStatus; 
-    lead.return_attempts = attempts + 1;
+    // ✅ Update with reason and comments
+    lead.return_status = returnStatus;
+    lead.return_attempts = attempts + 1; 
+    lead.return_reason = returnReason;
+    lead.return_comments = returnComments;
 
     await lead.save();
 
