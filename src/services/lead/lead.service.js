@@ -12,12 +12,14 @@ const { User } = require('../../models/user.model.js');
 
 const createLead = async (data, options = {}) => {
   try {
-    const { session } = options;
+    const { session, transaction_id, original_cost } = options;
 
     // 🔥 LOG: Check incoming data
     console.log('📥 createLead service received data:', JSON.stringify(data, null, 2));
     console.log('📍 Incoming coordinates:', data.address?.coordinates);
     console.log('🆔 Incoming place_id:', data.address?.place_id);
+    console.log('💰 Transaction ID:', transaction_id);
+    console.log('💵 Original Cost:', original_cost);
 
     // 🔥 FIX: Ensure coordinates are properly formatted
     if (data.address?.coordinates) {
@@ -48,6 +50,14 @@ const createLead = async (data, options = {}) => {
       }
     }
 
+    // ✅ ADD: Store transaction_id and original_cost if provided
+    if (transaction_id) {
+      data.transaction_id = transaction_id;
+    }
+    if (original_cost !== undefined && original_cost !== null) {
+      data.original_cost = original_cost;
+    }
+
     console.log('📤 Data being saved to MongoDB:', JSON.stringify(data, null, 2));
 
     // Create lead
@@ -63,6 +73,8 @@ const createLead = async (data, options = {}) => {
     console.log('✅ Lead created successfully');
     console.log('📍 Saved coordinates:', populatedLead.address?.coordinates);
     console.log('🆔 Saved place_id:', populatedLead.address?.place_id);
+    console.log('💰 Saved transaction_id:', populatedLead.transaction_id);
+    console.log('💵 Saved original_cost:', populatedLead.original_cost);
 
     return populatedLead;
   } catch (error) {
@@ -652,6 +664,8 @@ const rejectReturnLead = async (leadId, returnStatus) => {
   }
 };
 const approveReturnLead = async(leadId, returnStatus) => {
+  const Transaction = require('../../models/transaction.model');
+  
   try {
     const lead = await Lead.findById(leadId);
 
@@ -669,7 +683,7 @@ const approveReturnLead = async(leadId, returnStatus) => {
       throw new ErrorHandler(404, 'Campaign not found for this lead');
     }
 
-    const { bid_price = 0, user_id } = campaign;
+    const { user_id } = campaign;
 
     if (!user_id) {
       throw new ErrorHandler(400, 'Campaign is missing user_id');
@@ -680,20 +694,78 @@ const approveReturnLead = async(leadId, returnStatus) => {
       throw new ErrorHandler(404, 'User not found for this campaign');
     }
 
-    // ✅ Add refund directly to user balance
-    if (bid_price > 0) {
-      user.balance = (user.balance || 0) + bid_price;
-      await user.save();
+    let originalLeadCost = 0;
+    let transactionId = null;
+    let fetchMethod = 'unknown';
+
+    // ✅ PRIORITY 1: Get from stored original_cost (for new leads)
+    if (lead.original_cost && lead.original_cost > 0) {
+      originalLeadCost = lead.original_cost;
+      transactionId = lead.transaction_id;
+      fetchMethod = 'stored_in_lead';
+      
+      console.log('✅ Using stored original_cost from lead:', originalLeadCost);
+    } 
+    // ✅ PRIORITY 2: Get from stored transaction_id reference
+    else if (lead.transaction_id) {
+      const transaction = await Transaction.findById(lead.transaction_id);
+      
+      if (transaction) {
+        originalLeadCost = Math.abs(transaction.amount);
+        transactionId = transaction._id;
+        fetchMethod = 'transaction_by_id';
+        
+        console.log('✅ Fetched from transaction by stored ID:', originalLeadCost);
+      }
     }
+    
+    // ✅ PRIORITY 3: Fallback - search by user and time (for old leads)
+    if (originalLeadCost <= 0) {
+      const transaction = await Transaction.findOne({
+        user_id: user_id,
+        createdAt: { 
+          $gte: new Date(lead.createdAt.getTime() - 10000), // 10 seconds before
+          $lte: new Date(lead.createdAt.getTime() + 10000)  // 10 seconds after
+        }
+      }).sort({ createdAt: 1 });
+
+      if (transaction) {
+        originalLeadCost = Math.abs(transaction.amount);
+        transactionId = transaction._id;
+        fetchMethod = 'transaction_by_time';
+        
+        console.log('⚠️ Fallback: Fetched from transaction by time:', originalLeadCost);
+      }
+    }
+
+    // ✅ Final validation
+    if (originalLeadCost <= 0) {
+      throw new ErrorHandler(404, 'Original transaction/cost not found for this lead. Cannot process refund.');
+    }
+
+    // ✅ Process refund
+    const previousBalance = user.balance || 0;
+    user.balance = previousBalance + originalLeadCost;
+    await user.save();
 
     lead.return_status = returnStatus;
     await lead.save();
 
+    console.log(`✅ Refund processed: $${originalLeadCost} added to user ${user_id}`);
+    console.log(`   Previous balance: $${previousBalance}`);
+    console.log(`   New balance: $${user.balance}`);
+    console.log(`   Fetch method: ${fetchMethod}`);
+
     return {
       lead: lead.toObject(),
-      message: bid_price > 0 
-        ? `Refund of $${bid_price} added to user balance. New balance: $${user.balance}`
-        : 'Lead return approved',
+      originalLeadCost,
+      currentBidPrice: campaign.bid_price,
+      refundedAmount: originalLeadCost,
+      transactionId,
+      fetchMethod,
+      previousBalance,
+      newBalance: user.balance,
+      message: `Refund of $${originalLeadCost} added to user balance. New balance: $${user.balance}`,
     };
   } catch (error) {
     throw new ErrorHandler(
