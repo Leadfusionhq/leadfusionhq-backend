@@ -178,6 +178,18 @@ const leadSchema = new mongoose.Schema({
       required: false,
     },
   },
+
+  transaction_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Transaction',
+      default: null,
+      index: true // Add index for faster queries
+  },
+  original_cost: {
+      type: Number,
+      default: 0,
+      min: 0
+  },
   
   // Additional Information
   note: {

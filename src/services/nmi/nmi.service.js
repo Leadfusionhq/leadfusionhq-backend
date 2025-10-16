@@ -6,44 +6,56 @@ const dayjs = require('dayjs');
 const { XMLParser } = require('fast-xml-parser');
 const NMI_QUERY_URL = process.env.NMI_QUERY_URL;
 const { User } = require('../../models/user.model');
-const formatForNmi = (d) => dayjs(d).format('MM/DD/YYYY');
+// const formatForNmi = (d) => dayjs(d).format('MM/DD/YYYY');
+const axios = require('axios');
+const qs = require('querystring');
 
-// ✅ Safe parser for NMI response (JSON | XML | NVP)
-const safeParseNmiResponse = (resp) => {
-  const raw = typeof resp === 'string' ? resp : (resp?.data ?? '');
-  const text = (raw || '').trim();
-  if (!text) throw new Error('Empty response from NMI');
+const formatForNmi = (dayjsObj) => {
+  return dayjsObj.format('YYYYMMDDHHmmss');
+};
 
-  // Try JSON first
-  try {
-    if (text.startsWith('{') || text.startsWith('[')) {
-      return { obj: JSON.parse(text), raw: text };
+const parseXmlResponse = (xmlString) => {
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    attributeNamePrefix: '',
+    parseAttributeValue: true,
+    parseTagValue: true,
+    trimValues: true,
+    numberParseOptions: {
+      hex: false,
+      leadingZeros: false,
+      skipLike: /[a-zA-Z]/
     }
-  } catch {}
+  });
 
-  // Try XML
-  if (text.startsWith('<')) {
-    const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '' });
-    const obj = parser.parse(text);
-    return { obj, raw: text };
+  try {
+    return parser.parse(xmlString);
+  } catch (error) {
+    console.error('❌ NMI XML Parse Error:', error.message);
+    throw new Error('Failed to parse NMI XML response');
+  }
+};
+
+const extractRecordsFromXml = (obj) => {
+  if (!obj?.nm_response) {
+    console.warn('⚠️ NMI: No response data found');
+    return [];
   }
 
-  // Fallback: name-value pairs (key=value&key2=value2)
-  const nvp = {};
-  text.split('&').forEach((pair) => {
-    const [k, v = ''] = pair.split('=');
-    if (k) nvp[k] = decodeURIComponent(v.replace(/\+/g, ' '));
-  });
-  return { obj: nvp, raw: text };
+  const response = obj.nm_response;
+
+  if (!response.transaction) {
+    console.warn('⚠️ NMI: No transactions in response');
+    return [];
+  }
+
+  let transactions = Array.isArray(response.transaction)
+    ? response.transaction
+    : [response.transaction];
+
+  return transactions;
 };
 
-// ✅ Extract records array from NMI response
-const extractRecords = (obj) => {
-  const recs = obj?.records?.record || obj?.report?.records?.record || obj?.record || [];
-  return Array.isArray(recs) ? recs : (recs ? [recs] : []);
-};
-
-// ✅ Get revenue from NMI (sales)
 const getRevenueFromNmi = async ({ start, end }) => {
   const payload = {
     security_key: SECURITY_KEY,
@@ -51,25 +63,61 @@ const getRevenueFromNmi = async ({ start, end }) => {
     start_date: formatForNmi(start),
     end_date: formatForNmi(end),
     action_type: 'sale',
-    response: '1',
-    output: 'JSON', // uppercase can help
+    transaction_type: 'cc',
   };
 
-  const resp = await fetchWrapper('POST', NMI_QUERY_URL, payload, null, false, true);
-  const { obj, raw } = safeParseNmiResponse(resp);
+  // ✅ Add this log to see exact dates being sent
+  console.log('📅 NMI Query Dates:', {
+    start: start.format('YYYY-MM-DD HH:mm:ss'),
+    end: end.format('YYYY-MM-DD HH:mm:ss'),
+    start_formatted: formatForNmi(start),
+    end_formatted: formatForNmi(end),
+  });
 
-  // Optional: detect NMI errors
-  if (obj?.error || obj?.['error-response'] || obj?.result === 'ERROR') {
-    throw new Error(`NMI error: ${JSON.stringify(obj).slice(0, 500)}`);
+  try {
+    const response = await axios.post(
+      NMI_QUERY_URL,
+      qs.stringify(payload),
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+    );
+
+    const obj = parseXmlResponse(response.data);
+
+    if (obj.nm_response?.error) {
+      throw new Error(`NMI error: ${obj.nm_response.error}`);
+    }
+
+    const records = extractRecordsFromXml(obj);
+
+    const totalAmount = records.reduce((sum, r) => {
+      const isComplete = r.condition === 'complete';
+      const isSuccessful = r.action?.success === 1;
+
+      if (!isComplete || !isSuccessful) {
+        return sum;
+      }
+
+      const amountInCents = parseFloat(r.action?.amount) || 0;
+      const amountInDollars = amountInCents / 100;
+
+      return sum + amountInDollars;
+    }, 0);
+
+    const successfulCount = records.filter(r => r.condition === 'complete' && r.action?.success === 1).length;
+
+    console.log(`💰 NMI Sales: ${successfulCount} transactions, total: $${totalAmount.toFixed(2)}`);
+
+    return {
+      totalAmount: parseFloat(totalAmount.toFixed(2)),
+      count: successfulCount,
+      raw: obj
+    };
+  } catch (error) {
+    console.error('❌ NMI Sale Query Failed:', error.message);
+    throw error;
   }
-
-  const records = extractRecords(obj);
-  const totalAmount = records.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0);
-
-  return { totalAmount, count: records.length, raw: obj };
 };
 
-// ✅ Get refunds from NMI
 const getRefundsFromNmi = async ({ start, end }) => {
   const payload = {
     security_key: SECURITY_KEY,
@@ -77,17 +125,51 @@ const getRefundsFromNmi = async ({ start, end }) => {
     start_date: formatForNmi(start),
     end_date: formatForNmi(end),
     action_type: 'refund',
-    response: '1',
-    output: 'JSON',
+    transaction_type: 'cc',
   };
 
-  const resp = await fetchWrapper('POST', NMI_QUERY_URL, payload, null, false, true);
-  const { obj } = safeParseNmiResponse(resp);
+  try {
+    const response = await axios.post(
+      NMI_QUERY_URL,
+      qs.stringify(payload),
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+    );
 
-  const records = extractRecords(obj);
-  const totalAmount = records.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0);
+    const obj = parseXmlResponse(response.data);
 
-  return { totalAmount, count: records.length, raw: obj };
+    if (obj.nm_response?.error) {
+      throw new Error(`NMI error: ${obj.nm_response.error}`);
+    }
+
+    const records = extractRecordsFromXml(obj);
+
+    const totalAmount = records.reduce((sum, r) => {
+      const isComplete = r.condition === 'complete';
+      const isSuccessful = r.action?.success === 1;
+
+      if (!isComplete || !isSuccessful) {
+        return sum;
+      }
+
+      const amountInCents = parseFloat(r.action?.amount) || 0;
+      const amountInDollars = amountInCents / 100;
+
+      return sum + amountInDollars;
+    }, 0);
+
+    const successfulCount = records.filter(r => r.condition === 'complete' && r.action?.success === 1).length;
+
+    console.log(`💸 NMI Refunds: ${successfulCount} transactions, total: $${totalAmount.toFixed(2)}`);
+
+    return {
+      totalAmount: parseFloat(totalAmount.toFixed(2)),
+      count: successfulCount,
+      raw: obj
+    };
+  } catch (error) {
+    console.error('❌ NMI Refund Query Failed:', error.message);
+    throw error;
+  }
 };
 
 // ... existing functions (createCustomerVault, chargeCustomerVault, etc.) ...
@@ -100,7 +182,7 @@ const createCustomerVault = async (cardInfo) => {
     ...cardInfo
   };
 
-  billingLogger.info('Creating NMI customer vault', { 
+  billingLogger.info('Creating NMI customer vault', {
     cardLast4: cardInfo.ccnumber ? cardInfo.ccnumber.slice(-4) : 'N/A',
     billingName: `${cardInfo.billing_first_name} ${cardInfo.billing_last_name}`
   });
@@ -116,14 +198,14 @@ const createCustomerVault = async (cardInfo) => {
       true   // formEncoded = true
     );
 
-    billingLogger.info('NMI vault creation response received', { 
+    billingLogger.info('NMI vault creation response received', {
       responseLength: response ? response.length : 0,
       cardLast4: cardInfo.ccnumber ? cardInfo.ccnumber.slice(-4) : 'N/A'
     });
 
     return response; // raw text from NMI
   } catch (error) {
-    billingLogger.error('NMI vault creation failed', error, { 
+    billingLogger.error('NMI vault creation failed', error, {
       cardLast4: cardInfo.ccnumber ? cardInfo.ccnumber.slice(-4) : 'N/A'
     });
     throw error;
@@ -133,7 +215,7 @@ const createCustomerVault = async (cardInfo) => {
 // In nmi.service.js - Update chargeCustomerVault function
 
 const chargeCustomerVault = async (customerVaultId, amount, description = '') => {
-  billingLogger.info('Starting NMI charge process', { 
+  billingLogger.info('Starting NMI charge process', {
     vaultId: customerVaultId,
     amount,
     description
@@ -159,16 +241,16 @@ const chargeCustomerVault = async (customerVaultId, amount, description = '') =>
   const result = await User.aggregate([
     { $unwind: "$paymentMethods" },
     { $match: { "paymentMethods.customerVaultId": customerVaultId } },
-    { 
-      $project: { 
-        _id: 0, 
+    {
+      $project: {
+        _id: 0,
         cvv: "$paymentMethods.cvv",
         cardLastFour: "$paymentMethods.cardLastFour", // ✅ Use consistent field name
         brand: "$paymentMethods.brand" // ✅ Use consistent field name
-      } 
+      }
     }
   ]);
-  
+
   const cvv = result.length > 0 ? result[0].cvv : null;
   const cardType = result.length > 0 ? result[0].brand : 'Card';
   const last4 = result.length > 0 ? result[0].cardLastFour : '****';
@@ -179,7 +261,7 @@ const chargeCustomerVault = async (customerVaultId, amount, description = '') =>
       message: 'Update Your Card Details'
     };
   }
-  
+
   const payload = {
     security_key: SECURITY_KEY,
     type: 'sale',
@@ -188,8 +270,8 @@ const chargeCustomerVault = async (customerVaultId, amount, description = '') =>
     order_description: description || 'Customer charge',
     cvv: cvv,
   };
-  
-  billingLogger.info('Sending charge request to NMI', { 
+
+  billingLogger.info('Sending charge request to NMI', {
     vaultId: customerVaultId,
     amount: amount.toFixed(2)
   });
@@ -205,7 +287,7 @@ const chargeCustomerVault = async (customerVaultId, amount, description = '') =>
     );
 
     billingLogger.info('NMI charge response received');
-    
+
     let responseText;
     if (typeof response === 'string') {
       responseText = response;
@@ -217,16 +299,16 @@ const chargeCustomerVault = async (customerVaultId, amount, description = '') =>
 
     const responseMatch = responseText.match(/response=(\d+)/);
     const responseCode = responseMatch ? responseMatch[1] : null;
-    
+
     const transactionIdMatch = responseText.match(/transactionid=([^&\s]+)/);
     const transactionId = transactionIdMatch ? transactionIdMatch[1] : null;
-    
+
     const responseTextMatch = responseText.match(/responsetext=([^&\s]+)/);
     const responseMessage = responseTextMatch ? decodeURIComponent(responseTextMatch[1].replace(/\+/g, ' ')) : '';
 
     const success = responseCode === '1';
 
-    billingLogger.info('NMI charge processed', { 
+    billingLogger.info('NMI charge processed', {
       success,
       responseCode,
       transactionId,
@@ -280,7 +362,7 @@ const getCustomerVault = async (customerVaultId) => {
 };
 
 const deleteCustomerVault = async (customerVaultId) => {
-  billingLogger.info('Deleting NMI customer vault', { 
+  billingLogger.info('Deleting NMI customer vault', {
     vaultId: customerVaultId
   });
 
@@ -309,7 +391,7 @@ const deleteCustomerVault = async (customerVaultId) => {
 
     const responseMatch = responseText.match(/response=(\d+)/);
     const responseCode = responseMatch ? responseMatch[1] : null;
-    
+
     const responseTextMatch = responseText.match(/responsetext=([^&]+)/);
     const message = responseTextMatch ? decodeURIComponent(responseTextMatch[1]) : '';
 
@@ -317,7 +399,7 @@ const deleteCustomerVault = async (customerVaultId) => {
     const isInvalidVault = message.includes('Invalid Customer Vault Id');
     const success = responseCode === '1' || isInvalidVault;
 
-    billingLogger.info('NMI vault deletion completed', { 
+    billingLogger.info('NMI vault deletion completed', {
       vaultId: customerVaultId,
       success,
       responseCode,
@@ -334,7 +416,7 @@ const deleteCustomerVault = async (customerVaultId) => {
     };
 
   } catch (error) {
-    billingLogger.error('NMI vault deletion failed', error, { 
+    billingLogger.error('NMI vault deletion failed', error, {
       vaultId: customerVaultId
     });
     throw error;
@@ -362,7 +444,7 @@ const refundTransaction = async (transactionId, amount) => {
     const responseText = response.data;
     const responseMatch = responseText.match(/response=(\d+)/);
     const responseCode = responseMatch ? responseMatch[1] : null;
-    
+
     const refundTransactionIdMatch = responseText.match(/transactionid=([^&\s]+)/);
     const refundTransactionId = refundTransactionIdMatch ? refundTransactionIdMatch[1] : null;
 
@@ -386,5 +468,5 @@ module.exports = {
   refundTransaction,
   getRevenueFromNmi,
   getRefundsFromNmi,
-  
+
 };

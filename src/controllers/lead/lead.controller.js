@@ -42,12 +42,16 @@ const createLead = wrapAsync(async (req, res) => {
         leadLogger.info('Generated unique lead_id', { ...logMeta, lead_id });
 
         let leadData = { ...req.body, user_id, lead_id };
+        
+        // ✅ FIRST: Create lead WITHOUT transaction_id (we don't have it yet)
         const result = await LeadServices.createLead(leadData, { session });
         leadLogger.info('Lead created in DB', { ...logMeta, lead_db_id: result._id });
-
+        leadLogger.info('Lead created in DB', { ...logMeta, lead_db_id: result._id });
+        
         await result.populate('campaign_id');
         await result.populate('address.state');
 
+        // ✅ SECOND: Create billing/transaction
         const billingResult = await BillingServices.assignLeadNew(
             campaignData.user_id,
             result._id,
@@ -62,17 +66,28 @@ const createLead = wrapAsync(async (req, res) => {
             leadCost,
         });
 
+        // ✅ THIRD: Update lead with transaction_id and original_cost
+        result.transaction_id = billingResult.transactionId;
+        result.original_cost = leadCost;
+        await result.save({ session });
+
+        leadLogger.info('Lead updated with transaction details', {
+            ...logMeta,
+            transaction_id: billingResult.transactionId,
+            original_cost: leadCost,
+        });
+
         await session.commitTransaction();
         session.endSession();
 
-        leadLogger.info(' Lead transaction committed successfully', logMeta);
+        leadLogger.info('Lead transaction committed successfully', logMeta);
 
         // Continue with email / notification / SMS sections...
-        leadLogger.info(' Lead creation process completed successfully', logMeta);
+        leadLogger.info('Lead creation process completed successfully', logMeta);
         sendResponse(res, { leadData: result }, 'Lead has been created successfully', 201);
 
     } catch (err) {
-        leadLogger.error(' Error during lead creation process', err, logMeta);
+        leadLogger.error('Error during lead creation process', err, logMeta);
         await session.abortTransaction();
         session.endSession();
         throw err;
