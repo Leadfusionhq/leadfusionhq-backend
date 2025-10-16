@@ -57,7 +57,7 @@ export default function AdminDashboard() {
   const [error, setError] = useState<string | null>(null);
 
   // Revenue and date range state
-  const [revenueRange, setRevenueRange] = useState<'today' | '7d' | '30d' | 'mtd' | 'ytd' | 'all'>('mtd');
+  const [revenueRange, setRevenueRange] = useState<'today' | '7d' | '30d' | 'mtd'>('mtd');
   const [revenueWindow, setRevenueWindow] = useState<{ from?: string; to?: string } | null>(null);
   const [leadDateRange, setLeadDateRange] = useState<'7d' | '30d' | 'mtd'>('7d');
 
@@ -423,8 +423,7 @@ export default function AdminDashboard() {
                 <option value="7d">Last 7d</option>
                 <option value="30d">Last 30d</option>
                 <option value="mtd">MTD</option>
-                <option value="ytd">YTD</option>
-                <option value="all">All Time</option>
+       
               </select>
             </div>
             <p className="text-gray-600 text-sm mb-1">Total Revenue</p>
