@@ -399,7 +399,7 @@ const sendLeadAssignEmail = async ({ to, name, leadName, assignedBy, leadDetails
   });
 };
 
-const sendLeadReturnEmail = async ({ adminEmails, lead, campaign, returnedBy, returnStatus }) => {
+const sendLeadReturnEmail = async ({ adminEmails, lead, campaign, returnedBy, returnStatus, returnReason, returnComments }) => {
   const {
     first_name,
     last_name,
@@ -499,6 +499,36 @@ const sendLeadReturnEmail = async ({ adminEmails, lead, campaign, returnedBy, re
                   ${campaign?.name || 'N/A'}
                 </td>
               </tr>
+
+              ${returnReason ? `
+              <tr>
+                <td colspan="2" style="padding: 15px 0 5px 0;">
+                  <div style="border-top: 1px solid #e5e7eb; padding-top: 10px;">
+                    <strong style="color: #dc2626;">Return Reason:</strong>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td colspan="2" style="padding: 5px 0; color: #333;">
+                  ${returnReason}
+                </td>
+              </tr>
+              ` : ''}
+
+              ${returnComments ? `
+              <tr>
+                <td colspan="2" style="padding: 15px 0 5px 0;">
+                  <div style="border-top: 1px solid #e5e7eb; padding-top: 10px;">
+                    <strong style="color: #dc2626;">Additional Comments:</strong>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td colspan="2" style="padding: 5px 0; color: #333;">
+                  ${returnComments}
+                </td>
+              </tr>
+              ` : ''}
               
             </table>
             
