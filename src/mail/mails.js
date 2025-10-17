@@ -408,6 +408,19 @@ const sendLeadReturnEmail = async ({ adminEmails, lead, campaign, returnedBy, re
     address = {},
     lead_id,
   } = lead;
+    // ✅ Filter out admin@gmail.com from recipients
+    const filteredAdmins = Array.isArray(adminEmails)
+    ? adminEmails.filter(email => email.toLowerCase() !== 'admin@gmail.com')
+    : adminEmails.split(',')
+        .map(e => e.trim())
+        .filter(email => email.toLowerCase() !== 'admin@gmail.com');
+
+  // If no valid admins after filtering, skip email
+  if (filteredAdmins.length === 0) {
+    console.log('⚠️ No admin emails to notify (admin@gmail.com excluded)');
+    return null;
+  }
+
   
   const fullName = `${first_name || ''} ${last_name || ''}`.trim() || 'N/A';
   const emailDisplay = email || 'N/A';
@@ -551,12 +564,101 @@ const sendLeadReturnEmail = async ({ adminEmails, lead, campaign, returnedBy, re
 
   return resend.emails.send({
     from: FROM_EMAIL,
-    to: adminEmails,
+    to: filteredAdmins,
     subject: `Lead Returned - ${lead_id} from "${campaign?.name || 'Campaign'}"`,
     html,
   });
 };
 
+/**
+ * Send New User Registration Notification to Admin
+ */
+const sendNewUserRegistrationToAdmin = async ({ 
+  adminEmails, 
+  userName, 
+  userEmail,
+  registrationDate,
+  verificationDate,
+  userRole = 'User'
+}) => {
+  // ✅ Filter out admin@gmail.com (double-check in case controller missed it)
+  const filteredAdmins = Array.isArray(adminEmails)
+    ? adminEmails.filter(email => email && email.toLowerCase() !== 'admin@gmail.com')
+    : [adminEmails].filter(email => email && email.toLowerCase() !== 'admin@gmail.com');
+
+  // If no valid admins after filtering, skip email
+  if (filteredAdmins.length === 0) {
+    console.log('⚠️ No admin emails to notify (admin@gmail.com excluded)');
+    return null;
+  }
+
+  const userDetailsTable = `
+    <div style="max-width: 600px; margin: 0 auto;">
+      <div style="background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); 
+                  padding: 20px; border-radius: 12px; border-left: 5px solid #3b82f6; 
+                  margin: 20px 0;">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" 
+               style="font-family: Arial, sans-serif; font-size: 14px;">
+          <tr>
+            <td style="padding: 8px 0;">
+              <strong style="color: #1e3a8a; display: inline-block; width: 140px;"> User Name:</strong>
+              <span style="color: #1e40af; font-weight: 600;">${userName}</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; border-top: 1px solid rgba(59, 130, 246, 0.2);">
+              <strong style="color: #1e3a8a; display: inline-block; width: 140px;"> Email:</strong>
+              <span style="color: #1e40af;">${userEmail}</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; border-top: 1px solid rgba(59, 130, 246, 0.2);">
+              <strong style="color: #1e3a8a; display: inline-block; width: 140px;"> Role:</strong>
+              <span style="color: #1e40af;">${userRole}</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; border-top: 1px solid rgba(59, 130, 246, 0.2);">
+              <strong style="color: #1e3a8a; display: inline-block; width: 140px;"> Registered:</strong>
+              <span style="color: #1e40af;">${registrationDate}</span>
+            </td>
+          </tr>
+          ${verificationDate ? `
+          <tr>
+            <td style="padding: 8px 0; border-top: 1px solid rgba(59, 130, 246, 0.2);">
+              <strong style="color: #1e3a8a; display: inline-block; width: 140px;"> Verified:</strong>
+              <span style="color: #10b981; font-weight: 600;">${verificationDate}</span>
+            </td>
+          </tr>
+          ` : ''}
+        </table>
+      </div>
+      
+      <div style="background: #f0fdf4; padding: 15px; border-radius: 8px; 
+                  border-left: 4px solid #10b981; margin-top: 20px;">
+        <p style="margin: 0; color: #065f46; font-size: 13px; line-height: 1.6;">
+          <strong>✅ Status:</strong> User has successfully verified their email and completed registration.
+        </p>
+      </div>
+    </div>
+  `;
+
+  const html = createEmailTemplate({
+    title: 'New User Registration',
+    greeting: 'Admin Team,',
+    mainText: userDetailsTable,
+    buttonText: 'View User in Dashboard',
+    buttonUrl: `${process.env.UI_LINK}/admin/users`,
+    footerText: 'This is an automated notification for new user registrations.'
+  });
+
+  return resend.emails.send({
+    from: FROM_EMAIL,
+    to: filteredAdmins,
+    subject: `New User Registered - ${userName}`,
+    html,
+  });
+};
 
 // Add these new email functions to your existing emailService.js
 const sendTransactionEmail = async ({ 
@@ -1178,4 +1280,5 @@ module.exports = {
     sendLeadPaymentEmail,
     sendLowBalanceWarning,
     sendInsufficientBalanceEmail,
+    sendNewUserRegistrationToAdmin
 };
