@@ -10,6 +10,8 @@ import 'slick-carousel/slick/slick.css';
 import 'slick-carousel/slick/slick-theme.css';
 import AOSInitializer from "@/components/Layout/AOSInitializer/AOSInitializer";
 import ClientLayout from "./ClientLayout"; 
+import Script from "next/script"; // ✅ Add this
+
 
 const inter = Inter({
   subsets: ['latin'],
@@ -42,6 +44,19 @@ export default function RootLayout({
  
   return (
     <html lang="en" className={``}>
+
+      <Script
+        async
+        src="https://www.googletagmanager.com/gtag/js?id=G-27XER9S72F"
+      />
+      <Script id="google-analytics">
+        {`
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-27XER9S72F');
+        `}
+      </Script>
       <body>
         <Toaster />
         <AOSInitializer/>
