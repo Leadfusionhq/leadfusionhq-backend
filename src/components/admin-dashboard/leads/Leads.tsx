@@ -46,6 +46,7 @@ type Lead = {
   updatedAt: string;
   status: string;
   lead_type: string;
+  return_status: string; 
   exclusivity: string;
   language: string;
   geography: string;
@@ -99,6 +100,21 @@ export default function LeadTable() {
     // or: const statuses = Object.values(LEAD_STATUS);
   ];
 
+// ✅ ADD THIS - Lead Status Mapping
+const LEAD_STATUS_MAP: Record<string, { label: string; color: string }> = {
+  'Not Returned': { label: 'Active', color: '#4caf50' },
+  'Pending': { label: 'Pending Return', color: '#ff9800' },
+  'Approved': { label: 'Returned', color: '#2196f3' },
+  'Rejected': { label: 'Return Rejected', color: '#f44336' }
+};
+
+const getLeadStatus = (return_status: string) => {
+  return LEAD_STATUS_MAP[return_status] || LEAD_STATUS_MAP['Not Returned'];
+};
+
+
+
+  
   const formatStatus = (s: string) =>
     s.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
 
@@ -341,6 +357,7 @@ useEffect(() => {
     createdAt: "",
     updatedAt: "",
     status: "",
+    return_status: "", 
     lead_type: "",
     exclusivity: "",
     language: "",
@@ -423,6 +440,29 @@ const hasFilters = !!(selectedCampaign || selectedStatus || selectedState);
           <div style={{ minWidth: "160px" }} className="font-medium text-gray-900">{`${row.first_name} ${row.last_name}`}</div>
         ),
       sortable: true,
+    },
+     {
+      name: "Lead Status",
+      selector: (row) => row.return_status,
+      cell: (row) =>
+        row._id.startsWith("skeleton") ? (
+          <Skeleton variant="text" width={120} animation="wave" />
+        ) : (
+          <div style={{ minWidth: "140px" }}>
+            <Chip
+              label={getLeadStatus(row.return_status).label}
+              size="small"
+              sx={{
+                backgroundColor: getLeadStatus(row.return_status).color,
+                color: '#fff',
+                fontWeight: 500,
+                fontSize: '12px'
+              }}
+            />
+          </div>
+        ),
+      sortable: true,
+      width: "160px",
     },
     {
       name: "Email",
