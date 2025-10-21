@@ -25,74 +25,145 @@ const createLead = wrapAsync(async (req, res) => {
     const session = await mongoose.startSession();
     session.startTransaction();
 
-    const logMeta = {
-        user_id: req?.user?._id,
-        campaign_id: req?.body?.campaign_id,
-        route: req.originalUrl,
-    };
-
     try {
-        leadLogger.info('Starting lead creation process', logMeta);
-
         const { campaign_id } = req.body;
         const user_id = req.user._id;
         const { campaignData, leadCost } = await LeadServices.validatePrepaidCampaignBalance(campaign_id);
 
         const lead_id = await generateUniqueLeadId();
-        leadLogger.info('Generated unique lead_id', { ...logMeta, lead_id });
-
         let leadData = { ...req.body, user_id, lead_id };
-        
-        // ✅ FIRST: Create lead WITHOUT transaction_id (we don't have it yet)
         const result = await LeadServices.createLead(leadData, { session });
-        leadLogger.info('Lead created in DB', { ...logMeta, lead_db_id: result._id });
-        leadLogger.info('Lead created in DB', { ...logMeta, lead_db_id: result._id });
         
         await result.populate('campaign_id');
         await result.populate('address.state');
-
-        // ✅ SECOND: Create billing/transaction
+        
+        const assignedBy = req.user._id;
         const billingResult = await BillingServices.assignLeadNew(
             campaignData.user_id,
             result._id,
             leadCost,
-            req.user._id,
+            assignedBy,
             session
         );
-
-        leadLogger.info('Billing record created successfully', {
-            ...logMeta,
-            transactionId: billingResult.transactionId,
-            leadCost,
-        });
-
-        // ✅ THIRD: Update lead with transaction_id and original_cost
-        result.transaction_id = billingResult.transactionId;
-        result.original_cost = leadCost;
-        await result.save({ session });
-
-        leadLogger.info('Lead updated with transaction details', {
-            ...logMeta,
-            transaction_id: billingResult.transactionId,
-            original_cost: leadCost,
-        });
-
+        
         await session.commitTransaction();
         session.endSession();
 
-        leadLogger.info('Lead transaction committed successfully', logMeta);
+        const campaign = result.campaign_id;
+        const campaignOwner = await User.findById(campaign.user_id);
 
-        // Continue with email / notification / SMS sections...
-        leadLogger.info('Lead creation process completed successfully', logMeta);
-        sendResponse(res, { leadData: result }, 'Lead has been created successfully', 201);
+        // ✅ Send lead payment transaction email to campaign owner
+        try {
+            await MAIL_HANDLER.sendLeadPaymentEmail({
+                to: campaignOwner.email,
+                userName: campaignOwner.name,
+                leadCost: leadCost,
+                leadId: result.lead_id,
+                leadName: `${result.first_name} ${result.last_name}`.trim(),
+                campaignName: campaign.name,
+                payment_type:campaign.payment_type,
+                full_address:result.address.full_address,
+                transactionId: billingResult.transactionId,
+                newBalance: billingResult.newBalance,
+                leadData: {
+                    first_name: result.first_name,
+                    last_name: result.last_name,
+                    phone_number: result.phone_number,
+                    email: result.email,
+                    address: result.address
+                }
+            });
+            console.log('✅ Lead payment transaction email sent');
+        } catch (emailErr) {
+            console.error('Failed to send lead payment email:', emailErr.message);
+        }
 
+        // Existing notification and delivery code...
+        const message = 'New Lead has been assigned to your campaign!';
+        try {
+            await NotificationServices.createNotification(
+                user_id, 
+                campaign.user_id, 
+                'info', 
+                message, 
+                0, 
+                `/dashboard/leads`
+            );
+
+            // Email delivery
+            if (campaign?.delivery?.method?.includes('email') && campaign?.delivery?.email?.addresses) {                try {
+                const emailSubjectFromCampaign = campaign?.delivery?.email?.subject?.trim();
+                await MAIL_HANDLER.sendLeadAssignEmail({
+                    to: campaign.delivery.email.addresses,
+                    name: campaignOwner.name || 'Campaign User',
+                    leadName: result.lead_id,
+                    assignedBy: req.user?.name || 'System',
+                    leadDetailsUrl: `${process.env.UI_LINK}/dashboard/leads/${result._id}`,
+                    campaignName: campaign.name,
+                    leadData: leadData,
+                    realleadId: result._id,
+                    subject: emailSubjectFromCampaign || `New Lead Assigned in "${campaign.name}"`,
+                });
+                console.log(`✅ Lead assignment email sent to ${campaign.delivery.email.addresses}`);
+            } catch (err) {
+                console.error('Failed to send lead assignment email:', err.message);
+            }
+        }
+
+        // SMS delivery
+    // SMS delivery
+    if (campaign?.delivery?.method?.includes('phone') && campaign?.delivery?.phone?.numbers) {
+    try {
+        const fullName = `${result.first_name || ''} ${result.last_name || ''}`.trim();
+        const phoneNumber = result.phone_number || result.phone || '';
+        const email = result.email || '';
+        const address = [
+        result?.address?.full_address || '',
+        result?.address?.city || '',
+        result?.address?.zip_code || '',
+        ].filter(Boolean).join(', ');
+        const leadId = result.lead_id;
+        const campaignName = campaign?.name || 'N/A';
+
+        const smsMessage = `New Lead Assigned
+
+    Name: ${fullName}
+    Phone: ${phoneNumber}
+    Email: ${email}
+    Address: ${address}
+    Lead ID: ${leadId}
+    Campaign: ${campaignName}
+
+    View Lead: ${process.env.UI_LINK}/dashboard/leads/${result._id}`;
+
+        const smsResult = await SmsServices.sendSms({
+        to: campaign.delivery.phone.numbers, // array or comma-separated string
+        message: smsMessage,
+        from: process.env.SMS_SENDER_ID || '+18563908470', // make sure this is YOUR Notifyre number
+        });
+
+        if (smsResult.success) {
+        console.log(`✅ Lead assignment SMS sent to ${smsResult.sentTo.join(', ')}`);
+        } else {
+        console.error('❌ Lead assignment SMS failed:', JSON.stringify(smsResult, null, 2));
+        }
     } catch (err) {
-        leadLogger.error('Error during lead creation process', err, logMeta);
-        await session.abortTransaction();
-        session.endSession();
-        throw err;
+        console.error('❌ SMS fatal error:', err?.message);
     }
+    }
+    } catch (err) {
+        console.error(`Failed to send notification:`, err.message);
+    }
+
+    sendResponse(res, { leadData: result }, 'Lead has been created successfully', 201);
+} catch (err) {
+    await session.abortTransaction();
+    session.endSession();
+    throw err;
+}
 });
+
+
 
 
 

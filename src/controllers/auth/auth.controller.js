@@ -9,7 +9,7 @@ const { ErrorHandler } = require('../../utils/error-handler');
 const { randomNumberGenerate, isEmpty } = require('../../utils/utils');
 const OTP = require('../../models/otp.model');
 const { syncUserToBoberdooById } = require('../../services/boberdoo/boberdoo.service');
-
+const { User } = require('../../models/user.model');
 // const registerUser = wrapAsync(async (req, res) => {
 //     const userPayload = req.body;
 
@@ -102,78 +102,108 @@ const loginWithEmail = wrapAsync(async (req, res) => {
 
 // });
 const verifyEmail = wrapAsync(async (req, res) => {
-    const { token } = req.query;
-    if (!token) {
-        throw new ErrorHandler(400, 'Verification token is required');
+  const { token } = req.query;
+  if (!token) throw new ErrorHandler(400, 'Verification token is required');
+
+  const user = await AuthService.verifyEmailService(token);
+  console.log('✅ Email verified for user:', user.email, { userId: user._id, role: user.role, createdAt: user.createdAt });
+
+  (async () => {
+    try {
+      console.log('🚀 Starting Boberdoo sync for verified user:', user._id);
+      const result = await syncUserToBoberdooById(user._id);
+      console.log('✅ Boberdoo sync (verify):', result);
+    } catch (err) {
+      console.error('❌ Boberdoo sync exception (verify):', err.message);
     }
-    
-    const user = await AuthService.verifyEmailService(token);
+  })();
 
-    console.log('✅ Email verified for user:', user.email);
-  
-    // ✅ FIRE-AND-FORGET: Boberdoo sync (only after email verification)
-    (async () => {
-      try {
-        console.log('🚀 Starting Boberdoo sync for verified user:', user._id);
-        const result = await syncUserToBoberdooById(user._id);
-        console.log('✅ Boberdoo sync (verify):', result);
-      } catch (err) {
-        console.error('❌ Boberdoo sync exception (verify):', err.message);
+  try {
+    const mailKeys = Object.keys(MAIL_HANDLER || {});
+    console.log('[MAIL_HANDLER] exported keys:', mailKeys);
+    if (typeof MAIL_HANDLER?.sendNewUserRegistrationToAdmin !== 'function') {
+      console.error('❌ MAIL_HANDLER.sendNewUserRegistrationToAdmin not found');
+    }
+  } catch (e) {
+    console.error('❌ MAIL_HANDLER inspection failed:', e.message);
+  }
+
+  try {
+    // Exclude these admin emails from notifications
+    const EXCLUDED = new Set([
+      'admin@gmail.com',
+      'admin123@gmail.com',
+      'admin1234@gmail.com',
+    ]);
+
+    const adminUsers = await User.find({
+      role: { $in: ['ADMIN', 'SUPER_ADMIN'] },
+      isActive: { $ne: false },
+    }).select('_id email name role');
+
+    console.log(`[AdminLookup] Found ${adminUsers?.length || 0} admins`, adminUsers);
+
+    let adminEmails = (adminUsers || [])
+      .map(a => a.email)
+      .filter(Boolean)
+      .map(e => e.trim().toLowerCase())
+      .filter(e => !EXCLUDED.has(e)); // <-- exclude here
+
+    // Deduplicate
+    adminEmails = [...new Set(adminEmails)];
+
+    if (!adminEmails.length) {
+      console.warn('⚠️ No valid admin emails found after exclusions. Skipping admin notification.');
+    } else {
+      const registrationDate = user.createdAt
+        ? new Date(user.createdAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
+        : new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+
+      const verificationDate = new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+
+      const mailPayload = {
+        to: adminEmails, // most mailers expect "to"
+        userName: user.name,
+        userEmail: user.email,
+        userRole: user.role || 'User',
+        registrationDate,
+        verificationDate,
+        subject: `New user verified: ${user.name} (${user.email})`,
+      };
+
+      console.log('[AdminEmail] Prepared payload:', { recipients: adminEmails, subject: mailPayload.subject });
+
+      const info = await MAIL_HANDLER.sendNewUserRegistrationToAdmin(mailPayload);
+
+      console.log('[AdminEmail] send result:', {
+        messageId: info?.messageId || info?.id,
+        accepted: info?.accepted,
+        rejected: info?.rejected,
+        response: info?.response,
+        envelope: info?.envelope,
+      });
+
+      if (info?.rejected?.length) {
+        console.warn('[AdminEmail] Some recipients were rejected:', info.rejected);
       }
-    })();
 
-    // ✅ NEW: Send registration notification to admins (from database)
-    (async () => {
-      try {
-        const User = require('../../models/user.model'); // ✅ Import User model
-        
-        const adminUsers = await User.find({ role: 'ADMIN' });
+      console.log('✅ Admin notification sent for new user:', user.email, {
+        adminCount: adminEmails.length,
+        adminEmails
+      });
+    }
+  } catch (err) {
+    console.error('❌ Admin notification failed:', {
+      message: err?.message,
+      code: err?.code,
+      stack: err?.stack,
+      response: err?.response,
+      status: err?.status,
+      data: err?.response?.data,
+    });
+  }
 
-        if (adminUsers && adminUsers.length > 0) {
-          // ✅ Filter out admin@gmail.com
-          const adminEmails = adminUsers
-            .map(admin => admin.email)
-            .filter(email => email && email.toLowerCase() !== 'admin@gmail.com');
-
-          if (adminEmails.length > 0) {
-            await MAIL_HANDLER.sendNewUserRegistrationToAdmin({
-              adminEmails,
-              userName: user.name,
-              userEmail: user.email,
-              registrationDate: user.createdAt 
-                ? new Date(user.createdAt).toLocaleString('en-US', { 
-                    dateStyle: 'medium', 
-                    timeStyle: 'short' 
-                  })
-                : new Date().toLocaleString('en-US', { 
-                    dateStyle: 'medium', 
-                    timeStyle: 'short' 
-                  }),
-              verificationDate: new Date().toLocaleString('en-US', { 
-                dateStyle: 'medium', 
-                timeStyle: 'short' 
-              }),
-              userRole: user.role || 'User'
-            });
-            
-            console.log('✅ Admin notification sent for new user:', user.email, {
-              adminCount: adminEmails.length,
-              adminEmails
-            });
-          } else {
-            console.warn('⚠️ No valid admin emails found (admin@gmail.com excluded)');
-          }
-        } else {
-          console.warn('⚠️ No admin users found in system');
-        }
-      } catch (err) {
-        console.error('❌ Admin notification failed:', err.message);
-        // Don't throw - email failure shouldn't break verification
-      }
-    })();
-
-    console.warn('user', user);
-    sendResponse(res, {}, 'Email successfully verified');
+  sendResponse(res, {}, 'Email successfully verified');
 });
 
 const sendOtpOnEmail = wrapAsync(async (req, res) => {
