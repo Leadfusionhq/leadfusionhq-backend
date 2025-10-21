@@ -663,7 +663,7 @@ const rejectReturnLead = async (leadId, returnStatus) => {
     );
   }
 };
-const approveReturnLead = async(leadId, returnStatus) => {
+const approveReturnLead = async(leadId, returnStatus, isDirectReturn = false) => {
   const Transaction = require('../../models/transaction.model');
   
   try {
@@ -674,8 +674,22 @@ const approveReturnLead = async(leadId, returnStatus) => {
     }
 
     const currentStatus = lead.return_status ?? 'Not Returned';
-    if (currentStatus !== 'Pending') {
-      throw new ErrorHandler(400, 'Lead return is not pending and cannot be approved');
+
+    // ✅ Validation logic:
+    // - If admin direct return: allow any status EXCEPT 'Approved' (prevent double refund)
+    // - If regular approval: only allow if status is 'Pending'
+    if (isDirectReturn) {
+      // Admin can return: 'Not Returned', 'Pending', or 'Rejected'
+      // Admin CANNOT return: 'Approved' (already refunded)
+      if (currentStatus === 'Approved') {
+        throw new ErrorHandler(400, 'Lead has already been returned and refunded. Cannot return again.');
+      }
+      // ✅ Allow 'Not Returned', 'Pending', and 'Rejected' for admin
+    } else {
+      // Regular approval flow (user-initiated return from pending queue)
+      if (currentStatus !== 'Pending') {
+        throw new ErrorHandler(400, 'Lead return is not pending and cannot be approved');
+      }
     }
 
     const campaign = await Campaign.findById(lead.campaign_id);
@@ -748,13 +762,19 @@ const approveReturnLead = async(leadId, returnStatus) => {
     user.balance = previousBalance + originalLeadCost;
     await user.save();
 
-    lead.return_status = returnStatus;
+    // ✅ Update lead status
+    const previousReturnStatus = lead.return_status;
+    lead.return_status = returnStatus; // 'Approved'
+    lead.returned_at = new Date(); // ✅ Track when returned
     await lead.save();
 
     console.log(`✅ Refund processed: $${originalLeadCost} added to user ${user_id}`);
+    console.log(`   Previous return status: ${previousReturnStatus}`);
+    console.log(`   New return status: ${returnStatus}`);
     console.log(`   Previous balance: $${previousBalance}`);
     console.log(`   New balance: $${user.balance}`);
     console.log(`   Fetch method: ${fetchMethod}`);
+    console.log(`   Direct admin return: ${isDirectReturn}`);
 
     return {
       lead: lead.toObject(),
@@ -765,6 +785,8 @@ const approveReturnLead = async(leadId, returnStatus) => {
       fetchMethod,
       previousBalance,
       newBalance: user.balance,
+      isDirectReturn,
+      previousReturnStatus,
       message: `Refund of $${originalLeadCost} added to user balance. New balance: $${user.balance}`,
     };
   } catch (error) {

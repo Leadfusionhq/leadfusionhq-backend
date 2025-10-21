@@ -295,15 +295,9 @@ const approveReturnLead = wrapAsync(async (req, res) => {
         leadLogger.info('Starting lead return approval process', logMeta);
 
         // Validate input
-        if (!lead_id || !return_status) {
-            leadLogger.warn('Missing required fields for lead return approval', {
-                ...logMeta,
-                missingFields: {
-                    lead_id: !lead_id,
-                    return_status: !return_status
-                }
-            });
-            throw new ErrorHandler(400, 'Lead ID and return status are required');
+        if (!lead_id) {
+            leadLogger.warn('Missing lead_id for lead return approval', logMeta);
+            throw new ErrorHandler(400, 'Lead ID is required');
         }
 
         // Get lead details before approval
@@ -327,20 +321,28 @@ const approveReturnLead = wrapAsync(async (req, res) => {
             return_reason: lead.return_reason
         });
 
-        // Process approval
-        const result = await LeadServices.approveReturnLead(lead_id, return_status);
+        // ✅ Determine if this is an admin direct return or regular approval
+        const isAdmin = req.user?.role === 'ADMIN' || req.user?.role === 'SUPER_ADMIN';
+        const isDirectReturn = isAdmin && return_status === 'Approved';
 
-        leadLogger.info('Lead return approved successfully', {
+        // Process approval/return
+        const result = await LeadServices.approveReturnLead(
+            lead_id, 
+            return_status, 
+            isDirectReturn // ✅ Pass flag to service
+        );
+
+        leadLogger.info('Lead return processed successfully', {
             ...logMeta,
             previous_status: lead.return_status,
             new_status: return_status,
+            isDirectReturn,
             result: result
         });
 
         // Send notification to lead owner
         try {
             if (lead.user_id && lead.user_id.email) {
-                // You can add email notification here
                 leadLogger.info('Lead owner notified of approval', {
                     ...logMeta,
                     owner_email: lead.user_id.email,
@@ -352,7 +354,8 @@ const approveReturnLead = wrapAsync(async (req, res) => {
                 //     userEmail: lead.user_id.email,
                 //     userName: lead.user_id.name,
                 //     lead: lead,
-                //     campaign: lead.campaign_id
+                //     campaign: lead.campaign_id,
+                //     isDirectReturn
                 // });
             }
         } catch (notificationErr) {
@@ -362,8 +365,12 @@ const approveReturnLead = wrapAsync(async (req, res) => {
             });
         }
 
+        const message = isDirectReturn 
+            ? 'Lead returned successfully by admin' 
+            : 'Lead return approved successfully';
+
         leadLogger.info('Lead return approval process completed', logMeta);
-        sendResponse(res, result, 'Lead return approved successfully', 200);
+        sendResponse(res, result, message, 200);
 
     } catch (err) {
         leadLogger.error('Error during lead return approval', err, {
