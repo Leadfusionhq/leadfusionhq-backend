@@ -686,7 +686,7 @@ const approveReturnLead = async(leadId, returnStatus, isDirectReturn = false) =>
       }
       // ✅ Allow 'Not Returned', 'Pending', and 'Rejected' for admin
     } else {
-      // Regular approval flow (user-initiated return from pending queue)
+      // Regular approval    here flow (user-initiated return from pending queue)
       if (currentStatus !== 'Pending') {
         throw new ErrorHandler(400, 'Lead return is not pending and cannot be approved');
       }
