@@ -7,6 +7,13 @@ const CONSTANT_ENUM = require('../../helper/constant-enums.js');
 const BillingSchema = require('../../request-schemas/billing.schema.js');
 const { celebrate } = require('celebrate');
 const { Joi, Segments } = require('celebrate');
+const { generateTransactionReceipt } = require('../../services/pdf/receiptGenerator');
+const { User } = require('../../models/user.model');
+const Transaction = require('../../models/transaction.model');
+
+
+
+
 
 const API = {
   BILLING_INFO:'/',
@@ -23,7 +30,9 @@ const API = {
   GET_CARDS: '/cards', // NEW
   SET_DEFAULT_CARD: '/cards/default', // NEW
   DELETE_CARD: '/cards/:vaultId' ,
-  TEST_AUTO_TOPUP: '/test-auto-topup'
+  TEST_AUTO_TOPUP: '/test-auto-topup',
+  REVENUE_FROM_NMI: '/revenue-from-nmi',
+  RECEIPT: '/receipts/:txnId', // 
 };
 
 // Info endpoint for Billing API
@@ -68,7 +77,10 @@ billingRouter.get(API.BILLING_INFO, (req, res) => {
 
 billingRouter.use(
     checkAuth,
-    authorizedRoles([CONSTANT_ENUM.USER_ROLE.USER])
+    authorizedRoles([
+      CONSTANT_ENUM.USER_ROLE.ADMIN,
+      CONSTANT_ENUM.USER_ROLE.USER
+  ])
 );
 
 // billingRouter.get(
@@ -137,11 +149,35 @@ billingRouter.post(
     celebrate(BillingSchema.toggleAutoTopUp),
     billingController.toggleAutoTopUp
 );
+billingRouter.get(
+  API.REVENUE_FROM_NMI,
+  // checkAuth,
+  // authorizedRoles([CONSTANT_ENUM.USER_ROLE.ADMIN]),
+  billingController.getRevenueFromGateway
+);
+
+
+
 billingRouter.get(API.GET_CARDS, billingController.getCards);
 billingRouter.post(API.SET_DEFAULT_CARD, billingController.setDefaultCard);
 billingRouter.delete(API.DELETE_CARD, billingController.deleteCard);
 
 
+// routes/billing/billing.routes.js
+
+billingRouter.get(
+  API.RECEIPT,
+  celebrate({
+    [Segments.PARAMS]: Joi.object({
+      txnId: Joi.string().trim().required(),
+    }),
+    [Segments.QUERY]: Joi.object({
+      mobile: Joi.string().valid('0', '1').optional(),
+      download: Joi.string().valid('0', '1').optional()
+    }).unknown(true)
+  }),
+  billingController.getReceipt
+);
 
 
 

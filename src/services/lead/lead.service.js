@@ -8,18 +8,77 @@ const { addCSVProcessingJob, getJobStatus } = require('../../queue/csvProcessor'
 const mongoose = require('mongoose');
 const { User } = require('../../models/user.model.js');
 
-const createLead = async (data,  options = {}) => {
-  try {
-    const { session } = options;
+// services/lead.service.js
 
+const createLead = async (data, options = {}) => {
+  try {
+    const { session, transaction_id, original_cost } = options;
+
+    // 🔥 LOG: Check incoming data
+    console.log('📥 createLead service received data:', JSON.stringify(data, null, 2));
+    console.log('📍 Incoming coordinates:', data.address?.coordinates);
+    console.log('🆔 Incoming place_id:', data.address?.place_id);
+    console.log('💰 Transaction ID:', transaction_id);
+    console.log('💵 Original Cost:', original_cost);
+
+    // 🔥 FIX: Ensure coordinates are properly formatted
+    if (data.address?.coordinates) {
+      const { lat, lng } = data.address.coordinates;
+      
+      if (lat !== undefined && lng !== undefined && 
+          lat !== null && lng !== null &&
+          lat !== '' && lng !== '') {
+        data.address.coordinates = {
+          lat: Number(lat),
+          lng: Number(lng)
+        };
+        console.log('✅ Coordinates formatted:', data.address.coordinates);
+      } else {
+        // Remove incomplete coordinates
+        delete data.address.coordinates;
+        console.log('⚠️ Incomplete coordinates removed');
+      }
+    }
+
+    // 🔥 FIX: Ensure place_id is preserved
+    if (data.address?.place_id !== undefined) {
+      if (data.address.place_id && data.address.place_id.trim() !== '') {
+        console.log('✅ Place ID preserved:', data.address.place_id);
+      } else {
+        delete data.address.place_id;
+        console.log('⚠️ Empty place_id removed');
+      }
+    }
+
+    // ✅ ADD: Store transaction_id and original_cost if provided
+    if (transaction_id) {
+      data.transaction_id = transaction_id;
+    }
+    if (original_cost !== undefined && original_cost !== null) {
+      data.original_cost = original_cost;
+    }
+
+    console.log('📤 Data being saved to MongoDB:', JSON.stringify(data, null, 2));
+
+    // Create lead
     const newLead = await Lead.create([data], { session });
+    
+    // Populate and return
     const populatedLead = await Lead.findById(newLead[0]._id)
-    .populate('campaign_id', 'user_id')
-    .session(session || null) 
-    .exec();
+      .populate('campaign_id')
+      .populate('address.state')
+      .session(session || null)
+      .exec();
+
+    console.log('✅ Lead created successfully');
+    console.log('📍 Saved coordinates:', populatedLead.address?.coordinates);
+    console.log('🆔 Saved place_id:', populatedLead.address?.place_id);
+    console.log('💰 Saved transaction_id:', populatedLead.transaction_id);
+    console.log('💵 Saved original_cost:', populatedLead.original_cost);
 
     return populatedLead;
   } catch (error) {
+    console.error('❌ createLead error:', error);
     throw new ErrorHandler(500, error.message || 'Failed to create lead');
   }
 };
@@ -28,9 +87,14 @@ const getLeads = async (page = 1, limit = 10, filters = {}) => {
   try {
     const skip = (page - 1) * limit;
 
+    const normalizeId = (val) => String(val).split('|')[0]; // trims any accidental "|…"
+
     const query = {
       ...(filters.campaign_id && { campaign_id: filters.campaign_id }),
+      ...(filters.status && { status: filters.status }),
+      ...(filters.state && { 'address.state': normalizeId(filters.state) }),
     };
+    
 
     const [leads, total] = await Promise.all([
       Lead.find(query)
@@ -59,39 +123,34 @@ const getLeads = async (page = 1, limit = 10, filters = {}) => {
   }
 };
 
-const getLeadByUserId = async (page = 1, limit = 10, user_id) => {
-  try {
-    const skip = (page - 1) * limit;
+const getLeadByUserId = async (page = 1, limit = 10, user_id, filters = {}) => {
+  const skip = (page - 1) * limit;
+  const campaigns = await Campaign.find({ user_id }).select('_id');
+  if (!campaigns.length) {
+    return { data: [], meta: { total: 0, page, limit, totalPages: 0 } };
+  }
 
-    const campaigns = await Campaign.find({ user_id }).select('_id');
+  const normalizeId = (val) => String(val).split('|')[0];
 
-    if (!campaigns.length) {
-      return { data: [], meta: { total: 0, page, limit, totalPages: 0 } };
-    }
+  const baseQuery = { campaign_id: { $in: campaigns.map(c => c._id) } };
+  if (filters.status) baseQuery.status = filters.status;
+  if (filters.state) baseQuery['address.state'] = normalizeId(filters.state);
 
-    const leads = await Lead.find({ campaign_id: { $in: campaigns.map(c => c._id) } })
-      .skip(skip)
-      .limit(limit)
+  const [leads, total] = await Promise.all([
+    Lead.find(baseQuery)
       .populate('campaign_id', 'campaign_id name status lead_type exclusivity language geography delivery user_id note')
       .populate('address.state', 'name abbreviation')
       .sort({ createdAt: -1 })
-      .lean();
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    Lead.countDocuments(baseQuery),
+  ]);
 
-    const total = await Lead.countDocuments({ campaign_id: { $in: campaigns.map(c => c._id) } });
-
-    return {
-      data: leads,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
-  } catch (error) {
-    console.error('Error in getLeadsByUserId:', error);
-    throw new ErrorHandler(500, error.message || 'Failed to fetch leads');
-  }
+  return {
+    data: leads,
+    meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+  };
 };
 
 const getLeadById = async (leadId, userId) => {
@@ -109,6 +168,7 @@ const getLeadById = async (leadId, userId) => {
   .populate({
     path: 'campaign_id',
   })
+  .populate('address.state', 'name abbreviation')
   .lean();
 
   if (!lead || String(lead.campaign_id?.user_id) !== String(userId)) {
@@ -143,18 +203,93 @@ const updateLead = async (leadId, userId, role, updateData) => {
       filter.user_id = userId;
     }
 
+    // 🔥 LOG: Check incoming update data
+    console.log('📥 updateLead service received data:', JSON.stringify(updateData, null, 2));
+    console.log('📍 Incoming coordinates:', updateData.address?.coordinates);
+    console.log('🆔 Incoming place_id:', updateData.address?.place_id);
+
+    // 🔥 FIX: Handle nested address updates properly
+    if (updateData.address) {
+      // Get existing lead
+      const existingLead = await Lead.findOne(filter);
+      
+      if (!existingLead) {
+        throw new ErrorHandler(404, 'Lead not found or access denied');
+      }
+
+      // Merge address fields
+      const mergedAddress = {
+        ...existingLead.address.toObject(),
+        ...updateData.address,
+      };
+
+      // 🔥 FIX: Handle coordinates update
+      if (updateData.address.coordinates !== undefined) {
+        if (updateData.address.coordinates === null) {
+          // Explicitly remove coordinates
+          mergedAddress.coordinates = undefined;
+          console.log('⚠️ Coordinates removed');
+        } else {
+          const { lat, lng } = updateData.address.coordinates;
+          
+          if (lat !== undefined && lng !== undefined && 
+              lat !== null && lng !== null &&
+              lat !== '' && lng !== '') {
+            mergedAddress.coordinates = {
+              lat: Number(lat),
+              lng: Number(lng)
+            };
+            console.log('✅ Coordinates updated:', mergedAddress.coordinates);
+          } else {
+            // Keep existing coordinates if new ones are incomplete
+            mergedAddress.coordinates = existingLead.address.coordinates;
+            console.log('⚠️ Incomplete coordinates, keeping existing');
+          }
+        }
+      }
+
+      // 🔥 FIX: Handle place_id explicitly
+      if (updateData.address.place_id !== undefined) {
+        if (updateData.address.place_id && updateData.address.place_id.trim() !== '') {
+          mergedAddress.place_id = updateData.address.place_id;
+          console.log('✅ Place ID updated:', mergedAddress.place_id);
+        } else {
+          mergedAddress.place_id = undefined;
+          console.log('⚠️ Place ID removed (empty)');
+        }
+      }
+
+      updateData.address = mergedAddress;
+    }
+
+    console.log('📤 Update data being saved:', JSON.stringify(updateData, null, 2));
+
+    // Update lead
     const updatedLead = await Lead.findOneAndUpdate(
       filter,
-      updateData,
-      { new: true, runValidators: true }
-    ).lean();
+      { 
+        ...updateData,
+        updatedAt: Date.now()
+      },
+      { 
+        new: true,
+        runValidators: true,
+      }
+    )
+    .populate('address.state')
+    .populate('campaign_id');
 
     if (!updatedLead) {
-      throw new ErrorHandler(404, 'lead not found or access denied');
+      throw new ErrorHandler(404, 'Lead not found or access denied');
     }
+
+    console.log('✅ Lead updated successfully');
+    console.log('📍 Updated coordinates:', updatedLead.address?.coordinates);
+    console.log('🆔 Updated place_id:', updatedLead.address?.place_id);
 
     return updatedLead;
   } catch (error) {
+    console.error('❌ updateLead error:', error);
     throw new ErrorHandler(error.statusCode || 500, error.message || 'Failed to update lead');
   }
 };
@@ -367,8 +502,13 @@ const validatePrepaidCampaignBalance = async (campaign_id) => {
       throw new ErrorHandler(404, 'Campaign not found');
     }
 
-    const leadCost = campaign.bid_price || 0;
-    if (leadCost <= 0) {
+    // const leadCost = campaign.bid_price || 0;
+    // if (leadCost <= 0) {
+    //   throw new ErrorHandler(400, 'Campaign has invalid bid_price');
+    // }
+    const leadCost = Number(campaign.bid_price) || 0;
+
+    if (leadCost < 0) {
       throw new ErrorHandler(400, 'Campaign has invalid bid_price');
     }
 
@@ -424,7 +564,7 @@ const getCampaignByLead = async (leadId) => {
   }
 };
 
-const returnLead = async (leadId, returnStatus) => {
+const returnLead = async (leadId, returnStatus, returnReason, returnComments) => {
   try {
     const lead = await Lead.findById(leadId);
 
@@ -436,7 +576,7 @@ const returnLead = async (leadId, returnStatus) => {
     const attempts = lead.return_attempts ?? 0;
     const maxAttempts = lead.max_return_attempts ?? 2;
 
-    if (currentStatus !== 'Not Returned' && currentStatus !== 'Rejected' ) {
+    if (currentStatus !== 'Not Returned' && currentStatus !== 'Rejected') {
       throw new ErrorHandler(400, 'This lead has already been marked for return');
     }
 
@@ -444,8 +584,11 @@ const returnLead = async (leadId, returnStatus) => {
       throw new ErrorHandler(400, 'Maximum return attempts reached for this lead');
     }
 
-    lead.return_status = returnStatus; 
-    lead.return_attempts = attempts + 1;
+    // ✅ Update with reason and comments
+    lead.return_status = returnStatus;
+    lead.return_attempts = attempts + 1; 
+    lead.return_reason = returnReason;
+    lead.return_comments = returnComments;
 
     await lead.save();
 
@@ -521,8 +664,9 @@ const rejectReturnLead = async (leadId, returnStatus) => {
   }
 };
 const approveReturnLead = async(leadId, returnStatus) => {
+  const Transaction = require('../../models/transaction.model');
+  
   try {
-
     const lead = await Lead.findById(leadId);
 
     if (!lead) {
@@ -539,7 +683,7 @@ const approveReturnLead = async(leadId, returnStatus) => {
       throw new ErrorHandler(404, 'Campaign not found for this lead');
     }
 
-    const { bid_price = 0, user_id } = campaign;
+    const { user_id } = campaign;
 
     if (!user_id) {
       throw new ErrorHandler(400, 'Campaign is missing user_id');
@@ -550,31 +694,121 @@ const approveReturnLead = async(leadId, returnStatus) => {
       throw new ErrorHandler(404, 'User not found for this campaign');
     }
 
-    let refundedAmount = 0;
-    if (bid_price > 0) {
-      user.refundMoney = (user.refundMoney || 0) + bid_price;
-      await user.save();
-      refundedAmount = bid_price;
+    let originalLeadCost = 0;
+    let transactionId = null;
+    let fetchMethod = 'unknown';
+
+    // ✅ PRIORITY 1: Get from stored original_cost (for new leads)
+    if (lead.original_cost && lead.original_cost > 0) {
+      originalLeadCost = lead.original_cost;
+      transactionId = lead.transaction_id;
+      fetchMethod = 'stored_in_lead';
+      
+      console.log('✅ Using stored original_cost from lead:', originalLeadCost);
+    } 
+    // ✅ PRIORITY 2: Get from stored transaction_id reference
+    else if (lead.transaction_id) {
+      const transaction = await Transaction.findById(lead.transaction_id);
+      
+      if (transaction) {
+        originalLeadCost = Math.abs(transaction.amount);
+        transactionId = transaction._id;
+        fetchMethod = 'transaction_by_id';
+        
+        console.log('✅ Fetched from transaction by stored ID:', originalLeadCost);
+      }
     }
+    
+    // ✅ PRIORITY 3: Fallback - search by user and time (for old leads)
+    if (originalLeadCost <= 0) {
+      const transaction = await Transaction.findOne({
+        user_id: user_id,
+        createdAt: { 
+          $gte: new Date(lead.createdAt.getTime() - 10000), // 10 seconds before
+          $lte: new Date(lead.createdAt.getTime() + 10000)  // 10 seconds after
+        }
+      }).sort({ createdAt: 1 });
+
+      if (transaction) {
+        originalLeadCost = Math.abs(transaction.amount);
+        transactionId = transaction._id;
+        fetchMethod = 'transaction_by_time';
+        
+        console.log('⚠️ Fallback: Fetched from transaction by time:', originalLeadCost);
+      }
+    }
+
+    // ✅ Final validation
+    if (originalLeadCost <= 0) {
+      throw new ErrorHandler(404, 'Original transaction/cost not found for this lead. Cannot process refund.');
+    }
+
+    // ✅ Process refund
+    const previousBalance = user.balance || 0;
+    user.balance = previousBalance + originalLeadCost;
+    await user.save();
 
     lead.return_status = returnStatus;
     await lead.save();
 
+    console.log(`✅ Refund processed: $${originalLeadCost} added to user ${user_id}`);
+    console.log(`   Previous balance: $${previousBalance}`);
+    console.log(`   New balance: $${user.balance}`);
+    console.log(`   Fetch method: ${fetchMethod}`);
+
     return {
       lead: lead.toObject(),
-      refund: refundedAmount > 0 
-        ? {
-            user_id: user._id,
-            refunded_amount: refundedAmount,
-            total_refund: user.refundMoney,
-          }
-        : null, 
+      originalLeadCost,
+      currentBidPrice: campaign.bid_price,
+      refundedAmount: originalLeadCost,
+      transactionId,
+      fetchMethod,
+      previousBalance,
+      newBalance: user.balance,
+      message: `Refund of $${originalLeadCost} added to user balance. New balance: $${user.balance}`,
     };
   } catch (error) {
     throw new ErrorHandler(
       error.statusCode || 500,
       error.message || 'Failed to approve return request'
     );
+  }
+};
+
+// Permanent delete lead
+const deleteLead = async (leadId, userId, role) => {
+  try {
+    // Non-admin users can only delete their own leads
+    if (role !== CONSTANT_ENUM.USER_ROLE.ADMIN) {
+      // Get lead's campaign to check ownership
+      const lead = await Lead.findById(leadId).populate('campaign_id');
+      
+      if (!lead) {
+        throw new ErrorHandler(404, 'Lead not found');
+      }
+      
+      if (lead.campaign_id.user_id.toString() !== userId.toString()) {
+        throw new ErrorHandler(403, 'Access denied: You can only delete your own leads');
+      }
+    }
+
+    // Permanently delete the lead
+    const deletedLead = await Lead.findByIdAndDelete(leadId);
+
+    if (!deletedLead) {
+      throw new ErrorHandler(404, 'Lead not found');
+    }
+
+    console.log(`✅ Lead ${leadId} permanently deleted by user ${userId}`);
+    
+    return {
+      deleted: true,
+      lead_id: leadId,
+      message: 'Lead permanently deleted from database'
+    };
+  } catch (error) {
+    console.error('❌ deleteLead error:', error);
+    throw new ErrorHandler(error.statusCode || 500, error.message || 'Failed to delete lead');
   }
 };
 
@@ -596,5 +830,5 @@ module.exports = {
   approveReturnLead,
   getLeadCountByCampaignId,
   getCampaignByLead,
-
+  deleteLead
 };

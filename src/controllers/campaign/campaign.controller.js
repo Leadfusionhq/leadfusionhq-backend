@@ -1,7 +1,7 @@
 const { wrapAsync } = require('../../utils/wrap-async');
 const { sendResponse } = require('../../utils/response');
 const CampaignServices = require('../../services/campaign/campaign.service');
-const N8NCampaignServices = require('../../services/n8n/n8n.campaign.service');
+const { sendToN8nWebhook } = require('../../services/n8n/webhookService.js');
 const { ErrorHandler } = require('../../utils/error-handler');
 const { randomNumberGenerate, isEmpty } = require('../../utils/utils');
 const { getPaginationParams , extractFilters} = require('../../utils/pagination');
@@ -15,6 +15,17 @@ const createCampaign = wrapAsync(async (req, res) => {
     const  result  = await CampaignServices.createCampaign(campaignData);
     sendResponse(res, { result }, 'campaign has been create succefully', 201);
 });
+
+const createCampaignByAdmin = wrapAsync(async (req, res) => {
+    const { userId } = req.params;
+    const user_id = userId;
+
+    const campaign_id = await generateUniqueCampaignId();
+    const campaignData = { ...req.body, user_id , campaign_id };
+    const  result  = await CampaignServices.createCampaign(campaignData);
+    sendResponse(res, { result }, 'campaign has been create succefully', 201);
+});
+
 const updateCampaign = wrapAsync(async (req, res) => {
   const { _id: user_id, role } = req.user;
   const { campaignId } = req.params;
@@ -114,11 +125,23 @@ const quickSearchCampaigns = wrapAsync(async (req, res) => {
 
     sendResponse(res, { data }, "Quick search completed successfully", 200);
 });
+const deleteCampaign = wrapAsync(async (req, res) => {
+  const { _id: user_id, role } = req.user;
+  const { campaignId } = req.params;
+
+  const result = await CampaignServices.deleteCampaign(campaignId, user_id, role);
+  
+  sendResponse(res, { result }, result.message, 200);
+});
+
+
 module.exports = {
     createCampaign,
+    createCampaignByAdmin,
     getCampaigns,
     getCampaignById,
     updateCampaign,
     searchCampaigns,
     quickSearchCampaigns, 
+    deleteCampaign
 };

@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { ErrorHandler } = require('../../utils/error-handler');
-
+const Log = require('../../models/Log');  // ADD THIS LINE
 const LOGS_DIR = path.join(__dirname, '../../../logs');
 
 // Helper function to check if log file exists
@@ -23,85 +23,52 @@ const getLogFilePath = (logType) => {
 // Read and parse log file with pagination
 const readLogFile = async (logType, options = {}) => {
     const { page = 1, limit = 50, search } = options;
-    const filePath = getLogFilePath(logType);
     
     try {
-        // Check if file exists
-        if (!fs.existsSync(filePath)) {
+        // Build query
+        const query = { logType: logType };
+        
+        if (search) {
+            query.$or = [
+                { message: { $regex: search, $options: 'i' } },
+                { rawLog: { $regex: search, $options: 'i' } }
+            ];
+        }
+        
+        // Get total count
+        const total = await Log.countDocuments(query);
+        
+        if (total === 0) {
             return {
                 logs: [],
                 pagination: {
                     page,
                     limit,
                     total: 0,
-                    totalPages: 0
+                    totalPages: 0,
+                    hasNext: false,
+                    hasPrev: false
                 },
                 message: `${logType} log file not found or empty`
             };
         }
         
-        // Read file content
-        const content = fs.readFileSync(filePath, 'utf8');
-        if (!content.trim()) {
-            return {
-                logs: [],
-                pagination: {
-                    page,
-                    limit,
-                    total: 0,
-                    totalPages: 0
-                },
-                message: `${logType} log file is empty`
-            };
-        }
+        // Get paginated logs from database
+        const logs = await Log.find(query)
+            .sort({ timestamp: -1 })
+            .skip((page - 1) * limit)
+            .limit(parseInt(limit))
+            .lean();
         
-        // Split into log entries (each log entry starts with a timestamp)
-        const logEntries = content.split(/(?=\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})/)
-            .filter(entry => entry.trim())
-            .reverse(); // Show newest logs first
-        
-        // Filter logs if search query provided
-        let filteredLogs = logEntries;
-        if (search) {
-            filteredLogs = logEntries.filter(log => 
-                log.toLowerCase().includes(search.toLowerCase())
-            );
-        }
-        
-        // Calculate pagination
-        const total = filteredLogs.length;
         const totalPages = Math.ceil(total / limit);
-        const startIndex = (page - 1) * limit;
-        const endIndex = startIndex + limit;
         
-        // Get paginated logs
-        const paginatedLogs = filteredLogs.slice(startIndex, endIndex);
-        
-        // Parse log entries into structured format
-        const parsedLogs = paginatedLogs.map((logEntry, index) => {
-            const lines = logEntry.trim().split('\n');
-            const firstLine = lines[0];
-            
-            // Extract timestamp and level
-            const timestampMatch = firstLine.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})/);
-            const levelMatch = firstLine.match(/\[(\w+)\]/);
-            
-            // Extract message (everything after the level)
-            let message = firstLine;
-            if (levelMatch) {
-                message = firstLine.substring(firstLine.indexOf(levelMatch[0]) + levelMatch[0].length).trim();
-                // Remove [BILLING] tag if present
-                message = message.replace(/^\[BILLING\]:\s*/, '');
-            }
-            
-            return {
-                id: startIndex + index + 1,
-                timestamp: timestampMatch ? timestampMatch[1] : null,
-                level: levelMatch ? levelMatch[1] : 'INFO',
-                message: message.replace(/^:\s*/, ''),
-                rawLog: logEntry.trim()
-            };
-        });
+        const parsedLogs = logs.map((log, index) => ({
+            id: ((page - 1) * limit) + index + 1,
+            timestamp: log.timestamp ? log.timestamp.toISOString().replace('T', ' ').substring(0, 19) : null,
+            level: log.level || 'INFO',
+            message: log.message,
+            rawLog: log.rawLog
+        }));
         
         return {
             logs: parsedLogs,
@@ -243,33 +210,30 @@ const formatBytes = (bytes) => {
 
 // Clear log file
 const clearLogFile = async (logType) => {
-    const filePath = getLogFilePath(logType);
-    
     try {
-        // Check if file exists
-        if (!fs.existsSync(filePath)) {
+        const count = await Log.countDocuments({ logType: logType });
+        
+        if (count === 0) {
             return {
                 success: true,
                 message: `${logType} log file does not exist - nothing to clear`,
                 logType,
-                cleared: false
+                cleared: false,
+                deletedCount: 0
             };
         }
         
-        // Get file stats before clearing
-        const fileStats = fs.statSync(filePath);
-        const originalSize = fileStats.size;
-        
-        // Clear the file by writing empty content
-        fs.writeFileSync(filePath, '', 'utf8');
+        // Delete from database
+        const result = await Log.deleteMany({ logType: logType });
         
         return {
             success: true,
             message: `${logType} log file cleared successfully`,
             logType,
             cleared: true,
-            originalSize,
-            originalSizeFormatted: formatBytes(originalSize),
+            originalSize: 0,
+            originalSizeFormatted: '0 B',
+            deletedCount: result.deletedCount,
             clearedAt: new Date().toISOString()
         };
         
@@ -317,10 +281,61 @@ const clearAllLogFiles = async () => {
     };
 };
 
+// NEW METHOD: Sync file logs to database
+const syncFileLogsToDatabase = async (logType) => {
+    const filePath = getLogFilePath(logType);
+    
+    try {
+        if (!fs.existsSync(filePath)) {
+            return { 
+                success: true,
+                synced: 0, 
+                total: 0,
+                message: `${logType} log file not found` 
+            };
+        }
+        
+        const content = fs.readFileSync(filePath, 'utf8');
+        if (!content.trim()) {
+            return { 
+                success: true,
+                synced: 0, 
+                total: 0,
+                message: `${logType} log file is empty` 
+            };
+        }
+        
+        const logEntries = content.split(/(?=\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})/)
+            .filter(entry => entry.trim());
+        
+        let syncedCount = 0;
+        
+        for (const logEntry of logEntries) {
+            await Log.create({
+                logType: logType,
+                message: logEntry.substring(0, 200),
+                rawLog: logEntry.trim(),
+                timestamp: new Date()
+            });
+            syncedCount++;
+        }
+        
+        return { 
+            success: true,
+            synced: syncedCount, 
+            total: logEntries.length,
+            message: `Synced ${syncedCount} logs to database`
+        };
+    } catch (error) {
+        throw new ErrorHandler(500, `Failed to sync ${logType} logs: ${error.message}`);
+    }
+};
+
 module.exports = {
     readLogFile,
     getLogStatistics,
     searchLogs,
     clearLogFile,
-    clearAllLogFiles
+    clearAllLogFiles,
+    syncFileLogsToDatabase
 };

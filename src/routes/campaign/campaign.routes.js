@@ -9,11 +9,13 @@ const CONSTANT_ENUM = require('../../helper/constant-enums.js');
 
 const API = {
     CREATE_CAMPAIGN: '/',
+    CREATE_CAMPAIGN_BY_ADMIN:'/:userId/add',
     GET_ALL_CAMPAIGNS:'/',
     QUICK_SEARCH: '/quick-search',    
     GET_CAMPAIGN:'/:campaignId',
     UPDATE_CAMPAIGN:'/:campaignId',
-    SEARCH_CAMPAIGNS: '/search',    
+    SEARCH_CAMPAIGNS: '/search',   
+    DELETE_CAMPAIGN:'/:campaignId' 
 };
 campaignRouter.use(
     checkAuth,
@@ -51,11 +53,20 @@ campaignRouter.post(
     celebrate(CampaignSchema.createCampaign),
     campaignController.createCampaign
 );
+campaignRouter.post(
+    API.CREATE_CAMPAIGN_BY_ADMIN,
+    celebrate(CampaignSchema.createCampaignByAdmin),
+    campaignController.createCampaignByAdmin
+);
+
 campaignRouter.put( 
     API.UPDATE_CAMPAIGN,
     celebrate(CampaignSchema.updateCampaign), 
     campaignController.updateCampaign
 );
-
+campaignRouter.delete(
+    API.DELETE_CAMPAIGN,
+    campaignController.deleteCampaign
+);
 
 module.exports = campaignRouter;
