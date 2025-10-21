@@ -18,6 +18,7 @@ const API = {
   GET_COUNTIES_BY_STATE: '/states/:stateId/counties'
 
 };
+locationRouter.get( API.GET_STATES, locationController.getAllStates);
 locationRouter.use(
     checkAuth,
     // authorizedRoles([CONSTANT_ENUM.USER_ROLE.ADMIN], [CONSTANT_ENUM.USER_ROLE.USER])
@@ -27,7 +28,7 @@ locationRouter.post( API.UPLOAD_CSV_DATA, upload.single('file'),  locationContro
 
 locationRouter.get( API.GET_ALL_LOCATIONS, locationController.getAllLocationsDetailed);
 
-locationRouter.get( API.GET_STATES, locationController.getAllStates);
+
 
 locationRouter.get( API.GET_COUNTIES_BY_STATE, celebrate(LocationSchema.getCountiesByState), locationController.getCountiesByState);
 

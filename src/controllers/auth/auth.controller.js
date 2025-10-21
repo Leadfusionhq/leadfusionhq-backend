@@ -8,24 +8,43 @@ const TOKEN_GEN = require('../../helper/generate-token');
 const { ErrorHandler } = require('../../utils/error-handler');
 const { randomNumberGenerate, isEmpty } = require('../../utils/utils');
 const OTP = require('../../models/otp.model');
+const { syncUserToBoberdooById } = require('../../services/boberdoo/boberdoo.service');
+
+// const registerUser = wrapAsync(async (req, res) => {
+//     const userPayload = req.body;
+
+//     const { user } = await AuthService.registerUser(userPayload);
+
+//     MAIL_HANDLER.sendVerificationEmail({
+//         to: user?.email,
+//         name: user?.name,
+//         token: user?.verificationToken,
+//     });
+
+
+//     sendResponse(res, { user }, 'Success! Please verify your email to activate your account.', 201);
+// });
 
 const registerUser = wrapAsync(async (req, res) => {
     const userPayload = req.body;
-
+  
     const { user } = await AuthService.registerUser(userPayload);
-
+  
+    // ✅ ONLY send verification email - NO Boberdoo sync yet
     MAIL_HANDLER.sendVerificationEmail({
-        to: user?.email,
-        name: user?.name,
-        token: user?.verificationToken,
-    });
-
-
+      to: user?.email,
+      name: user?.name,
+      token: user?.verificationToken,
+    }).catch((e) => console.error('❌ Verification email error:', e.message));
+  
     sendResponse(res, { user }, 'Success! Please verify your email to activate your account.', 201);
-});
+  });
+
 
 const loginWithEmail = wrapAsync(async (req, res) => {
-    const { email: rawEmail, password ,role: requestedRole} = req.body;
+    // const { email: rawEmail, password ,role: requestedRole} = req.body;
+    const { email: rawEmail, password, role: requestedRole, rememberMe = false } = req.body;
+
     const email = rawEmail.toLowerCase();
 
     const user = await UserServices.getUserByEmail(email, true);
@@ -42,7 +61,13 @@ const loginWithEmail = wrapAsync(async (req, res) => {
 
     if (!(await user.comparePassword(password))) throw new ErrorHandler(400, 'Incorrect email or password');
 
-    const token = TOKEN_GEN.generateToken(user._id, user.role, '72h');
+    const tokenExpiration = rememberMe ? '30d' : '24h'; 
+    // const token = TOKEN_GEN.generateToken(user._id, user.role, '72h');
+    // const token = TOKEN_GEN.generateToken(user._id, user.role, tokenExpiration);
+    const token = TOKEN_GEN.generateToken(user._id, user.role, tokenExpiration, rememberMe);
+
+    const tokenExpiryTimestamp = Date.now() + (rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000);
+
     const safeUser = await UserServices.getUserByID(user._id);
     // const filteredUser = {
     //     id: safeUser._id,
@@ -51,7 +76,13 @@ const loginWithEmail = wrapAsync(async (req, res) => {
     //     role: safeUser.role,
     // };
 
-    sendResponse(res, { user: safeUser, token }, 'Login successful');
+    // sendResponse(res, { user: safeUser, token }, 'Login successful');
+    sendResponse(res, { 
+        user: safeUser, 
+        token,
+        tokenExpiry: tokenExpiryTimestamp,
+        rememberMe 
+    }, 'Login successful');
     
 });
 
@@ -77,24 +108,72 @@ const verifyEmail = wrapAsync(async (req, res) => {
     }
     
     const user = await AuthService.verifyEmailService(token);
-    
-    try {
-        const n8nAccount = await N8nServices.createSubAccount(user);
-        console.log('n8nAccount',n8nAccount)
-        if (n8nAccount?.user?.id) {
-            user.n8nUserId = n8nAccount.user.id;
-            await user.save();
+
+    console.log('✅ Email verified for user:', user.email);
+  
+    // ✅ FIRE-AND-FORGET: Boberdoo sync (only after email verification)
+    (async () => {
+      try {
+        console.log('🚀 Starting Boberdoo sync for verified user:', user._id);
+        const result = await syncUserToBoberdooById(user._id);
+        console.log('✅ Boberdoo sync (verify):', result);
+      } catch (err) {
+        console.error('❌ Boberdoo sync exception (verify):', err.message);
+      }
+    })();
+
+    // ✅ NEW: Send registration notification to admins (from database)
+    (async () => {
+      try {
+        const User = require('../../models/user.model'); // ✅ Import User model
+        
+        const adminUsers = await User.find({ role: 'ADMIN' });
+
+        if (adminUsers && adminUsers.length > 0) {
+          // ✅ Filter out admin@gmail.com
+          const adminEmails = adminUsers
+            .map(admin => admin.email)
+            .filter(email => email && email.toLowerCase() !== 'admin@gmail.com');
+
+          if (adminEmails.length > 0) {
+            await MAIL_HANDLER.sendNewUserRegistrationToAdmin({
+              adminEmails,
+              userName: user.name,
+              userEmail: user.email,
+              registrationDate: user.createdAt 
+                ? new Date(user.createdAt).toLocaleString('en-US', { 
+                    dateStyle: 'medium', 
+                    timeStyle: 'short' 
+                  })
+                : new Date().toLocaleString('en-US', { 
+                    dateStyle: 'medium', 
+                    timeStyle: 'short' 
+                  }),
+              verificationDate: new Date().toLocaleString('en-US', { 
+                dateStyle: 'medium', 
+                timeStyle: 'short' 
+              }),
+              userRole: user.role || 'User'
+            });
+            
+            console.log('✅ Admin notification sent for new user:', user.email, {
+              adminCount: adminEmails.length,
+              adminEmails
+            });
+          } else {
+            console.warn('⚠️ No valid admin emails found (admin@gmail.com excluded)');
+          }
         } else {
-            console.warn(`No n8n user ID returned for email ${user.email}`);
+          console.warn('⚠️ No admin users found in system');
         }
+      } catch (err) {
+        console.error('❌ Admin notification failed:', err.message);
+        // Don't throw - email failure shouldn't break verification
+      }
+    })();
 
-    } catch (err) {
-        console.error(`Failed to create n8n sub-account for ${user.email}`, err.message);
-    }
-
-    console.warn('user',user)
+    console.warn('user', user);
     sendResponse(res, {}, 'Email successfully verified');
-
 });
 
 const sendOtpOnEmail = wrapAsync(async (req, res) => {

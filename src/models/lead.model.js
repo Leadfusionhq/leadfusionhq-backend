@@ -160,7 +160,35 @@ const leadSchema = new mongoose.Schema({
       minlength: 5,
       maxlength: 10,
       trim: true
-    }
+    },
+    coordinates: {
+      lat: {
+        type: Number,
+        min: -90,
+        max: 90
+      },
+      lng: {
+        type: Number,
+        min: -180,
+        max: 180
+      }
+    },
+    place_id: {
+      type: String,
+      required: false,
+    },
+  },
+
+  transaction_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Transaction',
+      default: null,
+      index: true // Add index for faster queries
+  },
+  original_cost: {
+      type: Number,
+      default: 0,
+      min: 0
   },
   
   // Additional Information
@@ -195,6 +223,19 @@ const leadSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+    // ✅ ONLY ADD THESE TWO SIMPLE FIELDS
+    return_reason: {
+      type: String,
+      trim: true,
+      default: null
+    },
+    return_comments: {
+      type: String,
+      maxlength: 1000,
+      trim: true,
+      default: null
+    },
+    
   max_return_attempts: {
     type: Number,
     default: 2

@@ -87,6 +87,20 @@ const createLead = {
       }),
 
       zip: Joi.string().min(5).max(10).allow('').optional(),
+
+      coordinates: Joi.object({
+        lat: Joi.number().min(-90).max(90).required().messages({
+          'number.base': 'Latitude must be a number',
+        }),
+        lng: Joi.number().min(-180).max(180).required().messages({
+          'number.base': 'Longitude must be a number',
+        }),
+      }).optional().allow(null), // ✅ Allow null or complete object
+      
+      // 🔥 FIX: Allow place_id to be stored
+      place_id: Joi.string().allow('', null).optional(),
+    
+
     }).required(),
 
     // Additional information
@@ -153,6 +167,12 @@ const updateLead = {
       state: Joi.string().hex().length(24).optional(),
       zip_code: Joi.string().min(5).max(10).optional(),
       zip: Joi.string().min(5).max(10).allow('').optional(),
+      coordinates: Joi.object({
+        lat: Joi.number().min(-90).max(90).optional(),
+        lng: Joi.number().min(-180).max(180).optional(),
+      }).optional().allow(null),
+      
+      place_id: Joi.string().allow('', null).optional(),
     }).optional(),
 
     // Additional information
@@ -181,6 +201,20 @@ const returnLead = {
       .messages({
         'any.only': 'Return status must be "Pending"',
       }),
+      return_reason: Joi.string()
+      .valid(
+        'invalid_contact',
+        'duplicate',
+        'not_interested',
+        'wrong_location',
+        'poor_quality',
+        'other'
+      )
+      .required(),
+    return_comments: Joi.string()
+      .max(1000)
+      .allow('', null)
+      .optional(),
   }),
 };
 

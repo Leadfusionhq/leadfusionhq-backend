@@ -5,6 +5,19 @@ const { ErrorHandler } = require('../../utils/error-handler');
 const { getPaginationParams, extractFilters } = require('../../utils/pagination');
 const { User } = require('../../models/user.model');
 const { billingLogger } = require('../../utils/logger');
+const dayjs = require('dayjs');
+const path = require('path');
+const { URL } = require('url');
+
+const { generateTransactionReceipt } = require('../../services/pdf/receiptGenerator');
+
+const Transaction = require('../../models/transaction.model');
+
+
+const MAIL_HANDLER = require('../../mail/mails');
+
+
+const { getRevenueFromNmi, getRefundsFromNmi } = require('../../services/nmi/nmi.service'); // import
 
 // Contract management
 const getCurrentContract = wrapAsync(async (req, res) => {
@@ -21,6 +34,45 @@ const getContractStatus = wrapAsync(async (req, res) => {
     billingLogger.info('Contract status retrieved successfully', { userId: user_id, status });
     return sendResponse(res, { status }, 'Contract status retrieved successfully');
 });
+
+
+// ✅ Add this controller
+const getRevenueFromGateway = wrapAsync(async (req, res) => {
+    const { range = 'mtd', start, end, includeRefunds = '0' } = req.query;
+  
+    let from = dayjs().startOf('month');
+    let to = dayjs().endOf('day');
+    if (range === 'today') { from = dayjs().startOf('day'); to = dayjs().endOf('day'); }
+    if (range === '7d') { from = dayjs().subtract(6, 'day').startOf('day'); to = dayjs().endOf('day'); }
+    if (range === '30d') { from = dayjs().subtract(29, 'day').startOf('day'); to = dayjs().endOf('day'); }
+    if (range === 'custom' && start && end) {
+      from = dayjs(start).startOf('day');
+      to = dayjs(end).endOf('day');
+    }
+  
+    const { totalAmount: sales, count: salesCount } = await getRevenueFromNmi({ start: from, end: to });
+  
+    let refunds = 0;
+    let refundCount = 0;
+    if (includeRefunds === '1') {
+      const r = await getRefundsFromNmi({ start: from, end: to });
+      refunds = r.totalAmount;
+      refundCount = r.count;
+    }
+  
+    const totalAmount = sales - refunds;
+  
+    return sendResponse(res, {
+      totalAmount,
+      sales,
+      refunds,
+      salesCount,
+      refundCount,
+      from: from.toISOString(),
+      to: to.toISOString()
+    }, 'Revenue fetched successfully');
+  });
+  
 
 const acceptContract = wrapAsync(async (req, res) => {
     const user_id = req.user._id;
@@ -131,75 +183,93 @@ const getCards = wrapAsync(async (req, res) => {
     const user_id = req.user._id;
     const { deductAmount } = req.body;
     
-    billingLogger.info('Testing auto top-up for user', { 
-        userId: user_id, 
-        deductAmount 
-    });
+    billingLogger.info('Testing auto top-up for user', { userId: user_id, deductAmount });
     
     try {
-      const result = await BillingServices.testLeadDeduction(user_id, deductAmount);
-      billingLogger.info('Auto top-up test completed', { 
-          userId: user_id, 
-          deductAmount, 
-          result: result.message 
-      });
-      return sendResponse(res, { result }, result.message);
+        const result = await BillingServices.testLeadDeduction(user_id, deductAmount);
+        
+        // ✅ Send auto top-up email if triggered
+        if (result.autoTopUpTriggered) {
+            try {
+                const user = await User.findById(user_id);
+                await MAIL_HANDLER.sendAutoTopUpEmail({
+                    to: user.email,
+                    userName: user.name,
+                    amount: result.topUpAmount,
+                    transactionId: result.topUpTransactionId,
+                    triggerReason: `Balance below threshold after lead deduction`,
+                    newBalance: result.newBalance,
+                    threshold: result.threshold || 50
+                });
+                billingLogger.info('Auto top-up email sent', { userId: user_id });
+            } catch (emailErr) {
+                billingLogger.error('Failed to send auto top-up email', emailErr);
+            }
+        }
+
+        billingLogger.info('Auto top-up test completed', { 
+            userId: user_id, 
+            deductAmount, 
+            result: result.message 
+        });
+        
+        return sendResponse(res, { result }, result.message);
     } catch (err) {
-      billingLogger.error('Failed to process lead deduction', err, { 
-          userId: user_id, 
-          deductAmount 
-      });
-      
-      // Pass through the specific error message for insufficient funds
-      if (err.statusCode === 400) {
-        throw new ErrorHandler(400, err.message);
-      }
-      
-      throw new ErrorHandler(500, 'Failed to process lead deduction. Please try again later.');
+        billingLogger.error('Failed to process lead deduction', err, { userId: user_id, deductAmount });
+        
+        if (err.statusCode === 400) {
+            throw new ErrorHandler(400, err.message);
+        }
+        
+        throw new ErrorHandler(500, 'Failed to process lead deduction. Please try again later.');
     }
-  });
+});
+
 
 
 
 // Billing operations
+// Update addFunds function
 const addFunds = wrapAsync(async (req, res) => {
-    console.log(req.body);
-    
     const user_id = req.user._id;
-    const { amount, vaultId} = req.body;
+    const { amount, vaultId } = req.body;
     
-    billingLogger.info('User attempting to add funds', { 
-        userId: user_id, 
-        amount 
-    });
+    billingLogger.info('User attempting to add funds', { userId: user_id, amount });
     
-    // Check if user has accepted the latest contract
     const contractStatus = await BillingServices.getUserContractStatus(user_id);
     if (!contractStatus.hasAcceptedLatest) {
-        billingLogger.warn('User tried to add funds without accepting contract', { 
-            userId: user_id, 
-            amount 
-        });
+        billingLogger.warn('User tried to add funds without accepting contract', { userId: user_id, amount });
         throw new ErrorHandler(400, 'You must accept the latest contract before adding funds.');
     }
     
     try {
-        const result = await BillingServices.addFunds(user_id, amount , vaultId);
+        const result = await BillingServices.addFunds(user_id, amount, vaultId);
         billingLogger.info('Funds added successfully', { 
             userId: user_id, 
             amount, 
             transactionId: result.transactionId 
         });
+
+        // ✅ Send funds added email
+        try {
+            const user = await User.findById(user_id);
+            await MAIL_HANDLER.sendFundsAddedEmail({
+                to: user.email,
+                userName: user.name,
+                amount: amount,
+                transactionId: result.transactionId,
+                paymentMethod: result.paymentMethod || 'Card',
+                newBalance: result.newBalance
+            });
+            billingLogger.info('Funds added email sent', { userId: user_id });
+        } catch (emailErr) {
+            billingLogger.error('Failed to send funds added email', emailErr);
+        }
+
         return sendResponse(res, { result }, 'Funds added successfully', 201);
     } catch (err) {
-        billingLogger.error('Failed to add funds', err, { 
-            userId: user_id, 
-            amount 
-        });
-
-        console.log(`error received in billing controller is ${err.message}`)
+        billingLogger.error('Failed to add funds', err, { userId: user_id, amount });
         
-        // Check if it's a payment decline (400 error) and pass through the message
         if (err.statusCode === 400) {
             throw new ErrorHandler(400, err.message);
         }
@@ -290,6 +360,69 @@ const toggleAutoTopUp = wrapAsync(async (req, res) => {
     }
   });
 
+  // Build a sensible logoPath from env or local fallback
+const getLogoPath = () => {
+    // Highest priority: explicit company logo URL
+    if (process.env.COMPANY_LOGO_URL) return process.env.COMPANY_LOGO_URL;
+  
+    // Next: UI_LINK + /images/logo.png
+    if (process.env.UI_LINK) {
+      try {
+        return new URL('/images/logo.png', process.env.UI_LINK).toString();
+      } catch (_) { /* ignore */ }
+    }
+  
+    // Fallback to local file (if running on a server with the asset available)
+    return path.join(process.cwd(), 'public', 'images', 'logo.png');
+  };
+  
+  const getReceipt = async (req, res, next) => {
+    try {
+      const { txnId } = req.params;
+      const mobile = req.query.mobile === '1';
+      const download = req.query.download !== '0'; // default to download; use ?download=0 for inline
+  
+      // Find by custom transaction_id or by ObjectId
+      let txn = await Transaction.findOne({ transaction_id: txnId }).lean();
+      if (!txn) txn = await Transaction.findById(txnId).lean();
+      if (!txn) return res.status(404).json({ message: 'Receipt not found' });
+  
+      const userId = txn.userId || txn.user_id;
+      const user = userId ? await User.findById(userId).lean() : null;
+  
+      const logoPath = getLogoPath();
+  
+      const pdf = await generateTransactionReceipt({
+        transactionId: txn.transaction_id || String(txn._id),
+        userName: user?.name || 'Customer',
+        userEmail: user?.email || '',
+        transactionType: txn.description || txn.type || 'Transaction',
+        amount: Number(txn.amount || 0),
+        date: new Date(txn.createdAt || Date.now()).toLocaleString(),
+        newBalance: txn.balance_after ?? txn.balanceAfter ?? 0,
+        oldBalance: txn.balance_before ?? txn.balanceBefore ?? undefined,
+        description: txn.description || '',
+        paymentMethod: txn.paymentMethodDetails
+          ? `${txn.paymentMethodDetails.brand || 'Card'} •••• ${txn.paymentMethodDetails.lastFour || ''}`
+          : (txn.paymentMethod || ''),
+        logoPath, // <- pass your logo
+        mobile
+      });
+  
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader(
+        'Content-Disposition',
+        `${download ? 'attachment' : 'inline'}; filename="receipt-${txnId}.pdf"`
+      );
+      res.setHeader('Cache-Control', 'private, max-age=60');
+  
+      return res.send(pdf);
+    } catch (err) {
+      return next(err);
+    }
+  };
+  
+
 module.exports = {
     getCurrentContract,
     getContractStatus,
@@ -305,4 +438,6 @@ module.exports = {
     setDefaultCard,
     deleteCard,
     testAutoTopUp,
+    getRevenueFromGateway,
+    getReceipt,
 };
