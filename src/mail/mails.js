@@ -678,102 +678,61 @@ const sendTransactionEmail = async ({
   const userEmail     = metadata.userEmail || to;
   const oldBalance    = metadata.oldBalance;
   const paymentMethod = metadata.payment_type || '';
-  const placeOfSupply = metadata.fullAddress || 'No Address ';
+
+  // Make Place of Supply EXACTLY what the email uses (fullAddress)
+  const placeOfSupply = (metadata.fullAddress && String(metadata.fullAddress).trim()) || 'N/A';
+
   const logoPath = `${(process.env.UI_LINK || '').replace(/\/+$/, '')}/images/logo.png`;
-  // 1) Generate PDF receipt to attach
-  let receiptBuffer = null;
-  try {
-    receiptBuffer = await generateTransactionReceipt({
-      transactionId,
-      userName,
-      userEmail,
-      transactionType,
-      amount: Number(amount || 0),
-      date,
-      newBalance: Number(newBalance || 0),
-      oldBalance: oldBalance !== undefined ? Number(oldBalance) : undefined,
-      description,
-      paymentMethod,
-      logoPath: logoPath,
-      companyName: 'Leadfusionhq',
-      companyAddress:'525 NJ-73 Suite 104',
-      companyCity: placeOfSupply,
-      companyPhone: '+1 (609) 707-6818',
-      companyEmail: 'support@leadfusionhq.com',
-      companyWebsite: 'www.leadfusionhq.com'
-    });
-  } catch (e) {
-    console.error('Receipt PDF generation failed:', e.message);
-  }
 
-  // 2) Public download URL (served by your route)
-  const downloadUrl = `${process.env.BACKEND_LINK}/billing/receipts/${encodeURIComponent(transactionId)}`;
+  // US timezone (default EST/EDT); override via RECEIPT_TZ if needed
+  const TZ = process.env.RECEIPT_TZ || 'America/New_York';
+  const inputDate = metadata.transactionDate || date || Date.now();
+  const dateObj = inputDate instanceof Date ? inputDate : new Date(inputDate);
+  const displayDate = dateObj.toLocaleString('en-US', { timeZone: TZ, dateStyle: 'medium', timeStyle: 'short' });
+  const dateShort = displayDate.split(',')[0]; // first part only (e.g., Sep 12, 2025)
 
-  // Hard truncate description (email clients may ignore CSS ellipsis)
-  const rawDesc = (description || transactionType || 'Transaction').trim();
-  const maxDescChars = 90;
-  const truncatedDesc = rawDesc.length > maxDescChars ? (rawDesc.slice(0, maxDescChars - 1) + '…') : rawDesc;
-  const dateShort = (date && String(date).split(',')[0]) || date || '';
-
-  // Divider right under the title (Transaction Receipt)
+  // Divider under the title
   const dividerUnderTitle = `
     <div style="height:1px; background:#e5e7eb; margin:8px 0 16px 0;"></div>
   `;
 
-  // ----- Invoice Meta (Billed To flush-left; Invoice No/Date right) -----
+  // ----- Invoice Meta (Billed To left; Invoice No/Date right) -----
   const invoiceMeta = `
     <table width="100%" cellpadding="0" cellspacing="0" border="0"
       style="border-collapse:collapse; margin:0; font-family: Arial, sans-serif;">
       <tr>
-        <!-- Left column: Billed To (flush-left) -->
-        <td valign="top" align="left"
-          style="padding:0; margin:0; vertical-align:top; width:50%;">
+        <td valign="top" align="left" style="padding:0; margin:0; vertical-align:top; width:50%;">
           <table cellpadding="0" cellspacing="0" border="0" style="margin:0; padding:0;">
-            <tr>
-              <td style="font-size:12px; color:#555;">Billed To</td>
-            </tr>
-            <tr>
-              <td style="font-size:13px; color:#111; font-weight:bold;">${userName || 'Customer'}</td>
-            </tr>
-            <tr>
-              <td style="font-size:12px; color:#555;">${userEmail || ''}</td>
-            </tr>
+            <tr><td style="font-size:12px; color:#555;">Billed To</td></tr>
+            <tr><td style="font-size:13px; color:#111; font-weight:bold;">${userName || 'Customer'}</td></tr>
+            <tr><td style="font-size:12px; color:#555;">${userEmail || ''}</td></tr>
           </table>
         </td>
-
-        <!-- Right column: Invoice meta -->
-        <td valign="top" align="right"
-          style="padding:0; margin:0; vertical-align:top; width:50%;">
-          <table width="100%" cellpadding="0" cellspacing="0" border="0"
-            style="border-collapse:collapse; margin:0;">
-            <tr>
-              <td align="right" style="font-size:12px; color:#555;">Invoice No</td>
-            </tr>
-            <tr>
-              <td align="right" style="font-size:12px; color:#111; font-weight:bold;">${transactionId}</td>
-            </tr>
-            <tr>
-              <td align="right" style="font-size:12px; color:#555; padding-top:8px;">Invoice Date</td>
-            </tr>
-            <tr>
-              <td align="right" style="font-size:12px; color:#111; font-weight:bold;">${date}</td>
-            </tr>
+        <td valign="top" align="right" style="padding:0; margin:0; vertical-align:top; width:50%;">
+          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse; margin:0;">
+            <tr><td align="right" style="font-size:12px; color:#555;">Invoice No</td></tr>
+            <tr><td align="right" style="font-size:12px; color:#111; font-weight:bold;">${transactionId}</td></tr>
+            <tr><td align="right" style="font-size:12px; color:#555; padding-top:8px;">Invoice Date</td></tr>
+            <tr><td align="right" style="font-size:12px; color:#111; font-weight:bold;">${displayDate}</td></tr>
           </table>
         </td>
       </tr>
     </table>
   `;
 
+  // ----- Strict line-items table -----
+  const rawDesc = (description || transactionType || 'Transaction').trim();
+  const maxDescChars = 90;
+  const truncatedDesc = rawDesc.length > maxDescChars ? (rawDesc.slice(0, maxDescChars - 1) + '…') : rawDesc;
 
-  // ----- Strict line-items table (like PDF) -----
   const lineItemTable = `
     <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse; border:1px solid #e5e7eb; table-layout:fixed; font-family: Arial, sans-serif; margin-top:8px;">
       <colgroup>
-        <col style="width:92px; max-width:92px; min-width:92px;" />
+        <col style="width:92px;" />
         <col style="width:auto;" />
-        <col style="width:82px; max-width:82px; min-width:82px;" />
-        <col style="width:90px; max-width:90px; min-width:90px;" />
-        <col style="width:90px; max-width:90px; min-width:90px;" />
+        <col style="width:82px;" />
+        <col style="width:90px;" />
+        <col style="width:90px;" />
       </colgroup>
       <thead>
         <tr style="background-color:#f7f7f7;">
@@ -786,8 +745,8 @@ const sendTransactionEmail = async ({
       </thead>
       <tbody>
         <tr>
-          <td align="left"  style="padding:8px 6px; font-size:12px; color:#111; border-bottom:1px solid #e5e7eb; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${dateShort || ''}</td>
-          <td align="left"  style="padding:8px 6px; font-size:12px; color:#111; border-bottom:1px solid #e5e7eb; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${truncatedDesc}</td>
+          <td align="left"  style="padding:8px 6px; font-size:12px; color:#111; border-bottom:1px solid #e5e7eb;">${dateShort || ''}</td>
+          <td align="left"  style="padding:8px 6px; font-size:12px; color:#111; border-bottom:1px solid #e5e7eb;">${truncatedDesc}</td>
           <td align="right" style="padding:8px 6px; font-size:12px; color:#111; border-bottom:1px solid #e5e7eb;">$${formattedAmount}</td>
           <td align="right" style="padding:8px 6px; font-size:12px; color:#111; border-bottom:1px solid #e5e7eb;">$${formattedAmount}</td>
           <td align="right" style="padding:8px 6px; font-size:12px; color:#111; border-bottom:1px solid #e5e7eb;">$${formattedAmount}</td>
@@ -803,41 +762,25 @@ const sendTransactionEmail = async ({
         <td width="60%"></td>
         <td width="40%">
           <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
-            <tr>
-              <td align="left"  style="padding:6px 0; font-size:12px; color:#111;">SUBTOTAL:</td>
-              <td align="right" style="padding:6px 0; font-size:12px; color:#111;">$${formattedAmount}</td>
-            </tr>
-            <tr>
-              <td align="left"  style="padding:6px 0; font-size:12px; color:#111;">TAX (0%):</td>
-              <td align="right" style="padding:6px 0; font-size:12px; color:#111;">$0.00</td>
-            </tr>
-            <tr>
-              <td colspan="2" style="border-top:1px solid #e5e7eb; height:1px; line-height:1px; font-size:0;"></td>
-            </tr>
-            <tr>
-              <td align="left"  style="padding:6px 0; font-size:12px; color:#111; font-weight:bold;">TOTAL:</td>
-              <td align="right" style="padding:6px 0; font-size:12px; color:#111; font-weight:bold;">$${formattedAmount}</td>
-            </tr>
+            <tr><td align="left"  style="padding:6px 0; font-size:12px; color:#111;">SUBTOTAL:</td><td align="right" style="padding:6px 0; font-size:12px; color:#111;">$${formattedAmount}</td></tr>
+            <tr><td align="left"  style="padding:6px 0; font-size:12px; color:#111;">TAX (0%):</td><td align="right" style="padding:6px 0; font-size:12px; color:#111;">$0.00</td></tr>
+            <tr><td colspan="2" style="border-top:1px solid #e5e7eb; height:1px; line-height:1px; font-size:0;"></td></tr>
+            <tr><td align="left"  style="padding:6px 0; font-size:12px; color:#111; font-weight:bold;">TOTAL:</td><td align="right" style="padding:6px 0; font-size:12px; color:#111; font-weight:bold;">$${formattedAmount}</td></tr>
           </table>
         </td>
       </tr>
     </table>
   `;
 
-  // ----- Meta lines -----
+  // ----- Meta lines (ensure same Place of Supply as email) -----
   const metaBlock = `
     <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse; margin-top:12px; font-family: Arial, sans-serif;">
-      <tr>
-        <td style="font-size:12px; color:#555;">Payment Method: ${paymentMethod || 'N/A'}</td>
-      </tr>
-      <tr>
-        <td style="font-size:12px; color:#555;">Place of Supply: ${placeOfSupply}</td>
-      </tr>
+      <tr><td style="font-size:12px; color:#555;">Payment Method: ${paymentMethod || 'N/A'}</td></tr>
+      <tr><td style="font-size:12px; color:#555;">Place of Supply: ${placeOfSupply}</td></tr>
     </table>
   `;
 
-
-  // Assemble body (no greeting, no intro sentence, no badge, no extra CTA)
+  // Assemble body
   const body = `
     ${dividerUnderTitle}
     ${invoiceMeta}
@@ -848,13 +791,41 @@ const sendTransactionEmail = async ({
 
   const html = createEmailTemplate({
     title: 'Transaction Receipt',
-    greeting: '',        // remove Hello name
+    greeting: '',
     mainText: body,
-    // Remove header CTA
-    // buttonText: undefined,
-    // buttonUrl: undefined,
     footerText: 'If you have any questions about this transaction, please contact our support team.'
   });
+
+  // 1) Generate PDF receipt (pass Place of Supply; do not show address in header)
+  let receiptBuffer = null;
+  try {
+    receiptBuffer = await generateTransactionReceipt({
+      transactionId,
+      userName,
+      userEmail,
+      transactionType,
+      amount: Number(amount || 0),
+      date: displayDate,                        // already in US timezone
+      newBalance: Number(newBalance || 0),
+      oldBalance: oldBalance !== undefined ? Number(oldBalance) : undefined,
+      description,
+      paymentMethod,
+      logoPath,
+      companyName: 'Leadfusionhq',
+      // address will NOT be rendered in header anymore (see PDF gen)
+      companyAddress: '525 NJ-73 Suite 104',
+      companyCity: 'Marlton, NJ 08053',
+      companyPhone: '+1 (609) 707-6818',
+      companyEmail: 'support@leadfusionhq.com',
+      companyWebsite: 'www.leadfusionhq.com',
+      placeOfSupply,                            // NEW
+    });
+  } catch (e) {
+    console.error('Receipt PDF generation failed:', e.message);
+  }
+
+  // 2) Public download URL (served by your route)
+  const downloadUrl = `${process.env.BACKEND_LINK}/billing/receipts/${encodeURIComponent(transactionId)}`;
 
   const payload = {
     from: FROM_EMAIL,
@@ -864,9 +835,7 @@ const sendTransactionEmail = async ({
   };
 
   if (receiptBuffer) {
-    payload.attachments = [
-      { filename: `receipt-${transactionId}.pdf`, content: receiptBuffer }
-    ];
+    payload.attachments = [{ filename: `receipt-${transactionId}.pdf`, content: receiptBuffer }];
   }
 
   return resend.emails.send(payload);
