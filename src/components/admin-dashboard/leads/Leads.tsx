@@ -46,6 +46,7 @@ type Lead = {
   updatedAt: string;
   status: string;
   lead_type: string;
+  return_status: string; 
   exclusivity: string;
   language: string;
   geography: string;
@@ -99,6 +100,21 @@ export default function LeadTable() {
     // or: const statuses = Object.values(LEAD_STATUS);
   ];
 
+// ✅ ADD THIS - Lead Status Mapping
+const LEAD_STATUS_MAP: Record<string, { label: string; color: string }> = {
+  'Not Returned': { label: 'Active', color: '#4caf50' },
+  'Pending': { label: 'Pending Return', color: '#ff9800' },
+  'Approved': { label: 'Returned', color: '#2196f3' },
+  'Rejected': { label: 'Return Rejected', color: '#f44336' }
+};
+
+const getLeadStatus = (return_status: string) => {
+  return LEAD_STATUS_MAP[return_status] || LEAD_STATUS_MAP['Not Returned'];
+};
+
+
+
+  
   const formatStatus = (s: string) =>
     s.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
 
@@ -120,7 +136,55 @@ export default function LeadTable() {
 
     const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
     const [menuRow, setMenuRow] = useState<Lead | null>(null);
+    const [returnDialog, setReturnDialog] = useState({
+      open: false,
+      lead: null as Lead | null,
+    });
     const isMenuOpen = Boolean(menuAnchorEl);
+
+
+    const handleReturnLead = (row: Lead) => {
+      setReturnDialog({ open: true, lead: row });
+      handleMenuClose();
+    };
+
+    const confirmReturnLead = async () => {
+      if (!returnDialog.lead) return;
+
+      try {
+        setLoading(true);
+        
+        await axiosWrapper(
+          "patch",
+          LEADS_API.APPROVE_RETURN_LEAD,
+          { 
+            lead_id: returnDialog.lead._id,           
+            return_status: 'Approved' 
+          },
+          token ?? undefined
+        );
+
+        toast.success("Lead returned successfully");
+        setReturnDialog({ open: false, lead: null });
+        
+        // Refresh the table
+        fetchLeads(
+          pagination.page,
+          pagination.limit,
+          selectedCampaign,
+          selectedStatus,
+          selectedState
+        );
+      } catch (err: any) {
+        console.error("Failed to return lead:", err);
+        const message = err?.response?.data?.message || "Failed to return lead";
+        toast.error(message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+
 
     const handleMenuClick = (event: React.MouseEvent<HTMLButtonElement>, row: Lead) => {
       setMenuAnchorEl(event.currentTarget);
@@ -341,6 +405,7 @@ useEffect(() => {
     createdAt: "",
     updatedAt: "",
     status: "",
+    return_status: "", 
     lead_type: "",
     exclusivity: "",
     language: "",
@@ -423,6 +488,29 @@ const hasFilters = !!(selectedCampaign || selectedStatus || selectedState);
           <div style={{ minWidth: "160px" }} className="font-medium text-gray-900">{`${row.first_name} ${row.last_name}`}</div>
         ),
       sortable: true,
+    },
+     {
+      name: "Lead Status",
+      selector: (row) => row.return_status,
+      cell: (row) =>
+        row._id.startsWith("skeleton") ? (
+          <Skeleton variant="text" width={120} animation="wave" />
+        ) : (
+          <div style={{ minWidth: "140px" }}>
+            <Chip
+              label={getLeadStatus(row.return_status).label}
+              size="small"
+              sx={{
+                backgroundColor: getLeadStatus(row.return_status).color,
+                color: '#fff',
+                fontWeight: 500,
+                fontSize: '12px'
+              }}
+            />
+          </div>
+        ),
+      sortable: true,
+      width: "160px",
     },
     {
       name: "Email",
@@ -654,6 +742,20 @@ const hasFilters = !!(selectedCampaign || selectedStatus || selectedState);
         >
           Delete
         </MenuItem>
+          {/* ✅ ADD THIS */}
+        {/* ✅ Show "Return Lead" for all statuses EXCEPT 'Approved' */}
+        {menuRow && menuRow.return_status !== 'Approved' && (
+          <MenuItem
+            onClick={() => {
+              if (menuRow) handleReturnLead(menuRow);
+              handleMenuClose();
+            }}
+            sx={{ color: 'warning.main' }}
+          >
+            Return Lead
+          </MenuItem>
+        )}
+        
         {/* Optional: add more lead actions here */}
         {/* <MenuItem onClick={() => { ... }}>Return Lead</MenuItem> */}
         {/* <MenuItem onClick={() => { ... }}>Delete Lead</MenuItem> */}
@@ -709,12 +811,20 @@ const hasFilters = !!(selectedCampaign || selectedStatus || selectedState);
     </Popover>
     </Box>
     <ConfirmDialog
-    open={deleteDialog.open}
-    title="Delete Lead"
-    message={`Are you sure you want to delete lead "${deleteDialog.lead?.first_name} ${deleteDialog.lead?.last_name}"? This action cannot be undone.`}
-    onConfirm={confirmDelete}
-    onCancel={() => setDeleteDialog({ open: false, lead: null })}
-  /> 
+        open={deleteDialog.open}
+        title="Delete Lead"
+        message={`Are you sure you want to delete lead "${deleteDialog.lead?.first_name} ${deleteDialog.lead?.last_name}"? This action cannot be undone.`}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteDialog({ open: false, lead: null })}
+      /> 
+      {/* ✅ ADD THIS */}
+    <ConfirmDialog
+      open={returnDialog.open}
+      title="Return Lead"
+      message={`Are you sure you want to return lead "${returnDialog.lead?.first_name} ${returnDialog.lead?.last_name}"? The lead will be returned and the user will be refunded.`}
+      onConfirm={confirmReturnLead}
+      onCancel={() => setReturnDialog({ open: false, lead: null })}
+    />
   </>
   );
 }
