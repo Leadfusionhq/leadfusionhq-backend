@@ -136,7 +136,55 @@ const getLeadStatus = (return_status: string) => {
 
     const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
     const [menuRow, setMenuRow] = useState<Lead | null>(null);
+    const [returnDialog, setReturnDialog] = useState({
+      open: false,
+      lead: null as Lead | null,
+    });
     const isMenuOpen = Boolean(menuAnchorEl);
+
+
+    const handleReturnLead = (row: Lead) => {
+      setReturnDialog({ open: true, lead: row });
+      handleMenuClose();
+    };
+
+    const confirmReturnLead = async () => {
+      if (!returnDialog.lead) return;
+
+      try {
+        setLoading(true);
+        
+        await axiosWrapper(
+          "patch",
+          LEADS_API.APPROVE_RETURN_LEAD,
+          { 
+            lead_id: returnDialog.lead._id,           
+            return_status: 'Approved' 
+          },
+          token ?? undefined
+        );
+
+        toast.success("Lead returned successfully");
+        setReturnDialog({ open: false, lead: null });
+        
+        // Refresh the table
+        fetchLeads(
+          pagination.page,
+          pagination.limit,
+          selectedCampaign,
+          selectedStatus,
+          selectedState
+        );
+      } catch (err: any) {
+        console.error("Failed to return lead:", err);
+        const message = err?.response?.data?.message || "Failed to return lead";
+        toast.error(message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+
 
     const handleMenuClick = (event: React.MouseEvent<HTMLButtonElement>, row: Lead) => {
       setMenuAnchorEl(event.currentTarget);
@@ -694,6 +742,20 @@ const hasFilters = !!(selectedCampaign || selectedStatus || selectedState);
         >
           Delete
         </MenuItem>
+          {/* ✅ ADD THIS */}
+        {/* ✅ Show "Return Lead" for all statuses EXCEPT 'Approved' */}
+        {menuRow && menuRow.return_status !== 'Approved' && (
+          <MenuItem
+            onClick={() => {
+              if (menuRow) handleReturnLead(menuRow);
+              handleMenuClose();
+            }}
+            sx={{ color: 'warning.main' }}
+          >
+            Return Lead
+          </MenuItem>
+        )}
+        
         {/* Optional: add more lead actions here */}
         {/* <MenuItem onClick={() => { ... }}>Return Lead</MenuItem> */}
         {/* <MenuItem onClick={() => { ... }}>Delete Lead</MenuItem> */}
@@ -749,12 +811,20 @@ const hasFilters = !!(selectedCampaign || selectedStatus || selectedState);
     </Popover>
     </Box>
     <ConfirmDialog
-    open={deleteDialog.open}
-    title="Delete Lead"
-    message={`Are you sure you want to delete lead "${deleteDialog.lead?.first_name} ${deleteDialog.lead?.last_name}"? This action cannot be undone.`}
-    onConfirm={confirmDelete}
-    onCancel={() => setDeleteDialog({ open: false, lead: null })}
-  /> 
+        open={deleteDialog.open}
+        title="Delete Lead"
+        message={`Are you sure you want to delete lead "${deleteDialog.lead?.first_name} ${deleteDialog.lead?.last_name}"? This action cannot be undone.`}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteDialog({ open: false, lead: null })}
+      /> 
+      {/* ✅ ADD THIS */}
+    <ConfirmDialog
+      open={returnDialog.open}
+      title="Return Lead"
+      message={`Are you sure you want to return lead "${returnDialog.lead?.first_name} ${returnDialog.lead?.last_name}"? The lead will be returned and the user will be refunded.`}
+      onConfirm={confirmReturnLead}
+      onCancel={() => setReturnDialog({ open: false, lead: null })}
+    />
   </>
   );
 }
