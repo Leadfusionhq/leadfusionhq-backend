@@ -46,7 +46,8 @@ const sourceOptions = [
   { value: 'manual', label: 'Manual' },
   { value: 'csv_upload', label: 'CSV Upload' },
   { value: 'api', label: 'API' },
-  { value: 'import', label: 'Import' }
+  { value: 'import', label: 'Import' },
+  { value: 'boberdo', label: 'Boberdo' }
 ];
 
 
