@@ -209,10 +209,17 @@ const leadSchema = new mongoose.Schema({
   // Processing Information
   source: {
     type: String,
-    enum: ['manual', 'csv_upload', 'api', 'import'],
+    enum: ['manual', 'csv_upload', 'api', 'import', 'boberdo'],
     default: 'manual'
   },
 
+  // Add optional fields for Boberdo integration
+  boberdo_metadata: {
+    external_id: { type: String, sparse: true }, // Boberdo's lead ID
+    source_campaign: { type: String },
+    received_at: { type: Date }
+  },
+  
   return_status: {
     type: String,
     enum: ['Not Returned', 'Pending', 'Approved', 'Rejected'],
