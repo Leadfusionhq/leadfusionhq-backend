@@ -34,6 +34,8 @@ const testRoutes = require('./src/routes/test/email-routes');
 const billingLogTestRoutes = require('./src/routes/test/billing-log-test');
 const logsRoutes = require('./src/routes/logs/logs.routes');
 const smsRoutes = require('./src/routes/sms/sms.route');
+const boberDoRoutes = require('./src/routes/boberdo/boberdo.route');
+const boberdoAdminRoutes = require('./src/routes/boberdo/boberdo-admin.route');
 
 
 app.use(cors());
@@ -84,6 +86,13 @@ app.use(`/${config.server.route}/logs`, logsRoutes);
 
 /** ::::::::::::::::::logs routes:::::::::::::::::: */
 app.use(`/${config.server.route}/sms`, smsRoutes);
+
+
+// boberdo routes
+// Add these routes
+app.use(`/${config.server.route}/boberdo`, boberDoRoutes); // Public API for Boberdo
+app.use(`/${config.server.route}/admin/boberdo`, boberdoAdminRoutes); // Admin management
+
 
 app.use(errors());
 
