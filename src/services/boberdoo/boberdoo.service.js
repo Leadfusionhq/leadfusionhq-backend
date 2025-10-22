@@ -2,6 +2,15 @@ const axios = require('axios');
 const crypto = require('crypto');
 const { User } = require('../../models/user.model');
 const CONSTANT_ENUM = require('../../helper/constant-enums');
+const mongoose = require('mongoose');
+const Campaign = require('../../models/campaign.model');
+const { ErrorHandler } = require('../../utils/error-handler');
+const generateUniqueLeadId = require('../../utils/idGenerator');
+const  State  = require('../../models/state.model');
+const Lead = require('../../models/lead.model');
+const BillingServices = require('../billing/billing.service');
+const MAIL_HANDLER = require('../../mail/mails');
+
 
 // Keep only URL and KEY from env (secrets)
 const API_URL = (process.env.BOBERDOO_API_URL || 'https://leadfusionhq.leadportal.com/apiJSON.php').trim();
@@ -496,11 +505,167 @@ async function updateCampaignInBoberdoo(campaignData, filterSetId, partnerId) {
 
 
 
+const processBoberdoLead = async (leadData) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
+    try {
+        // ✅ 1. Find campaign by Boberdoo filter_set_id
+        const campaign = await Campaign.findOne({ 
+            boberdoo_filter_set_id: leadData.filter_set_id 
+        });
+        
+        if (!campaign) {
+            throw new ErrorHandler(404, `Campaign not found for filter_set_id: ${leadData.filter_set_id}`);
+        }
+
+        console.log('✅ Campaign found:', {
+            internal_id: campaign._id,
+            name: campaign.name,
+            filter_set_id: campaign.boberdoo_filter_set_id
+        });
+
+        // ✅ 2. Check if campaign is active (case-insensitive)
+        const isActive = String(campaign.status).toUpperCase() === 'ACTIVE';
+        if (!isActive) {
+            throw new ErrorHandler(400, `Campaign "${campaign.name}" is not active. Status: ${campaign.status}`);
+        }
+
+        // ✅ 3. Convert state code to ObjectId
+        const state = await State.findOne({ 
+            abbreviation: leadData.address.state_code.toUpperCase() 
+        });
+        
+        if (!state) {
+            throw new ErrorHandler(400, `Invalid state code: ${leadData.address.state_code}`);
+        }
+
+        // ✅ 4. Check prepaid balance
+        const leadCost = campaign.bid_price || 0;
+        if (campaign.payment_type === 'prepaid') {
+            const campaignUser = await User.findById(campaign.user_id);
+            if (!campaignUser) {
+                throw new ErrorHandler(404, 'Campaign user not found');
+            }
+
+            const totalAvailable = (campaignUser.balance || 0) + (campaignUser.refundMoney || 0);
+            if (totalAvailable < leadCost) {
+                throw new ErrorHandler(400, `Insufficient funds for campaign "${campaign.name}". Required: $${leadCost}, Available: $${totalAvailable}`);
+            }
+        }
+
+        // ✅ 5. Generate unique lead ID
+        const lead_id = await generateUniqueLeadId();
+
+        // ✅ 6. Prepare lead data
+        const preparedLead = {
+            lead_id,
+            user_id: campaign.user_id,
+            campaign_id: campaign._id,
+            first_name: leadData.first_name,
+            last_name: leadData.last_name,
+            middle_name: leadData.middle_name,
+            suffix: leadData.suffix,
+            phone_number: leadData.phone_number,
+            email: leadData.email,
+            age: leadData.age,
+            gender: leadData.gender,
+            address: {
+                street: leadData.address.street,
+                city: leadData.address.city,
+                state: state._id,
+                zip_code: leadData.address.zip_code,
+                full_address: leadData.address.full_address || 
+                    `${leadData.address.street}, ${leadData.address.city}, ${state.abbreviation} ${leadData.address.zip_code}`,
+                coordinates: leadData.address.coordinates,
+                place_id: leadData.address.place_id
+            },
+            note: leadData.note,
+            source: 'boberdo',
+            status: 'active',
+            boberdo_metadata: {
+                external_id: leadData.external_lead_id,
+                filter_set_id: leadData.filter_set_id,
+                source_campaign: leadData.source_info,
+                received_at: new Date()
+            }
+        };
+
+        // ✅ 7. Create lead
+        const newLead = await Lead.create([preparedLead], { session });
+        const createdLead = newLead[0];
+
+        console.log('✅ Lead created:', {
+            lead_id: createdLead.lead_id,
+            internal_id: createdLead._id
+        });
+
+        // ✅ 8. Process billing if prepaid
+        let billingResult = null;
+        if (campaign.payment_type === 'prepaid' && leadCost > 0) {
+            billingResult = await BillingServices.assignLeadNew(
+                campaign.user_id,
+                createdLead._id,
+                leadCost,
+                campaign.user_id,
+                session
+            );
+            console.log('✅ Billing processed:', billingResult);
+        }
+
+        // ✅ 9. Commit transaction
+        await session.commitTransaction();
+        session.endSession();
+
+        // ✅ 10. Populate lead for response
+        const populatedLead = await Lead.findById(createdLead._id)
+            .populate('campaign_id', 'name campaign_id')
+            .populate('address.state', 'name abbreviation');
+
+        // ✅ 11. Send notifications (async)
+        sendBoberdoLeadNotifications(populatedLead, campaign, billingResult).catch(err => {
+            console.error('Failed to send Boberdo lead notifications:', err);
+        });
+
+        return populatedLead;
+
+    } catch (error) {
+        await session.abortTransaction();
+        session.endSession();
+        throw error;
+    }
+};
+
+const sendBoberdoLeadNotifications = async (lead, campaign, billingResult) => {
+    try {
+        const campaignOwner = await User.findById(campaign.user_id);
+        if (!campaignOwner) return;
+
+        // Email notification
+        if (campaign?.delivery?.method?.includes('email') && 
+            campaign?.delivery?.email?.addresses) {
+            await MAIL_HANDLER.sendLeadAssignEmail({
+                to: campaign.delivery.email.addresses,
+                name: campaignOwner.name || 'Campaign User',
+                leadName: lead.lead_id,
+                assignedBy: 'Boberdo Integration',
+                leadDetailsUrl: `${process.env.UI_LINK}/dashboard/leads/${lead._id}`,
+                campaignName: campaign.name,
+                leadData: lead,
+                realleadId: lead._id,
+                subject: `New Boberdo Lead Assigned to "${campaign.name}"`,
+            });
+            console.log('✅ Email notification sent');
+        }
+    } catch (error) {
+        console.error('Error sending Boberdo notifications:', error);
+    }
+};
 
 
 module.exports = { 
   syncUserToBoberdooById
   ,createCampaignInBoberdoo,
-  updateCampaignInBoberdoo
+  updateCampaignInBoberdoo,
+  processBoberdoLead,
  };
