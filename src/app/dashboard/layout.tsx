@@ -8,6 +8,7 @@ import { useSocket } from '@/context/SocketContext';
 import Sidebar from '@/components/Layout/Sidebar/Sidebar';
 import MainPanel from '@/components/Layout/Dashboard/MainPanel/MainPanel';
 import FloatingChatWidget from '@/components/chat/FloatingChatWidget'; 
+import Breadcrumbs from '@/components/Breadcrumb/Breadcrumb';
 
 export default function UserLayout({ children }: { children: ReactNode }) {
   const { isLoggedIn, user } = useSelector((state: RootState) => state.auth);
@@ -43,6 +44,7 @@ export default function UserLayout({ children }: { children: ReactNode }) {
               Socket: {connected ? '🟢' : '🔴'} | User ID: {user?._id || 'None'}
             </div>
           )}
+           <Breadcrumbs />
           {children}
         </main>
           {/* Floating Chat Widget */}

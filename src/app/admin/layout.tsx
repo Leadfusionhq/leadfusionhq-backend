@@ -9,7 +9,7 @@ import MainPanel from '@/components/Layout/Dashboard/MainPanel/MainPanel';
 import Sidebar from '@/components/Layout/Sidebar/Sidebar';
 import FloatingChatWidget from '@/components/chat/FloatingChatWidget'; 
 import { useLoader } from '@/context/LoaderContext';
-
+import Breadcrumbs from '@/components/Breadcrumb/Breadcrumb';
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const { isLoggedIn, user } = useSelector((state: RootState) => state.auth);
@@ -48,6 +48,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               Socket: {connected ? '🟢' : '🔴'} | User ID: {user?._id || 'None'}
             </div>
           )} */}
+           <Breadcrumbs />
           {children}
         </main>
           
