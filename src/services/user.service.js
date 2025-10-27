@@ -22,6 +22,65 @@ const updateUser = async (userId, updateData) => {
   return User.findByIdAndUpdate(userId, updateData, { new: true }).exec();
 };
 
+const updateUserProfile = async (userId, updateData) => {
+  console.log("🔧 [updateUserProfile] Updating user:", userId);
+  console.log("📦 Data to update:", updateData);
+
+  // Handle address state conversion
+  if (updateData.address && updateData.address.state) {
+    console.log("🌍 [updateUserProfile] Handling address state conversion");
+    if (typeof updateData.address.state === 'object') {
+      updateData.address.state = updateData.address.state.abbreviation || updateData.address.state;
+    }
+    updateData.region = updateData.address.state;
+  }
+
+  if (updateData.name) {
+    updateData.name = updateData.name.trim();
+  }
+
+  const user = await User.findByIdAndUpdate(
+    userId,
+    { $set: updateData },
+    { new: true, runValidators: true }
+  ).select('-password -verificationToken -resetPasswordToken');
+
+  if (!user) {
+    console.error("❌ [updateUserProfile] User not found:", userId);
+    throw new ErrorHandler(404, 'User not found');
+  }
+
+  console.log("✅ [updateUserProfile] Updated user document:", user);
+  return user;
+};
+
+
+const changeUserPassword = async (userId, currentPassword, newPassword) => {
+  const user = await User.findById(userId).select('+password');
+  
+  if (!user) {
+      throw new ErrorHandler(404, 'User not found');
+  }
+
+  // Verify current password
+  const isPasswordValid = await user.comparePassword(currentPassword);
+  if (!isPasswordValid) {
+      throw new ErrorHandler(401, 'Current password is incorrect');
+  }
+
+  // Check if new password is same as current    
+  const isSamePassword = await user.comparePassword(newPassword);
+    if (isSamePassword) {
+      throw new ErrorHandler(400, 'New password must be different from current password');
+  }
+
+  // Update password
+  user.password = newPassword;
+  await user.save();
+
+  return user;
+};
+
 const softDeleteUser = async (userId) => {
   return User.findByIdAndUpdate(userId, { isDeleted: true }, { new: true }).exec();
 };
@@ -178,6 +237,8 @@ module.exports = {
   getUserByEmail,
   getUserByID,
   updateUser,
+  updateUserProfile,
+  changeUserPassword,
   softDeleteUser,
   hardDeleteUser,
   listUsers,

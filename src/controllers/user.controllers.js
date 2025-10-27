@@ -36,6 +36,82 @@ const addUser = wrapAsync(async (req, res) => {
 
     sendResponse(res, { user }, 'User has been created. They can log in after verifying their account.', 201);
 });
+
+
+const getMyProfile = wrapAsync(async (req, res) => {
+  const userId = req.user._id; // From auth middleware
+  const user = await UserServices.getUserByID(userId);
+  
+  sendResponse(res, { user }, 'Profile fetched successfully.', 200);
+});
+
+const updateMyProfile = wrapAsync(async (req, res) => {
+  const userId = req.user._id; // From auth middleware
+  const updateData = req.body;
+
+  console.log("🟢 [updateMyProfile] Incoming profile update request:");
+  console.log("➡️ User ID:", userId);
+  console.log("➡️ Raw update data:", updateData);
+
+  // Users cannot update these fields themselves
+  delete updateData.password;
+  delete updateData.role;
+  delete updateData.isEmailVerified;
+  delete updateData.isActive;
+  delete updateData.balance;
+  delete updateData.refundMoney;
+  delete updateData.n8nUserId;
+
+  console.log("🧹 [updateMyProfile] Sanitized update data:", updateData);
+
+  const updatedUser = await UserServices.updateUserProfile(userId, updateData);
+
+  console.log("✅ [updateMyProfile] User updated successfully:", updatedUser);
+
+  sendResponse(res, { user: updatedUser }, 'Profile updated successfully.', 200);
+});
+
+
+const changeMyPassword = wrapAsync(async (req, res) => {
+  console.log('Incoming password change body:', req.body);
+
+  const userId = req.user._id;
+  const { currentPassword, newPassword } = req.body;
+  
+  await UserServices.changeUserPassword(userId, currentPassword, newPassword);
+  
+  sendResponse(res, {}, 'Password changed successfully. Please login again.', 200);
+});
+
+// ✅ Add this new controller
+const uploadMyAvatar = wrapAsync(async (req, res) => {
+  const userId = req.user._id; // Get from auth middleware
+
+  if (!req.file) {
+    return sendResponse(res, {}, "No file uploaded", 400);
+  }
+
+  const folder = "profile/user";
+  const avatarPath = `/uploads/${folder}/${req.file.filename}`; // store without /public
+
+  const user = await UserServices.getUserByID(userId, true);
+
+  // Delete previous avatar
+  if (user?.avatar) {
+    const oldAvatarPath = path.join(process.cwd(), "public", user.avatar.replace(/^\/+/, ""));
+    if (fs.existsSync(oldAvatarPath)) {
+      fs.unlinkSync(oldAvatarPath);
+    }
+  }
+
+  // Update user with new avatar
+  const updatedUser = await UserServices.updateUserProfile(userId, { avatar: avatarPath });
+
+  sendResponse(res, { user: updatedUser }, "Avatar uploaded successfully", 200);
+});
+
+
+
 const getUserById = wrapAsync(async (req, res) => {
     const { userId } = req.params;
     const data = await UserServices.getUserByID(userId); 
@@ -148,5 +224,9 @@ module.exports = {
  acceptContract,
  getContractStatus,
  checkContractAcceptance,
- resyncBoberdoo
+ resyncBoberdoo,
+ uploadMyAvatar,
+ getMyProfile,
+ updateMyProfile,
+ changeMyPassword,
 };
