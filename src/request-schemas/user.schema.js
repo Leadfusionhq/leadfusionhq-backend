@@ -18,12 +18,12 @@ const createUserByAdmin = {
       'string.min': 'Password must be at least 6 characters',
       'any.required': 'Password is required',
     }),
-    
+
     confirmPassword: Joi.string().valid(Joi.ref('password')).required().messages({
       'any.only': 'Confirm password does not match password',
       'any.required': 'Confirm password is required',
     }),
-    
+
     companyName: Joi.string().required().messages({
       'any.required': 'Company name is required',
     }),
@@ -47,18 +47,23 @@ const createUserByAdmin = {
         'string.length': 'State must be a 2-letter code',
         'any.required': 'State is required',
       }),
-      zip_code: Joi.string().pattern(/^\d{5}(-\d{4})?$/).required().messages({
-        'string.pattern.base': 'ZIP code must be in format 12345 or 12345-6789',
-        'any.required': 'ZIP code is required',
-      }),
+      zip_code: Joi.string()
+        .pattern(/^\d{5}(-\d{4})?$/)
+        .required()
+        .messages({
+          'string.pattern.base': 'ZIP code must be in format 12345 or 12345-6789',
+          'any.required': 'ZIP code is required',
+        }),
       coordinates: Joi.object({
         lat: Joi.number().min(-90).max(90).optional(),
         lng: Joi.number().min(-180).max(180).optional(),
       }).optional(),
       place_id: Joi.string().optional(),
-    }).required().messages({
-      'any.required': 'Address information is required',
-    }),
+    })
+      .required()
+      .messages({
+        'any.required': 'Address information is required',
+      }),
 
     role: Joi.string()
       .valid(CONSTANT_ENUM.USER_ROLE.USER)
@@ -72,8 +77,8 @@ const createUserByAdmin = {
 const getUserById = {
   [Segments.BODY]: Joi.object().keys({
     userId: Joi.string().required().messages({
-      'any.required': 'USER id is required'
-    })
+      'any.required': 'USER id is required',
+    }),
   }),
 };
 
@@ -119,9 +124,12 @@ const updateUser = {
       state: Joi.string().length(2).uppercase().optional().messages({
         'string.length': 'State must be a 2-letter code',
       }),
-      zip_code: Joi.string().pattern(/^\d{5}(-\d{4})?$/).optional().messages({
-        'string.pattern.base': 'ZIP code must be in format 12345 or 12345-6789',
-      }),
+      zip_code: Joi.string()
+        .pattern(/^\d{5}(-\d{4})?$/)
+        .optional()
+        .messages({
+          'string.pattern.base': 'ZIP code must be in format 12345 or 12345-6789',
+        }),
       coordinates: Joi.object({
         lat: Joi.number().min(-90).max(90).optional(),
         lng: Joi.number().min(-180).max(180).optional(),
@@ -143,41 +151,41 @@ const updateUser = {
 const acceptContract = {
   [Segments.BODY]: Joi.object().keys({
     version: Joi.string().optional().messages({
-      'any.required': 'Contract version is required'
+      'any.required': 'Contract version is required',
     }),
     ipAddress: Joi.string().ip().optional().messages({
-      'string.ip': 'IP address must be a valid IP'
-    })
+      'string.ip': 'IP address must be a valid IP',
+    }),
   }),
   [Segments.PARAMS]: Joi.object().keys({
     userId: Joi.string().required().messages({
-      'any.required': 'User ID is required'
-    })
-  })
+      'any.required': 'User ID is required',
+    }),
+  }),
 };
 
 const checkContract = {
   [Segments.BODY]: Joi.object().keys({
     version: Joi.string().required().messages({
-      'any.required': 'Contract version is required'
-    })
+      'any.required': 'Contract version is required',
+    }),
   }),
   [Segments.PARAMS]: Joi.object().keys({
     userId: Joi.string().required().messages({
-      'any.required': 'User ID is required'
-    })
-  })
+      'any.required': 'User ID is required',
+    }),
+  }),
 };
 
 const getContractStatus = {
   [Segments.PARAMS]: Joi.object().keys({
     userId: Joi.string().required().messages({
-      'any.required': 'User ID is required'
-    })
+      'any.required': 'User ID is required',
+    }),
   }),
   [Segments.QUERY]: Joi.object().keys({
-    version: Joi.string().optional()
-  })
+    version: Joi.string().optional(),
+  }),
 };
 
 module.exports = {
@@ -186,5 +194,5 @@ module.exports = {
   updateUser,
   acceptContract,
   checkContract,
-  getContractStatus
+  getContractStatus,
 };

@@ -47,18 +47,23 @@ const registerUser = {
         'string.length': 'State must be a 2-letter code',
         'any.required': 'State is required',
       }),
-      zip_code: Joi.string().pattern(/^\d{5}(-\d{4})?$/).required().messages({
-        'string.pattern.base': 'ZIP code must be in format 12345 or 12345-6789',
-        'any.required': 'ZIP code is required',
-      }),
+      zip_code: Joi.string()
+        .pattern(/^\d{5}(-\d{4})?$/)
+        .required()
+        .messages({
+          'string.pattern.base': 'ZIP code must be in format 12345 or 12345-6789',
+          'any.required': 'ZIP code is required',
+        }),
       coordinates: Joi.object({
         lat: Joi.number().min(-90).max(90).optional(),
         lng: Joi.number().min(-180).max(180).optional(),
       }).optional(),
       place_id: Joi.string().optional(),
-    }).required().messages({
-      'any.required': 'Address information is required',
-    }),
+    })
+      .required()
+      .messages({
+        'any.required': 'Address information is required',
+      }),
 
     terms: Joi.boolean().valid(true).required().messages({
       'any.only': 'You must accept the terms and conditions',

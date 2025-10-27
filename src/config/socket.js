@@ -6,9 +6,9 @@ const initSocket = (server) => {
   // Initialize socket.io with the HTTP server
   io = socketIo(server, {
     cors: {
-      origin: "*", // Configure as needed for your client
-      methods: ["GET", "POST"]
-    }
+      origin: '*', // Configure as needed for your client
+      methods: ['GET', 'POST'],
+    },
   });
 
   // Set up the connection event for users

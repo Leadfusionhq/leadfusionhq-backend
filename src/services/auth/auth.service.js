@@ -1,123 +1,186 @@
+// services/auth.service.js
 const { User } = require('../../models/user.model');
+const { OTP } = require('../../models/otp.model');
 const { ErrorHandler } = require('../../utils/error-handler');
 const { generateVerificationToken, getTokenExpiration } = require('../../utils/token.utils');
-const UserServices = require('../user.service');
 
-const registerUser = async (data) => {
-  const { 
-    email, 
-    password, 
-    confirmPassword,
-    name, 
-    phoneNumber, 
-    companyName, 
-    address 
-  } = data;
-  
-  const normalizedEmail = email.toLowerCase();
+const TOKEN_GEN = require('../../helper/generate-token');
 
-  const existingUser = await UserServices.getUserByEmail(normalizedEmail);
-  if (existingUser) {
-    throw new ErrorHandler(409, 'User with this email already exists');
+const mailService = require('../../mail/mails');
+const authConfig = require('../../config/auth.config');
+
+const register = async ({ name, email, password }) => {
+  const normalized = email.toLowerCase();
+
+  const exists = await User.findOne({ email: normalized });
+  if (exists) throw new ErrorHandler(409, 'Email already registered');
+
+  const user = await User.create({ name, email: normalized, password });
+
+  // Email Verification (if enabled)
+  if (authConfig.features.emailVerification) {
+    user.verificationToken = generateVerificationToken();
+    user.verificationTokenExpires = Date.now() + authConfig.tokens.verificationToken.expiry;
+    await user.save();
+
+    mailService
+      .sendVerificationEmail({
+        to: user.email,
+        name: user.name,
+        token: user.verificationToken,
+      })
+      .catch((err) => console.error('Email send failed:', err));
+
+    return {
+      data: { user: user.toSafeObject() },
+      message: 'Registration successful. Please verify your email.',
+    };
   }
 
-  const verificationToken = generateVerificationToken();
-  const verificationTokenExpires = getTokenExpiration(24);
+  // Auto-verify if feature disabled
+  user.isEmailVerified = true;
+  await user.save();
 
-  // Extract state from address (could be string or object from Google API)
-  let stateValue = '';
-  if (address && address.state) {
-    if (typeof address.state === 'object' && address.state.abbreviation) {
-      stateValue = address.state.abbreviation;
-    } else if (typeof address.state === 'string') {
-      stateValue = address.state;
-    }
-  }
-
-  // Prepare address object
-  const addressData = {
-    full_address: address?.full_address || '',
-    street: address?.street || '',
-    city: address?.city || '',
-    state: stateValue,
-    zip_code: address?.zip_code || '',
-    coordinates: address?.coordinates || { lat: null, lng: null },
-    place_id: address?.place_id || ''
+  return {
+    data: { user: user.toSafeObject() },
+    message: 'Registration successful',
   };
+};
 
-  const newUser = await User.create({
-    name,
-    email: normalizedEmail,
-    password,
-    phoneNumber,
-    companyName,
-    address: addressData,
-    role: 'USER',
-    isEmailVerified: false,
-    verificationToken,
-    verificationTokenExpires,
-    
-    // Set country to "United States" for Boberdoo (US-only registration)
-    country: 'United States',
-    region: stateValue, // Store state abbreviation in region field
+const login = async (email, password, rememberMe = false) => {
+  const normalized = email.toLowerCase();
+
+  const user = await User.findOne({ email: normalized }).select('+password');
+  if (!user) throw new ErrorHandler(404, 'Invalid credentials');
+
+  if (!user.isActive) throw new ErrorHandler(403, 'Account deactivated');
+
+  // Check email verification (if enabled)
+  if (authConfig.features.emailVerification && !user.isEmailVerified) {
+    throw new ErrorHandler(403, 'Please verify your email first');
+  }
+
+  const isMatch = await user.comparePassword(password);
+  if (!isMatch) throw new ErrorHandler(404, 'Invalid credentials');
+
+  // Generate token
+  const expiry =
+    authConfig.features.rememberMe && rememberMe
+      ? authConfig.tokens.accessToken.long
+      : authConfig.tokens.accessToken.short;
+
+  const token = tokenHelper.generateToken({ id: user._id, role: user.role }, expiry);
+
+  return {
+    data: {
+      user: user.toSafeObject(),
+      token,
+      expiresIn: expiry,
+    },
+    message: 'Login successful',
+  };
+};
+
+// ============ EMAIL VERIFICATION ============
+const verifyEmail = async (token) => {
+  const user = await User.findOne({
+    verificationToken: token,
+    verificationTokenExpires: { $gt: Date.now() },
   });
 
-  const userWithoutPassword = await UserServices.getUserByID(newUser._id);
-
-  return { user: userWithoutPassword };
-};
-
-const verifyEmailService = async (token) => {
-  if (!token) {
-    throw new ErrorHandler(400, 'Verification token is required');
-  }
-
-  const user = await User.findOne({ verificationToken: token });
-
-  if (!user) {
-    throw new ErrorHandler(404, 'Invalid or expired verification token');
-  }
-
-  const now = new Date();
-  if (user.verificationTokenExpires && user.verificationTokenExpires < now) {
-    throw new ErrorHandler(400, 'Verification token has expired');
-  }
+  if (!user) throw new ErrorHandler(400, 'Invalid or expired token');
 
   user.isEmailVerified = true;
-  user.verificationToken = null;
-  user.verificationTokenExpires = null;
-
+  user.verificationToken = undefined;
+  user.verificationTokenExpires = undefined;
   await user.save();
 
-  return user;
+  return true;
 };
 
-const userSendVerificationEmail = async (email) => {
-  if (!email) {
-    throw new ErrorHandler(400, 'Email is required');
-  }
+const resendVerification = async (email) => {
+  const user = await User.findOne({ email: email.toLowerCase() });
+  if (!user) throw new ErrorHandler(404, 'User not found');
 
-  const normalizedEmail = email.toLowerCase();
-  const user = await User.findOne({ email: normalizedEmail });
+  if (user.isEmailVerified) throw new ErrorHandler(400, 'Email already verified');
 
-  if (!user) {
-    throw new ErrorHandler(404, 'User not found');
-  }
-
-  if (user.isEmailVerified) {
-    throw new ErrorHandler(400, 'Email is already verified');
-  }
-
-  user.verificationToken = generateVerificationToken();
-  user.verificationTokenExpires = getTokenExpiration(24);
-
+  user.verificationToken = tokenHelper.generateRandomToken(32);
+  user.verificationTokenExpires = Date.now() + authConfig.tokens.verificationToken.expiry;
   await user.save();
 
-  return user;
+  await mailService.sendVerificationEmail({
+    to: user.email,
+    name: user.name,
+    token: user.verificationToken,
+  });
+
+  return true;
+};
+
+// ============ FORGOT PASSWORD (OTP) ============
+const sendOTP = async (email) => {
+  const user = await User.findOne({ email: email.toLowerCase() });
+  if (!user) throw new ErrorHandler(404, 'User not found');
+
+  const otp = tokenHelper.generateOTP(authConfig.otp.length);
+
+  await OTP.deleteMany({ email: user.email });
+  await OTP.create({
+    email: user.email,
+    otp,
+    expiresAt: Date.now() + authConfig.otp.expiryMinutes * 60 * 1000,
+  });
+
+  await mailService.sendOTPEmail({
+    to: user.email,
+    name: user.name,
+    otp,
+  });
+
+  return true;
+};
+
+const verifyOTP = async (email, otp) => {
+  const record = await OTP.findOne({
+    email: email.toLowerCase(),
+    otp,
+    expiresAt: { $gt: Date.now() },
+  });
+
+  if (!record) throw new ErrorHandler(400, 'Invalid or expired OTP');
+
+  const user = await User.findOne({ email: email.toLowerCase() });
+  if (!user) throw new ErrorHandler(404, 'User not found');
+
+  await OTP.deleteOne({ _id: record._id });
+
+  const resetToken = tokenHelper.generateResetToken({ id: user._id });
+
+  return {
+    resetToken,
+    user: user.toSafeObject(),
+  };
+};
+
+const resetPassword = async (token, newPassword) => {
+  const decoded = tokenHelper.verifyResetToken(token);
+  if (!decoded) throw new ErrorHandler(400, 'Invalid or expired token');
+
+  const user = await User.findById(decoded.id);
+  if (!user) throw new ErrorHandler(404, 'User not found');
+
+  user.password = newPassword;
+  await user.save();
+
+  return true;
 };
 
 module.exports = {
-  registerUser,
-  verifyEmailService,
-  userSendVerificationEmail,
+  register,
+  login,
+  verifyEmail,
+  resendVerification,
+  sendOTP,
+  verifyOTP,
+  resetPassword,
 };

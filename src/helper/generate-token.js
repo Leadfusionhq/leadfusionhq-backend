@@ -2,9 +2,9 @@ const jwt = require('jsonwebtoken');
 const config = require('../config/config');
 
 const generateToken = (id, role, expiresIn) => {
-    return jwt.sign({ id, role }, config.server.jwtSecretKey, {
-        expiresIn
-    });
+  return jwt.sign({ id, role }, config.server.jwtSecretKey, {
+    expiresIn,
+  });
 };
 function generateResetToken(userId) {
   const payload = { userId };

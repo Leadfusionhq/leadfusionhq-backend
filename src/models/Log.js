@@ -4,39 +4,37 @@ const logSchema = new mongoose.Schema({
   timestamp: {
     type: Date,
     default: Date.now,
-    index: true
+    index: true,
   },
   level: {
     type: String,
     enum: ['INFO', 'WARN', 'ERROR', 'DEBUG', 'SUCCESS'],
     required: true,
-    index: true
+    index: true,
   },
   message: {
     type: String,
-    required: true
+    required: true,
   },
   logType: {
     type: String,
     enum: ['billing', 'combined', 'error'],
     default: 'combined',
-    index: true
+    index: true,
   },
   module: {
     type: String,
-    default: 'GENERAL'
+    default: 'GENERAL',
   },
   userId: {
     type: String,
-    default: null
+    default: null,
   },
   metadata: {
     type: mongoose.Schema.Types.Mixed,
-    default: {}
+    default: {},
   },
-  rawLog: String
-}, {
-  timestamps: true
+  rawLog: String,
 });
 
 // Auto-delete logs older than 30 days

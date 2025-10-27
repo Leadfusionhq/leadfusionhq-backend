@@ -1,10 +1,10 @@
-# Node.js Backend Setup - Lawyer Directory
+# Node.js Backend Setup - By node js
 
 This project is a Node.js backend powered by Express.js and MongoDB, designed for scalable and modular API development.
 
 ---
 
-## 📦 Installation
+## Installation
 
 Clone the repository and install dependencies:
 
@@ -17,12 +17,11 @@ npm update
 
 
 
-├── app.js                  # Main express setup (routes, error handlers) & app entery point
-├── .env                    # Environment configuration
-├── src
-│   ├── config              # MongoDB and other configs
-│   ├── controllers         # Route controllers
-│   ├── routes              # Express route definitions
-│   ├── services            # Logic layer (DB queries, etc.)
-│   └── utils               # Utility functions, error handlers
-# leadfusionhq-backend
+```
+
+use below cmd before pushing the code for use the same formet for whole project
+
+`npm run format` → formats all files.
+`npm run format:check` → checks for formatting issues.
+
+I am using `npm install --save-dev jest supertest` for testing

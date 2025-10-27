@@ -1,7 +1,7 @@
 const express = require('express');
 const logsRouter = express.Router();
 const logsController = require('../../controllers/logs/logs.controller');
-const Log = require('../../models/Log');  // ADD THIS LINE
+const Log = require('../../models/Log'); // ADD THIS LINE
 const API = {
   LOGS_INFO: '/',
   BILLING_LOGS: '/billing',
@@ -14,19 +14,15 @@ const API = {
   CLEAR_ERRORS: '/clear/errors',
   CLEAR_ALL: '/clear/all',
 
-  SYNC_LOGS: '/sync/:logType',  // NEW
-  SYNC_ALL: '/sync'   ,           // NEW
+  SYNC_LOGS: '/sync/:logType', // NEW
+  SYNC_ALL: '/sync', // NEW
 
-  
   GET_ALL_LOGS: '/all',
   GET_LOG_DETAIL: '/:id',
- 
+
   CLEAR_LOGS: '/clear',
   EXPORT_LOGS: '/export',
 };
-
-
- 
 
 // Get billing logs
 // GET /api/logs/billing?page=1&limit=50&search=userId
@@ -47,8 +43,6 @@ logsRouter.get(API.STATS, logsController.getLogStats);
 // Search across all log files
 // GET /api/logs/search?query=payment&page=1&limit=50&logType=billing
 logsRouter.get(API.SEARCH, logsController.searchLogs);
-
-
 
 // Clear billing logs
 // DELETE /api/logs/clear/billing
@@ -72,7 +66,6 @@ logsRouter.post(API.SYNC_LOGS, logsController.syncLogs);
 // Sync all logs to database
 // POST /api/logs/sync
 logsRouter.post(API.SYNC_ALL, logsController.syncAllLogs);
-
 
 // GET /api/logs/all?page=1&limit=50&level=error&source=AuthService&startDate=2024-01-01&endDate=2024-01-31&message=failed
 logsRouter.get(API.GET_ALL_LOGS, logsController.getAllLogs);
@@ -102,16 +95,17 @@ logsRouter.get(API.LOGS_INFO, (req, res) => {
     baseUrl: '/api/logs',
     endpoints: {
       logs: {
-        getAllLogs: 'GET /api/logs/all?page=1&limit=50&level=error&source=AuthService&startDate=2024-01-01&endDate=2024-01-31&message=failed',
+        getAllLogs:
+          'GET /api/logs/all?page=1&limit=50&level=error&source=AuthService&startDate=2024-01-01&endDate=2024-01-31&message=failed',
         getLogDetail: 'GET /api/logs/:id',
-        exportLogs: 'GET /api/logs/export?format=csv&level=error'
+        exportLogs: 'GET /api/logs/export?format=csv&level=error',
       },
       statistics: {
-        getStats: 'GET /api/logs/stats'
+        getStats: 'GET /api/logs/stats',
       },
       management: {
-        clearLogs: 'DELETE /api/logs/clear?level=debug&beforeDate=2024-01-01'
-      }
+        clearLogs: 'DELETE /api/logs/clear?level=debug&beforeDate=2024-01-01',
+      },
     },
     logLevels: ['info', 'warn', 'error', 'debug'],
     queryParameters: {
@@ -121,8 +115,8 @@ logsRouter.get(API.LOGS_INFO, (req, res) => {
       source: 'Filter by source (e.g., AuthService, API-Gateway)',
       message: 'Search in message field (case-insensitive)',
       startDate: 'Filter logs from this date (ISO format)',
-      endDate: 'Filter logs until this date (ISO format)'
-    }
+      endDate: 'Filter logs until this date (ISO format)',
+    },
   });
 });
 module.exports = logsRouter;
