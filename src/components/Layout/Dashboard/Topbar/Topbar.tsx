@@ -139,7 +139,7 @@ const Topbar = () => {
     />
      
 
-        {openProfile &&<ProfileCard/>} 
+     {openProfile && <ProfileCard onClose={() => openSetProfile(false)} />}
     </div>
   
    </div>

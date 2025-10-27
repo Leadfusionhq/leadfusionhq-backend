@@ -39,6 +39,7 @@ interface FormikGoogleAddressInputProps {
     coordinates?: string;
     placeId?: string;
   };
+  disabled?: boolean;
   className?: string;
 }
 

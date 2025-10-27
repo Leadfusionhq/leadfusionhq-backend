@@ -139,6 +139,16 @@ export const userSidebarItems: SidebarItem[] = [
     link: '/dashboard/chats',
   },
   {
+    id: 'setting-support',
+    name: 'Setting & Supports',
+    icon: '/images/icons/setting.svg',
+    link: '/dashboard/setting-support',
+    // pathCombinations: [
+    //   '/admin/leads/edit',
+    //   '/admin/leads/add',
+    // ]
+  },
+  {
 
     id: 'faq',
     name: 'FAQs',

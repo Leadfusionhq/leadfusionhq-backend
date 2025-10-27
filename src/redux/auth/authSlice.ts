@@ -13,6 +13,12 @@ interface User {
   address?:string; 
   dob?: string | null;
   balance?:null;
+    // 👇 Add these fields from backend
+    companyName?: string;
+    zipCode?: string;
+    isActive?: boolean;
+    isSuperAdmin?: boolean;
+    isEmailVerified?: boolean;
 }
 
 interface AuthState {
