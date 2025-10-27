@@ -9,7 +9,11 @@ import { removeToken } from '@/utils/auth';
 import { logout } from '@/redux/auth/authSlice';
 import { useLoader } from '@/context/LoaderContext';
 
-const ProfileCard = () => {
+interface ProfileCardProps {
+  onClose?: () => void;
+}
+
+const ProfileCard: React.FC<ProfileCardProps> = ({ onClose }) => {
   const { user } = useSelector((state: RootState) => state.auth);
 
   const { showLoader, hideLoader } = useLoader(); 
@@ -22,11 +26,13 @@ const ProfileCard = () => {
   const dispatch = useDispatch<AppDispatch>();
   const router = useRouter();
   const dashboardLink = user?.role === 'ADMIN' ? '/admin/dashboard' : '/dashboard';
-
+  const settingsLink = user?.role === 'ADMIN' ? '/admin/setting-support' : '/dashboard/setting-support';
+  
   const menuItems = [
     { id: 1, label: "Dashboard", link: dashboardLink },
-    { id: 2, label: "Settings", link: "/settings" },
+    { id: 2, label: "Settings", link: settingsLink },
   ];
+  
 
   
   const handleLogout = async () => {
@@ -77,6 +83,7 @@ const ProfileCard = () => {
             key={item.id}
             href={item.link}
             className="px-4 py-3 text-white hover:bg-gray-700 cursor-pointer border-b border-gray-800"
+            onClick={() => onClose?.()}
           >
             {item.label}
           </Link>

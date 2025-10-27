@@ -20,7 +20,12 @@ export const API_URL = {
     GET_USER_BY_ID: `${USER_API_BASE}/:userId`,
     DELETE_USER_BY_ID: `${USER_API_BASE}/:userId`,
     SYNC_BOMBERDO:`${USER_API_BASE}/:userId/boberdoo/resync`,
-
+    
+    GET_MY_PROFILE: `${USER_API_BASE}/me/profile`,
+    UPDATE_MY_PROFILE: `${USER_API_BASE}/me/profile`,
+    CHANGE_MY_PASSWORD: `${USER_API_BASE}/me/change-password`,
+    UPLOAD_MY_AVATAR: `${USER_API_BASE}/me/avatar`,
+    
     ACCEPT_CONTRACT:`${USER_API_BASE}/:userId/contract/accept`,
     CHECK_CONTRACT:`${USER_API_BASE}/:userId/contract/status`,
     
