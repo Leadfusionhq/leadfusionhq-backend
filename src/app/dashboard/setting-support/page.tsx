@@ -83,8 +83,6 @@ const SettingsPage = () => {
                         toast.success(res.message || 'Avatar updated successfully!');
                       }
                       
-
-                      toast.success(res.message || 'Avatar updated successfully!');
                       resetForm();
                       setPreview(null);
                     } catch (err: any) {
