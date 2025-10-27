@@ -177,7 +177,7 @@ const AddressSection = () => {
           {isEditing ? '✕ Cancel' : '✏️ Edit'}
         </button>
       </div>
-
+  
       <Formik
         initialValues={getInitialValues()}
         validationSchema={validationSchema}
@@ -186,58 +186,58 @@ const AddressSection = () => {
       >
         {({ values, errors, touched, setFieldValue }) => (
           <Form className="space-y-6">
-            {/* Google Address Autocomplete */}
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl border border-blue-100">
-              <div className="flex items-start gap-3 mb-4">
-                <div className="bg-blue-500 text-white p-2 rounded-lg">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
+  
+            {/* ✅ Only show Smart Address Lookup when editing */}
+            {isEditing && (
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl border border-blue-100">
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="bg-blue-500 text-white p-2 rounded-lg">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 3 0 016 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900">Smart Address Lookup</h3>
+                    <p className="text-sm text-gray-600">Start typing to search and auto-fill your address</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900">Smart Address Lookup</h3>
-                  <p className="text-sm text-gray-600">Start typing to search and auto-fill your address</p>
-                </div>
+  
+                <FormikGoogleAddressInput
+                  name="full_address"
+                  placeholder="Start typing your address..."
+                  errorMessage={touched.full_address ? errors.full_address : undefined}
+                  showCurrentLocation={true}
+                  disabled={!isEditing}
+                  autoFillFields={{
+                    street: 'street',
+                    city: 'city',
+                    state: 'state',
+                    zipCode: 'zip_code',
+                    coordinates: 'coordinates',
+                    placeId: 'place_id',
+                  }}
+                  onAddressSelect={(addressData) => {
+                    if (!isEditing) return; // ✅ Prevent unwanted auto updates
+  
+                    if (addressData) {
+                      const selectedState = stateOptions.find(
+                        (state) =>
+                          state.abbreviation === addressData.addressComponents.state ||
+                          state.name.toLowerCase() === addressData.addressComponents.state?.toLowerCase()
+                      );
+  
+                      if (selectedState) setFieldValue('state', selectedState);
+                      if (addressData.coordinates) setFieldValue('coordinates', addressData.coordinates);
+                      if (addressData.placeId) setFieldValue('place_id', addressData.placeId);
+                    }
+                  }}
+                />
               </div>
-
-              <FormikGoogleAddressInput
-                name="full_address"
-                placeholder="Start typing your address..."
-                errorMessage={touched.full_address ? errors.full_address : undefined}
-                showCurrentLocation={true}
-                disabled={!isEditing}
-                autoFillFields={{
-                  street: 'street',
-                  city: 'city',
-                  state: 'state',
-                  zipCode: 'zip_code',
-                  coordinates: 'coordinates',
-                  placeId: 'place_id',
-                }}
-                onAddressSelect={(addressData) => {
-                  if (addressData) {
-                    const selectedState = stateOptions.find(
-                      (state) =>
-                        state.abbreviation === addressData.addressComponents.state ||
-                        state.name.toLowerCase() === addressData.addressComponents.state?.toLowerCase()
-                    );
-
-                    if (selectedState) {
-                      setFieldValue('state', selectedState);
-                    }
-
-                    if (addressData.coordinates) {
-                      setFieldValue('coordinates', addressData.coordinates);
-                    }
-
-                    if (addressData.placeId) {
-                      setFieldValue('place_id', addressData.placeId);
-                    }
-                  }
-                }}
-              />
-            </div>
+            )}
+  
+      
+  
 
             {/* Address Details Grid */}
             <div className="bg-gray-50 p-6 rounded-xl space-y-6">
