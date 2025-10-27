@@ -7,6 +7,8 @@ const N8nServices = require('../services/n8n/n8n.automation.service');
 const { syncUserToBoberdooById } = require('../services/boberdoo/boberdoo.service');
 const MAIL_HANDLER = require('../mail/mails');
 const CONSTANT_ENUM = require('../helper/constant-enums.js');
+const path = require('path');
+const fs = require("fs");
 
 const getAllUsers = wrapAsync(async (req, res) => {
     const data = await UserServices.getAllUsersService(); 
