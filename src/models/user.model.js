@@ -121,6 +121,8 @@ const baseUserSchema = new mongoose.Schema({
       trim: true,
     }
   },
+  
+  companyName: { type: String, trim: true },
 
   integrations: {
     boberdoo: {
@@ -130,6 +132,8 @@ const baseUserSchema = new mongoose.Schema({
       last_error: { type: String, default: null }
     }
   }
+
+  
 }, options);
 
 // Password hashing middleware
