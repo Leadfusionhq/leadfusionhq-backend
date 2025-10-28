@@ -168,6 +168,8 @@ function buildCreateFields(user) {
     // Status numeric 0..2
     Status: statusCode,
 
+    Credit_Limit: 'Unlimited',
+
     // Optional fields (uncomment if needed)
     // Test: 1,                       // fake-success if inputs are valid (doesn't create real record)
     // Website: 'https://example.com',
@@ -369,7 +371,8 @@ async function createCampaignInBoberdoo(campaignData, partnerId) {
       Weekly_Limit: campaignData.weekly_limit ?? 0,
       Monthly_Limit: campaignData.monthly_limit ?? 0,
       Accept_Only_Reprocessed_Leads: 'Yes',
-      Filter_Set_Status: campaignData.status === 'ACTIVE' ? 1 : 0
+      Filter_Set_Status: campaignData.status === 'ACTIVE' ? 1 : 0,
+      Delivery_Type: '100275 - LeadFusion HQ - boberdoo Lead API',
     };
 
     console.log('[boberdoo] Creating campaign:', {
@@ -453,7 +456,8 @@ async function updateCampaignInBoberdoo(campaignData, filterSetId, partnerId) {
       Weekly_Limit: campaignData.weekly_limit ?? 0,
       Monthly_Limit: campaignData.monthly_limit ?? 0,
       Accept_Only_Reprocessed_Leads: 'Yes',
-      Filter_Set_Status: campaignData.status === 'ACTIVE' ? 1 : 0
+      Filter_Set_Status: campaignData.status === 'ACTIVE' ? 1 : 0,
+      Delivery_Type: '100275 - LeadFusion HQ - boberdoo Lead API',
     };
 
     console.log('[boberdoo] Updating campaign:', {
