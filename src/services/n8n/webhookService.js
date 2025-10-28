@@ -59,8 +59,9 @@ const sendToN8nWebhook = async (campaignData) => {
       ? campaignData.geography.coverage.partial.zip_codes
       : [];
 
-    // Payload
+    // Payload (always mark as update)
     const payload = {
+      action: 'update', // 👈 always send "update"
       campaign_id: campaignData.campaign_id || '',
       state: stateName,
       zip_codes: zipCodes,
@@ -76,7 +77,6 @@ const sendToN8nWebhook = async (campaignData) => {
         Accept: 'application/json',
       },
       timeout: 10000,
-      // validateStatus: () => true, // uncomment if you want to inspect non-2xx without throwing
     });
 
     console.log('n8n response:', resp.status, resp.data);
