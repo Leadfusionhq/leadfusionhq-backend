@@ -130,6 +130,7 @@ const updateCampaign = async (campaignId, userId, role, updateData) => {
       { new: true, runValidators: true }
     )
       .populate('user_id', 'integrations.boberdoo.external_id name email')
+      .populate('geography.state', 'name abbreviation')
       .lean();
 
     if (!updatedCampaign) {
@@ -187,12 +188,29 @@ const updateCampaign = async (campaignId, userId, role, updateData) => {
     }
     // --- BOBERDOO SYNC END ---
 
+    // --- N8N WEBHOOK TRIGGER ---
+    try {
+      // Always send action as 'update'
+      const resultForN8n = await sendToN8nWebhook({
+        ...updatedCampaign,
+        action: 'update'
+      });
+      console.log('📊 N8N Webhook (Update) Result:', resultForN8n);
+    } catch (n8nError) {
+      console.error('⚠ Failed to send update webhook to N8N:', n8nError.message);
+    }
+    // --- END WEBHOOK TRIGGER ---
+
+
+    // --- END WEBHOOK TRIGGER ---
+
     return updatedCampaign;
   } catch (error) {
     console.error('Campaign update error:', error.message);
     throw new ErrorHandler(error.statusCode || 500, error.message || 'Failed to update campaign');
   }
 };
+
 
 
 // const getCampaignsByUserId = async (page = 1, limit = 10, user_id) => {
