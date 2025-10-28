@@ -22,13 +22,9 @@ const postLead = wrapAsync(async (req, res) => {
         $inc: { total_leads_received: 1 } 
     });
     
-    sendResponse(res, { 
-        lead_id: result.lead_id,
-        internal_id: result._id,
-        campaign_id: result.campaign_id._id,
-        campaign_name: result.campaign_id.name,
-        status: result.status
-    }, 'Lead received successfully', 201);
+
+    // Send plain text message (exactly what Boberdoo expects)
+    res.status(201).send('Lead received successfully');
 });
 
 module.exports = {
