@@ -87,34 +87,6 @@ const createCampaign = async (data) => {
 };
 
 
-// const updateCampaign = async (campaignId, userId, updateData) => {
-//   try {
-//     const updatedCampaign = await Campaign.findOneAndUpdate(
-//       { _id: campaignId, user_id: userId },
-//       updateData,
-//       { new: true, runValidators: true }
-//     ).lean();
-
-//     if (!updatedCampaign) {
-//       throw new ErrorHandler(404, 'Campaign not found or access denied');
-//     }
-
-//     if (updatedCampaign.geography?.coverage?.type === 'PARTIAL') {
-//       const countyIds = updatedCampaign.geography.coverage.partial.counties || [];
-
-//       const counties = await County.find({ _id: { $in: countyIds } })
-//         .select('_id name fips_code state')
-//         .lean();
-
-//       updatedCampaign.geography.coverage.partial.countyDetails = counties;
-//     }
-
-//     return updatedCampaign;
-
-//   } catch (error) {
-//     throw new ErrorHandler(error.statusCode || 500, error.message || 'Failed to update campaign');
-//   }
-// };
 const updateCampaign = async (campaignId, userId, role, updateData) => {
   try {
     const filter = { _id: campaignId };
@@ -149,48 +121,95 @@ const updateCampaign = async (campaignId, userId, role, updateData) => {
 
     // --- BOBERDOO SYNC START ---
     const partnerId = updatedCampaign?.user_id?.integrations?.boberdoo?.external_id;
-    const filterSetId = updatedCampaign?.boberdoo_filter_set_id;
+    let filterSetId = updatedCampaign?.boberdoo_filter_set_id;
 
-    if (partnerId && filterSetId) {
-      // Set sync status to pending before API call
-      await Campaign.findByIdAndUpdate(campaignId, {
-        $set: {
-          boberdoo_sync_status: 'PENDING',
-          boberdoo_last_sync_at: new Date()
+    if (partnerId) {
+      // ✅ CHECK: If filter_set_id is missing, CREATE campaign first
+      if (!filterSetId) {
+        console.log(`⚠ Campaign ${campaignId} has no filter_set_id. Creating in Boberdoo first...`);
+
+        // Set sync status to pending before creating
+        await Campaign.findByIdAndUpdate(campaignId, {
+          $set: {
+            boberdoo_sync_status: 'PENDING',
+            boberdoo_last_sync_at: new Date()
+          }
+        });
+
+        // Create campaign in Boberdoo
+        const createResult = await createCampaignInBoberdoo(updatedCampaign, partnerId);
+
+        if (createResult.success) {
+          // Update campaign with the new filter_set_id
+          filterSetId = createResult.filterSetId;
+          await Campaign.findByIdAndUpdate(campaignId, {
+            $set: {
+              boberdoo_filter_set_id: filterSetId,
+              boberdoo_sync_status: 'SUCCESS',
+              boberdoo_last_sync_at: new Date(),
+              boberdoo_last_error: null
+            }
+          });
+          console.log(`✅ Campaign ${campaignId} created in Boberdoo with filter_set_id: ${filterSetId}`);
+        } else {
+          // Failed to create
+          await Campaign.findByIdAndUpdate(campaignId, {
+            $set: {
+              boberdoo_sync_status: 'FAILED',
+              boberdoo_last_sync_at: new Date(),
+              boberdoo_last_error: createResult.error
+            }
+          });
+          console.warn(`❌ Failed to create campaign ${campaignId} in Boberdoo: ${createResult.error}`);
         }
-      });
-
-      console.log(`🔄 Syncing campaign ${campaignId} to Boberdoo (update)...`);
-
-      const boberdooResult = await updateCampaignInBoberdoo(updatedCampaign, filterSetId, partnerId);
-
-      if (boberdooResult.success) {
-        await Campaign.findByIdAndUpdate(campaignId, {
-          $set: {
-            boberdoo_sync_status: 'SUCCESS',
-            boberdoo_last_sync_at: new Date(),
-            boberdoo_last_error: null
-          }
-        });
-        console.log(`✅ Campaign ${campaignId} updated successfully in Boberdoo`);
       } else {
+        // ✅ filter_set_id EXISTS: Update in Boberdoo
+        console.log(`🔄 Syncing campaign ${campaignId} to Boberdoo (update)...`);
+
+        // Set sync status to pending before API call
         await Campaign.findByIdAndUpdate(campaignId, {
           $set: {
-            boberdoo_sync_status: 'FAILED',
-            boberdoo_last_sync_at: new Date(),
-            boberdoo_last_error: boberdooResult.error
+            boberdoo_sync_status: 'PENDING',
+            boberdoo_last_sync_at: new Date()
           }
         });
-        console.warn(`❌ Boberdoo update failed for campaign ${campaignId}: ${boberdooResult.error}`);
+
+        const boberdooResult = await updateCampaignInBoberdoo(updatedCampaign, filterSetId, partnerId);
+        console.log("boberdoo api result:",boberdooResult);
+
+        if (boberdooResult.success) {
+          await Campaign.findByIdAndUpdate(campaignId, {
+            $set: {
+              boberdoo_sync_status: 'SUCCESS',
+              boberdoo_last_sync_at: new Date(),
+              boberdoo_last_error: null
+            }
+          });
+          console.log(`✅ Campaign ${campaignId} updated successfully in Boberdoo`);
+        } else {
+          await Campaign.findByIdAndUpdate(campaignId, {
+            $set: {
+              boberdoo_sync_status: 'FAILED',
+              boberdoo_last_sync_at: new Date(),
+              boberdoo_last_error: boberdooResult.error
+            }
+          });
+          console.warn(`❌ Boberdoo update failed for campaign ${campaignId}: ${boberdooResult.error}`);
+        }
       }
     } else {
-      console.warn(`⚠ Campaign ${campaignId} not synced to Boberdoo: missing Partner ID or Filter Set ID`);
+      console.warn(`⚠ Campaign ${campaignId} not synced to Boberdoo: missing Partner ID`);
+      await Campaign.findByIdAndUpdate(campaignId, {
+        $set: {
+          boberdoo_sync_status: 'FAILED',
+          boberdoo_last_error: 'User does not have a Boberdoo partner ID'
+        }
+      });
     }
     // --- BOBERDOO SYNC END ---
 
     // --- N8N WEBHOOK TRIGGER ---
     try {
-      // Always send action as 'update'
       const resultForN8n = await sendToN8nWebhook({
         ...updatedCampaign,
         action: 'update'
@@ -199,9 +218,6 @@ const updateCampaign = async (campaignId, userId, role, updateData) => {
     } catch (n8nError) {
       console.error('⚠ Failed to send update webhook to N8N:', n8nError.message);
     }
-    // --- END WEBHOOK TRIGGER ---
-
-
     // --- END WEBHOOK TRIGGER ---
 
     return updatedCampaign;
