@@ -375,6 +375,18 @@ export default function UserTable() {
           sortable: true,
         },
         {
+          name: 'Partner ID',
+          selector: (row: User) => row.integrations?.boberdoo?.external_id || '—',
+          cell: (row) =>
+            row._id.startsWith("skeleton") ? (
+              <Skeleton variant="text" width={120} />
+            ) : (
+              <span>{row.integrations?.boberdoo?.external_id || '—'}</span>
+            ),
+          sortable: true,
+        },
+        
+        {
           name: "Action",
           button: true,
           cell: (row) =>
