@@ -33,7 +33,7 @@ const CampaignBasicInfo: React.FC<Props> = ({ values, setFieldValue ,isEditMode 
             value,
             label: key.replace("_", " "),
           }))}
-          isDisabled={isEditMode}
+        
         />
 
         <FormikSelect
