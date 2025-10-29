@@ -54,6 +54,7 @@ type Campaign = {
     _id: string;
   };
   note?: string;
+  boberdoo_filter_set_id?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -389,6 +390,18 @@ const leadTypes = Object.values(LEAD_TYPE);
       sortable: true,
       minWidth: "130px",
     },
+    {
+      name: "Filter Set ID",
+      selector: (row) => row.boberdoo_filter_set_id || "",
+      cell: (row) =>
+        row._id.startsWith("skeleton") ? (
+          <Skeleton variant="text" width={120} animation="wave" />
+        ) : (
+          <div className="text-sm text-gray-600">{row.boberdoo_filter_set_id || "-"}</div>
+        ),
+      sortable: true,
+      minWidth: "150px",
+    },    
     {
       name: "State",
       selector: (row) => row.geography.state.abbreviation,
