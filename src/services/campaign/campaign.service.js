@@ -365,7 +365,7 @@ const getCampaigns = async (page = 1, limit = 10, filters = {}) => {
       query['geography.state'] = stateCache[stateAbbr];
     }
 
-    const projection = 'campaign_id name status lead_type exclusivity language geography delivery user_id note createdAt updatedAt';
+    const projection = 'campaign_id name status boberdoo_filter_set_id lead_type exclusivity language geography delivery user_id note createdAt updatedAt';
 
     const [campaigns, total] = await Promise.all([
       Campaign.find(query)

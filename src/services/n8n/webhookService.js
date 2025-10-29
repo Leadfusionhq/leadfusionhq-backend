@@ -66,6 +66,7 @@ const sendToN8nWebhook = async (campaignData) => {
       state: stateName,
       zip_codes: zipCodes,
       client_name: userName,
+      boberdoo_filter_set_id: campaignData.boberdoo_filter_set_id || null,
       submitted_at: new Date().toISOString(),
     };
 
