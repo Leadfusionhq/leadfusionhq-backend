@@ -3,7 +3,7 @@ const { ErrorHandler } = require('../utils/error-handler');
 const OTP = require('../models/otp.model');
 const CONSTANT_ENUM = require('../helper/constant-enums');
 const { generateVerificationToken , getTokenExpiration } = require('../utils/token.utils');
-
+const { updatePartnerInBoberdoo } = require('../services/boberdoo/boberdoo.service');
 const getUserByEmail = async (email, includePassword = false) => {
   const projection = includePassword ? {} : { password: 0 };
   return User.findOne({ email }, projection).exec();
@@ -19,40 +19,41 @@ const getUserByID = async (userId, includePassword = false) => {
 };
 
 const updateUser = async (userId, updateData) => {
-  return User.findByIdAndUpdate(userId, updateData, { new: true }).exec();
+  const user = await User.findByIdAndUpdate(userId, updateData, { new: true }).exec();
+
+  if (user?.integrations?.boberdoo?.external_id) {
+    console.log("🔁 Admin updated user – syncing with Boberdoo...");
+    const result = await updatePartnerInBoberdoo(user);
+    console.log("Boberdoo sync result:", result);
+  } else {
+    console.log("⚠️ User has no Boberdoo Partner ID – skipping sync.");
+  }
+
+  return user;
 };
 
+
 const updateUserProfile = async (userId, updateData) => {
-  console.log("🔧 [updateUserProfile] Updating user:", userId);
-  console.log("📦 Data to update:", updateData);
-
-  // Handle address state conversion
-  if (updateData.address && updateData.address.state) {
-    console.log("🌍 [updateUserProfile] Handling address state conversion");
-    if (typeof updateData.address.state === 'object') {
-      updateData.address.state = updateData.address.state.abbreviation || updateData.address.state;
-    }
-    updateData.region = updateData.address.state;
-  }
-
-  if (updateData.name) {
-    updateData.name = updateData.name.trim();
-  }
-
   const user = await User.findByIdAndUpdate(
     userId,
     { $set: updateData },
     { new: true, runValidators: true }
   ).select('-password -verificationToken -resetPasswordToken');
 
-  if (!user) {
-    console.error("❌ [updateUserProfile] User not found:", userId);
-    throw new ErrorHandler(404, 'User not found');
+  if (!user) throw new ErrorHandler(404, 'User not found');
+
+  // 🔄 Sync with Boberdoo if partner exists
+  if (user.integrations?.boberdoo?.external_id) {
+    console.log("🔁 Syncing updated user profile with Boberdoo...");
+    const result = await updatePartnerInBoberdoo(user);
+    console.log("Boberdoo sync result:", result);
+  } else {
+    console.log("⚠️ Skipping Boberdoo sync (no external_id).");
   }
 
-  console.log("✅ [updateUserProfile] Updated user document:", user);
   return user;
 };
+
 
 
 const changeUserPassword = async (userId, currentPassword, newPassword) => {

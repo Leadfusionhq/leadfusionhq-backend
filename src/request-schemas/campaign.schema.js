@@ -34,7 +34,10 @@ const createCampaign = {
 
     // Geography validation
     geography: Joi.object({
-      state: Joi.string().required(),
+      state: Joi.array().items(Joi.string().hex().length(24)).min(1).required().messages({
+        'array.base': 'State must be an array of IDs',
+        'array.min': 'At least one state is required',
+      }),
       coverage: Joi.object({
         type: Joi.string().optional(),
         full_state: Joi.boolean().optional(),
@@ -137,7 +140,10 @@ const createCampaignByAdmin = {
 
     // Geography validation
     geography: Joi.object({
-      state: Joi.string().required(),
+      state: Joi.array().items(Joi.string().hex().length(24)).min(1).required().messages({
+        'array.base': 'State must be an array of IDs',
+        'array.min': 'At least one state is required',
+      }),
       coverage: Joi.object({
         type: Joi.string().optional(),
         full_state: Joi.boolean().optional(),
@@ -239,7 +245,10 @@ const updateCampaign = {
     
     // Geography validation
     geography: Joi.object({
-      state: Joi.string().required(),
+      state: Joi.array().items(Joi.string().hex().length(24)).min(1).required().messages({
+        'array.base': 'State must be an array of IDs',
+        'array.min': 'At least one state is required',
+      }),
       coverage: Joi.object({
         type: Joi.string().optional(),
         full_state: Joi.boolean().optional(),

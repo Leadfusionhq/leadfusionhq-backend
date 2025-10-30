@@ -1,29 +1,32 @@
 const axios = require('axios');
-const State = require('../../models/state.model'); // adjust path if needed
-const User = require('../../models/user.model');   // adjust path if needed
+const State = require('../../models/state.model');
+const User = require('../../models/user.model');
 
-const WEBHOOK_URL = 'https://n8n.srv997679.hstgr.cloud/webhook/ffe20f26-ebb5-42fa-8e2d-8867957396b2';
-
+// Create and Update Webhook URLs
+const WEBHOOK_CREATE_URL = 'https://n8n.srv997679.hstgr.cloud/webhook/ffe20f26-ebb5-42fa-8e2d-8867957396b2';
+const WEBHOOK_UPDATE_URL = 'https://n8n.srv997679.hstgr.cloud/webhook/update';
 
 const sendToN8nWebhook = async (campaignData) => {
   try {
-    // Resolve state name
-    let stateName = '';
+    // ✅ Resolve multiple states (abbreviations)
+    let stateAbbrs = [];
     const stateVal = campaignData?.geography?.state;
-    if (stateVal) {
-      if (typeof stateVal === 'object' && stateVal.name) {
-        stateName = stateVal.name;
-      } else {
-        try {
-          const stateDoc = await State.findById(stateVal).select('name');
-          stateName = stateDoc?.name || '';
-        } catch (e) {
-          console.error('State lookup failed:', e.message);
-        }
+
+    if (Array.isArray(stateVal)) {
+      const stateDocs = await State.find({ _id: { $in: stateVal } }).select('abbreviation');
+      stateAbbrs = stateDocs.map((s) => s.abbreviation).filter(Boolean);
+    } else if (typeof stateVal === 'object' && stateVal.abbreviation) {
+      stateAbbrs = [stateVal.abbreviation];
+    } else if (stateVal) {
+      try {
+        const stateDoc = await State.findById(stateVal).select('abbreviation');
+        if (stateDoc) stateAbbrs = [stateDoc.abbreviation];
+      } catch (e) {
+        console.error('State lookup failed:', e.message);
       }
     }
 
-    // Resolve user name (client_name)
+    // ✅ Resolve user name
     let userName = '';
     const userVal = campaignData?.user_id;
     if (userVal) {
@@ -54,25 +57,31 @@ const sendToN8nWebhook = async (campaignData) => {
       }
     }
 
-    // Zip codes
+    // ✅ Zip codes
     const zipCodes = Array.isArray(campaignData?.geography?.coverage?.partial?.zip_codes)
       ? campaignData.geography.coverage.partial.zip_codes
       : [];
 
-    // Payload (always mark as update)
+    // ✅ Payload
     const payload = {
-      action: 'update', // 👈 always send "update"
+      action: campaignData.action || 'create',
       campaign_id: campaignData.campaign_id || '',
-      state: stateName,
+      states: stateAbbrs, // e.g. ["CA", "TX"]
       zip_codes: zipCodes,
       client_name: userName,
       boberdoo_filter_set_id: campaignData.boberdoo_filter_set_id || null,
       submitted_at: new Date().toISOString(),
     };
 
-    console.log('Sending to n8n (axios POST):', payload);
+    // ✅ Choose correct webhook
+    const webhookUrl =
+      campaignData.action === 'update' ? WEBHOOK_UPDATE_URL : WEBHOOK_CREATE_URL;
 
-    const resp = await axios.post(WEBHOOK_URL, payload, {
+    console.log(`📤 Sending ${campaignData.action} webhook to:`, webhookUrl);
+    console.log('Payload:', payload);
+
+    // ✅ Send request
+    const resp = await axios.post(webhookUrl, payload, {
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
@@ -80,11 +89,10 @@ const sendToN8nWebhook = async (campaignData) => {
       timeout: 10000,
     });
 
-    console.log('n8n response:', resp.status, resp.data);
-
+    console.log('✅ N8N response:', resp.status, resp.data);
     return { success: true, data: resp.data };
   } catch (error) {
-    console.error('Error sending webhook to n8n:', error?.response?.status, error?.response?.data || error.message);
+    console.error('❌ Error sending webhook to N8N:', error?.response?.status, error?.response?.data || error.message);
     return { success: false, error: error.message };
   }
 };

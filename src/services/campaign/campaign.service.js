@@ -6,7 +6,7 @@ const CONSTANT_ENUM = require('../../helper/constant-enums.js');
 const {getLeadCountByCampaignId} = require('../../services/lead/lead.service.js');
 const Lead = require('../../models/lead.model.js'); 
 const { sendToN8nWebhook } = require('../../services/n8n/webhookService.js');
-const { createCampaignInBoberdoo ,updateCampaignInBoberdoo} = require('../boberdoo/boberdoo.service');
+const { createCampaignInBoberdoo ,updateCampaignInBoberdoo ,deleteCampaignFromBoberdoo} = require('../boberdoo/boberdoo.service');
 const { User } = require('../../models/user.model');
 // const createCampaign = async (data) => {
 //   try {
@@ -55,6 +55,7 @@ const createCampaign = async (data) => {
           }
         });
         console.log(`✓ Campaign ${newCampaign.campaign_id} synced to Boberdoo with filter_set_ID: ${boberdooResult.filterSetId}`);
+        console.log("boberdoo api Result :",boberdooResult);
       } else {
         // Update with error status
         await Campaign.findByIdAndUpdate(newCampaign._id, {
@@ -137,7 +138,7 @@ const updateCampaign = async (campaignId, userId, role, updateData) => {
         });
 
         // Create campaign in Boberdoo
-        const createResult = await createCampaignInBoberdoo(updatedCampaign, partnerId);
+        const createResult = await updateCampaignInBoberdoo(updatedCampaign,filterSetId, partnerId);
 
         if (createResult.success) {
           // Update campaign with the new filter_set_id
@@ -151,6 +152,7 @@ const updateCampaign = async (campaignId, userId, role, updateData) => {
             }
           });
           console.log(`✅ Campaign ${campaignId} created in Boberdoo with filter_set_id: ${filterSetId}`);
+          console.log(`boberdoo api Result (Updated):${createResult}`);
         } else {
           // Failed to create
           await Campaign.findByIdAndUpdate(campaignId, {
@@ -362,7 +364,7 @@ const getCampaigns = async (page = 1, limit = 10, filters = {}) => {
         }
       }
 
-      query['geography.state'] = stateCache[stateAbbr];
+      query['geography.state'] = { $in: [stateCache[stateAbbr]] };
     }
 
     const projection = 'campaign_id name status boberdoo_filter_set_id lead_type exclusivity language geography delivery user_id note createdAt updatedAt';
@@ -497,7 +499,8 @@ const searchCampaigns = async (page = 1, limit = 10, userId, role, searchQuery =
           };
         }
       }
-      query['geography.state'] = stateCache[stateAbbr];
+      query['geography.state'] = { $in: [stateCache[stateAbbr]] };
+
     }
 
     // Add search functionality
@@ -580,44 +583,54 @@ const quickSearchCampaigns = async (userId, role, searchQuery = '', limit = 20) 
 // Permanent delete campaign
 const deleteCampaign = async (campaignId, userId, role) => {
   try {
-    // Build filter based on role
     const filter = { _id: campaignId };
-  
-
-    // Find campaign first
     const campaign = await Campaign.findOne(filter);
-    
-    if (!campaign) {
-      throw new ErrorHandler(404, 'Campaign not found or access denied');
-    }
 
-    // Count associated leads
+    if (!campaign) throw new ErrorHandler(404, "Campaign not found or access denied");
+
     const leadCount = await Lead.countDocuments({ campaign_id: campaignId });
-    
-    console.log(`🗑️ Deleting campaign ${campaign.campaign_id} and ${leadCount} associated lead(s)...`);
 
-    // Delete all associated leads first
     if (leadCount > 0) {
       await Lead.deleteMany({ campaign_id: campaignId });
       console.log(`✅ Deleted ${leadCount} lead(s) associated with campaign ${campaignId}`);
     }
 
-    // Delete the campaign
-    await Campaign.findByIdAndDelete(campaignId);
+    // ✅ Disable in Boberdoo before deleting locally
+    if (campaign.boberdoo_filter_set_id) {
+      const result = await deleteCampaignFromBoberdoo({
+        filterSetId: campaign.boberdoo_filter_set_id,
+        leadTypeId: campaign.lead_type || 33,
+      });
+      console.log("🧾 Boberdoo disable result:", result);
+    }
 
+    // Now delete from database
+    await Campaign.findByIdAndDelete(campaignId);
     console.log(`✅ Campaign ${campaignId} permanently deleted by user ${userId}`);
-    
+
+    // ✅ Send delete webhook to N8N
+    try {
+      const webhookResult = await sendToN8nWebhook({
+        ...campaign.toObject(),
+        action: 'delete',
+      });
+      console.log('📊 N8N Webhook (Delete) Result:', webhookResult);
+    } catch (n8nError) {
+      console.error('⚠ Failed to send delete webhook to N8N:', n8nError.message);
+    }
+
     return {
       deleted: true,
       campaign_id: campaign.campaign_id,
       leads_deleted: leadCount,
-      message: leadCount > 0 
-        ? `Campaign and ${leadCount} associated lead(s) permanently deleted `
-        : 'Campaign permanently deleted '
+      message:
+        leadCount > 0
+          ? `Campaign and ${leadCount} associated lead(s) permanently deleted`
+          : "Campaign permanently deleted",
     };
   } catch (error) {
-    console.error('❌ deleteCampaign error:', error);
-    throw new ErrorHandler(error.statusCode || 500, error.message || 'Failed to delete campaign');
+    console.error("❌ deleteCampaign error:", error);
+    throw new ErrorHandler(error.statusCode || 500, error.message || "Failed to delete campaign");
   }
 };
 
