@@ -15,6 +15,8 @@ const MAIL_HANDLER = require('../../mail/mails');
 // Keep only URL and KEY from env (secrets)
 const API_URL = (process.env.BOBERDOO_API_URL || 'https://leadfusionhq.leadportal.com/apiJSON.php').trim();
 const API_KEY = (process.env.BOBERDOO_API_KEY || '').trim();
+const API_UPDATE_KEY =(process.env.BOBERDOO_UPDATE_API_KEY || '').trim(); 
+
 const CREATE_ACTION = 'createNewPartner'; // fixed here
 
 const CAMPAIGN_API_URL = process.env.BOBERDOO_CAMPAIGN_API_URL;
@@ -178,35 +180,74 @@ function buildCreateFields(user) {
 }
 
 async function updatePartnerStatusInBoberdoo(partnerId, status = 0) {
-  if (!partnerId) return { success: false, error: "Missing partner ID" };
+  if (!partnerId) {
+    console.error("❌ Missing partner ID for status update");
+    return { success: false, error: "Missing partner ID" };
+  }
 
   try {
-    const payload = {
-      Key: API_KEY,
+    // ✅ Build payload for status update
+    const params = {
+      Key: API_UPDATE_KEY, // ✅ Use the update API key
       API_Action: "updatePartnerSettings",
-      Format: "json",
+      Format: "JSON", // ✅ Request JSON response
       Partner_ID: partnerId,
       Status: status, // 0 = Not Active, 1 = Temp Stop, 2 = Active
     };
 
-    console.log("🟠 Updating Boberdoo Partner Status:", payload);
+    console.log("🟠 [boberdoo] Updating Partner Status:", partnerId);
+    console.log("➡️ Status:", status === 0 ? 'Not Active' : status === 1 ? 'Temporarily Stopped' : 'Active');
+    console.log("➡️ Params:", params);
+    console.log("➡️ Using API_UPDATE_KEY:", mask(API_UPDATE_KEY));
 
-    const response = await axios.post(API_URL, { Request: payload }, {
+    // ✅ Use new_api/api.php endpoint with GET request
+    const updateUrl = "https://leadfusionhq.leadportal.com/new_api/api.php";
+    
+    const response = await axios.get(updateUrl, {
+      params: params,
       timeout: TIMEOUT_MS,
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      validateStatus: () => true,
+      headers: {
+        "Accept": "application/json"
+      },
+      validateStatus: () => true
     });
 
-    const data = typeof response.data === "string" ? safeJson(response.data) : response.data;
+    console.log('[boberdoo] <- Status Update Response:', response.status);
+    console.log('[boberdoo] <- Response Headers:', response.headers['content-type']);
+    console.log('[boberdoo] <- Response Data:', preview(response.data));
 
-    if (data?.response?.status === "Success") {
+    // ✅ Handle both XML and JSON responses
+    let data;
+    const contentType = response.headers['content-type'] || '';
+    
+    if (contentType.includes('xml')) {
+      console.warn('⚠️ Received XML response instead of JSON - parsing error from XML');
+      // Extract error from XML
+      const errorMatch = response.data.match(/<error>(.*?)<\/error>/);
+      const errorMsg = errorMatch ? errorMatch[1] : 'Unknown error';
+      
+      console.error(`❌ Failed to update Partner ${partnerId} status:`, errorMsg);
+      return {
+        success: false,
+        error: errorMsg,
+        data: { raw: response.data }
+      };
+    }
+    
+    data = typeof response.data === "string" ? safeJson(response.data) : response.data;
+
+    // ✅ Check for success in response
+    if (data?.response?.result?.includes("successfully updated")) {
       console.log(`✅ Partner ${partnerId} status updated to ${status} in Boberdoo`);
       return { success: true, data };
     }
 
-    const errors = toErrorList(data).join("; ");
-    console.error(`❌ Failed to update Partner ${partnerId} status:`, errors);
-    return { success: false, error: errors || "Unknown error", data };
+    // ✅ Handle errors
+    const errors = toErrorList(data);
+    const errorMsg = errors.join("; ") || "Unknown error";
+    
+    console.error(`❌ Failed to update Partner ${partnerId} status:`, errorMsg);
+    return { success: false, error: errorMsg, data };
 
   } catch (error) {
     console.error("[boberdoo] updatePartnerStatusInBoberdoo error:", error.message);
@@ -334,11 +375,9 @@ async function updatePartnerInBoberdoo(user) {
     const partnerId = user.integrations.boberdoo.external_id;
     const { first, last } = splitName(user.name || "");
     
-    // ✅ Use proper state normalization
     let state = (user.address?.state || user.region || user.state || "IL").toUpperCase();
     if (state.length > 2) state = state.slice(0, 2);
     
-    // ✅ Use proper country normalization
     let country = user.country || "United States";
     if (/^\s*US\s*$/i.test(country) || /^\s*U\.?S\.?A\.?$/i.test(country)) {
       country = "United States";
@@ -347,31 +386,22 @@ async function updatePartnerInBoberdoo(user) {
       country = "Canada";
     }
 
-    // ✅ Build payload - ADD Format parameter for JSON response
     const params = {
-      Key: API_KEY,
+      Key: API_UPDATE_KEY,
       API_Action: "updatePartnerSettings",
-      Format: "JSON", // ✅ Request JSON response
+      Format: "JSON",
       Partner_ID: partnerId,
-      
-      // Personal info
       Company_Name: user.companyName || user.name || "My Company",
       First_Name: first,
       Last_Name: last,
-      
-      // Address info
       Address: user.address?.street || "132 Main St.",
       City: user.address?.city || "Chicago",
       State: state,
       Country: country,
       Zip: user.address?.zip_code || user.zipCode || "60610",
-      
-      // Contact info
       Phone: digitsOnly(user.phoneNumber || "5551234567"),
       Contact_Email: user.email,
       Lead_Email: user.leadEmail || user.company_contact_email || user.email,
-      
-      // Settings
       Delivery_Option: Number(user.deliveryOption) || 0,
       Status: Number(user.statusCode) || 2,
       Credit_Limit: "Unlimited",
@@ -384,9 +414,8 @@ async function updatePartnerInBoberdoo(user) {
 
     console.log("🟡 [boberdoo] Updating Partner:", partnerId);
     console.log("➡️ Params:", params);
-    console.log("➡️ Using API_KEY:", mask(API_KEY));
+    console.log("➡️ Using API_UPDATE_KEY:", mask(API_UPDATE_KEY));
 
-    // ✅ Use new_api/api.php endpoint
     const updateUrl = "https://leadfusionhq.leadportal.com/new_api/api.php";
     
     const response = await axios.get(updateUrl, {
@@ -402,15 +431,22 @@ async function updatePartnerInBoberdoo(user) {
     console.log('[boberdoo] <- Response Headers:', response.headers['content-type']);
     console.log('[boberdoo] <- Response Data:', preview(response.data));
 
-    // ✅ Handle both XML and JSON responses
     let data;
     const contentType = response.headers['content-type'] || '';
     
     if (contentType.includes('xml')) {
       console.warn('⚠️ Received XML response instead of JSON - parsing error from XML');
-      // Extract error from XML
       const errorMatch = response.data.match(/<error>(.*?)<\/error>/);
       const errorMsg = errorMatch ? errorMatch[1] : 'Unknown error';
+      
+      // ✅ Update DB with error
+      await User.findByIdAndUpdate(user._id, {
+        $set: {
+          'integrations.boberdoo.last_sync_at': new Date(),
+          'integrations.boberdoo.sync_status': 'FAILED',
+          'integrations.boberdoo.last_error': errorMsg
+        }
+      });
       
       return {
         success: false,
@@ -425,15 +461,24 @@ async function updatePartnerInBoberdoo(user) {
     if (data?.response?.result?.includes("successfully updated")) {
       console.log(`✅ Partner ${partnerId} updated successfully in Boberdoo`);
       
-      await User.findByIdAndUpdate(user._id, {
-        $set: {
-          'integrations.boberdoo.last_sync_at': new Date(),
-          'integrations.boberdoo.sync_status': 'SUCCESS',
-          'integrations.boberdoo.last_error': null
-        }
-      });
+      // ✅ IMPORTANT: Use 'new: true' to return updated document
+      const updatedUser = await User.findByIdAndUpdate(
+        user._id,
+        {
+          $set: {
+            'integrations.boberdoo.last_sync_at': new Date(),
+            'integrations.boberdoo.sync_status': 'SUCCESS',
+            'integrations.boberdoo.last_error': null
+          }
+        },
+        { new: true } // ✅ This returns the updated document!
+      );
       
-      return { success: true, data };
+      return { 
+        success: true, 
+        data,
+        updatedUser // ✅ Return the fresh user data
+      };
     }
 
     // ✅ Handle errors
