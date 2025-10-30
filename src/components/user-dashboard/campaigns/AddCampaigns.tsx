@@ -279,8 +279,8 @@ const AddNewCampaign = () => {
                 token={token}
                 setCountiesList={setCountiesList}
                 setIsLoadingCounties={setIsLoadingCounties}
-                setUtilitiesList={setUtilitiesList}
-                setIsLoadingUtilities={setIsLoadingUtilities}
+                // setUtilitiesList={setUtilitiesList}
+                // setIsLoadingUtilities={setIsLoadingUtilities}
               />
 
               <TabsHeader activeTab={activeTab} setActiveTab={setActiveTab} errors={errors} />
@@ -294,8 +294,8 @@ const AddNewCampaign = () => {
                     countiesList,
                     isLoadingCounties,
                     loadStates,
-                    utilitiesList,
-                    isLoadingUtilities,
+                    // utilitiesList,
+                    // isLoadingUtilities,
                     activeDeliveryTab,
                     setActiveDeliveryTab,
                     isEditMode,

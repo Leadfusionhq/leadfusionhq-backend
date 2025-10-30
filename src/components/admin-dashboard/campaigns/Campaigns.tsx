@@ -404,16 +404,24 @@ const leadTypes = Object.values(LEAD_TYPE);
     },    
     {
       name: "State",
-      selector: (row) => row.geography.state.abbreviation,
+      selector: (row) => 
+        Array.isArray(row.geography.state)
+          ? row.geography.state.map((s) => s.abbreviation).join(", ")
+          : row.geography.state?.abbreviation || "",
       cell: (row) =>
         row._id.startsWith("skeleton") ? (
           <Skeleton variant="text" width={100} animation="wave" />
         ) : (
-          <div className="text-sm text-gray-600 uppercase">{row.geography.state.abbreviation}</div>
+          <div className="text-sm text-gray-600 uppercase">
+            {Array.isArray(row.geography.state)
+              ? row.geography.state.map((s) => s.abbreviation).join(", ")
+              : row.geography.state?.abbreviation || "-"}
+          </div>
         ),
       sortable: true,
       minWidth: "130px",
     },
+    
     {
       name: "Status",
       selector: (row) => row.status,
