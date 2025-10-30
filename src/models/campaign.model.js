@@ -59,12 +59,13 @@ const campaignSchema = new mongoose.Schema({
     type: String, 
   },
   geography: {
-    state: { 
-      type: mongoose.Schema.Types.ObjectId,
-      // type: String,
-      ref: 'State',
-      required: true,
-    },
+    state: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'State',
+        required: true,
+      }
+    ],
     coverage: {
       type: { type: String, enum: ['FULL_STATE', 'PARTIAL'], default: 'FULL_STATE' },
       full_state: { 

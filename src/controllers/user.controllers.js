@@ -4,11 +4,12 @@ const { sendResponse } = require('../utils/response');
 const { ErrorHandler } = require('../utils/error-handler');
 const UserServices = require('../services/user.service');
 const N8nServices = require('../services/n8n/n8n.automation.service');
-const { syncUserToBoberdooById } = require('../services/boberdoo/boberdoo.service');
+const { syncUserToBoberdooById,updatePartnerStatusInBoberdoo } = require('../services/boberdoo/boberdoo.service');
 const MAIL_HANDLER = require('../mail/mails');
 const CONSTANT_ENUM = require('../helper/constant-enums.js');
 const path = require('path');
 const fs = require("fs");
+
 
 const getAllUsers = wrapAsync(async (req, res) => {
     const data = await UserServices.getAllUsersService(); 
@@ -139,6 +140,18 @@ const deleteUser = wrapAsync(async (req, res) => {
     return sendResponse(res, null, 'User not found.', 404);
   }
 
+  // 🔄 Step 1: Deactivate user in Boberdoo instead of deleting
+  if (user.integrations?.boberdoo?.external_id) {
+    try {
+      const partnerId = user.integrations.boberdoo.external_id;
+      const result = await updatePartnerStatusInBoberdoo(partnerId, 0);
+      console.log(`Boberdoo partner ${partnerId} set inactive:`, result.success);
+    } catch (err) {
+      console.error("Failed to deactivate user in Boberdoo:", err.message);
+    }
+  }
+
+  // 🔁 Step 2: Delete N8N account if exists
   if (user.n8nUserId) {
     try {
       await N8nServices.deleteSubAccountById(user.n8nUserId);
@@ -148,9 +161,10 @@ const deleteUser = wrapAsync(async (req, res) => {
     }
   }
 
+  // 🗑️ Step 3: Delete locally from DB
   await UserServices.hardDeleteUser(userId);
 
-  return sendResponse(res, null, 'User has been deleted.', 200);
+  return sendResponse(res, null, 'User has been deleted and deactivated in Boberdoo.', 200);
 });
 
 

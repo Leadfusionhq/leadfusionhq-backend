@@ -177,6 +177,43 @@ function buildCreateFields(user) {
   };
 }
 
+async function updatePartnerStatusInBoberdoo(partnerId, status = 0) {
+  if (!partnerId) return { success: false, error: "Missing partner ID" };
+
+  try {
+    const payload = {
+      Key: API_KEY,
+      API_Action: "updatePartnerSettings",
+      Format: "json",
+      Partner_ID: partnerId,
+      Status: status, // 0 = Not Active, 1 = Temp Stop, 2 = Active
+    };
+
+    console.log("🟠 Updating Boberdoo Partner Status:", payload);
+
+    const response = await axios.post(API_URL, { Request: payload }, {
+      timeout: TIMEOUT_MS,
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      validateStatus: () => true,
+    });
+
+    const data = typeof response.data === "string" ? safeJson(response.data) : response.data;
+
+    if (data?.response?.status === "Success") {
+      console.log(`✅ Partner ${partnerId} status updated to ${status} in Boberdoo`);
+      return { success: true, data };
+    }
+
+    const errors = toErrorList(data).join("; ");
+    console.error(`❌ Failed to update Partner ${partnerId} status:`, errors);
+    return { success: false, error: errors || "Unknown error", data };
+
+  } catch (error) {
+    console.error("[boberdoo] updatePartnerStatusInBoberdoo error:", error.message);
+    return { success: false, error: error.message || "API request failed" };
+  }
+}
+
 // Basic validation to avoid trivial failures (but we fill defaults first)
 function validateFields(fields) {
   const missing = [];
@@ -287,6 +324,152 @@ async function createPartner(user) {
   return last;
 }
 
+
+async function updatePartnerInBoberdoo(user) {
+  try {
+    if (!user?.integrations?.boberdoo?.external_id) {
+      throw new Error("Missing Partner_ID for update");
+    }
+
+    const partnerId = user.integrations.boberdoo.external_id;
+    const { first, last } = splitName(user.name || "");
+    
+    // ✅ Use proper state normalization
+    let state = (user.address?.state || user.region || user.state || "IL").toUpperCase();
+    if (state.length > 2) state = state.slice(0, 2);
+    
+    // ✅ Use proper country normalization
+    let country = user.country || "United States";
+    if (/^\s*US\s*$/i.test(country) || /^\s*U\.?S\.?A\.?$/i.test(country)) {
+      country = "United States";
+    }
+    if (/^\s*CA\s*$/i.test(country)) {
+      country = "Canada";
+    }
+
+    // ✅ Build payload - ADD Format parameter for JSON response
+    const params = {
+      Key: API_KEY,
+      API_Action: "updatePartnerSettings",
+      Format: "JSON", // ✅ Request JSON response
+      Partner_ID: partnerId,
+      
+      // Personal info
+      Company_Name: user.companyName || user.name || "My Company",
+      First_Name: first,
+      Last_Name: last,
+      
+      // Address info
+      Address: user.address?.street || "132 Main St.",
+      City: user.address?.city || "Chicago",
+      State: state,
+      Country: country,
+      Zip: user.address?.zip_code || user.zipCode || "60610",
+      
+      // Contact info
+      Phone: digitsOnly(user.phoneNumber || "5551234567"),
+      Contact_Email: user.email,
+      Lead_Email: user.leadEmail || user.company_contact_email || user.email,
+      
+      // Settings
+      Delivery_Option: Number(user.deliveryOption) || 0,
+      Status: Number(user.statusCode) || 2,
+      Credit_Limit: "Unlimited",
+      Ability_To_Add_Funds: 1,
+      Can_Request_Lead_Refunds: 1,
+      Can_Partner_Change_Status: 1,
+      Partner_Label: 0,
+      Partner_Group: 0,
+    };
+
+    console.log("🟡 [boberdoo] Updating Partner:", partnerId);
+    console.log("➡️ Params:", params);
+    console.log("➡️ Using API_KEY:", mask(API_KEY));
+
+    // ✅ Use new_api/api.php endpoint
+    const updateUrl = "https://leadfusionhq.leadportal.com/new_api/api.php";
+    
+    const response = await axios.get(updateUrl, {
+      params: params,
+      timeout: TIMEOUT_MS,
+      headers: {
+        "Accept": "application/json"
+      },
+      validateStatus: () => true
+    });
+
+    console.log('[boberdoo] <- Update Response:', response.status);
+    console.log('[boberdoo] <- Response Headers:', response.headers['content-type']);
+    console.log('[boberdoo] <- Response Data:', preview(response.data));
+
+    // ✅ Handle both XML and JSON responses
+    let data;
+    const contentType = response.headers['content-type'] || '';
+    
+    if (contentType.includes('xml')) {
+      console.warn('⚠️ Received XML response instead of JSON - parsing error from XML');
+      // Extract error from XML
+      const errorMatch = response.data.match(/<error>(.*?)<\/error>/);
+      const errorMsg = errorMatch ? errorMatch[1] : 'Unknown error';
+      
+      return {
+        success: false,
+        error: errorMsg,
+        data: { raw: response.data }
+      };
+    }
+    
+    data = typeof response.data === "string" ? safeJson(response.data) : response.data;
+
+    // ✅ Check for success in response
+    if (data?.response?.result?.includes("successfully updated")) {
+      console.log(`✅ Partner ${partnerId} updated successfully in Boberdoo`);
+      
+      await User.findByIdAndUpdate(user._id, {
+        $set: {
+          'integrations.boberdoo.last_sync_at': new Date(),
+          'integrations.boberdoo.sync_status': 'SUCCESS',
+          'integrations.boberdoo.last_error': null
+        }
+      });
+      
+      return { success: true, data };
+    }
+
+    // ✅ Handle errors
+    const errors = toErrorList(data);
+    const errorMsg = errors.join("; ") || "Unknown error";
+    
+    console.error("❌ Boberdoo update error:", errorMsg);
+    
+    await User.findByIdAndUpdate(user._id, {
+      $set: {
+        'integrations.boberdoo.last_sync_at': new Date(),
+        'integrations.boberdoo.sync_status': 'FAILED',
+        'integrations.boberdoo.last_error': errorMsg
+      }
+    });
+    
+    return { success: false, error: errorMsg, data };
+
+  } catch (err) {
+    console.error("❌ updatePartnerInBoberdoo failed:", err.message);
+    
+    await User.findByIdAndUpdate(user._id, {
+      $set: {
+        'integrations.boberdoo.last_sync_at': new Date(),
+        'integrations.boberdoo.sync_status': 'FAILED',
+        'integrations.boberdoo.last_error': err.message
+      }
+    });
+    
+    return { success: false, error: err.message };
+  }
+}
+
+
+
+
 async function syncUserToBoberdooById(userId) {
   console.log('=== [boberdoo] SYNC TRIGGERED ===', { userId });
 
@@ -343,169 +526,233 @@ async function syncUserToBoberdooById(userId) {
 
 
 // Create or insert a campaign in Boberdoo
+
+// 🗓️ Day mapping between API and DB
+const DAY_MAPPING = {
+  Sunday: "SUNDAY",
+  Monday: "MONDAY",
+  Tuesday: "TUESDAY",
+  Wednesday: "WEDNESDAY",
+  Thursday: "THURSDAY",
+  Friday: "FRIDAY",
+  Saturday: "SATURDAY",
+};
+
+// 🔁 Convert DB-style → API-style (e.g., MONDAY → Monday)
+function convertDbDaysToApi(daysFromDb = []) {
+  const reverseMap = Object.fromEntries(
+    Object.entries(DAY_MAPPING).map(([api, db]) => [db, api])
+  );
+  return daysFromDb.map(day => reverseMap[day] || day);
+}
+
+// 🗺️ Get state abbreviation or fallback
+function getStateAbbreviation(state) {
+  if (!state) return "";
+  if (typeof state === "string") return state;
+  return state.abbreviation || state.value || state.code || state.name || "";
+}
+
+
 async function createCampaignInBoberdoo(campaignData, partnerId) {
   try {
-    // Map project enum to Boberdoo lead type integer
     const leadTypeId = CONSTANT_ENUM.BOBERDOO_LEAD_TYPE_MAP[campaignData.lead_type];
-    if (!leadTypeId) {
-      return {
-        success: false,
-        error: `Invalid lead type: ${campaignData.lead_type}`
-      };
-    }
+    if (!leadTypeId)
+      return { success: false, error: `Invalid lead type: ${campaignData.lead_type}` };
 
-    // Prepare payload for Boberdoo API
+    const stateList = Array.isArray(campaignData.geography?.state)
+      ? campaignData.geography.state.map(getStateAbbreviation).filter(Boolean).join(",")
+      : getStateAbbreviation(campaignData.geography?.state);
+
+    const coverageType = campaignData.geography.coverage?.type || "FULL_STATE";
+    const zipMode = coverageType === "FULL_STATE" ? 0 : 1;
+
+    // 🕒 Day conversion
+    const activeDaysArray = campaignData.delivery?.schedule?.days
+      ?.filter(d => d.active)
+      ?.map(d => d.day.toUpperCase()) || [];
+    const activeDays = convertDbDaysToApi(activeDaysArray).join(",");
+
+    // ⏰ Time range
+    const firstActive = campaignData.delivery?.schedule?.days?.find(d => d.active);
+    const timeRange =
+      firstActive?.start_time && firstActive?.end_time
+        ? `${firstActive.start_time}-${firstActive.end_time}`
+        : "00:00-23:59";
+
+    // 📦 Handle ZIP codes (only for PARTIAL)
+    const zipCodes =
+      coverageType === "PARTIAL"
+        ? (campaignData.geography?.coverage?.partial?.zip_codes || []).join(",")
+        : "";
+
     const payload = {
       Key: CAMPAIGN_API_KEY,
       API_Action: CREATE_CAMPAIGN_ACTION,
-      Format: 'json', // Always request JSON response
-      Mode: 'insert',
+      Format: "json",
+      Mode: "insert",
       Partner_ID: partnerId,
-      TYPE: leadTypeId, // Correct field name for lead type
+      TYPE: leadTypeId,
       Filter_Set_Name: campaignData.name,
       Filter_Set_Price: campaignData.bid_price || 0,
-      Accepted_Sources: campaignData.accepted_sources?.join(',') || '-all-', // Default to all
+      Accepted_Sources: campaignData.accepted_sources?.join(",") || "-all-",
       Match_Priority: campaignData.match_priority || 5,
       Hourly_Limit: campaignData.hourly_limit ?? 0,
       Daily_Limit: campaignData.daily_limit ?? 0,
       Weekly_Limit: campaignData.weekly_limit ?? 0,
       Monthly_Limit: campaignData.monthly_limit ?? 0,
-      Accept_Only_Reprocessed_Leads: 'Yes',
-      Filter_Set_Status: campaignData.status === 'ACTIVE' ? 1 : 0,
-      Delivery_Type: '100275 - LeadFusion HQ - boberdoo Lead API',
+      Accept_Only_Reprocessed_Leads: "Yes",
+      Filter_Set_Status: campaignData.status === "ACTIVE" ? 1 : 0,
+      Delivery_Type: "100275 - LeadFusion HQ - boberdoo Lead API",
+      State: stateList,
+      Zip_Mode: zipMode,
+      Zip: zipCodes, // ✅ Added
+      Day_Of_Week_Accept_Leads: activeDays,
+      Time_Of_Day_Accept_Leads: timeRange,
     };
 
-    console.log('[boberdoo] Creating campaign:', {
-      name: campaignData.name,
-      partnerId,
-      price: payload.Filter_Set_Price,
-      leadType: payload.TYPE
-    });
+    console.log("🟢 Payload sent to Boberdoo (Create):", payload);
 
-    // Send request
     const response = await axios.post(CAMPAIGN_API_URL, null, {
       params: payload,
       timeout: TIMEOUT_MS,
-      validateStatus: () => true
+      validateStatus: () => true,
     });
 
-    // Parse response safely
-    const data = typeof response.data === 'string' ? safeJson(response.data) : response.data;
-
-    // Success check
-    if (data?.response?.status === 'Success' && data?.response?.filter_set_ID) {
-      return {
-        success: true,
-        filterSetId: data.response.filter_set_ID,
-        data
-      };
+    const data = typeof response.data === "string" ? safeJson(response.data) : response.data;
+    if (data?.response?.status === "Success" && data?.response?.filter_set_ID) {
+      return { success: true, filterSetId: data.response.filter_set_ID, data };
     }
 
-    // Extract errors if any
-    const errors = toErrorList(data).join('; ');
-    return {
-      success: false,
-      error: errors || 'Failed to create campaign in Boberdoo',
-      data
-    };
+    const errors = toErrorList(data).join("; ");
+    return { success: false, error: errors || "Failed to create campaign in Boberdoo", data };
 
   } catch (error) {
-    console.error('[boberdoo] Campaign creation error:', error.message);
-    return {
-      success: false,
-      error: error.message || 'Failed to create campaign in Boberdoo'
-    };
+    console.error("[boberdoo] Campaign creation error:", error.message);
+    return { success: false, error: error.message || "Failed to create campaign in Boberdoo" };
   }
 }
 
-// Update an existing campaign in Boberdoo
+
 async function updateCampaignInBoberdoo(campaignData, filterSetId, partnerId) {
   try {
     const leadTypeId = CONSTANT_ENUM.BOBERDOO_LEAD_TYPE_MAP[campaignData.lead_type];
-    if (!leadTypeId) {
-      return {
-        success: false,
-        error: `Invalid lead type: ${campaignData.lead_type}`
-      };
-    }
+    if (!leadTypeId) return { success: false, error: `Invalid lead type: ${campaignData.lead_type}` };
+    if (!filterSetId) return { success: false, error: "Filter_Set_ID is required for update" };
 
-    if (!filterSetId) {
-      return {
-        success: false,
-        error: 'Filter_Set_ID is required for update'
-      };
-    }
+    const stateList = Array.isArray(campaignData.geography?.state)
+      ? campaignData.geography.state.map(getStateAbbreviation).filter(Boolean).join(",")
+      : getStateAbbreviation(campaignData.geography?.state);
 
-    console.log(`\n🔄 Syncing campaign ${campaignData._id || campaignData.campaign_id} to Boberdoo (update)...`);
+    const coverageType = campaignData.geography.coverage?.type || "FULL_STATE";
+    const zipMode = coverageType === "FULL_STATE" ? 0 : 1;
 
-    // Prepare payload for update
+    const activeDaysArray = campaignData.delivery?.schedule?.days
+      ?.filter(d => d.active)
+      ?.map(d => d.day.toUpperCase()) || [];
+    const activeDays = convertDbDaysToApi(activeDaysArray).join(",");
+
+    const firstActive = campaignData.delivery?.schedule?.days?.find(d => d.active);
+    const timeRange =
+      firstActive?.start_time && firstActive?.end_time
+        ? `${firstActive.start_time}-${firstActive.end_time}`
+        : "00:00-23:59";
+
+    const zipCodes =
+      coverageType === "PARTIAL"
+        ? (campaignData.geography?.coverage?.partial?.zip_codes || []).join(",")
+        : "";
+
     const payload = {
       Key: CAMPAIGN_API_KEY,
       API_Action: CREATE_CAMPAIGN_ACTION,
-      Format: 'json',
-      Mode: 'update',
+      Format: "json",
+      Mode: "update",
       TYPE: leadTypeId,
       Filter_Set_ID: filterSetId,
       Partner_ID: partnerId,
       Filter_Set_Name: campaignData.name,
       Filter_Set_Price: campaignData.bid_price || 0,
-      Accepted_Sources: campaignData.accepted_sources?.join(',') || '-all-',
+      Accepted_Sources: campaignData.accepted_sources?.join(",") || "-all-",
       Match_Priority: campaignData.match_priority || 5,
       Hourly_Limit: campaignData.hourly_limit ?? 0,
       Daily_Limit: campaignData.daily_limit ?? 0,
       Weekly_Limit: campaignData.weekly_limit ?? 0,
       Monthly_Limit: campaignData.monthly_limit ?? 0,
-      Accept_Only_Reprocessed_Leads: 'Yes',
-      Filter_Set_Status: campaignData.status === 'ACTIVE' ? 1 : 0,
-      Delivery_Type: '100275 - LeadFusion HQ - boberdoo Lead API',
+      Accept_Only_Reprocessed_Leads: "Yes",
+      Filter_Set_Status: campaignData.status === "ACTIVE" ? 1 : 0,
+      Delivery_Type: "100275 - LeadFusion HQ - boberdoo Lead API",
+      State: stateList,
+      Zip_Mode: zipMode,
+      Zip: zipCodes, // ✅ Added for update too
+      Day_Of_Week_Accept_Leads: activeDays,
+      Time_Of_Day_Accept_Leads: timeRange,
     };
 
-    console.log('[boberdoo] Updating campaign:', {
-      filterSetId,
-      name: campaignData.name,
-      partnerId,
-      price: payload.Filter_Set_Price,
-      leadType: payload.TYPE
-    });
+    console.log("🟡 Payload sent to Boberdoo (Update):", payload);
 
-    // Send update request
     const response = await axios.post(CAMPAIGN_API_URL, null, {
       params: payload,
       timeout: TIMEOUT_MS,
-      validateStatus: () => true
+      validateStatus: () => true,
     });
 
-    console.log('[boberdoo] Raw API response:', response.data);
+    const data = typeof response.data === "string" ? safeJson(response.data) : response.data;
 
-    const data = typeof response.data === 'string' ? safeJson(response.data) : response.data;
-
-    // Check success
-    if (data?.response?.status === 'Success') {
+    if (data?.response?.status === "Success") {
       console.log(`✅ Campaign ${campaignData._id || campaignData.campaign_id} updated successfully in Boberdoo`);
-      return {
-        success: true,
-        filterSetId,
-        data
-      };
+      return { success: true, filterSetId, data };
     }
 
-    const errors = toErrorList(data).join('; ');
-    console.warn(`❌ Failed to update campaign ${campaignData._id || campaignData.campaign_id} in Boberdoo: ${errors}`);
-
-    return {
-      success: false,
-      error: errors || 'Failed to update campaign in Boberdoo',
-      data
-    };
+    const errors = toErrorList(data).join("; ");
+    return { success: false, error: errors || "Failed to update campaign in Boberdoo", data };
 
   } catch (error) {
-    console.error('[boberdoo] Campaign update error:', error.message);
-    return {
-      success: false,
-      error: error.message || 'Failed to update campaign in Boberdoo'
-    };
+    console.error("[boberdoo] Campaign update error:", error.message);
+    return { success: false, error: error.message || "Failed to update campaign in Boberdoo" };
   }
 }
+
+
+
+/**
+ * Disable campaign (Filter Set) in Boberdoo by setting Filter_Set_Status = 0
+ */
+ const deleteCampaignFromBoberdoo = async ({ filterSetId, leadTypeId }) => {
+  try {
+    if (!filterSetId) {
+      console.warn("⚠️ Missing filterSetId in deleteCampaignFromBoberdoo()");
+      return { success: false, message: "Filter_Set_ID missing" };
+    }
+
+    const payload = {
+      Format: "json",
+      Key: BOBERDOO_API_KEY,
+      API_Action: CREATE_CAMPAIGN_ACTION,
+      Mode: "update", // ✅ Update mode required
+      TYPE: leadTypeId || 33, // Default lead type (you can adjust)
+      Filter_Set_ID: filterSetId,
+      Filter_Set_Status: 0, // ✅ Disable the campaign
+    };
+
+    console.log("🧾 Disabling campaign in Boberdoo:", payload);
+
+    const { data } = await axios.post(BOBERDOO_API_URL, payload, {
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    });
+
+    if (data?.response?.status === "Success") {
+      console.log(`✅ Boberdoo campaign disabled: Filter_Set_ID ${filterSetId}`);
+      return { success: true, message: "Campaign disabled in Boberdoo" };
+    } else {
+      console.error("❌ Boberdoo disable failed:", data);
+      return { success: false, message: "Failed to disable in Boberdoo", data };
+    }
+  } catch (error) {
+    console.error("❌ Error disabling campaign in Boberdoo:", error);
+    return { success: false, message: error.message };
+  }
+};
 
 
 
@@ -668,8 +915,13 @@ const sendBoberdoLeadNotifications = async (lead, campaign, billingResult) => {
 
 
 module.exports = { 
-  syncUserToBoberdooById
-  ,createCampaignInBoberdoo,
+  syncUserToBoberdooById,
+  updatePartnerStatusInBoberdoo,
+  updatePartnerInBoberdoo,
+
+  createCampaignInBoberdoo,
   updateCampaignInBoberdoo,
+  deleteCampaignFromBoberdoo,
+
   processBoberdoLead,
  };
