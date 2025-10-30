@@ -44,16 +44,20 @@ const transformBackendDataToFormData = (backendData: any, statesList: State[]) =
 
     // Geography
     if (backendData.geography) {
-      if (backendData.geography.state && statesList.length > 0) {
-        const stateData = statesList.find(state => state._id === backendData.geography.state);
-        if (stateData) {
-          formData.geography.state = {
-            label: `${stateData.name} (${stateData.abbreviation})`,
-            value: stateData._id,
-            name: stateData.name,
-            abbreviation: stateData.abbreviation,
-          };
-        }
+      if (backendData.geography.state && Array.isArray(backendData.geography.state) && statesList.length > 0) {
+        formData.geography.state = backendData.geography.state
+          .map((stateId: string) => {
+            const stateData = statesList.find((s) => s._id === stateId);
+            return stateData
+              ? {
+                  label: `${stateData.name} (${stateData.abbreviation})`,
+                  value: stateData._id,
+                  name: stateData.name,
+                  abbreviation: stateData.abbreviation,
+                }
+              : null;
+          })
+          .filter(Boolean);
       }
 
       if (backendData.geography.coverage) {
@@ -343,8 +347,8 @@ const EditCampaign = () => {
               token={token}
               setCountiesList={setCountiesList}
               setIsLoadingCounties={setIsLoadingCounties}
-              setUtilitiesList={setUtilitiesList}
-              setIsLoadingUtilities={setIsLoadingUtilities}
+              // setUtilitiesList={setUtilitiesList}
+              // setIsLoadingUtilities={setIsLoadingUtilities}
             />
 
             <TabsHeader activeTab={activeTab} setActiveTab={setActiveTab} errors={errors} />
@@ -358,8 +362,8 @@ const EditCampaign = () => {
                   countiesList,
                   isLoadingCounties,
                   loadStates,
-                  utilitiesList,
-                  isLoadingUtilities,
+                  // utilitiesList,
+                  // isLoadingUtilities,
                   activeDeliveryTab,
                   setActiveDeliveryTab,
                   true,

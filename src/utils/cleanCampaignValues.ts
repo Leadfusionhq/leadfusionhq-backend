@@ -48,7 +48,12 @@ export const cleanCampaignValues = (values: typeof initialValues) => {
     company_contact_email: values.company_contact_email || '',
     geography: {
       ...values.geography,
-      state: values.geography.state ? values.geography.state.value : "",
+      // state: values.geography.state ? values.geography.state.value : "",
+      state: Array.isArray(values.geography.state)
+      ? values.geography.state.map((s) => s.value)
+      : values.geography.state
+      ? values.geography.state.value
+      : "",
       coverage: {
         ...values.geography.coverage,
         type:values.geography.coverage.type,

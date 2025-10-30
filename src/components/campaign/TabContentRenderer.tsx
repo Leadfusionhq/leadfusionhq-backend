@@ -14,8 +14,8 @@ export const renderTabContent = (
   countiesList: County[],
   isLoadingCounties: boolean,
   loadStates: (input: string, cb: (options: any[]) => void) => void,
-  utilitiesList: Utility[],
-  isLoadingUtilities: boolean,
+  // utilitiesList: Utility[],
+  // isLoadingUtilities: boolean,
   activeDeliveryTab: "method" | "schedule" | "other",
   setActiveDeliveryTab: (tab: "method" | "schedule" | "other") => void,
   isEditMode: boolean,
@@ -30,8 +30,8 @@ export const renderTabContent = (
         <CampaignGeography
           values={values}
           setFieldValue={setFieldValue}
-          countiesList={countiesList}
-          isLoadingCounties={isLoadingCounties}
+          // countiesList={countiesList}
+          // isLoadingCounties={isLoadingCounties}
           loadStates={loadStates}
           isEditMode={isEditMode} 
           isAdmin={isAdmin}
