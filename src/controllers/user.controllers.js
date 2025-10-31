@@ -9,7 +9,8 @@ const MAIL_HANDLER = require('../mail/mails');
 const CONSTANT_ENUM = require('../helper/constant-enums.js');
 const path = require('path');
 const fs = require("fs");
-
+const  Campaign  = require('../models/campaign.model');
+const CampaignServices = require('../services/campaign/campaign.service');
 
 const getAllUsers = wrapAsync(async (req, res) => {
     const data = await UserServices.getAllUsersService(); 
@@ -135,37 +136,61 @@ const updateUser = wrapAsync(async (req, res) => {
 const deleteUser = wrapAsync(async (req, res) => {
   const { userId } = req.params;
 
+  console.log("🧨 [DELETE USER INITIATED] =>", userId);
+
   const user = await UserServices.getUserByID(userId);
   if (!user) {
+    console.warn("⚠️ User not found:", userId);
     return sendResponse(res, null, 'User not found.', 404);
   }
 
-  // 🔄 Step 1: Deactivate user in Boberdoo instead of deleting
+  // 1️⃣ Deactivate user in Boberdoo
   if (user.integrations?.boberdoo?.external_id) {
+    const partnerId = user.integrations.boberdoo.external_id;
     try {
-      const partnerId = user.integrations.boberdoo.external_id;
+      console.log("📦 Deactivating Boberdoo partner:", partnerId);
       const result = await updatePartnerStatusInBoberdoo(partnerId, 0);
-      console.log(`Boberdoo partner ${partnerId} set inactive:`, result.success);
+      console.log("✅ Boberdoo Partner Status Updated:", result);
     } catch (err) {
-      console.error("Failed to deactivate user in Boberdoo:", err.message);
+      console.error("❌ Failed to deactivate user in Boberdoo:", err.message);
     }
   }
 
-  // 🔁 Step 2: Delete N8N account if exists
+  // 2️⃣ Delete user in N8N
   if (user.n8nUserId) {
     try {
+      console.log("📦 Deleting N8N sub-account:", user.n8nUserId);
       await N8nServices.deleteSubAccountById(user.n8nUserId);
-      console.log(`n8n user ${user.n8nUserId} deleted successfully.`);
+      console.log("✅ N8N user deleted successfully.");
     } catch (err) {
-      console.error(`Failed to delete n8n user ${user.n8nUserId}:`, err.message);
+      console.error("❌ Failed to delete N8N user:", err.message);
     }
   }
 
-  // 🗑️ Step 3: Delete locally from DB
-  await UserServices.hardDeleteUser(userId);
+  // 3️⃣ Delete user's campaigns
+  const campaigns = await Campaign.find({ user_id: userId });
+  if (campaigns.length > 0) {
+    console.log(`📣 Found ${campaigns.length} campaign(s) to delete for user ${userId}`);
+    for (const campaign of campaigns) {
+      try {
+        console.log("🔁 Starting campaign delete process:", campaign._id);
+        const campaignResult = await CampaignServices.deleteCampaign(campaign._id, userId, user.role);
+        console.log("✅ Campaign deleted successfully:", campaignResult);
+      } catch (campErr) {
+        console.error(`❌ Error deleting campaign ${campaign._id}:`, campErr.message);
+      }
+    }
+  } else {
+    console.log("ℹ️ No campaigns found for user:", userId);
+  }
 
-  return sendResponse(res, null, 'User has been deleted and deactivated in Boberdoo.', 200);
+  // 4️⃣ Finally delete user from local DB
+  await UserServices.hardDeleteUser(userId);
+  console.log("✅ User deleted from local DB:", userId);
+
+  return sendResponse(res, null, 'User and related data deleted successfully.', 200);
 });
+
 
 
 const acceptContract = wrapAsync(async (req, res) => {
