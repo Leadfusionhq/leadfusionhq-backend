@@ -14,6 +14,7 @@ import { getErrorMessage } from '@/utils/getErrorMessage';
 import { Skeleton, Box, Button } from "@mui/material";
 import { IconButton, Menu, MenuItem } from "@mui/material";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
+import ConfirmDialog from "@/components/common/ConfirmDialog";
 
 type User = {
   _id: string;
@@ -40,6 +41,7 @@ type ApiResponse = {
 };
 
 
+
 export default function AdminTable() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -47,6 +49,13 @@ export default function AdminTable() {
   const [menuRow, setMenuRow] = useState<User | null>(null);
 
   const isMenuOpen = Boolean(menuAnchorEl);
+
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
 
   const handleMenuClick = (event: React.MouseEvent<HTMLButtonElement>, row: User) => {
     setMenuAnchorEl(event.currentTarget);
@@ -146,23 +155,51 @@ export default function AdminTable() {
     router.push(`/admin/user-management/admin/${row._id}/edit`);
   };
 
-  const handleDelete = async (row: User) => {
-    const confirmation = window.confirm(`Are you sure you want to delete ${row.name}?`);
-    if (!confirmation) return;
+  // const handleDelete = async (row: User) => {
+  //   const confirmation = window.confirm(`Are you sure you want to delete ${row.name}?`);
+  //   if (!confirmation) return;
 
+  //   if (row.isSuperAdmin) {
+  //     // alert('Super Admin cannot be deleted.');
+  //     toast.error('Super Admin cannot be deleted.');
+  //     return; // 🚨 Prevent further execution
+  //   }
+
+  //   try {
+  //     setLoading(true);
+  //     const url = API_URL.DELETE_ADMIN_BY_ID.replace(':adminId', row._id);
+  //     await axiosWrapper('delete', url, {}, token ?? undefined);
+  //     setUsers((prevUsers) => prevUsers.filter((user) => user._id !== row._id));
+  //   } catch (err) {
+  //     console.error('Failed to delete user:', err);
+  //     toast.error(getErrorMessage(err));
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
+
+  const handleDelete = (row: User) => {
+    setConfirmDialog({
+      open: true,
+      title: "Delete Admin",
+      message: `Are you sure you want to delete ${row.name}?`,
+      onConfirm: () => confirmDelete(row),
+    });
+  };
+  
+  const confirmDelete = async (row: User) => {
     if (row.isSuperAdmin) {
-      // alert('Super Admin cannot be deleted.');
-      toast.error('Super Admin cannot be deleted.');
-      return; // 🚨 Prevent further execution
+      toast.error("Super Admin cannot be deleted.");
+      return;
     }
-
+  
     try {
       setLoading(true);
-      const url = API_URL.DELETE_ADMIN_BY_ID.replace(':adminId', row._id);
-      await axiosWrapper('delete', url, {}, token ?? undefined);
+      const url = API_URL.DELETE_ADMIN_BY_ID.replace(":adminId", row._id);
+      await axiosWrapper("delete", url, {}, token ?? undefined);
       setUsers((prevUsers) => prevUsers.filter((user) => user._id !== row._id));
+      toast.success("Admin deleted successfully.");
     } catch (err) {
-      console.error('Failed to delete user:', err);
       toast.error(getErrorMessage(err));
     } finally {
       setLoading(false);
@@ -348,6 +385,16 @@ export default function AdminTable() {
         </Menu>
 
       </div>
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        onConfirm={() => {
+          confirmDialog.onConfirm();
+          setConfirmDialog({ ...confirmDialog, open: false });
+        }}
+        onCancel={() => setConfirmDialog({ ...confirmDialog, open: false })}
+      />
     </>
   );
 }

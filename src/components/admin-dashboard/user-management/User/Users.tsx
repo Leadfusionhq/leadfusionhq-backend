@@ -13,6 +13,8 @@ import { useRouter } from 'next/navigation';
 import { Skeleton, Box, Button, Typography, IconButton, Menu, MenuItem } from "@mui/material";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import { toast } from 'react-toastify';
+import ConfirmDialog from "@/components/common/ConfirmDialog"; 
+
 type User = {
     _id: string;
     name: string;
@@ -69,6 +71,11 @@ export default function UserTable() {
     const [users, setUsers] = useState<User[]>([]); 
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
+
+    const [confirmOpen, setConfirmOpen] = useState(false);
+    const [selectedUser, setSelectedUser] = useState<User | null>(null);
+
+
 
     const [pagination, setPagination] = useState<{ page: number; limit: number }>({
         page: 1,
@@ -158,21 +165,31 @@ export default function UserTable() {
       router.push(`/admin/campaigns/user/${row._id}/add`);
     }
 
-    const handleDelete = async (row: User) => {
-        const confirmation = window.confirm(`Are you sure you want to delete ${row.name}?`);
-        if (!confirmation) return;
-        try {
-            setLoading(true);
-
-            const url = API_URL.DELETE_USER_BY_ID.replace(':userId', row._id);
-            await axiosWrapper('delete', url, {}, token ?? undefined);
-            setUsers((prevUsers) => prevUsers.filter((user) => user._id !== row._id));
-        } catch (err) {
-            console.error('Failed to delete user:', err);
-        } finally {
-            setLoading(false);
-        }
+    const handleDeleteClick = (row: User) => {
+      setSelectedUser(row);
+      setConfirmOpen(true);
     };
+
+    const confirmDeleteUser = async () => {
+      if (!selectedUser) return;
+    
+      try {
+        setLoading(true);
+        const url = API_URL.DELETE_USER_BY_ID.replace(':userId', selectedUser._id);
+        await axiosWrapper('delete', url, {}, token ?? undefined);
+    
+        toast.success(`${selectedUser.name} deleted successfully`);
+        setUsers((prev) => prev.filter((u) => u._id !== selectedUser._id));
+      } catch (err) {
+        console.error('Failed to delete user:', err);
+        toast.error('Failed to delete user');
+      } finally {
+        setLoading(false);
+        setConfirmOpen(false);
+        setSelectedUser(null);
+      }
+    };
+    
 
     const handleSyncBoberdoo = async (row: User) => {
       const toastId = toast.loading(`Syncing ${row.name} to Boberdoo...`);
@@ -507,14 +524,25 @@ export default function UserTable() {
               )}
               <MenuItem
                 onClick={() => {
-                  if (menuRow) handleDelete(menuRow);
+                  if (menuRow) handleDeleteClick(menuRow);
                   handleMenuClose();
                 }}
               >
                 Delete User Account
               </MenuItem>
+
             </Menu>
         </div>
+        <ConfirmDialog
+          open={confirmOpen}
+          title="Delete User Account"
+          message={`Are you sure you want to delete ${
+            selectedUser?.name || "this user"
+          }? This will also remove their campaigns and related data.`}
+          onConfirm={confirmDeleteUser}
+          onCancel={() => setConfirmOpen(false)}
+        />
+
         </>
     );
 }
