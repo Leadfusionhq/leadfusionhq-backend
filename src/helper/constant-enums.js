@@ -6,23 +6,40 @@ const USER_ROLE = {
 const LEAD_TYPE = {
   SOLAR_RESIDENTIAL: 'SOLAR_RESIDENTIAL',
   ROOFING: 'ROOFING',
-  SOLAR_COMMERCIAL: 'SOLAR_COMMERCIAL',
-  POWER_WASHING: 'POWER_WASHING',
-  ROOF_REJUVENATION: 'ROOF_REJUVENATION',
-  GUTTERS: 'GUTTERS',
-  SIDING: 'SIDING',
-  WINDOWS: 'WINDOWS',
+  INBOUND_PHONE:'INBOUND_PHONE',
+  // SOLAR_COMMERCIAL: 'SOLAR_COMMERCIAL',
+  // POWER_WASHING: 'POWER_WASHING',
+  // ROOF_REJUVENATION: 'ROOF_REJUVENATION',
+  // GUTTERS: 'GUTTERS',
+  // SIDING: 'SIDING',
+  // WINDOWS: 'WINDOWS',
 };
 const BOBERDOO_LEAD_TYPE_MAP = {
   SOLAR_RESIDENTIAL: 33, // replace with actual ID
-  ROOFING: 34,           // replace with actual ID
-  SOLAR_COMMERCIAL: 35,
-  POWER_WASHING: 36,
-  ROOF_REJUVENATION: 37,
-  GUTTERS: 38,
-  SIDING: 39,
-  WINDOWS: 40,
+  ROOFING: 35,           // replace with actual ID
+  // SOLAR_COMMERCIAL: 35,
+  // POWER_WASHING: 36,
+  // ROOF_REJUVENATION: 37,
+  // GUTTERS: 38,
+  // SIDING: 39,
+  // WINDOWS: 40,
+  INBOUND_PHONE:9
 };
+
+const TIMEZONES = {
+  EASTERN: 'America/New_York',
+  CENTRAL: 'America/Chicago',
+  MOUNTAIN: 'America/Denver',
+  PACIFIC: 'America/Los_Angeles'
+};
+
+const TIMEZONE_LABELS = {
+  'America/New_York': 'Eastern Time (ET)',
+  'America/Chicago': 'Central Time (CT)',
+  'America/Denver': 'Mountain Time (MT)',
+  'America/Los_Angeles': 'Pacific Time (PT)'
+};
+
 
 const EXCLUSIVITY = {
   EXCLUSIVE: 'EXCLUSIVE',         // Lead sold to only 1 buyer
@@ -83,5 +100,8 @@ module.exports = {
   
   CONTENT_TYPE,
   CHAT_STATUS,
-  PAYMENT_TYPE
+  PAYMENT_TYPE,
+  TIMEZONES,
+  TIMEZONE_LABELS,
+
 };

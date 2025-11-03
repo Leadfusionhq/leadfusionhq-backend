@@ -2,9 +2,10 @@ const axios = require('axios');
 const State = require('../../models/state.model');
 const User = require('../../models/user.model');
 
-// Create and Update Webhook URLs
+// Create, Update, and Delete Webhook URLs
 const WEBHOOK_CREATE_URL = 'https://n8n.srv997679.hstgr.cloud/webhook/ffe20f26-ebb5-42fa-8e2d-8867957396b2';
 const WEBHOOK_UPDATE_URL = 'https://n8n.srv997679.hstgr.cloud/webhook/update';
+const WEBHOOK_DELETE_URL = 'https://n8n.srv997679.hstgr.cloud/webhook/delete';
 
 const sendToN8nWebhook = async (campaignData) => {
   try {
@@ -66,16 +67,18 @@ const sendToN8nWebhook = async (campaignData) => {
     const payload = {
       action: campaignData.action || 'create',
       campaign_id: campaignData.campaign_id || '',
-      states: stateAbbrs, // e.g. ["CA", "TX"]
+      states: stateAbbrs,
       zip_codes: zipCodes,
       client_name: userName,
       boberdoo_filter_set_id: campaignData.boberdoo_filter_set_id || null,
+      timezone: campaignData.delivery?.schedule?.timezone || 'America/New_York',
       submitted_at: new Date().toISOString(),
     };
 
     // ✅ Choose correct webhook
-    const webhookUrl =
-      campaignData.action === 'update' ? WEBHOOK_UPDATE_URL : WEBHOOK_CREATE_URL;
+    let webhookUrl = WEBHOOK_CREATE_URL;
+    if (campaignData.action === 'update') webhookUrl = WEBHOOK_UPDATE_URL;
+    else if (campaignData.action === 'delete') webhookUrl = WEBHOOK_DELETE_URL;
 
     console.log(`📤 Sending ${campaignData.action} webhook to:`, webhookUrl);
     console.log('Payload:', payload);
