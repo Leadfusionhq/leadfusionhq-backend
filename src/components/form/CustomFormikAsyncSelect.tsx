@@ -21,6 +21,7 @@ interface Props {
   defaultOptions?: boolean | Option[];
   cacheOptions?: boolean;
   isDisabled?: boolean; // ✅ added here
+  isClearable?: boolean; 
 }
 
 const CustomFormikAsyncSelect: React.FC<Props> = ({
@@ -33,6 +34,7 @@ const CustomFormikAsyncSelect: React.FC<Props> = ({
   defaultOptions = true,
   cacheOptions = true,
   isDisabled = false, // ✅ default false
+  isClearable = true,
 }) => {
   const [field, meta, helpers] = useField(name);
   const { setValue, setTouched } = helpers;
@@ -77,7 +79,7 @@ const CustomFormikAsyncSelect: React.FC<Props> = ({
         placeholder={placeholder}
         classNamePrefix="react-select"
         isMulti={isMulti}
-        isClearable
+        isClearable={isClearable}
         isDisabled={isDisabled} // ✅ forward here
         styles={{
           control: (base) => ({

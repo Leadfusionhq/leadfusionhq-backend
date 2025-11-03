@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react';
-import { FormikInput, FormikRadio, FormikTextarea, FormikCheckbox } from '@/components/form';
+import { FormikInput, FormikRadio, FormikTextarea, FormikCheckbox, FormikSelect } from '@/components/form';
 
 interface DeliveryValues {
   delivery: any;
@@ -13,8 +13,15 @@ interface CampaignDeliveryProps {
   activeDeliveryTab: 'method' | 'schedule' | 'other';
   setActiveDeliveryTab: (tab: 'method' | 'schedule' | 'other') => void;
   isEditMode?: boolean;
-  formKey?: number; // Add formKey prop
+  formKey?: number;
 }
+
+const TIMEZONE_OPTIONS = [
+  { value: 'America/New_York', label: 'Eastern Time (ET)' },
+  { value: 'America/Chicago', label: 'Central Time (CT)' },
+  { value: 'America/Denver', label: 'Mountain Time (MT)' },
+  { value: 'America/Los_Angeles', label: 'Pacific Time (PT)' },
+];
 
 const CampaignDelivery: React.FC<CampaignDeliveryProps> = ({
   values,
@@ -22,10 +29,9 @@ const CampaignDelivery: React.FC<CampaignDeliveryProps> = ({
   activeDeliveryTab,
   setActiveDeliveryTab,
   isEditMode = false,
-  formKey // Receive formKey
+  formKey
 }) => {
   const tabs = ["method", "schedule"] as const;
-
 
   const handleDeliveryMethodChange = (method: string, isChecked: boolean) => {
     const currentMethods = values.delivery.method || [];
@@ -80,21 +86,21 @@ const CampaignDelivery: React.FC<CampaignDeliveryProps> = ({
             <p className="text-sm text-gray-500 mb-4">Select one or more delivery methods</p>
             <div className="flex flex-col gap-3">
               <FormikCheckbox 
-                key={`email-${formKey}`} // Add key to force re-render
+                key={`email-${formKey}`}
                 name="delivery.method.email" 
                 checked={isMethodSelected('email')}
                 label="Email Delivery"
                 onChange={(e) => handleDeliveryMethodChange('email', e.target.checked)}
               />
               <FormikCheckbox 
-                key={`phone-${formKey}`} // Add key to force re-render
+                key={`phone-${formKey}`}
                 name="delivery.method.phone" 
                 checked={isMethodSelected('phone')}
                 label="Phone Delivery"
                 onChange={(e) => handleDeliveryMethodChange('phone', e.target.checked)}
               />
               <FormikCheckbox 
-                key={`crm-${formKey}`} // Add key to force re-render
+                key={`crm-${formKey}`}
                 name="delivery.method.crm" 
                 checked={isMethodSelected('crm')}
                 label="CRM Integration"
@@ -103,7 +109,7 @@ const CampaignDelivery: React.FC<CampaignDeliveryProps> = ({
             </div>
           </div>
 
-          {/* Conditional Fields */}
+          {/* Conditional Fields (existing) */}
           {isMethodSelected('email') && (
             <div className="border border-[#E0E0E0] rounded-lg p-6">
               <h4 className="text-lg font-medium mb-4">Email Configuration</h4>
@@ -151,58 +157,54 @@ const CampaignDelivery: React.FC<CampaignDeliveryProps> = ({
         </div>
       )}
 
-      {/* Schedule Tab */}
+      {/* ✅ NEW Schedule Tab */}
       {activeDeliveryTab === "schedule" && (
         <div className="space-y-6">
-          <h4 className="text-lg font-medium">Weekly Schedule</h4>
-          <div className="space-y-4">
-            {values.delivery.schedule.days.map((day: any, index: number) => (
-              <div
-                key={day.day}
-                className="grid grid-cols-1 md:grid-cols-6 gap-4 items-center p-4 border border-[#E0E0E0] rounded-lg"
-              >
-                <div className="font-medium text-[#1C1C1C]">{day.day}</div>
-                <FormikCheckbox name={`delivery.schedule.days.${index}.active`} label="Active" />
-                <FormikInput 
-                  name={`delivery.schedule.days.${index}.start_time`} 
-                  type="time" 
-                  label="Start" 
-                  disabled={!day.active}
+          <h4 className="text-lg font-medium">Delivery Schedule</h4>
+          
+          {/* ✅ Time Range + Timezone */}
+          <div className="border border-[#E0E0E0] rounded-lg p-6">
+            <h5 className="text-md font-medium mb-4">Operating Hours</h5>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <FormikInput 
+                name="delivery.schedule.start_time" 
+                type="time" 
+                label="Start Time *"
+                required
+              />
+              <FormikInput 
+                name="delivery.schedule.end_time" 
+                type="time" 
+                label="End Time *"
+                required
+              />
+              <FormikSelect
+                name="delivery.schedule.timezone"
+                label="Timezone *"
+                options={TIMEZONE_OPTIONS}
+                required
+              />
+            </div>
+            <p className="text-sm text-gray-500 mt-2">
+              Leads will be delivered during these hours ({values.delivery.schedule.timezone})
+            </p>
+          </div>
+
+          {/* ✅ Active Days (no individual times) */}
+          <div className="border border-[#E0E0E0] rounded-lg p-6">
+            <h5 className="text-md font-medium mb-4">Active Days</h5>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {values.delivery.schedule.days.map((day: any, index: number) => (
+                <FormikCheckbox
+                  key={day.day}
+                  name={`delivery.schedule.days.${index}.active`}
+                  label={day.day}
                 />
-                <FormikInput 
-                  name={`delivery.schedule.days.${index}.end_time`} 
-                  type="time" 
-                  label="End"
-                  disabled={!day.active}
-                />
-                <FormikInput 
-                  name={`delivery.schedule.days.${index}.cap`} 
-                  type="number" 
-                  label="Cap"
-                  min="0"
-                  disabled={!day.active}
-                />
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       )}
-
-      {/* Other Tab */}
-      {/* {activeDeliveryTab === "other" && (
-        <div className="space-y-6">
-          <h4 className="text-lg font-medium">Other Settings</h4>
-          <div className="border border-[#E0E0E0] rounded-lg p-6">
-            <FormikInput
-              name="delivery.other.homeowner_count"
-              type="number"
-              min="0"
-              placeholder="0"
-              label="Homeowner 2nd Proposal Request (days)"
-            />
-          </div>
-        </div>
-      )} */}
     </div>
   );
 };

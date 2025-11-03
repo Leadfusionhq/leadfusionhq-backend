@@ -1,5 +1,6 @@
 "use client";
 import { initialValues } from "@/constants/initialCampaign"; 
+import { StateOption } from "@/types/campaign";
 
 // export const cleanCampaignValues = (values: typeof initialValues) => {
 //   return {
@@ -30,6 +31,25 @@ import { initialValues } from "@/constants/initialCampaign";
 
 
 
+const cleanStateValue = (state: StateOption | StateOption[] | null | undefined): string[] => {
+  // Handle null/undefined
+  if (!state) return [];
+  
+  // Handle array (multi-select)
+  if (Array.isArray(state)) {
+    return state
+      .map((s) => s?.value)
+      .filter((val): val is string => Boolean(val));
+  }
+  
+  // Handle single object (if somehow passed as single select)
+  if (typeof state === 'object' && state !== null && 'value' in state) {
+    return state.value ? [state.value] : [];
+  }
+  
+  // Fallback for any other case
+  return [];
+};
 
 
 
@@ -49,11 +69,7 @@ export const cleanCampaignValues = (values: typeof initialValues) => {
     geography: {
       ...values.geography,
       // state: values.geography.state ? values.geography.state.value : "",
-      state: Array.isArray(values.geography.state)
-      ? values.geography.state.map((s) => s.value)
-      : values.geography.state
-      ? values.geography.state.value
-      : "",
+      state: cleanStateValue(values.geography.state), 
       coverage: {
         ...values.geography.coverage,
         type:values.geography.coverage.type,
@@ -79,10 +95,16 @@ export const cleanCampaignValues = (values: typeof initialValues) => {
     delivery: {
       ...values.delivery,
       method: values.delivery.method || [],
-    //   schedule: {
-    //     ...values.geography.coverage,
-    
-    //   },
+      schedule: {
+        // ✅ NEW: Single time + timezone
+        start_time: values.delivery.schedule.start_time || "09:00",
+        end_time: values.delivery.schedule.end_time || "17:00",
+        timezone: values.delivery.schedule.timezone || "America/New_York",
+        days: values.delivery.schedule.days.map(day => ({
+          day: day.day,
+          active: day.active || false,
+        })),
+      },
       other : {
         // ...values.delivery.other,
         homeowner_count:values.delivery.other.homeowner_count,
