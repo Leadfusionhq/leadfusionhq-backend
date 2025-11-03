@@ -19,21 +19,37 @@ const { User } = require('../../models/user.model');
 
 const createCampaign = async (data) => {
   try {
-    // Create campaign in database first
+    // Validation
+    if (data.geography.coverage.type === 'FULL_STATE') {
+      if (!data.geography.state || data.geography.state.length === 0) {
+        throw new ErrorHandler(400, 'State is required for FULL_STATE coverage');
+      }
+    }
+    
+    if (data.geography.coverage.type === 'PARTIAL') {
+      if (!data.geography.coverage.partial.zip_codes || 
+          data.geography.coverage.partial.zip_codes.length === 0) {
+        throw new ErrorHandler(400, 'ZIP codes are required for PARTIAL coverage');
+      }
+      if (!data.geography.state) {
+        data.geography.state = [];
+      }
+    }
+
+    // Create campaign
     const newCampaign = await Campaign.create(data);
 
-    // Populate state and user to get their names
-    const populatedCampaign = await Campaign.findById(newCampaign._id)
+    // Initial populate
+    let populatedCampaign = await Campaign.findById(newCampaign._id)
       .populate('geography.state', 'name abbreviation')
       .populate('user_id', 'name email integrations.boberdoo.external_id')
       .lean();
 
-    // Get the user's Boberdoo partner ID
+    // Get user's Boberdoo partner ID
     const user = await User.findById(data.user_id).lean();
     const partnerId = user?.integrations?.boberdoo?.external_id;
 
     if (partnerId) {
-      // Update sync status to pending
       await Campaign.findByIdAndUpdate(newCampaign._id, {
         $set: {
           boberdoo_sync_status: 'PENDING',
@@ -41,11 +57,9 @@ const createCampaign = async (data) => {
         }
       });
 
-      // Sync to Boberdoo
       const boberdooResult = await createCampaignInBoberdoo(populatedCampaign, partnerId);
       
       if (boberdooResult.success) {
-        // Update campaign with Boberdoo filter set ID
         await Campaign.findByIdAndUpdate(newCampaign._id, {
           $set: {
             boberdoo_filter_set_id: boberdooResult.filterSetId,
@@ -54,10 +68,21 @@ const createCampaign = async (data) => {
             boberdoo_last_error: null
           }
         });
+
+        // ✅ Safe re-fetch with try-catch
+        try {
+          populatedCampaign = await Campaign.findById(newCampaign._id)
+            .populate('geography.state', 'name abbreviation')
+            .populate('user_id', 'name email integrations.boberdoo.external_id')
+            .lean();
+        } catch (refetchError) {
+          console.error('⚠️ Failed to re-fetch campaign after Boberdoo sync:', refetchError.message);
+          // Continue with old populatedCampaign data
+        }
+
         console.log(`✓ Campaign ${newCampaign.campaign_id} synced to Boberdoo with filter_set_ID: ${boberdooResult.filterSetId}`);
-        console.log("boberdoo api Result :",boberdooResult);
+        console.log("boberdoo api Result:", boberdooResult);
       } else {
-        // Update with error status
         await Campaign.findByIdAndUpdate(newCampaign._id, {
           $set: {
             boberdoo_sync_status: 'FAILED',
@@ -77,7 +102,7 @@ const createCampaign = async (data) => {
       });
     }
 
-    // Send webhook notification (your existing code)
+    // Send webhook with latest data
     const resultforN8n = await sendToN8nWebhook(populatedCampaign);
     console.log('📊 N8N Webhook Result:', resultforN8n);
 
@@ -87,9 +112,29 @@ const createCampaign = async (data) => {
   }
 };
 
-
 const updateCampaign = async (campaignId, userId, role, updateData) => {
   try {
+
+    if (updateData.geography?.coverage?.type === 'FULL_STATE') {
+      if (!updateData.geography.state || updateData.geography.state.length === 0) {
+        throw new ErrorHandler(400, 'State is required for FULL_STATE coverage');
+      }
+    }
+    
+    // Validate ZIP codes requirement for PARTIAL
+    if (updateData.geography?.coverage?.type === 'PARTIAL') {
+      if (!updateData.geography.coverage.partial.zip_codes || 
+          updateData.geography.coverage.partial.zip_codes.length === 0) {
+        throw new ErrorHandler(400, 'ZIP codes are required for PARTIAL coverage');
+      }
+      
+      // State is optional for PARTIAL
+      if (!updateData.geography.state) {
+        updateData.geography.state = [];
+      }
+    }
+
+
     const filter = { _id: campaignId };
 
     if (role !== CONSTANT_ENUM.USER_ROLE.ADMIN) {
@@ -588,7 +633,7 @@ const deleteCampaign = async (campaignId, userId, role) => {
     const campaign = await Campaign.findById(campaignId);
     if (!campaign) throw new ErrorHandler(404, "Campaign not found or access denied");
 
-    // 1️⃣ Delete all leads first
+    // 1️⃣ Delete all leads
     const leadCount = await Lead.countDocuments({ campaign_id: campaignId });
     if (leadCount > 0) {
       await Lead.deleteMany({ campaign_id: campaignId });
@@ -597,40 +642,50 @@ const deleteCampaign = async (campaignId, userId, role) => {
       console.log("ℹ️ No leads found for campaign:", campaignId);
     }
 
-    // 2️⃣ Disable in Boberdoo
+    // 2️⃣ Disable in Boberdoo (Filter_Set_Status = 0)
     if (campaign.boberdoo_filter_set_id) {
       try {
-        console.log("📦 Deactivating Boberdoo campaign:", {
+        // ✅ Map lead type string → numeric ID
+        const leadTypeId =
+          CONSTANT_ENUM.BOBERDOO_LEAD_TYPE_MAP[campaign.lead_type] || 33;
+
+        console.log("📦 Deactivating campaign in Boberdoo:", {
           filterSetId: campaign.boberdoo_filter_set_id,
-          leadTypeId: campaign.lead_type || 33,
+          leadType: campaign.lead_type,
+          mappedLeadTypeId: leadTypeId,
         });
+
         const boberdooResult = await deleteCampaignFromBoberdoo({
           filterSetId: campaign.boberdoo_filter_set_id,
-          leadTypeId: campaign.lead_type || 33,
+          leadTypeId,
         });
+
         console.log("✅ Boberdoo campaign deactivated:", boberdooResult);
       } catch (boberdooErr) {
-        console.error("❌ Failed to deactivate Boberdoo campaign:", boberdooErr.message);
+        console.error(
+          "❌ Failed to deactivate campaign in Boberdoo:",
+          boberdooErr.message
+        );
       }
     }
 
     // 3️⃣ Send delete webhook to N8N
     try {
-      console.log("📤 Sending delete webhook to N8N with payload:", {
+      console.log("📤 Sending delete webhook to N8N:", {
         campaign_id: campaign._id,
         name: campaign.name,
-        action: 'delete',
+        action: "delete",
       });
       const webhookResult = await sendToN8nWebhook({
         ...campaign.toObject(),
-        action: 'delete',
+        action: "delete",
       });
-      console.log("✅ N8N webhook delete success:", webhookResult);
+      console.log("✅ N8N delete webhook sent successfully:", webhookResult);
     } catch (n8nErr) {
       console.error("❌ Failed to send delete webhook to N8N:", n8nErr.message);
     }
 
-    // 4️⃣ Delete campaign from DB
+    // 4️⃣ Delete from DB
     await Campaign.findByIdAndDelete(campaignId);
     console.log(`✅ Campaign ${campaignId} deleted from DB by user ${userId}`);
 
@@ -640,7 +695,7 @@ const deleteCampaign = async (campaignId, userId, role) => {
       leads_deleted: leadCount,
       message:
         leadCount > 0
-          ? `Campaign and ${leadCount} lead(s) deleted`
+          ? `Campaign and ${leadCount} lead(s) deleted successfully`
           : "Campaign deleted successfully",
     };
   } catch (error) {

@@ -619,11 +619,14 @@ async function createCampaignInBoberdoo(campaignData, partnerId) {
     const activeDays = convertDbDaysToApi(activeDaysArray).join(",");
 
     // ⏰ Time range
-    const firstActive = campaignData.delivery?.schedule?.days?.find(d => d.active);
-    const timeRange =
-      firstActive?.start_time && firstActive?.end_time
-        ? `${firstActive.start_time}-${firstActive.end_time}`
-        : "00:00-23:59";
+
+  
+    const schedule = campaignData.delivery?.schedule || {};
+    const scheduleStart = schedule.start_time || "09:00";
+    const scheduleEnd = schedule.end_time || "17:00";
+    const timezone = schedule.timezone || "America/New_York";
+    const timeRange = `${scheduleStart}-${scheduleEnd}`; // ✅ fixed syntax
+    
 
     // 📦 Handle ZIP codes (only for PARTIAL)
     const zipCodes =
@@ -653,7 +656,8 @@ async function createCampaignInBoberdoo(campaignData, partnerId) {
       Zip_Mode: zipMode,
       Zip: zipCodes, // ✅ Added
       Day_Of_Week_Accept_Leads: activeDays,
-      Time_Of_Day_Accept_Leads: timeRange,
+      Time_Of_Day_Accept_Leads: timeRange, // ✅ global range
+      Timezone: timezone, // ✅ NEW
     };
 
     console.log("🟢 Payload sent to Boberdoo (Create):", payload);
@@ -697,11 +701,12 @@ async function updateCampaignInBoberdoo(campaignData, filterSetId, partnerId) {
       ?.map(d => d.day.toUpperCase()) || [];
     const activeDays = convertDbDaysToApi(activeDaysArray).join(",");
 
-    const firstActive = campaignData.delivery?.schedule?.days?.find(d => d.active);
-    const timeRange =
-      firstActive?.start_time && firstActive?.end_time
-        ? `${firstActive.start_time}-${firstActive.end_time}`
-        : "00:00-23:59";
+    const schedule = campaignData.delivery?.schedule || {};
+    const scheduleStart = schedule.start_time || "09:00";
+    const scheduleEnd = schedule.end_time || "17:00";
+    const timezone = schedule.timezone || "America/New_York";
+    const timeRange = `${scheduleStart}-${scheduleEnd}`; // ✅ fixed syntax
+    
 
     const zipCodes =
       coverageType === "PARTIAL"
@@ -730,8 +735,8 @@ async function updateCampaignInBoberdoo(campaignData, filterSetId, partnerId) {
       State: stateList,
       Zip_Mode: zipMode,
       Zip: zipCodes, // ✅ Added for update too
-      Day_Of_Week_Accept_Leads: activeDays,
-      Time_Of_Day_Accept_Leads: timeRange,
+      Time_Of_Day_Accept_Leads: timeRange, // ✅ global range
+      Timezone: timezone, // ✅ NEW
     };
 
     console.log("🟡 Payload sent to Boberdoo (Update):", payload);
@@ -763,7 +768,13 @@ async function updateCampaignInBoberdoo(campaignData, filterSetId, partnerId) {
 /**
  * Disable campaign (Filter Set) in Boberdoo by setting Filter_Set_Status = 0
  */
- const deleteCampaignFromBoberdoo = async ({ filterSetId, leadTypeId }) => {
+const deleteCampaignFromBoberdoo = async ({ filterSetId, leadTypeId }) => {
+
+
+if (!leadTypeId) {
+  console.error(`❌ Invalid lead type: ${campaignData.lead_type}`);
+  return { success: false, error: `Invalid lead type: ${campaignData.lead_type}` };
+}
   try {
     if (!filterSetId) {
       console.warn("⚠️ Missing filterSetId in deleteCampaignFromBoberdoo()");
@@ -771,33 +782,39 @@ async function updateCampaignInBoberdoo(campaignData, filterSetId, partnerId) {
     }
 
     const payload = {
+      Key: CAMPAIGN_API_KEY,
+      API_Action: CREATE_CAMPAIGN_ACTION, // same as updateCampaignInBoberdoo
       Format: "json",
-      Key: BOBERDOO_API_KEY,
-      API_Action: CREATE_CAMPAIGN_ACTION,
-      Mode: "update", // ✅ Update mode required
-      TYPE: leadTypeId || 33, // Default lead type (you can adjust)
+      Mode: "update",
+      TYPE: leadTypeId || 33,
       Filter_Set_ID: filterSetId,
-      Filter_Set_Status: 0, // ✅ Disable the campaign
+      Filter_Set_Status: 0, // ✅ Disable campaign (mark inactive)
     };
 
-    console.log("🧾 Disabling campaign in Boberdoo:", payload);
+    console.log("🧾 Sending Disable Campaign Payload to Boberdoo:", payload);
 
-    const { data } = await axios.post(BOBERDOO_API_URL, payload, {
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    const response = await axios.post(CAMPAIGN_API_URL, null, {
+      params: payload, // ✅ matches your updateCampaignInBoberdoo pattern
+      timeout: TIMEOUT_MS,
+      validateStatus: () => true,
     });
 
+    const data = typeof response.data === "string" ? safeJson(response.data) : response.data;
+
     if (data?.response?.status === "Success") {
-      console.log(`✅ Boberdoo campaign disabled: Filter_Set_ID ${filterSetId}`);
-      return { success: true, message: "Campaign disabled in Boberdoo" };
-    } else {
-      console.error("❌ Boberdoo disable failed:", data);
-      return { success: false, message: "Failed to disable in Boberdoo", data };
+      console.log(`✅ Boberdoo campaign disabled successfully (Filter_Set_ID: ${filterSetId})`);
+      return { success: true, message: "Campaign disabled in Boberdoo", data };
     }
+
+    console.error("❌ Failed to disable campaign in Boberdoo:", data);
+    return { success: false, message: "Boberdoo disable failed", data };
+
   } catch (error) {
     console.error("❌ Error disabling campaign in Boberdoo:", error);
     return { success: false, message: error.message };
   }
 };
+
 
 
 
