@@ -108,14 +108,20 @@ const transformBackendDataToFormData = (backendData: any, statesList: State[]) =
         formData.delivery.other.homeowner_count = backendData.delivery.other.homeowner_count || 0;
       }
 
-      if (backendData.delivery.schedule && backendData.delivery.schedule.days) {
-        formData.delivery.schedule.days = backendData.delivery.schedule.days.map((day: any) => ({
-          day: day.day,
-          active: day.active !== undefined ? day.active : true,
-          start_time: day.start_time || "09:00",
-          end_time: day.end_time || "17:00",
-          cap: day.cap || 1000,
-        }));
+      if (backendData.delivery.schedule) {
+        const schedule = backendData.delivery.schedule;
+        
+        formData.delivery.schedule = {
+          start_time: schedule.start_time || "09:00",
+          end_time: schedule.end_time || "17:00",
+          timezone: schedule.timezone || "America/New_York",
+          days: Array.isArray(schedule.days)
+            ? schedule.days.map((day: any) => ({
+                day: day.day,
+                active: day.active !== undefined ? day.active : true,
+              }))
+            : formData.delivery.schedule.days, // fallback to default
+        };
       }
     }
 

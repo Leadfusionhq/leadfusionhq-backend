@@ -51,7 +51,7 @@ export interface CampaignFormValues {
   company_contact_phone: string;
   company_contact_email: string;
   geography: {
-    state: StateOption | null;
+    state: StateOption[] | null;
     coverage: {
       type: "FULL_STATE" | "PARTIAL";
       partial: {

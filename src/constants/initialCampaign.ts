@@ -48,13 +48,14 @@ export const initialValues = {
         homeowner_count: 0,
       },
       schedule: {
+        // ✅ NEW: Single time range + timezone
+        start_time: "09:00",
+        end_time: "17:00",
+        timezone: "America/New_York",
         days: DAYS_OF_WEEK.map((day) => ({
           day,
-          active: ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"].includes(day),
-          start_time: "09:00",
-          end_time: day === "FRIDAY" ? "16:00" : "17:00",
-          cap: 1000,
-        })) as DaySchedule[],
+          active: ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"].includes(day),
+        })),
       },
     },
     note: "",

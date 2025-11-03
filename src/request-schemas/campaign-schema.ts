@@ -34,27 +34,39 @@ export const validationSchema = Yup.object().shape({
       otherwise: (schema) => schema.notRequired(),
     }),
     geography: Yup.object().shape({
-      state: Yup.mixed()
-        .test("is-object", "State is required", (value) => value !== null)
-        .required("State is required"),
+      // ✅ State is required only for FULL_STATE
+      state: Yup.mixed().when('coverage.type', {
+        is: 'FULL_STATE',
+        then: (schema) => schema
+          .test("is-object", "State is required for Full State coverage", (value) => value !== null && Array.isArray(value) && value.length > 0)
+          .required("State is required for Full State coverage"),
+        otherwise: (schema) => schema.nullable().notRequired()
+      }),
       coverage: Yup.object().shape({
         type: Yup.string().oneOf(["FULL_STATE", "PARTIAL"]).required("Coverage type is required"),
         partial: Yup.object().shape({
           counties: Yup.array(),
           radius: Yup.string(),
           zipcode: Yup.string().matches(/^\d{5}$/, "ZIP code must be exactly 5 digits"),
-          zip_codes: Yup.string().matches(
-            /^(\d{5})(\|\d{5})*$/,
-            "ZIPs must be 5-digit numbers separated by '|'"
-          ),
+          // ✅ ZIP codes required for PARTIAL coverage
+          zip_codes: Yup.string().when('$geography.coverage.type', {
+            is: 'PARTIAL',
+            then: (schema) => schema
+              .required("ZIP codes are required for Partial coverage")
+              .matches(
+                /^(\d{5})(\|\d{5})*$/,
+                "ZIPs must be 5-digit numbers separated by '|'"
+              ),
+            otherwise: (schema) => schema.notRequired()
+          }),
           countries: Yup.array().of(Yup.string()),
         }),
       }),
     }),
     utilities: Yup.object().shape({
       mode: Yup.string().oneOf(Object.values(UTILITIES)).required("Mode is required"),
-      exclude_some: Yup.array(), // Not required
-      include_some: Yup.array(), // Not required
+      exclude_some: Yup.array(),
+      include_some: Yup.array(),
     }),
     delivery: Yup.object().shape({
       method: Yup.array()
@@ -102,7 +114,6 @@ export const validationSchema = Yup.object().shape({
         }),
       }),
 
-      // optional
       other: Yup.object().shape({
         homeowner_count: Yup.number().min(0, "Must be positive"),
       }),

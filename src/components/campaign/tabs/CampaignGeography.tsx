@@ -1,5 +1,5 @@
 'use client'
-import React, { useEffect ,useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import { ErrorMessage } from "formik";
 import { FormikInput, FormikRadio, FormikTextarea, CustomFormikAsyncSelect } from "@/components/form";
 
@@ -13,8 +13,6 @@ interface County {
 interface GeographyProps {
   values: any;
   setFieldValue: (field: string, value: any) => void;
-  // countiesList: County[];
-  // isLoadingCounties: boolean;
   loadStates: (inputValue: string, callback: (options: CountyOption[]) => void) => void;
   isEditMode?: boolean;
   isAdmin?: boolean;
@@ -24,35 +22,24 @@ interface GeographyProps {
 const CampaignGeography: React.FC<GeographyProps> = ({
   values,
   setFieldValue,
-  // countiesList,
-  // isLoadingCounties,
   loadStates,
   isEditMode = false,
   isAdmin = false,
   formKey
 }) => {
-  // const loadCounties = (inputValue: string, callback: (options: CountyOption[]) => void) => {
-  //   const filtered = countiesList
-  //     .filter((county) => county.name.toLowerCase().includes(inputValue.toLowerCase()))
-  //     .map((county) => ({ label: county.name, value: county._id }));
-  //   callback(filtered);
-  // };
-
   const previousZipData = useRef({
     zipcode: "",
     zip_codes: "",
   });
-  
-  // Save ZIP data before switching to full state
+
   const handleFullStateSelect = () => {
     if (!isLocked) {
-      // ✅ Cache current zip data before clearing
+      // Cache ZIP data before clearing
       previousZipData.current = {
-        zipcode: values.geography.coverage.partial.zipcode,
-        zip_codes: values.geography.coverage.partial.zip_codes,
+        zipcode: values.geography.coverage.partial.zipcode || "",
+        zip_codes: values.geography.coverage.partial.zip_codes || "",
       };
   
-      // Then clear for full state mode
       setFieldValue("geography.coverage.type", "FULL_STATE");
       setFieldValue("geography.coverage.partial.counties", []);
       setFieldValue("geography.coverage.partial.radius", "");
@@ -65,48 +52,57 @@ const CampaignGeography: React.FC<GeographyProps> = ({
     if (!isLocked) {
       setFieldValue("geography.coverage.type", "PARTIAL");
   
-      // ✅ Restore cached data instantly
-      if (previousZipData.current) {
+      // ✅ Ensure state is array (can be empty for PARTIAL)
+      if (!Array.isArray(values.geography.state)) {
+        setFieldValue("geography.state", []);
+      }
+
+      // Restore cached ZIP data
+      if (previousZipData.current.zip_codes) {
         setFieldValue("geography.coverage.partial.zipcode", previousZipData.current.zipcode);
         setFieldValue("geography.coverage.partial.zip_codes", previousZipData.current.zip_codes);
       }
     }
   };
   
-  
   const isLocked = false;
 
-
-
-  // Reset geography fields when form is reset (formKey changes)
   useEffect(() => {
     if (!isEditMode && formKey) {
-      // This effect ensures that when we have a fresh form, all geography fields are properly reset
       console.log('Geography form reset detected, formKey:', formKey);
     }
   }, [formKey, isEditMode]);
 
+  // Determine required fields based on coverage type
+  const isStateRequired = values.geography.coverage?.type === "FULL_STATE";
+  const isZipRequired = values.geography.coverage?.type === "PARTIAL";
+
   return (
     <div className="space-y-6">
       <h3 className="text-[20px] font-[500] text-[#1C1C1C] mb-4">Geography Settings</h3>
+      
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* State Field */}
         <CustomFormikAsyncSelect
           key={`state-${formKey}`}
           name="geography.state"
-          label="State *"
+          label={`State ${isStateRequired ? '*' : '(Optional)'}`} 
           isMulti 
           loadOptions={loadStates}
           placeholder="Search and select a state"
           isDisabled={isLocked}
+          isClearable={!isStateRequired}
           onChange={(option) => {
             if (!isLocked) {
-              setFieldValue("geography.state", option || []); // ✅ store as array
-              // setFieldValue("geography.coverage.partial.counties", []);
+              // ✅ Ensure option is always array
+              setFieldValue("geography.state", option || []);
               setFieldValue("utilities.include_some", []);
               setFieldValue("utilities.exclude_some", []);
             }
           }}
         />
+        
+        {/* Coverage Type */}
         <div>
           <label className="block text-[#1C1C1C] text-lg mb-2">Coverage *</label>
           <div className="flex items-center space-x-6">
@@ -135,45 +131,18 @@ const CampaignGeography: React.FC<GeographyProps> = ({
         </div>
       </div>
 
+      {/* ZIP Codes Field for PARTIAL */}
       {values.geography.coverage.type === "PARTIAL" && (
         <>
           <p className="text-center text-[#666666] text-sm italic">
-            Please enter a Zip, a list of Zip codes, a selection of Counties, or any combination of these
+            Please enter ZIP codes separated by | (e.g., 90210|10001|33101)
           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* <FormikInput
-              key={`zipcode-${formKey}`}
-              name="geography.coverage.partial.zipcode"
-              type="text"
-              placeholder="90210"
-              label="Center Zip Code"
-              disabled={isLocked}
-            /> */}
-
-            {/* {isLoadingCounties ? (
-              <div className="flex items-center justify-center">
-                <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-blue-500"></div>
-                <span className="ml-2">Loading counties...</span>
-              </div>
-            ) : (
-              <div className="w-full">
-                <CustomFormikAsyncSelect
-                  key={`counties-${formKey}`}
-                  isMulti
-                  name="geography.coverage.partial.counties"
-                  label="Counties"
-                  loadOptions={loadCounties}
-                  placeholder="Search and select counties"
-                  isDisabled={isLocked}
-                />
-              </div>
-            )} */}
-
+          <div className="grid grid-cols-1 gap-6">
             <FormikTextarea
               key={`zip-codes-${formKey}`}
               name="geography.coverage.partial.zip_codes"
-              label="ZIP Codes (separated by |)"
+              label={`ZIP Codes (separated by |) ${isZipRequired ? '*' : ''}`}
               placeholder="#####|#####|#####..."
               rows={3}
               disabled={isLocked}
