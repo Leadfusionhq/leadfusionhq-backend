@@ -11,7 +11,9 @@ import Link from 'next/link';
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 import ReturnFeedbackModal from "@/components/common/ReturnFeedbackModal";
+import DownloadIcon from '@mui/icons-material/Download';
 
+// Define Lead type
 // Define Lead type
 type Lead = {
   _id: string;
@@ -34,19 +36,25 @@ type Lead = {
     _id: string;
     name: string;
     lead_type: string;
-  } | string; // campaign_id can be a string or an object
+    exclusivity?: string;
+    language?: string;
+    geography?: string;
+    delivery?: string;
+  } | string;
+  transaction_id?: {
+    _id: string;
+    amount: number;
+  } | string | null;
+  original_cost?: number;
   note: string;
   createdAt: string;
   updatedAt: string;
   status: string;
-  lead_type: string;
-  exclusivity: string;
-  language: string;
-  geography: string;
-  delivery: string;
   return_status: 'Not Returned' | 'Pending' | 'Approved' | 'Rejected';
   return_attempts: number;
   max_return_attempts: number;
+  return_reason?: string;
+  return_comments?: string;
 };
 
 type ApiResponse = {
@@ -66,10 +74,12 @@ export default function LeadTable() {
   const [error, setError] = useState<string | null>(null);
   const [pagination, setPagination] = useState({ page: 1, limit: 10 });
   const [totalRows, setTotalRows] = useState<number>(0);
+  const [downloadingCSV, setDownloadingCSV] = useState<boolean>(false);
   const router = useRouter();
   const token = useSelector((state: RootState) => state.auth.token);
   const [returnModalOpen, setReturnModalOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+
   // Fetch leads with pagination
   const fetchLeads = useCallback(
     async (pageNumber: number, pageSize: number) => {
@@ -102,6 +112,158 @@ export default function LeadTable() {
     [token]
   );
 
+  // CSV Download Functions
+// CSV Download Functions
+const convertToCSV = (data: Lead[]): string => {
+  if (!data || data.length === 0) return '';
+
+  // Define CSV headers
+  const headers = [
+    'Lead ID',
+    'First Name',
+    'Last Name',
+    'Email',
+    'Phone',
+    'Street',
+    'City',
+    'State',
+    'State Abbreviation',
+    'Zip Code',
+    'Campaign Name',
+    'Lead Type',
+    'Exclusivity',
+    'Language',
+   
+
+    'Original Cost',
+    'Note',
+    'Status',
+    'Return Status',
+    'Return Reason',
+    'Return Comments',
+    'Return Attempts',
+    'Max Return Attempts',
+    'Created Date',
+    'Updated Date'
+  ];
+
+  // Create CSV rows
+  const rows = data.map(lead => {
+    // Extract campaign data
+    const campaignName = typeof lead.campaign_id === 'object' && lead.campaign_id !== null
+      ? lead.campaign_id.name
+      : 'N/A';
+    
+    const leadType = typeof lead.campaign_id === 'object' && lead.campaign_id !== null
+      ? (lead.campaign_id.lead_type || 'N/A')
+      : 'N/A';
+    
+    const exclusivity = typeof lead.campaign_id === 'object' && lead.campaign_id !== null
+      ? (lead.campaign_id.exclusivity || 'N/A')
+      : 'N/A';
+    
+    const language = typeof lead.campaign_id === 'object' && lead.campaign_id !== null
+      ? (lead.campaign_id.language || 'N/A')
+      : 'N/A';
+    
+ 
+    
+
+    // Extract transaction amount
+
+    return [
+      lead.lead_id || '',
+      lead.first_name || '',
+      lead.last_name || '',
+      lead.email || '',
+      lead.phone || '',
+      lead.address?.street || '',
+      lead.address?.city || '',
+      lead.address?.state?.name || '',
+      lead.address?.state?.abbreviation || '',
+      lead.address?.zip_code || '',
+      campaignName,
+      leadType,
+      exclusivity,
+      language,
+     
+      lead.original_cost?.toString() || '0',
+      (lead.note || '').replace(/"/g, '""'), // Escape quotes in notes
+      lead.status || '',
+      lead.return_status || 'Not Returned',
+      (lead.return_reason || '').replace(/"/g, '""'), // Escape quotes
+      (lead.return_comments || '').replace(/"/g, '""'), // Escape quotes
+      lead.return_attempts?.toString() || '0',
+      lead.max_return_attempts?.toString() || '2',
+      lead.createdAt ? new Date(lead.createdAt).toLocaleString() : '',
+      lead.updatedAt ? new Date(lead.updatedAt).toLocaleString() : ''
+    ].map(field => `"${field}"`).join(',');
+  });
+
+  // Combine headers and rows
+  return [headers.join(','), ...rows].join('\n');
+};
+
+  const downloadCSV = (csvContent: string, filename: string) => {
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', filename);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
+  };
+
+  const handleDownloadCSV = async () => {
+    try {
+      setDownloadingCSV(true);
+      toast.info("Preparing CSV download...");
+
+      // Fetch all leads (without pagination) for complete export
+      const params = new URLSearchParams({
+        page: '1',
+        limit: totalRows.toString(), // Get all records
+      });
+
+      const response = (await axiosWrapper(
+        "get",
+        `${LEADS_API.GET_ALL_LEADS}?${params.toString()}`,
+        {},
+        token ?? undefined
+      )) as ApiResponse;
+
+      const allLeads = response.data || [];
+
+      if (allLeads.length === 0) {
+        toast.warning("No leads available to download");
+        return;
+      }
+
+      // Convert to CSV
+      const csvContent = convertToCSV(allLeads);
+
+      // Generate filename with current date
+      const currentDate = new Date().toISOString().split('T')[0];
+      const filename = `leads_export_${currentDate}.csv`;
+
+      // Download the file
+      downloadCSV(csvContent, filename);
+
+      toast.success(`Successfully downloaded ${allLeads.length} leads!`);
+    } catch (err) {
+      console.error("Failed to download CSV:", err);
+      toast.error("Failed to download CSV. Please try again.");
+    } finally {
+      setDownloadingCSV(false);
+    }
+  };
+
   // Fetch leads on mount or pagination change
   useEffect(() => {
     if (token) {
@@ -126,19 +288,18 @@ export default function LeadTable() {
       },
       zip_code: "",
     },
-    campaign_id: "", // Set this to empty string as skeleton data
+    campaign_id: "",
+
+    original_cost: 0,
     note: "",
     createdAt: "",
     updatedAt: "",
     status: "",
-    lead_type: "",
-    exclusivity: "",
-    language: "",
-    geography: "",
-    delivery: "",
-    return_status: 'Not Returned',
+    return_status: 'Not Returned' as const,
     return_attempts: 0,
     max_return_attempts: 2,
+    return_reason: "",
+    return_comments: "",
   }));
 
   const formatStatus = (status: string | undefined | null) => {
@@ -195,8 +356,6 @@ export default function LeadTable() {
       return;
     }
 
-
-
     try {
       setLoading(true);
       console.log("Return request for lead:", row);
@@ -214,18 +373,6 @@ export default function LeadTable() {
       )) as ApiResponse;
 
       console.log("Return Lead Response:", response);
-
-      // setLeads((prevLeads) =>
-      //   prevLeads.map((lead) =>
-      //     lead.lead_id === row.lead_id
-      //       ? {
-      //           ...lead,
-      //           return_status: 'Pending', 
-      //           return_attempts: (lead.return_attempts || 0) + 1,
-      //         }
-      //       : lead
-      //   )
-      // );
 
       toast.success("Lead return request submitted successfully!");
     } catch (err: any) {
@@ -291,8 +438,6 @@ export default function LeadTable() {
     setReturnModalOpen(false);
     setSelectedLead(null);
   };
-
-
 
   // Columns for the lead table
   const columns: TableColumn<Lead>[] = [
@@ -375,18 +520,6 @@ export default function LeadTable() {
       sortable: true,
       minWidth: "130px",
     },
-    // {
-    //   name: "Status",
-    //   selector: (row) => row.status,
-    //   cell: (row) =>
-    //     row._id.startsWith("skeleton") ? (
-    //       <Skeleton variant="text" width={80} animation="wave" />
-    //     ) : (
-    //       getStatusBadge(row.status)
-    //     ),
-    //   sortable: true,
-    //   minWidth: "110px",
-    // },
     {
       name: "Created Date",
       selector: (row) => row.createdAt,
@@ -492,7 +625,22 @@ export default function LeadTable() {
     <Box sx={{ padding: 2 }}>
       <div className="flex justify-between items-center pb-[30px]">
         <h3 className="text-[24px] text-[#1C1C1C] text-[Inter] font-semibold">List of Leads</h3>
-
+        
+        <Button
+          variant="contained"
+          startIcon={<DownloadIcon />}
+          onClick={handleDownloadCSV}
+          disabled={downloadingCSV || loading || leads.length === 0}
+          className="!bg-[#1C1C1C] !text-white hover:!bg-[#333333]"
+          sx={{
+            textTransform: "capitalize",
+            fontSize: "14px",
+            padding: "8px 20px",
+            fontWeight: 500,
+          }}
+        >
+          {downloadingCSV ? "Downloading..." : "Download CSV"}
+        </Button>
       </div>
 
       <DataTable
@@ -511,7 +659,7 @@ export default function LeadTable() {
         striped
         dense
         persistTableHead
-        progressPending={false} // We handle loading with skeleton rows
+        progressPending={false}
         noDataComponent={
           error ? (
             <Typography color="error" sx={{ py: 4, textAlign: 'center' }}>
@@ -525,8 +673,8 @@ export default function LeadTable() {
         }
       />
 
-       {/* Return Feedback Modal */}
-       <ReturnFeedbackModal
+      {/* Return Feedback Modal */}
+      <ReturnFeedbackModal
         open={returnModalOpen}
         leadId={selectedLead?._id || ''}
         leadName={selectedLead ? `${selectedLead.first_name} ${selectedLead.last_name}` : ''}
