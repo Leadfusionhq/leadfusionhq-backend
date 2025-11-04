@@ -124,6 +124,12 @@ const createLead = wrapAsync(async (req, res) => {
         ].filter(Boolean).join(', ');
         const leadId = result.lead_id;
         const campaignName = campaign?.name || 'N/A';
+        
+        const MAX_NOTE_LENGTH = 100;
+        let notes = result.note || 'No notes provided';
+        if (notes.length > MAX_NOTE_LENGTH) {
+            notes = notes.substring(0, MAX_NOTE_LENGTH) + '...';
+        }
 
         const smsMessage = `New Lead Assigned
 
@@ -133,6 +139,7 @@ const createLead = wrapAsync(async (req, res) => {
     Address: ${address}
     Lead ID: ${leadId}
     Campaign: ${campaignName}
+    Notes: ${notes}
 
     View Lead: ${process.env.UI_LINK}/dashboard/leads/${result._id}`;
 

@@ -146,7 +146,7 @@ const updateCampaign = async (campaignId, userId, role, updateData) => {
       filter,
       updateData,
       { new: true, runValidators: true }
-    )
+      )
       .populate('user_id', 'integrations.boberdoo.external_id name email')
       .populate('geography.state', 'name abbreviation')
       .lean();
@@ -630,7 +630,12 @@ const deleteCampaign = async (campaignId, userId, role) => {
   try {
     console.log("🧨 [DELETE CAMPAIGN INITIATED] =>", campaignId);
 
-    const campaign = await Campaign.findById(campaignId);
+    // ✅ Populate user and state info before anything else
+    const campaign = await Campaign.findById(campaignId)
+      .populate('user_id', 'name email firstName lastName username fullName integrations.boberdoo.external_id')
+      .populate('geography.state', 'name abbreviation')
+      .lean();
+
     if (!campaign) throw new ErrorHandler(404, "Campaign not found or access denied");
 
     // 1️⃣ Delete all leads
@@ -669,17 +674,20 @@ const deleteCampaign = async (campaignId, userId, role) => {
       }
     }
 
-    // 3️⃣ Send delete webhook to N8N
+    // 3️⃣ Send delete webhook to N8N (using populated campaign)
     try {
       console.log("📤 Sending delete webhook to N8N:", {
         campaign_id: campaign._id,
         name: campaign.name,
+        client: campaign?.user_id?.name || campaign?.user_id?.email,
         action: "delete",
       });
+
       const webhookResult = await sendToN8nWebhook({
-        ...campaign.toObject(),
+        ...campaign,
         action: "delete",
       });
+
       console.log("✅ N8N delete webhook sent successfully:", webhookResult);
     } catch (n8nErr) {
       console.error("❌ Failed to send delete webhook to N8N:", n8nErr.message);
@@ -703,6 +711,7 @@ const deleteCampaign = async (campaignId, userId, role) => {
     throw new ErrorHandler(error.statusCode || 500, error.message || "Failed to delete campaign");
   }
 };
+
 
 
 module.exports = {
