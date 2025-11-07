@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { LEAD_TYPE, STATUS, EXCLUSIVITY, DAYS_OF_WEEK,PAYMENT_TYPE } = require('../helper/constant-enums');
+const { LEAD_TYPE, STATUS, EXCLUSIVITY, DAYS_OF_WEEK,PAYMENT_TYPE,TIMEZONES } = require('../helper/constant-enums');
 
 
 const campaignSchema = new mongoose.Schema({
@@ -59,12 +59,13 @@ const campaignSchema = new mongoose.Schema({
     type: String, 
   },
   geography: {
-    state: { 
-      type: mongoose.Schema.Types.ObjectId,
-      // type: String,
-      ref: 'State',
-      required: true,
-    },
+    state: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'State',
+        required: false, // ✅ CHANGE: No longer globally required
+      }
+    ],
     coverage: {
       type: { type: String, enum: ['FULL_STATE', 'PARTIAL'], default: 'FULL_STATE' },
       full_state: { 
@@ -73,8 +74,7 @@ const campaignSchema = new mongoose.Schema({
       },
       partial: {
         radius: { type: Number, min: 0 },
-        zip_codes: [String],
-        // counties: [String],
+        zip_codes: [String], // Will be required for PARTIAL via validation
         counties: [
           {
             type: mongoose.Schema.Types.ObjectId,
@@ -82,11 +82,10 @@ const campaignSchema = new mongoose.Schema({
           }
         ],
         countries: [String],
-        zipcode: { type: String }, // optional string
+        zipcode: { type: String },
       },
     },
   },
-
   utilities: {
     mode: { type: String }, // you might want to restrict enum here if you have constants
     include_all: { 
@@ -114,6 +113,28 @@ const campaignSchema = new mongoose.Schema({
       instructions: { type: String },
     },
     schedule: {
+      // ✅ NEW: Single time range + timezone
+      start_time: { 
+        type: String, 
+        default: '09:00',
+        validate: {
+          validator: (v) => /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(v),
+          message: 'Invalid time format. Use HH:mm'
+        }
+      },
+      end_time: { 
+        type: String, 
+        default: '17:00',
+        validate: {
+          validator: (v) => /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(v),
+          message: 'Invalid time format. Use HH:mm'
+        }
+      },
+      timezone: {
+        type: String,
+        enum: ['America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles'],
+        default: 'America/New_York'
+      },
       days: [{
         day: {
           type: String,
@@ -121,11 +142,9 @@ const campaignSchema = new mongoose.Schema({
           required: true,
         },
         active: { type: Boolean, default: false },
-        start_time: { type: String },
-        end_time: { type: String },
-        cap: { type: Number, min: 0, default: 0 },
       }],
     },
+
     other: {
       homeowner: { type: Boolean, default: false },
       second_pro_call_request: { type: Boolean, default: false },
@@ -168,7 +187,23 @@ campaignSchema.index({ user_id: 1 });
 campaignSchema.index({ campaign_id: 1 }, { unique: true, sparse: true });
 campaignSchema.index({ status: 1, lead_type: 1 });
 
+// ✅ SINGLE pre-save hook
 campaignSchema.pre('save', function (next) {
+  // Validate state requirement for FULL_STATE
+  if (this.geography.coverage.type === 'FULL_STATE') {
+    if (!this.geography.state || this.geography.state.length === 0) {
+      return next(new Error('State is required for FULL_STATE coverage'));
+    }
+  }
+  
+  // Validate ZIP codes requirement for PARTIAL
+  if (this.geography.coverage.type === 'PARTIAL') {
+    if (!this.geography.coverage.partial.zip_codes || 
+        this.geography.coverage.partial.zip_codes.length === 0) {
+      return next(new Error('ZIP codes are required for PARTIAL coverage'));
+    }
+  }
+  
   this.updatedAt = Date.now();
   next();
 });

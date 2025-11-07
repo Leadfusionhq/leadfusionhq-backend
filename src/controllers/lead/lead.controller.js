@@ -124,6 +124,12 @@ const createLead = wrapAsync(async (req, res) => {
         ].filter(Boolean).join(', ');
         const leadId = result.lead_id;
         const campaignName = campaign?.name || 'N/A';
+        
+        const MAX_NOTE_LENGTH = 100;
+        let notes = result.note || 'No notes provided';
+        if (notes.length > MAX_NOTE_LENGTH) {
+            notes = notes.substring(0, MAX_NOTE_LENGTH) + '...';
+        }
 
         const smsMessage = `New Lead Assigned
 
@@ -133,6 +139,7 @@ const createLead = wrapAsync(async (req, res) => {
     Address: ${address}
     Lead ID: ${leadId}
     Campaign: ${campaignName}
+    Notes: ${notes}
 
     View Lead: ${process.env.UI_LINK}/dashboard/leads/${result._id}`;
 
@@ -294,13 +301,11 @@ const approveReturnLead = wrapAsync(async (req, res) => {
     try {
         leadLogger.info('Starting lead return approval process', logMeta);
 
-        // Validate input
         if (!lead_id) {
             leadLogger.warn('Missing lead_id for lead return approval', logMeta);
             throw new ErrorHandler(400, 'Lead ID is required');
         }
 
-        // Get lead details before approval
         const lead = await Lead.findById(lead_id)
             .populate('campaign_id')
             .populate('user_id')
@@ -321,7 +326,6 @@ const approveReturnLead = wrapAsync(async (req, res) => {
             return_reason: lead.return_reason
         });
 
-        // ✅ Determine if this is an admin direct return or regular approval
         const isAdmin = req.user?.role === 'ADMIN' || req.user?.role === 'SUPER_ADMIN';
         const isDirectReturn = isAdmin && return_status === 'Approved';
 
@@ -329,7 +333,7 @@ const approveReturnLead = wrapAsync(async (req, res) => {
         const result = await LeadServices.approveReturnLead(
             lead_id, 
             return_status, 
-            isDirectReturn // ✅ Pass flag to service
+            isDirectReturn
         );
 
         leadLogger.info('Lead return processed successfully', {
@@ -337,7 +341,9 @@ const approveReturnLead = wrapAsync(async (req, res) => {
             previous_status: lead.return_status,
             new_status: return_status,
             isDirectReturn,
-            result: result
+            refund_amount: result.refundedAmount,
+            refund_transaction_id: result.refundTransactionId, // ✅ Log transaction ID
+            new_balance: result.newBalance
         });
 
         // Send notification to lead owner
@@ -346,16 +352,18 @@ const approveReturnLead = wrapAsync(async (req, res) => {
                 leadLogger.info('Lead owner notified of approval', {
                     ...logMeta,
                     owner_email: lead.user_id.email,
-                    owner_name: lead.user_id.name
+                    owner_name: lead.user_id.name,
+                    refund_amount: result.refundedAmount
                 });
 
-                // Optional: Send email to lead owner
-                // await MAIL_HANDLER.sendLeadReturnApprovalEmail({
+                // ✅ Optional: Send refund confirmation email
+                // await MAIL_HANDLER.sendLeadRefundEmail({
                 //     userEmail: lead.user_id.email,
                 //     userName: lead.user_id.name,
-                //     lead: lead,
-                //     campaign: lead.campaign_id,
-                //     isDirectReturn
+                //     refundAmount: result.refundedAmount,
+                //     transactionId: result.refundTransactionId,
+                //     leadId: lead_id,
+                //     newBalance: result.newBalance
                 // });
             }
         } catch (notificationErr) {
@@ -366,10 +374,14 @@ const approveReturnLead = wrapAsync(async (req, res) => {
         }
 
         const message = isDirectReturn 
-            ? 'Lead returned successfully by admin' 
-            : 'Lead return approved successfully';
+            ? `Lead returned successfully by admin. Refund of $${result.refundedAmount} added to balance.` 
+            : `Lead return approved successfully. Refund of $${result.refundedAmount} added to balance.`;
 
-        leadLogger.info('Lead return approval process completed', logMeta);
+        leadLogger.info('Lead return approval process completed', {
+            ...logMeta,
+            refund_transaction_id: result.refundTransactionId
+        });
+        
         sendResponse(res, result, message, 200);
 
     } catch (err) {

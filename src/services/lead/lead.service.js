@@ -675,18 +675,12 @@ const approveReturnLead = async(leadId, returnStatus, isDirectReturn = false) =>
 
     const currentStatus = lead.return_status ?? 'Not Returned';
 
-    // ✅ Validation logic:
-    // - If admin direct return: allow any status EXCEPT 'Approved' (prevent double refund)
-    // - If regular approval: only allow if status is 'Pending'
+    // ✅ Validation logic
     if (isDirectReturn) {
-      // Admin can return: 'Not Returned', 'Pending', or 'Rejected'
-      // Admin CANNOT return: 'Approved' (already refunded)
       if (currentStatus === 'Approved') {
         throw new ErrorHandler(400, 'Lead has already been returned and refunded. Cannot return again.');
       }
-      // ✅ Allow 'Not Returned', 'Pending', and 'Rejected' for admin
     } else {
-      // Regular approval    here flow (user-initiated return from pending queue)
       if (currentStatus !== 'Pending') {
         throw new ErrorHandler(400, 'Lead return is not pending and cannot be approved');
       }
@@ -698,7 +692,6 @@ const approveReturnLead = async(leadId, returnStatus, isDirectReturn = false) =>
     }
 
     const { user_id } = campaign;
-
     if (!user_id) {
       throw new ErrorHandler(400, 'Campaign is missing user_id');
     }
@@ -712,34 +705,29 @@ const approveReturnLead = async(leadId, returnStatus, isDirectReturn = false) =>
     let transactionId = null;
     let fetchMethod = 'unknown';
 
-    // ✅ PRIORITY 1: Get from stored original_cost (for new leads)
+    // ✅ Get original cost (Priority: stored > transaction > fallback)
     if (lead.original_cost && lead.original_cost > 0) {
       originalLeadCost = lead.original_cost;
       transactionId = lead.transaction_id;
       fetchMethod = 'stored_in_lead';
-      
       console.log('✅ Using stored original_cost from lead:', originalLeadCost);
     } 
-    // ✅ PRIORITY 2: Get from stored transaction_id reference
     else if (lead.transaction_id) {
       const transaction = await Transaction.findById(lead.transaction_id);
-      
       if (transaction) {
         originalLeadCost = Math.abs(transaction.amount);
         transactionId = transaction._id;
         fetchMethod = 'transaction_by_id';
-        
         console.log('✅ Fetched from transaction by stored ID:', originalLeadCost);
       }
     }
     
-    // ✅ PRIORITY 3: Fallback - search by user and time (for old leads)
     if (originalLeadCost <= 0) {
       const transaction = await Transaction.findOne({
-        user_id: user_id,
+        userId: user_id,
         createdAt: { 
-          $gte: new Date(lead.createdAt.getTime() - 10000), // 10 seconds before
-          $lte: new Date(lead.createdAt.getTime() + 10000)  // 10 seconds after
+          $gte: new Date(lead.createdAt.getTime() - 10000),
+          $lte: new Date(lead.createdAt.getTime() + 10000)
         }
       }).sort({ createdAt: 1 });
 
@@ -747,12 +735,10 @@ const approveReturnLead = async(leadId, returnStatus, isDirectReturn = false) =>
         originalLeadCost = Math.abs(transaction.amount);
         transactionId = transaction._id;
         fetchMethod = 'transaction_by_time';
-        
         console.log('⚠️ Fallback: Fetched from transaction by time:', originalLeadCost);
       }
     }
 
-    // ✅ Final validation
     if (originalLeadCost <= 0) {
       throw new ErrorHandler(404, 'Original transaction/cost not found for this lead. Cannot process refund.');
     }
@@ -764,9 +750,24 @@ const approveReturnLead = async(leadId, returnStatus, isDirectReturn = false) =>
 
     // ✅ Update lead status
     const previousReturnStatus = lead.return_status;
-    lead.return_status = returnStatus; // 'Approved'
-    lead.returned_at = new Date(); // ✅ Track when returned
+    lead.return_status = returnStatus;
+    lead.returned_at = new Date();
     await lead.save();
+
+    // ✅✅ CREATE REFUND TRANSACTION RECORD ✅✅
+    const refundTransaction = new Transaction({
+      userId: user_id,
+      amount: originalLeadCost, // Positive amount for refund
+      type: 'REFUND',
+      status: 'COMPLETED',
+      description: `Lead return refund - Lead ID: ${leadId}${isDirectReturn ? ' (Admin Direct Return)' : ''}`,
+      paymentMethod: 'BALANCE',
+      transactionId: `REFUND-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
+      balanceAfter: user.balance,
+      note: `Return reason: ${lead.return_reason || 'Not specified'}. Original transaction: ${transactionId || 'N/A'}`
+    });
+
+    await refundTransaction.save();
 
     console.log(`✅ Refund processed: $${originalLeadCost} added to user ${user_id}`);
     console.log(`   Previous return status: ${previousReturnStatus}`);
@@ -775,6 +776,7 @@ const approveReturnLead = async(leadId, returnStatus, isDirectReturn = false) =>
     console.log(`   New balance: $${user.balance}`);
     console.log(`   Fetch method: ${fetchMethod}`);
     console.log(`   Direct admin return: ${isDirectReturn}`);
+    console.log(`   ✅ Refund transaction created: ${refundTransaction._id}`);
 
     return {
       lead: lead.toObject(),
@@ -787,6 +789,7 @@ const approveReturnLead = async(leadId, returnStatus, isDirectReturn = false) =>
       newBalance: user.balance,
       isDirectReturn,
       previousReturnStatus,
+      refundTransactionId: refundTransaction._id, // ✅ Return transaction ID
       message: `Refund of $${originalLeadCost} added to user balance. New balance: $${user.balance}`,
     };
   } catch (error) {
