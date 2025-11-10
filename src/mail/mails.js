@@ -385,7 +385,7 @@ const sendLeadAssignEmail = async ({ to, name, leadName, assignedBy, leadDetails
   `;
 
   const html = createEmailTemplate({
-    title: 'New Lead Assigned',
+    title: 'Lead Fusion - New Lead',
     mainText: mainText,
   });
 

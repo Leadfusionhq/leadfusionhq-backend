@@ -2,6 +2,11 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const CONSTANT_ENUM = require('../helper/constant-enums');
 
+// ✅ Import Chat and Message models
+const Chat = require('./chat.model');
+const Message = require('./message.model');
+
+
 const SALT_ROUNDS = 10;
 
 const options = {
@@ -89,8 +94,6 @@ const baseUserSchema = new mongoose.Schema({
   dob: {
     type: Date,
   },
-  
-  // Updated address field to be an object with detailed components
   address: {
     full_address: {
       type: String,
@@ -121,9 +124,7 @@ const baseUserSchema = new mongoose.Schema({
       trim: true,
     }
   },
-  
   companyName: { type: String, trim: true },
-
   integrations: {
     boberdoo: {
       external_id: { type: String, index: true, sparse: true, default: null },
@@ -132,8 +133,6 @@ const baseUserSchema = new mongoose.Schema({
       last_error: { type: String, default: null }
     }
   }
-
-  
 }, options);
 
 // Password hashing middleware
@@ -148,6 +147,7 @@ baseUserSchema.pre('save', async function(next) {
     next(err);
   }
 });
+
 baseUserSchema.pre('findOneAndUpdate', async function(next) {
   const update = this.getUpdate();
 
@@ -159,7 +159,6 @@ baseUserSchema.pre('findOneAndUpdate', async function(next) {
 
   next();
 });
-
 
 baseUserSchema.pre('findByIdAndUpdate', async function(next) {
   const update = this.getUpdate();
@@ -173,11 +172,38 @@ baseUserSchema.pre('findByIdAndUpdate', async function(next) {
   next();
 });
 
-
-// Method to compare passwords
+// ✅ Compare password method
 baseUserSchema.methods.comparePassword = async function(candidatePassword) {
   return bcrypt.compare(candidatePassword, this.password);
 };
+
+// 🧹 Cascade delete user's chats & messages
+baseUserSchema.pre('findOneAndDelete', async function(next) {
+  try {
+    const user = await this.model.findOne(this.getFilter());
+    if (!user) return next();
+
+    console.log(`🧹 Deleting all chats and messages for user: ${user._id}`);
+
+    // 1️⃣ Find all chats where the user is a participant
+    const chats = await Chat.find({ participants: user._id });
+    const chatIds = chats.map(chat => chat._id);
+
+    // 2️⃣ Delete all related messages
+    if (chatIds.length > 0) {
+      await Message.deleteMany({ chatId: { $in: chatIds } });
+    }
+
+    // 3️⃣ Delete all chats the user participated in
+    await Chat.deleteMany({ participants: user._id });
+
+    console.log(`✅ Successfully deleted ${chats.length} chats and related messages for user ${user._id}`);
+    next();
+  } catch (error) {
+    console.error('❌ Error while deleting user chats:', error);
+    next(error);
+  }
+});
 
 const User = mongoose.model('User', baseUserSchema);
 
@@ -195,13 +221,10 @@ const regularUserSchema = new mongoose.Schema({
     type: String,
     trim: true,
   },
-  
-  // Deprecated: keeping for backward compatibility but using address.zip_code instead
   zipCode: {
     type: String,
     trim: true,
   },
-
   paymentMethods: [{
     customerVaultId: {
       type: String,
