@@ -32,6 +32,8 @@ const CampaignGeography: React.FC<GeographyProps> = ({
     zip_codes: "",
   });
 
+  const isLocked = false;
+  
   const handleFullStateSelect = () => {
     if (!isLocked) {
       // Cache ZIP data before clearing
@@ -52,11 +54,9 @@ const CampaignGeography: React.FC<GeographyProps> = ({
     if (!isLocked) {
       setFieldValue("geography.coverage.type", "PARTIAL");
   
-      // ✅ Ensure state is array (can be empty for PARTIAL)
-      if (!Array.isArray(values.geography.state)) {
-        setFieldValue("geography.state", []);
-      }
-
+      // ✅ Clear state to avoid saving old data
+      setFieldValue("geography.state", []);
+  
       // Restore cached ZIP data
       if (previousZipData.current.zip_codes) {
         setFieldValue("geography.coverage.partial.zipcode", previousZipData.current.zipcode);
@@ -65,7 +65,8 @@ const CampaignGeography: React.FC<GeographyProps> = ({
     }
   };
   
-  const isLocked = false;
+  
+
 
   useEffect(() => {
     if (!isEditMode && formKey) {
@@ -83,6 +84,8 @@ const CampaignGeography: React.FC<GeographyProps> = ({
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* State Field */}
+      {/* State Field – only show when FULL_STATE is selected */}
+      {values.geography.coverage.type === "FULL_STATE" && (
         <CustomFormikAsyncSelect
           key={`state-${formKey}`}
           name="geography.state"
@@ -94,13 +97,14 @@ const CampaignGeography: React.FC<GeographyProps> = ({
           isClearable={!isStateRequired}
           onChange={(option) => {
             if (!isLocked) {
-              // ✅ Ensure option is always array
               setFieldValue("geography.state", option || []);
               setFieldValue("utilities.include_some", []);
               setFieldValue("utilities.exclude_some", []);
             }
           }}
         />
+      )}
+
         
         {/* Coverage Type */}
         <div>
