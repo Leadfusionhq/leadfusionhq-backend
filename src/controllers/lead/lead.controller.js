@@ -147,7 +147,7 @@ const createLead = wrapAsync(async (req, res) => {
               campaignName: campaign.name,
               leadData: leadData,
               realleadId: result._id,
-              subject: emailSubjectFromCampaign || `New Lead Assigned in "${campaign.name}"`,
+              subject: emailSubjectFromCampaign || `Lead Fusion - New Lead"`,
             });
   
             leadLogger.info('Lead assignment email sent successfully', {
