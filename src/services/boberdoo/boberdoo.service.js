@@ -10,7 +10,7 @@ const  State  = require('../../models/state.model');
 const Lead = require('../../models/lead.model');
 const BillingServices = require('../billing/billing.service');
 const MAIL_HANDLER = require('../../mail/mails');
-
+const SmsServices = require('../../services/sms/sms.service');
 
 // Keep only URL and KEY from env (secrets)
 const API_URL = (process.env.BOBERDOO_API_URL || 'https://leadfusionhq.leadportal.com/apiJSON.php').trim();
@@ -643,7 +643,8 @@ async function createCampaignInBoberdoo(campaignData, partnerId) {
       TYPE: leadTypeId,
       Filter_Set_Name: campaignData.name,
       Filter_Set_Price: campaignData.bid_price || 0,
-      Accepted_Sources: campaignData.accepted_sources?.join(",") || "properbusiness_solar,solarClosingSystem_solar",
+      // Accepted_Sources: campaignData.accepted_sources?.join(",") || "properbusiness_solar,solarClosingSystem_solar",
+      Accepted_Sources:'',
       Match_Priority: campaignData.match_priority || 5,
       Hourly_Limit: campaignData.hourly_limit ?? 0,
       Daily_Limit: campaignData.daily_limit ?? 0,
@@ -723,7 +724,8 @@ async function updateCampaignInBoberdoo(campaignData, filterSetId, partnerId) {
       Partner_ID: partnerId,
       Filter_Set_Name: campaignData.name,
       Filter_Set_Price: campaignData.bid_price || 0,
-      Accepted_Sources: campaignData.accepted_sources?.join(",") || "properbusiness_solar,solarClosingSystem_solar",
+      // Accepted_Sources: campaignData.accepted_sources?.join(",") || "properbusiness_solar,solarClosingSystem_solar",
+      Accepted_Sources:'',
       Match_Priority: campaignData.match_priority || 5,
       Hourly_Limit: campaignData.hourly_limit ?? 0,
       Daily_Limit: campaignData.daily_limit ?? 0,
@@ -966,10 +968,57 @@ const sendBoberdoLeadNotifications = async (lead, campaign, billingResult) => {
                 campaignName: campaign.name,
                 leadData: lead,
                 realleadId: lead._id,
-                subject: `New Boberdo Lead Assigned to "${campaign.name}"`,
+                subject: `Lead Fusion - New Lead`,
             });
             console.log('✅ Email notification sent');
         }
+
+                // ✅ SMS delivery
+        if (campaign?.delivery?.method?.includes('phone') && campaign?.delivery?.phone?.numbers) {
+          try {
+            const fullName = `${lead.first_name || ''} ${lead.last_name || ''}`.trim();
+            const phoneNumber = lead.phone_number || lead.phone || '';
+            const email = lead.email || '';
+            const address = [
+              lead?.address?.full_address || '',
+              lead?.address?.city || '',
+              lead?.address?.zip_code || '',
+            ].filter(Boolean).join(', ');
+            const campaignName = campaign?.name || 'N/A';
+        
+            const MAX_NOTE_LENGTH = 100;
+            let notes = lead.note || 'No notes provided';
+            if (notes.length > MAX_NOTE_LENGTH) notes = notes.substring(0, MAX_NOTE_LENGTH) + '...';
+        
+            const smsMessage = `New Lead Assigned
+        
+        Name: ${fullName}
+        Phone: ${phoneNumber}
+        Email: ${email}
+        Address: ${address}
+        Lead ID: ${lead.lead_id}
+        Campaign: ${campaignName}
+        Notes: ${notes}
+        
+        View Lead: ${process.env.UI_LINK}/dashboard/leads/${lead._id}`;
+        
+            const smsResult = await SmsServices.sendSms({
+              to: campaign.delivery.phone.numbers,
+              message: smsMessage,
+              from: process.env.SMS_SENDER_ID || '+18563908470',
+            });
+        
+            if (smsResult.success) {
+              console.log('✅ Lead assignment SMS sent successfully:', smsResult.sentTo);
+            } else {
+              console.warn('⚠️ Lead assignment SMS failed:', smsResult);
+            }
+          } catch (err) {
+            console.error('❌ Fatal error during SMS sending:', err.message);
+          }
+        }
+                
+
     } catch (error) {
         console.error('Error sending Boberdo notifications:', error);
     }
