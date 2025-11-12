@@ -11,7 +11,7 @@ const Lead = require('../../models/lead.model');
 const BillingServices = require('../billing/billing.service');
 const MAIL_HANDLER = require('../../mail/mails');
 const SmsServices = require('../../services/sms/sms.service');
-
+const { leadLogger } = require('../../utils/logger');
 // Keep only URL and KEY from env (secrets)
 const API_URL = (process.env.BOBERDOO_API_URL || 'https://leadfusionhq.leadportal.com/apiJSON.php').trim();
 const API_KEY = (process.env.BOBERDOO_API_KEY || '').trim();
@@ -937,9 +937,11 @@ const processBoberdoLead = async (leadData) => {
             .populate('campaign_id', 'name campaign_id')
             .populate('address.state', 'name abbreviation');
 
-        // ✅ 11. Send notifications (async)
-        sendBoberdoLeadNotifications(populatedLead, campaign, billingResult).catch(err => {
-            console.error('Failed to send Boberdo lead notifications:', err);
+        // ✅ 11. Send notifications (deferred async to avoid session conflict)
+        process.nextTick(() => {
+          sendBoberdoLeadNotifications(populatedLead, campaign, billingResult)
+            .then(() => console.log('✅ Boberdo notifications sent successfully'))
+            .catch(err => console.error('❌ Failed to send Boberdo lead notifications:', err));
         });
 
         return populatedLead;
@@ -952,76 +954,118 @@ const processBoberdoLead = async (leadData) => {
 };
 
 const sendBoberdoLeadNotifications = async (lead, campaign, billingResult) => {
-    try {
-        const campaignOwner = await User.findById(campaign.user_id);
-        if (!campaignOwner) return;
+  const logMeta = {
+    campaign_id: campaign?._id,
+    campaign_name: campaign?.name,
+    lead_id: lead?.lead_id,
+    lead_internal_id: lead?._id,
+    action: 'Send Boberdo Lead Notifications',
+  };
 
-        // Email notification
-        if (campaign?.delivery?.method?.includes('email') && 
-            campaign?.delivery?.email?.addresses) {
-            await MAIL_HANDLER.sendLeadAssignEmail({
-                to: campaign.delivery.email.addresses,
-                name: campaignOwner.name || 'Campaign User',
-                leadName: lead.lead_id,
-                assignedBy: 'Boberdo Integration',
-                leadDetailsUrl: `${process.env.UI_LINK}/dashboard/leads/${lead._id}`,
-                campaignName: campaign.name,
-                leadData: lead,
-                realleadId: lead._id,
-                subject: `Lead Fusion - New Lead`,
-            });
-            console.log('✅ Email notification sent');
-        }
-
-                // ✅ SMS delivery
-        if (campaign?.delivery?.method?.includes('phone') && campaign?.delivery?.phone?.numbers) {
-          try {
-            const fullName = `${lead.first_name || ''} ${lead.last_name || ''}`.trim();
-            const phoneNumber = lead.phone_number || lead.phone || '';
-            const email = lead.email || '';
-            const address = [
-              lead?.address?.full_address || '',
-              lead?.address?.city || '',
-              lead?.address?.zip_code || '',
-            ].filter(Boolean).join(', ');
-            const campaignName = campaign?.name || 'N/A';
-        
-            const MAX_NOTE_LENGTH = 100;
-            let notes = lead.note || 'No notes provided';
-            if (notes.length > MAX_NOTE_LENGTH) notes = notes.substring(0, MAX_NOTE_LENGTH) + '...';
-        
-            const smsMessage = `New Lead Assigned
-        
-        Name: ${fullName}
-        Phone: ${phoneNumber}
-        Email: ${email}
-        Address: ${address}
-        Lead ID: ${lead.lead_id}
-        Campaign: ${campaignName}
-        Notes: ${notes}
-        
-        View Lead: ${process.env.UI_LINK}/dashboard/leads/${lead._id}`;
-        
-            const smsResult = await SmsServices.sendSms({
-              to: campaign.delivery.phone.numbers,
-              message: smsMessage,
-              from: process.env.SMS_SENDER_ID || '+18563908470',
-            });
-        
-            if (smsResult.success) {
-              console.log('✅ Lead assignment SMS sent successfully:', smsResult.sentTo);
-            } else {
-              console.warn('⚠️ Lead assignment SMS failed:', smsResult);
-            }
-          } catch (err) {
-            console.error('❌ Fatal error during SMS sending:', err.message);
-          }
-        }
-                
-
-    } catch (error) {
-        console.error('Error sending Boberdo notifications:', error);
+  try {
+    const campaignOwner = await User.findById(campaign.user_id);
+    if (!campaignOwner) {
+      leadLogger.warn('Campaign owner not found while sending notifications', logMeta);
+      return;
     }
+
+    // ✅ Email delivery
+    if (campaign?.delivery?.method?.includes('email') && campaign?.delivery?.email?.addresses) {
+      try {
+        await MAIL_HANDLER.sendLeadAssignEmail({
+          to: campaign.delivery.email.addresses,
+          name: campaignOwner.name || 'Campaign User',
+          leadName: lead.lead_id,
+          assignedBy: 'Boberdo Integration',
+          leadDetailsUrl: `${process.env.UI_LINK}/dashboard/leads/${lead._id}`,
+          campaignName: campaign.name,
+          leadData: lead,
+          realleadId: lead._id,
+          subject: `Lead Fusion - New Lead`,
+        });
+
+        leadLogger.info('Boberdo lead assignment email sent successfully', {
+          ...logMeta,
+          email_to: campaign.delivery.email.addresses,
+        });
+      } catch (emailErr) {
+        leadLogger.error('Failed to send Boberdo lead assignment email', emailErr, {
+          ...logMeta,
+          error: emailErr.message,
+        });
+      }
+    }
+
+    // ✅ SMS delivery
+    if (campaign?.delivery?.method?.includes('phone') && campaign?.delivery?.phone?.numbers) {
+      try {
+        const fullName = `${lead.first_name || ''} ${lead.last_name || ''}`.trim();
+        const phoneNumber = lead.phone_number || lead.phone || '';
+        const email = lead.email || '';
+        const address = [
+          lead?.address?.full_address || '',
+          lead?.address?.city || '',
+          lead?.address?.zip_code || '',
+        ].filter(Boolean).join(', ');
+        const campaignName = campaign?.name || 'N/A';
+
+        const MAX_NOTE_LENGTH = 100;
+        let notes = lead.note || 'No notes provided';
+        if (notes.length > MAX_NOTE_LENGTH) notes = notes.substring(0, MAX_NOTE_LENGTH) + '...';
+
+        const smsMessage = `New Lead Assigned
+
+Name: ${fullName}
+Phone: ${phoneNumber}
+Email: ${email}
+Address: ${address}
+Lead ID: ${lead.lead_id}
+Campaign: ${campaignName}
+Notes: ${notes}
+
+View Lead: ${process.env.UI_LINK}/dashboard/leads/${lead._id}`;
+
+        leadLogger.info('Attempting to send Boberdo lead assignment SMS', {
+          ...logMeta,
+          to_numbers: campaign.delivery.phone.numbers,
+        });
+
+        const smsResult = await SmsServices.sendSms({
+          to: campaign.delivery.phone.numbers,
+          message: smsMessage,
+          from: process.env.SMS_SENDER_ID || '+18563908470',
+        });
+
+        if (smsResult.success) {
+          leadLogger.info('Boberdo lead assignment SMS sent successfully', {
+            ...logMeta,
+            sent_to: smsResult.sentTo.join(', '),
+            total_sent: smsResult.successful,
+          });
+        } else {
+          leadLogger.warn('Boberdo SMS failed', {
+            ...logMeta,
+            failed_count: smsResult.failed,
+            error: smsResult.results?.map(r => r.error?.message).join('; '),
+          });
+        }
+      } catch (err) {
+        leadLogger.error('Fatal error during Boberdo SMS sending', err, {
+          ...logMeta,
+          error: err.message,
+        });
+      }
+    }
+
+    leadLogger.info('Completed sending Boberdo notifications', logMeta);
+
+  } catch (error) {
+    leadLogger.error('Error in sendBoberdoLeadNotifications', error, {
+      ...logMeta,
+      error: error.message,
+      stack: error.stack,
+    });
+  }
 };
 
 
