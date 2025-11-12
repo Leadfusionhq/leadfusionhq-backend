@@ -6,7 +6,7 @@ import axiosWrapper from "@/utils/api";
 import { useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
 import DataTable, { TableColumn } from "react-data-table-component";
-import { Skeleton, Box, Button, Typography } from "@mui/material";
+import { Skeleton, Box, Button, Typography,Chip } from "@mui/material";
 import Link from 'next/link';
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
@@ -79,6 +79,19 @@ export default function LeadTable() {
   const token = useSelector((state: RootState) => state.auth.token);
   const [returnModalOpen, setReturnModalOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+
+  // ✅ ADD THIS - Lead Status Mapping
+  const LEAD_STATUS_MAP: Record<string, { label: string; color: string }> = {
+    'Not Returned': { label: 'Active', color: '#4caf50' },
+    'Pending': { label: 'Pending Return', color: '#ff9800' },
+    'Approved': { label: 'Returned', color: '#2196f3' },
+    'Rejected': { label: 'Return Rejected', color: '#f44336' }
+  };
+
+  const getLeadStatus = (return_status: string) => {
+    return LEAD_STATUS_MAP[return_status] || LEAD_STATUS_MAP['Not Returned'];
+  };
+
 
   // Fetch leads with pagination
   const fetchLeads = useCallback(
@@ -501,6 +514,30 @@ const convertToCSV = (data: Lead[]): string => {
       sortable: true,
       minWidth: "100px",
     },
+    {
+      name: "Lead Status",
+      selector: (row) => row.return_status,
+      cell: (row) =>
+        row._id.startsWith("skeleton") ? (
+          <Skeleton variant="text" width={120} animation="wave" />
+        ) : (
+          <div style={{ minWidth: "140px" }}>
+            <Chip
+              label={getLeadStatus(row.return_status).label}
+              size="small"
+              sx={{
+                backgroundColor: getLeadStatus(row.return_status).color,
+                color: '#fff',
+                fontWeight: 500,
+                fontSize: '12px'
+              }}
+            />
+          </div>
+        ),
+      sortable: true,
+      width: "160px",
+    },
+    
     {
       name: "Campaign",
       selector: (row) =>
