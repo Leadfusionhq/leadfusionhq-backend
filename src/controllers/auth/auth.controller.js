@@ -119,17 +119,6 @@ const verifyEmail = wrapAsync(async (req, res) => {
   })();
 
   try {
-    const mailKeys = Object.keys(MAIL_HANDLER || {});
-    console.log('[MAIL_HANDLER] exported keys:', mailKeys);
-    if (typeof MAIL_HANDLER?.sendNewUserRegistrationToAdmin !== 'function') {
-      console.error('❌ MAIL_HANDLER.sendNewUserRegistrationToAdmin not found');
-    }
-  } catch (e) {
-    console.error('❌ MAIL_HANDLER inspection failed:', e.message);
-  }
-
-  try {
-    // Exclude these admin emails from notifications
     const EXCLUDED = new Set([
       'admin@gmail.com',
       'admin123@gmail.com',
@@ -141,20 +130,15 @@ const verifyEmail = wrapAsync(async (req, res) => {
       isActive: { $ne: false },
     }).select('_id email name role');
 
-    console.log(`[AdminLookup] Found ${adminUsers?.length || 0} admins`, adminUsers);
-
     let adminEmails = (adminUsers || [])
       .map(a => a.email)
       .filter(Boolean)
       .map(e => e.trim().toLowerCase())
-      .filter(e => !EXCLUDED.has(e)); // <-- exclude here
+      .filter(e => !EXCLUDED.has(e));
 
-    // Deduplicate
     adminEmails = [...new Set(adminEmails)];
 
-    if (!adminEmails.length) {
-      console.warn('⚠️ No valid admin emails found after exclusions. Skipping admin notification.');
-    } else {
+    if (adminEmails.length) {
       const registrationDate = user.createdAt
         ? new Date(user.createdAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
         : new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
@@ -162,9 +146,11 @@ const verifyEmail = wrapAsync(async (req, res) => {
       const verificationDate = new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
 
       const mailPayload = {
-        to: adminEmails, // most mailers expect "to"
+        adminEmails,
         userName: user.name,
         userEmail: user.email,
+        companyName: user.companyName || 'N/A',
+        phoneNumber: user.phoneNumber || 'N/A',
         userRole: user.role || 'User',
         registrationDate,
         verificationDate,
@@ -182,29 +168,16 @@ const verifyEmail = wrapAsync(async (req, res) => {
         response: info?.response,
         envelope: info?.envelope,
       });
-
-      if (info?.rejected?.length) {
-        console.warn('[AdminEmail] Some recipients were rejected:', info.rejected);
-      }
-
-      console.log('✅ Admin notification sent for new user:', user.email, {
-        adminCount: adminEmails.length,
-        adminEmails
-      });
+    } else {
+      console.warn('⚠️ No valid admin emails found after exclusions. Skipping admin notification.');
     }
   } catch (err) {
-    console.error('❌ Admin notification failed:', {
-      message: err?.message,
-      code: err?.code,
-      stack: err?.stack,
-      response: err?.response,
-      status: err?.status,
-      data: err?.response?.data,
-    });
+    console.error('❌ Admin notification failed:', err);
   }
 
   sendResponse(res, {}, 'Email successfully verified');
 });
+
 
 const sendOtpOnEmail = wrapAsync(async (req, res) => {
     const { email } = req.body;
