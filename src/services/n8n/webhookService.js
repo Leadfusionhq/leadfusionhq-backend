@@ -29,6 +29,7 @@ const sendToN8nWebhook = async (campaignData) => {
 
     // ✅ Resolve user name
     let userName = '';
+    let partnerId = '';
     const userVal = campaignData?.user_id;
     if (userVal) {
       if (typeof userVal === 'object') {
@@ -40,9 +41,12 @@ const sendToN8nWebhook = async (campaignData) => {
           `${u.firstName || ''} ${u.lastName || ''}`.trim() ||
           u.email ||
           '';
+        
+        // ✅ FIX
+        partnerId = u?.integrations?.boberdoo?.external_id || '';
       } else {
         try {
-          const userDoc = await User.findById(userVal).select('name fullName username firstName lastName email');
+          const userDoc = await User.findById(userVal).select('name fullName username firstName lastName email integrations');
           if (userDoc) {
             userName =
               userDoc.name ||
@@ -51,6 +55,8 @@ const sendToN8nWebhook = async (campaignData) => {
               `${userDoc.firstName || ''} ${userDoc.lastName || ''}`.trim() ||
               userDoc.email ||
               '';
+                  // ⬇️ Extract Partner ID
+            partnerId = userDoc.integrations?.boberdoo?.external_id || '';
           }
         } catch (e) {
           console.error('User lookup failed:', e.message);
@@ -70,6 +76,7 @@ const sendToN8nWebhook = async (campaignData) => {
       states: stateAbbrs,
       zip_codes: zipCodes,
       client_name: userName,
+      partner_id: partnerId,       
       boberdoo_filter_set_id: campaignData.boberdoo_filter_set_id || null,
       timezone: campaignData.delivery?.schedule?.timezone || 'America/New_York',
       submitted_at: new Date().toISOString(),
