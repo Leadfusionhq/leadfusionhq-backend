@@ -500,6 +500,104 @@ const assignLeadNew = async (userId, leadId, leadCost, assignedBy, session) => {
   };
 };
 
+
+
+const assignLeadPrepaid = async (userId, leadId, leadCost, assignedBy, session) => {
+  const user = await User.findById(userId).session(session);
+  if (!user) throw new ErrorHandler(404, 'User not found');
+
+  const currentBalance = user.balance || 0;
+
+  if (currentBalance < leadCost) {
+    throw new ErrorHandler(400, 'Insufficient balance to assign lead');
+  }
+
+  user.balance = currentBalance - leadCost;
+  await user.save({ session });
+
+  const transaction = new Transaction({
+    userId,
+    type: "LEAD_ASSIGNMENT",
+    amount: -leadCost,
+    status: "COMPLETED",
+    description: `Lead assigned (Prepaid): ${leadId}`,
+    paymentMethod: "BALANCE",
+    leadId,
+    assignedBy,
+    balanceAfter: user.balance
+  });
+
+  await transaction.save({ session });
+
+  return {
+    paymentMethod: "BALANCE",
+    newBalance: user.balance,
+    leadId,
+    transactionId: transaction._id
+  };
+};
+
+
+
+const assignLeadPayAsYouGo = async (userId, leadId, leadCost, assignedBy, session) => {
+  const user = await User.findById(userId).session(session);
+  if (!user) throw new ErrorHandler(404, 'User not found');
+
+  const defaultPaymentMethod = user.paymentMethods?.find(pm => pm.isDefault === true);
+
+  if (!defaultPaymentMethod) {
+    throw new ErrorHandler(
+      400,
+      "No default payment method found. Please add or set a default card."
+    );
+  }
+
+  const vaultId = defaultPaymentMethod.customerVaultId;
+
+  if (!vaultId) {
+    throw new ErrorHandler(
+      400,
+      "Default payment method does not have a valid customerVaultId."
+    );
+  }
+
+  const chargeResult = await chargeCustomerVault(
+    vaultId,
+    leadCost,
+    `Lead assignment: ${leadId}`
+  );
+
+  if (!chargeResult.success) {
+    throw new ErrorHandler(400, "Card payment failed: " + chargeResult.message);
+  }
+
+
+  const transaction = new Transaction({
+    userId,
+    type: "LEAD_ASSIGNMENT",
+    amount: -leadCost,
+    status: "COMPLETED",
+    description: `Lead assigned (Pay-As-You-Go): ${leadId}`,
+    paymentMethod: "CARD",
+    transactionId: chargeResult.transactionId,
+    leadId,
+    assignedBy,
+    balanceAfter: user.balance
+  });
+
+  await transaction.save({ session });
+
+  return {
+    paymentMethod: "CARD",
+    transactionId: transaction._id,
+    gatewayTransactionId: chargeResult.transactionId,
+    leadId,
+    newBalance: user.balance
+  };
+};
+
+
+
 const manualCharge = async (userId, amount, note, chargedBy) => {
   const user = await User.findById(userId);
   if (!user) throw new ErrorHandler(404, 'User not found');
@@ -1009,4 +1107,8 @@ module.exports = {
   assignLeadNew,
   addBalanceByAdmin,
   getRevenueFromNmi,
+
+
+  assignLeadPrepaid,
+  assignLeadPayAsYouGo,
 };

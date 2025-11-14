@@ -21,6 +21,236 @@ const { User } = require('../../models/user.model.js');
 
 const { leadLogger } = require('../../utils/logger');
 
+// const createLead = wrapAsync(async (req, res) => {
+//     const session = await mongoose.startSession();
+//     session.startTransaction();
+  
+//     const logMeta = {
+//       user_id: req?.user?._id,
+//       user_role: req?.user?.role,
+//       route: req.originalUrl,
+//       action: 'Create Lead',
+//     };
+  
+//     try {
+//       leadLogger.info('Starting lead creation process', logMeta);
+  
+//       const { campaign_id } = req.body;
+//       const user_id = req.user._id;
+  
+//       if (!campaign_id) {
+//         leadLogger.warn('Missing campaign_id during lead creation', logMeta);
+//         throw new ErrorHandler(400, 'Campaign ID is required');
+//       }
+  
+//       const { campaignData, leadCost } = await LeadServices.validatePrepaidCampaignBalance(campaign_id);
+//       leadLogger.info('Validated campaign balance', { ...logMeta, campaign_id, leadCost });
+  
+//       const lead_id = await generateUniqueLeadId();
+//       let leadData = { ...req.body, user_id, lead_id };
+  
+//       const result = await LeadServices.createLead(leadData, { session });
+//       await result.populate('campaign_id');
+//       await result.populate('address.state');
+  
+//       leadLogger.info('Lead created successfully in database', {
+//         ...logMeta,
+//         lead_id: result.lead_id,
+//         campaign_name: result.campaign_id?.name,
+//         campaign_owner_id: result.campaign_id?.user_id,
+//       });
+  
+//       const assignedBy = req.user._id;
+//       const billingResult = await BillingServices.assignLeadNew(
+//         campaignData.user_id,
+//         result._id,
+//         leadCost,
+//         assignedBy,
+//         session
+//       );
+  
+//       leadLogger.info('Billing and balance updated successfully', {
+//         ...logMeta,
+//         transaction_id: billingResult.transactionId,
+//         new_balance: billingResult.newBalance,
+//         lead_cost: leadCost,
+//       });
+  
+//       await session.commitTransaction();
+//       session.endSession();
+  
+//       const campaign = result.campaign_id;
+//       const campaignOwner = await User.findById(campaign.user_id);
+  
+//       // Send lead payment transaction email
+//       try {
+//         await MAIL_HANDLER.sendLeadPaymentEmail({
+//           to: campaignOwner.email,
+//           userName: campaignOwner.name,
+//           leadCost: leadCost,
+//           leadId: result.lead_id,
+//           leadName: `${result.first_name} ${result.last_name}`.trim(),
+//           campaignName: campaign.name,
+//           payment_type: campaign.payment_type,
+//           full_address: result.address.full_address,
+//           transactionId: billingResult.transactionId,
+//           newBalance: billingResult.newBalance,
+//           leadData: {
+//             first_name: result.first_name,
+//             last_name: result.last_name,
+//             phone_number: result.phone_number,
+//             email: result.email,
+//             address: result.address
+//           }
+//         });
+  
+//         leadLogger.info('Lead payment email sent successfully', {
+//           ...logMeta,
+//           email_to: campaignOwner.email,
+//           transaction_id: billingResult.transactionId
+//         });
+//       } catch (emailErr) {
+//         leadLogger.error('Failed to send lead payment email', emailErr, {
+//           ...logMeta,
+//           error: emailErr.message
+//         });
+//       }
+  
+//       const message = 'New Lead has been assigned to your campaign!';
+//       try {
+//         await NotificationServices.createNotification(
+//           user_id,
+//           campaign.user_id,
+//           'info',
+//           message,
+//           0,
+//           `/dashboard/leads`
+//         );
+  
+//         leadLogger.info('Notification created successfully', {
+//           ...logMeta,
+//           recipient_id: campaign.user_id,
+//         });
+  
+//         if (campaign?.delivery?.method?.includes('email') && campaign?.delivery?.email?.addresses) {
+//           try {
+//             const emailSubjectFromCampaign = campaign?.delivery?.email?.subject?.trim();
+  
+//             await MAIL_HANDLER.sendLeadAssignEmail({
+//               to: campaign.delivery.email.addresses,
+//               name: campaignOwner.name || 'Campaign User',
+//               leadName: result.lead_id,
+//               assignedBy: req.user?.name || 'System',
+//               leadDetailsUrl: `${process.env.UI_LINK}/dashboard/leads/${result._id}`,
+//               campaignName: campaign.name,
+//               leadData: leadData,
+//               realleadId: result._id,
+//               subject: emailSubjectFromCampaign || `Lead Fusion - New Lead"`,
+//             });
+  
+//             leadLogger.info('Lead assignment email sent successfully', {
+//               ...logMeta,
+//               email_to: campaign.delivery.email.addresses,
+//             });
+//           } catch (err) {
+//             leadLogger.error('Failed to send lead assignment email', err, {
+//               ...logMeta,
+//               error: err.message
+//             });
+//           }
+//         }
+  
+//         if (campaign?.delivery?.method?.includes('phone') && campaign?.delivery?.phone?.numbers) {
+//           try {
+//             const fullName = `${result.first_name || ''} ${result.last_name || ''}`.trim();
+//             const phoneNumber = result.phone_number || result.phone || '';
+//             const email = result.email || '';
+//             const address = [
+//               result?.address?.full_address || '',
+//               result?.address?.city || '',
+//               result?.address?.zip_code || '',
+//             ].filter(Boolean).join(', ');
+//             const campaignName = campaign?.name || 'N/A';
+  
+//             const MAX_NOTE_LENGTH = 100;
+//             let notes = result.note || 'No notes provided';
+//             if (notes.length > MAX_NOTE_LENGTH) notes = notes.substring(0, MAX_NOTE_LENGTH) + '...';
+  
+//             const smsMessage = `New Lead Assigned
+  
+//   Name: ${fullName}
+//   Phone: ${phoneNumber}
+//   Email: ${email}
+//   Address: ${address}
+//   Lead ID: ${result.lead_id}
+//   Campaign: ${campaignName}
+//   Notes: ${notes}
+  
+//   View Lead: ${process.env.UI_LINK}/dashboard/leads/${result._id}`;
+  
+//             const smsResult = await SmsServices.sendSms({
+//               to: campaign.delivery.phone.numbers,
+//               message: smsMessage,
+//               from: process.env.SMS_SENDER_ID || '+18563908470',
+//             });
+  
+//             if (smsResult.success) {
+//               leadLogger.info('Lead assignment SMS sent successfully', {
+//                 ...logMeta,
+//                 sent_to: smsResult.sentTo.join(', ')
+//               });
+//             } else {
+//               leadLogger.warn('Lead assignment SMS failed', {
+//                 ...logMeta,
+//                 error: smsResult
+//               });
+//             }
+//           } catch (err) {
+//             leadLogger.error('Fatal error during SMS sending', err, {
+//               ...logMeta,
+//               error: err.message
+//             });
+//           }
+//         }
+  
+//       } catch (err) {
+//         leadLogger.error('Failed during notification or delivery process', err, {
+//           ...logMeta,
+//           error: err.message
+//         });
+//       }
+  
+//       leadLogger.info('Lead creation process completed successfully', {
+//         ...logMeta,
+//         lead_id: result.lead_id
+//       });
+  
+//       sendResponse(res, { leadData: result }, 'Lead has been created successfully', 201);
+  
+//     } catch (err) {
+//       await session.abortTransaction();
+//       session.endSession();
+  
+//       leadLogger.error('Error during lead creation process', err, {
+//         ...logMeta,
+//         error: err.message,
+//         stack: err.stack
+//       });
+  
+//       throw err;
+//     }
+//   });
+  
+
+
+
+
+
+
+// Get all leads (paginated with filters)
+
+
+
 const createLead = wrapAsync(async (req, res) => {
     const session = await mongoose.startSession();
     session.startTransaction();
@@ -61,13 +291,38 @@ const createLead = wrapAsync(async (req, res) => {
       });
   
       const assignedBy = req.user._id;
-      const billingResult = await BillingServices.assignLeadNew(
+    //   const billingResult = await BillingServices.assignLeadNew(
+    //     campaignData.user_id,
+    //     result._id,
+    //     leadCost,
+    //     assignedBy,
+    //     session
+    //   );
+
+    const campaign = result.campaign_id;
+
+    let billingResult;
+
+    if (campaign.payment_type === "prepaid") {
+    billingResult = await BillingServices.assignLeadPrepaid(
         campaignData.user_id,
         result._id,
         leadCost,
         assignedBy,
         session
-      );
+    );
+    } else if (campaign.payment_type === "payasyougo") {
+    billingResult = await BillingServices.assignLeadPayAsYouGo(
+        campaignData.user_id,
+        result._id,
+        leadCost,
+        assignedBy,
+        session
+    );
+    } else {
+    throw new ErrorHandler(400, "Invalid campaign payment type.");
+    }
+
   
       leadLogger.info('Billing and balance updated successfully', {
         ...logMeta,
@@ -79,10 +334,10 @@ const createLead = wrapAsync(async (req, res) => {
       await session.commitTransaction();
       session.endSession();
   
-      const campaign = result.campaign_id;
+    //   const campaign = result.campaign_id;
       const campaignOwner = await User.findById(campaign.user_id);
   
-      // ✅ Send lead payment transaction email
+      // Send lead payment transaction email
       try {
         await MAIL_HANDLER.sendLeadPaymentEmail({
           to: campaignOwner.email,
@@ -116,7 +371,6 @@ const createLead = wrapAsync(async (req, res) => {
         });
       }
   
-      // ✅ Notification creation
       const message = 'New Lead has been assigned to your campaign!';
       try {
         await NotificationServices.createNotification(
@@ -133,7 +387,6 @@ const createLead = wrapAsync(async (req, res) => {
           recipient_id: campaign.user_id,
         });
   
-        // ✅ Email delivery
         if (campaign?.delivery?.method?.includes('email') && campaign?.delivery?.email?.addresses) {
           try {
             const emailSubjectFromCampaign = campaign?.delivery?.email?.subject?.trim();
@@ -162,7 +415,6 @@ const createLead = wrapAsync(async (req, res) => {
           }
         }
   
-        // ✅ SMS delivery
         if (campaign?.delivery?.method?.includes('phone') && campaign?.delivery?.phone?.numbers) {
           try {
             const fullName = `${result.first_name || ''} ${result.last_name || ''}`.trim();
@@ -243,14 +495,8 @@ const createLead = wrapAsync(async (req, res) => {
       throw err;
     }
   });
-  
 
 
-
-
-
-
-// Get all leads (paginated with filters)
 const getLeads = wrapAsync(async (req, res) => {
     const { page, limit } = getPaginationParams(req.query);
     const user = req.user;
