@@ -1,6 +1,7 @@
 const axios = require('axios');
 const State = require('../../models/state.model');
 const User = require('../../models/user.model');
+const CONSTANT_ENUM = require('../../helper/constant-enums.js');
 
 // Create, Update, and Delete Webhook URLs
 const WEBHOOK_CREATE_URL = 'https://n8n.srv997679.hstgr.cloud/webhook/ffe20f26-ebb5-42fa-8e2d-8867957396b2';
@@ -69,6 +70,10 @@ const sendToN8nWebhook = async (campaignData) => {
       ? campaignData.geography.coverage.partial.zip_codes
       : [];
 
+    // ✅ Get lead_type and mapped boberdoo number
+    const leadTypeKey = campaignData.lead_type;
+    const boberdooTypeId =  CONSTANT_ENUM.BOBERDOO_LEAD_TYPE_MAP[leadTypeKey] || null;
+
     // ✅ Payload
     const payload = {
       action: campaignData.action || 'create',
@@ -80,7 +85,12 @@ const sendToN8nWebhook = async (campaignData) => {
       boberdoo_filter_set_id: campaignData.boberdoo_filter_set_id || null,
       timezone: campaignData.delivery?.schedule?.timezone || 'America/New_York',
       submitted_at: new Date().toISOString(),
+
+      // NEW FIELDS
+      lead_type: leadTypeKey,
+      boberdoo_lead_type_id: boberdooTypeId
     };
+
 
     // ✅ Choose correct webhook
     let webhookUrl = WEBHOOK_CREATE_URL;
