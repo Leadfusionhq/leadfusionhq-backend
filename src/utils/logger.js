@@ -195,8 +195,68 @@ const logger = {
     }
 };
 
+// Campaign Logger
+const campaignLogger = {
+    info: (message, data = {}) => {
+        consoleLog('INFO', `[CAMPAIGN] ${message}`, data);
+
+        saveToDatabase({
+            level: 'INFO',
+            message,
+            logType: 'combined',
+            module: 'CAMPAIGN',
+            userId: data.user_id,
+            metadata: data,
+            rawLog: `[INFO] [CAMPAIGN]: ${message}`
+        });
+    },
+    error: (message, error = null, data = {}) => {
+        consoleLog('ERROR', `[CAMPAIGN] ${message}`, { ...data, error: error?.message });
+
+        saveToDatabase({
+            level: 'ERROR',
+            message,
+            logType: 'error',
+            module: 'CAMPAIGN',
+            userId: data.user_id,
+            metadata: { ...data, error: error?.message, stack: error?.stack },
+            rawLog: `[ERROR] [CAMPAIGN]: ${message}`
+        });
+    },
+    warn: (message, data = {}) => {
+        consoleLog('WARN', `[CAMPAIGN] ${message}`, data);
+
+        saveToDatabase({
+            level: 'WARN',
+            message,
+            logType: 'combined',
+            module: 'CAMPAIGN',
+            userId: data.user_id,
+            metadata: data,
+            rawLog: `[WARN] [CAMPAIGN]: ${message}`
+        });
+    },
+    debug: (message, data = {}) => {
+        consoleLog('DEBUG', `[CAMPAIGN] ${message}`, data);
+
+        saveToDatabase({
+            level: 'DEBUG',
+            message,
+            logType: 'combined',
+            module: 'CAMPAIGN',
+            userId: data.user_id,
+            metadata: data,
+            rawLog: `[DEBUG] [CAMPAIGN]: ${message}`
+        });
+    }
+};
+
+
+
+
 module.exports = {
     logger,
     billingLogger,
-    leadLogger
+    leadLogger,
+    campaignLogger
 };
