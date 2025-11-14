@@ -8,6 +8,8 @@ const Lead = require('../../models/lead.model.js');
 const { sendToN8nWebhook } = require('../../services/n8n/webhookService.js');
 const { createCampaignInBoberdoo ,updateCampaignInBoberdoo ,deleteCampaignFromBoberdoo} = require('../boberdoo/boberdoo.service');
 const { User } = require('../../models/user.model');
+const { campaignLogger } = require('../../utils/logger');
+
 // const createCampaign = async (data) => {
 //   try {
 //     const newCampaign = await Campaign.create(data);
@@ -19,46 +21,44 @@ const { User } = require('../../models/user.model');
 
 const createCampaign = async (data) => {
   try {
-    // Validation
-    if (data.geography.coverage.type === 'FULL_STATE') {
-      if (!data.geography.state || data.geography.state.length === 0) {
-        throw new ErrorHandler(400, 'State is required for FULL_STATE coverage');
-      }
+    // --- Validation ---
+    if (data.geography.coverage.type === 'FULL_STATE' && (!data.geography.state || data.geography.state.length === 0)) {
+      const msg = 'State is required for FULL_STATE coverage';
+      campaignLogger.error(msg, null, { user_id: data.user_id, campaignData: data });
+      throw new ErrorHandler(400, msg);
     }
-    
+
     if (data.geography.coverage.type === 'PARTIAL') {
-      if (!data.geography.coverage.partial.zip_codes || 
-          data.geography.coverage.partial.zip_codes.length === 0) {
-        throw new ErrorHandler(400, 'ZIP codes are required for PARTIAL coverage');
+      if (!data.geography.coverage.partial.zip_codes || data.geography.coverage.partial.zip_codes.length === 0) {
+        const msg = 'ZIP codes are required for PARTIAL coverage';
+        campaignLogger.error(msg, null, { user_id: data.user_id, campaignData: data });
+        throw new ErrorHandler(400, msg);
       }
-      if (!data.geography.state) {
-        data.geography.state = [];
-      }
+      if (!data.geography.state) data.geography.state = [];
     }
 
-    // Create campaign
+    // --- Create campaign ---
     const newCampaign = await Campaign.create(data);
+    campaignLogger.info(`Campaign created in DB`, { user_id: data.user_id, campaign_id: newCampaign.campaign_id });
 
-    // Initial populate
+    // --- Initial populate ---
     let populatedCampaign = await Campaign.findById(newCampaign._id)
       .populate('geography.state', 'name abbreviation')
       .populate('user_id', 'name email integrations.boberdoo.external_id')
       .lean();
 
-    // Get user's Boberdoo partner ID
+    // --- Boberdoo integration ---
     const user = await User.findById(data.user_id).lean();
     const partnerId = user?.integrations?.boberdoo?.external_id;
 
     if (partnerId) {
       await Campaign.findByIdAndUpdate(newCampaign._id, {
-        $set: {
-          boberdoo_sync_status: 'PENDING',
-          boberdoo_last_sync_at: new Date()
-        }
+        $set: { boberdoo_sync_status: 'PENDING', boberdoo_last_sync_at: new Date() }
       });
+      campaignLogger.info(`Starting Boberdoo sync`, { campaign_id: newCampaign.campaign_id, user_id: data.user_id });
 
       const boberdooResult = await createCampaignInBoberdoo(populatedCampaign, partnerId);
-      
+
       if (boberdooResult.success) {
         await Campaign.findByIdAndUpdate(newCampaign._id, {
           $set: {
@@ -69,210 +69,142 @@ const createCampaign = async (data) => {
           }
         });
 
-        // ✅ Safe re-fetch with try-catch
+        // Re-fetch populated data safely
         try {
           populatedCampaign = await Campaign.findById(newCampaign._id)
             .populate('geography.state', 'name abbreviation')
             .populate('user_id', 'name email integrations.boberdoo.external_id')
             .lean();
         } catch (refetchError) {
-          console.error('⚠️ Failed to re-fetch campaign after Boberdoo sync:', refetchError.message);
-          // Continue with old populatedCampaign data
+          campaignLogger.warn('Failed to re-fetch campaign after Boberdoo sync', { campaign_id: newCampaign.campaign_id, error: refetchError.message });
         }
 
-        console.log(`✓ Campaign ${newCampaign.campaign_id} synced to Boberdoo with filter_set_ID: ${boberdooResult.filterSetId}`);
-        console.log("boberdoo api Result:", boberdooResult);
+        campaignLogger.info(`Campaign synced to Boberdoo`, { campaign_id: newCampaign.campaign_id, filter_set_id: boberdooResult.filterSetId, boberdooResult });
       } else {
         await Campaign.findByIdAndUpdate(newCampaign._id, {
-          $set: {
-            boberdoo_sync_status: 'FAILED',
-            boberdoo_last_sync_at: new Date(),
-            boberdoo_last_error: boberdooResult.error
-          }
+          $set: { boberdoo_sync_status: 'FAILED', boberdoo_last_sync_at: new Date(), boberdoo_last_error: boberdooResult.error }
         });
-        console.warn(`✗ Failed to sync campaign ${newCampaign.campaign_id} to Boberdoo: ${boberdooResult.error}`);
+        campaignLogger.error(`Failed Boberdoo sync`, null, { campaign_id: newCampaign.campaign_id, error: boberdooResult.error });
       }
     } else {
-      console.warn(`⚠ User ${data.user_id} doesn't have a Boberdoo partner ID, skipping sync`);
       await Campaign.findByIdAndUpdate(newCampaign._id, {
-        $set: {
-          boberdoo_sync_status: 'FAILED',
-          boberdoo_last_error: 'User does not have a Boberdoo partner ID'
-        }
+        $set: { boberdoo_sync_status: 'FAILED', boberdoo_last_error: 'User does not have a Boberdoo partner ID' }
       });
+      campaignLogger.warn(`Skipping Boberdoo sync - missing partner ID`, { campaign_id: newCampaign.campaign_id, user_id: data.user_id });
     }
 
-    // Send webhook with latest data
-    const resultforN8n = await sendToN8nWebhook(populatedCampaign);
-    console.log('📊 N8N Webhook Result:', resultforN8n);
+    // --- N8N Webhook ---
+    try {
+      const resultForN8n = await sendToN8nWebhook(populatedCampaign);
+      campaignLogger.info('N8N Webhook sent successfully', { campaign_id: newCampaign.campaign_id, resultForN8n });
+    } catch (n8nError) {
+      campaignLogger.error('Failed to send N8N webhook', n8nError, { campaign_id: newCampaign.campaign_id });
+    }
 
     return newCampaign;
   } catch (error) {
+    campaignLogger.error('Failed to create campaign', error, { campaignData: data });
     throw new ErrorHandler(500, error.message || 'Failed to create campaign');
   }
 };
 
+
 const updateCampaign = async (campaignId, userId, role, updateData) => {
   try {
-
-    if (updateData.geography?.coverage?.type === 'FULL_STATE') {
-      if (!updateData.geography.state || updateData.geography.state.length === 0) {
-        throw new ErrorHandler(400, 'State is required for FULL_STATE coverage');
-      }
+    // --- Validation ---
+    if (updateData.geography?.coverage?.type === 'FULL_STATE' && (!updateData.geography.state || updateData.geography.state.length === 0)) {
+      const msg = 'State is required for FULL_STATE coverage';
+      campaignLogger.error(msg, null, { campaign_id: campaignId, user_id: userId });
+      throw new ErrorHandler(400, msg);
     }
-    
-    // Validate ZIP codes requirement for PARTIAL
     if (updateData.geography?.coverage?.type === 'PARTIAL') {
-      if (!updateData.geography.coverage.partial.zip_codes || 
-          updateData.geography.coverage.partial.zip_codes.length === 0) {
-        throw new ErrorHandler(400, 'ZIP codes are required for PARTIAL coverage');
+      if (!updateData.geography.coverage.partial.zip_codes || updateData.geography.coverage.partial.zip_codes.length === 0) {
+        const msg = 'ZIP codes are required for PARTIAL coverage';
+        campaignLogger.error(msg, null, { campaign_id: campaignId, user_id: userId });
+        throw new ErrorHandler(400, msg);
       }
-      
-      // State is optional for PARTIAL
-      if (!updateData.geography.state) {
-        updateData.geography.state = [];
-      }
+      if (!updateData.geography.state) updateData.geography.state = [];
     }
-
 
     const filter = { _id: campaignId };
+    if (role !== CONSTANT_ENUM.USER_ROLE.ADMIN) filter.user_id = userId;
 
-    if (role !== CONSTANT_ENUM.USER_ROLE.ADMIN) {
-      filter.user_id = userId;
-    }
-
-    // Update campaign in DB
-    const updatedCampaign = await Campaign.findOneAndUpdate(
-      filter,
-      updateData,
-      { new: true, runValidators: true }
-      )
+    // --- Update campaign in DB ---
+    const updatedCampaign = await Campaign.findOneAndUpdate(filter, updateData, { new: true, runValidators: true })
       .populate('user_id', 'integrations.boberdoo.external_id name email')
       .populate('geography.state', 'name abbreviation')
       .lean();
 
     if (!updatedCampaign) {
-      throw new ErrorHandler(404, 'Campaign not found or access denied');
+      const msg = 'Campaign not found or access denied';
+      campaignLogger.error(msg, null, { campaign_id: campaignId, user_id: userId });
+      throw new ErrorHandler(404, msg);
     }
+    campaignLogger.info('Campaign updated in DB', { campaign_id: campaignId, user_id: userId, updateData });
 
-    // Add county details if partial coverage
+    // --- Partial coverage counties ---
     if (updatedCampaign.geography?.coverage?.type === 'PARTIAL') {
       const countyIds = updatedCampaign.geography.coverage.partial.counties || [];
-      const counties = await County.find({ _id: { $in: countyIds } })
-        .select('_id name fips_code state')
-        .lean();
-
+      const counties = await County.find({ _id: { $in: countyIds } }).select('_id name fips_code state').lean();
       updatedCampaign.geography.coverage.partial.countyDetails = counties;
     }
 
-    // --- BOBERDOO SYNC START ---
+    // --- Boberdoo sync ---
     const partnerId = updatedCampaign?.user_id?.integrations?.boberdoo?.external_id;
     let filterSetId = updatedCampaign?.boberdoo_filter_set_id;
 
     if (partnerId) {
-      // ✅ CHECK: If filter_set_id is missing, CREATE campaign first
+      campaignLogger.info('Starting Boberdoo sync', { campaign_id: campaignId, filterSetId, user_id: userId });
+
       if (!filterSetId) {
-        console.log(`⚠ Campaign ${campaignId} has no filter_set_id. Creating in Boberdoo first...`);
+        campaignLogger.warn('Missing filter_set_id, creating in Boberdoo', { campaign_id: campaignId });
+        await Campaign.findByIdAndUpdate(campaignId, { $set: { boberdoo_sync_status: 'PENDING', boberdoo_last_sync_at: new Date() } });
 
-        // Set sync status to pending before creating
-        await Campaign.findByIdAndUpdate(campaignId, {
-          $set: {
-            boberdoo_sync_status: 'PENDING',
-            boberdoo_last_sync_at: new Date()
-          }
-        });
-
-        // Create campaign in Boberdoo
-        const createResult = await updateCampaignInBoberdoo(updatedCampaign,filterSetId, partnerId);
-
+        const createResult = await updateCampaignInBoberdoo(updatedCampaign, filterSetId, partnerId);
         if (createResult.success) {
-          // Update campaign with the new filter_set_id
           filterSetId = createResult.filterSetId;
           await Campaign.findByIdAndUpdate(campaignId, {
-            $set: {
-              boberdoo_filter_set_id: filterSetId,
-              boberdoo_sync_status: 'SUCCESS',
-              boberdoo_last_sync_at: new Date(),
-              boberdoo_last_error: null
-            }
+            $set: { boberdoo_filter_set_id: filterSetId, boberdoo_sync_status: 'SUCCESS', boberdoo_last_sync_at: new Date(), boberdoo_last_error: null }
           });
-          console.log(`✅ Campaign ${campaignId} created in Boberdoo with filter_set_id: ${filterSetId}`);
-          console.log(`boberdoo api Result (Updated):${createResult}`);
+          campaignLogger.info('Campaign created in Boberdoo', { campaign_id: campaignId, filterSetId, createResult });
         } else {
-          // Failed to create
           await Campaign.findByIdAndUpdate(campaignId, {
-            $set: {
-              boberdoo_sync_status: 'FAILED',
-              boberdoo_last_sync_at: new Date(),
-              boberdoo_last_error: createResult.error
-            }
+            $set: { boberdoo_sync_status: 'FAILED', boberdoo_last_sync_at: new Date(), boberdoo_last_error: createResult.error }
           });
-          console.warn(`❌ Failed to create campaign ${campaignId} in Boberdoo: ${createResult.error}`);
+          campaignLogger.error('Failed Boberdoo creation', null, { campaign_id: campaignId, error: createResult.error });
         }
       } else {
-        // ✅ filter_set_id EXISTS: Update in Boberdoo
-        console.log(`🔄 Syncing campaign ${campaignId} to Boberdoo (update)...`);
-
-        // Set sync status to pending before API call
-        await Campaign.findByIdAndUpdate(campaignId, {
-          $set: {
-            boberdoo_sync_status: 'PENDING',
-            boberdoo_last_sync_at: new Date()
-          }
-        });
-
+        await Campaign.findByIdAndUpdate(campaignId, { $set: { boberdoo_sync_status: 'PENDING', boberdoo_last_sync_at: new Date() } });
         const boberdooResult = await updateCampaignInBoberdoo(updatedCampaign, filterSetId, partnerId);
-        console.log("boberdoo api result:",boberdooResult);
 
         if (boberdooResult.success) {
-          await Campaign.findByIdAndUpdate(campaignId, {
-            $set: {
-              boberdoo_sync_status: 'SUCCESS',
-              boberdoo_last_sync_at: new Date(),
-              boberdoo_last_error: null
-            }
-          });
-          console.log(`✅ Campaign ${campaignId} updated successfully in Boberdoo`);
+          await Campaign.findByIdAndUpdate(campaignId, { $set: { boberdoo_sync_status: 'SUCCESS', boberdoo_last_sync_at: new Date(), boberdoo_last_error: null } });
+          campaignLogger.info('Campaign updated in Boberdoo', { campaign_id: campaignId, filterSetId, boberdooResult });
         } else {
-          await Campaign.findByIdAndUpdate(campaignId, {
-            $set: {
-              boberdoo_sync_status: 'FAILED',
-              boberdoo_last_sync_at: new Date(),
-              boberdoo_last_error: boberdooResult.error
-            }
-          });
-          console.warn(`❌ Boberdoo update failed for campaign ${campaignId}: ${boberdooResult.error}`);
+          await Campaign.findByIdAndUpdate(campaignId, { $set: { boberdoo_sync_status: 'FAILED', boberdoo_last_sync_at: new Date(), boberdoo_last_error: boberdooResult.error } });
+          campaignLogger.error('Failed Boberdoo update', null, { campaign_id: campaignId, error: boberdooResult.error });
         }
       }
     } else {
-      console.warn(`⚠ Campaign ${campaignId} not synced to Boberdoo: missing Partner ID`);
-      await Campaign.findByIdAndUpdate(campaignId, {
-        $set: {
-          boberdoo_sync_status: 'FAILED',
-          boberdoo_last_error: 'User does not have a Boberdoo partner ID'
-        }
-      });
+      await Campaign.findByIdAndUpdate(campaignId, { $set: { boberdoo_sync_status: 'FAILED', boberdoo_last_error: 'User does not have a Boberdoo partner ID' } });
+      campaignLogger.warn('Skipping Boberdoo sync - missing partner ID', { campaign_id: campaignId, user_id: userId });
     }
-    // --- BOBERDOO SYNC END ---
 
-    // --- N8N WEBHOOK TRIGGER ---
+    // --- N8N webhook ---
     try {
-      const resultForN8n = await sendToN8nWebhook({
-        ...updatedCampaign,
-        action: 'update'
-      });
-      console.log('📊 N8N Webhook (Update) Result:', resultForN8n);
+      const resultForN8n = await sendToN8nWebhook({ ...updatedCampaign, action: 'update' });
+      campaignLogger.info('N8N Webhook sent successfully (update)', { campaign_id: campaignId, resultForN8n });
     } catch (n8nError) {
-      console.error('⚠ Failed to send update webhook to N8N:', n8nError.message);
+      campaignLogger.error('Failed to send update webhook to N8N', n8nError, { campaign_id: campaignId });
     }
-    // --- END WEBHOOK TRIGGER ---
 
     return updatedCampaign;
   } catch (error) {
-    console.error('Campaign update error:', error.message);
+    campaignLogger.error('Failed to update campaign', error, { campaign_id: campaignId, updateData });
     throw new ErrorHandler(error.statusCode || 500, error.message || 'Failed to update campaign');
   }
 };
+
 
 
 
