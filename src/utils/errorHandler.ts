@@ -3,6 +3,12 @@
 interface ApiErrorResponse {
   message?: string;
   error?: string;
+  validation?: {
+    body?: {
+      message?: string;
+    };
+  };
+  details?: Array<{ message?: string }>;
 }
 
 interface ApiError {
@@ -24,30 +30,39 @@ export const getErrorMessage = (error: unknown): string => {
   }
 
   const apiError = error as ApiError;
-  
-  // Check for API response error message
-  if (apiError?.response?.data?.message) {
-    return apiError.response.data.message;
-  }
-  
-  // Check for API response error field
-  if (apiError?.response?.data?.error) {
-    return apiError.response.data.error;
-  }
-  
-  // Check for general error message
-  if (apiError?.message) {
-    return apiError.message;
-  }
+  const data = apiError?.response?.data;
 
-  return 'An unexpected error occurred';
+  // 1️⃣ Joi/celebrate validation error (new, SAFE)
+  const validationMessage = data?.validation?.body?.message;
+
+  // 2️⃣ Custom validator: details[]
+  const detailMessage =
+    Array.isArray(data?.details) && typeof data.details[0]?.message === 'string'
+      ? data.details[0].message
+      : undefined;
+
+  // 3️⃣ Your original logic (unchanged)
+  const messageFromAPI = data?.message;
+  const errorField = data?.error;
+  const genericMessage = apiError?.message;
+
+  return (
+    validationMessage ||   // NEW
+    detailMessage ||       // NEW
+    messageFromAPI ||      // OLD
+    errorField ||          // OLD
+    genericMessage ||      // OLD
+    'An unexpected error occurred'
+  );
 };
 
 export const isNetworkError = (error: unknown): boolean => {
   const apiError = error as ApiError;
-  return apiError?.code === 'NETWORK_ERROR' || 
-         apiError?.code === 'ENOTFOUND' ||
-         !apiError?.response;
+  return (
+    apiError?.code === 'NETWORK_ERROR' ||
+    apiError?.code === 'ENOTFOUND' ||
+    !apiError?.response
+  );
 };
 
 export const getStatusCode = (error: unknown): number | null => {
