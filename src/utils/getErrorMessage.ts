@@ -1,24 +1,28 @@
-export function isAxiosError(
-  error: unknown
-): error is { isAxiosError: boolean; response?: { data?: { message?: string } }; message: string } {
+export function isAxiosError(error: unknown): error is {
+  isAxiosError: boolean;
+  response?: { data?: any };
+  message: string;
+} {
   return (
     typeof error === 'object' &&
     error !== null &&
     'isAxiosError' in error &&
-    typeof (error as Record<string, unknown>).isAxiosError === 'boolean' &&
-    (error as { isAxiosError: boolean }).isAxiosError === true
+    (error as any).isAxiosError === true
   );
 }
-export function getErrorMessage(error: unknown): string {
-  if (isAxiosError(error)) {
-    const data = error.response?.data as Record<string, any>;
 
-    // ✅ 1. Try extracting Joi/celebrate validation error
+export function getErrorMessage(error: unknown): string {
+  console.log("🔥 FULL ERROR:", JSON.stringify(error, null, 2));
+
+  // 1️⃣ If Axios error → handle normally
+  if (isAxiosError(error)) {
+    const data = error.response?.data || {};
+
     const validationMessage = data?.validation?.body?.message;
 
-    // ✅ 2. Try custom "details" structure if present
     const detailMessage =
-      Array.isArray(data.details) && typeof data.details[0]?.message === 'string'
+      Array.isArray(data?.details) &&
+      typeof data.details[0]?.message === "string"
         ? data.details[0].message
         : undefined;
 
@@ -30,9 +34,17 @@ export function getErrorMessage(error: unknown): string {
     );
   }
 
-  if (error instanceof Error) {
-    return error.message;
-  }
+  // 2️⃣ NON-AXIOS but structured backend error (your case)
+  const errObj = error as any;
 
-  return 'An unexpected error occurred.';
+  const validationMessage = errObj?.validation?.body?.message;
+  const message = errObj?.message;
+  const errorField = errObj?.error;
+
+  return (
+    validationMessage ||
+    message ||
+    errorField ||
+    "An unexpected error occurred"
+  );
 }
