@@ -916,16 +916,37 @@ const processBoberdoLead = async (leadData) => {
         });
 
         // ✅ 8. Process billing if prepaid
-        let billingResult = null;
-        if (campaign.payment_type === 'prepaid' && leadCost > 0) {
-            billingResult = await BillingServices.assignLeadNew(
-                campaign.user_id,
-                createdLead._id,
-                leadCost,
-                campaign.user_id,
-                session
-            );
-            console.log('✅ Billing processed:', billingResult);
+        // let billingResult = null;
+        // if (campaign.payment_type === 'prepaid' && leadCost > 0) {
+        //     billingResult = await BillingServices.assignLeadNew(
+        //         campaign.user_id,
+        //         createdLead._id,
+        //         leadCost,
+        //         campaign.user_id,
+        //         session
+        //     );
+        //     console.log('✅ Billing processed:', billingResult);
+        // }
+        let billingResult;
+        
+        if (campaign.payment_type === "prepaid" && leadCost > 0) {
+        billingResult = await BillingServices.assignLeadPrepaid(
+            campaign.user_id,
+            createdLead._id,
+            leadCost,
+            campaign.user_id,
+            session
+        );
+        } else if (campaign.payment_type === "payasyougo") {
+        billingResult = await BillingServices.assignLeadPayAsYouGo(
+            campaign.user_id,
+            createdLead._id,
+            leadCost,
+            campaign.user_id,
+            session
+        );
+        } else {
+        throw new ErrorHandler(400, "Invalid campaign payment type.");
         }
 
         // ✅ 9. Commit transaction
