@@ -318,7 +318,7 @@ const getBalance = wrapAsync(async (req, res) => {
 });
 
 const getTransactions = wrapAsync(async (req, res) => {
-    const user_id = req.user._id;
+    const user_id = req.query.userId || req.user?._id
     const { page, limit } = getPaginationParams(req.query);
     const filters = extractFilters(req.query, ['type', 'status', 'dateFrom', 'dateTo']);
     

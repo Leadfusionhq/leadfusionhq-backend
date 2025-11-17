@@ -105,6 +105,48 @@ router.post('/send-test-new-user-mail', async (req, res) => {
   }
 });
 
+router.post('/send-test-campaign-created-mail', async (req, res) => {
+  try {
+    const {
+      to,
+      name,
+      campaignName,
+      campaignId,
+      partnerId,
+      filterSetId
+    } = req.body;
+
+    if (!to) {
+      return res.status(400).json({ message: 'Email (to) is required' });
+    }
+
+    // Fake campaign object to test email template
+    const testCampaign = {
+      name: campaignName || "Test Campaign",
+      campaign_id: campaignId || "TEST12345",
+      user_id: {
+        name: name || "Test User",
+        email: to
+      },
+      boberdoo_filter_set_id: filterSetId || "FILTER_TEST_100",
+      userPartnerId: partnerId || "PARTNER_9999"
+    };
+
+    const result = await MAIL_HANDLER.sendCampaignCreatedEmail(testCampaign);
+
+    res.status(200).json({
+      message: "🚀 Test campaign creation email sent!",
+      data: result
+    });
+
+  } catch (error) {
+    console.error("❌ Error:", error);
+    res.status(500).json({
+      message: "Failed to send test campaign email",
+      error: error.message
+    });
+  }
+});
 
 
 module.exports = router;
