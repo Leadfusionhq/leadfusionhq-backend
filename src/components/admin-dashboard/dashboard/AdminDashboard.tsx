@@ -419,10 +419,20 @@ export default function AdminDashboard() {
                 onChange={(e) => setRevenueRange(e.target.value as any)}
                 disabled={revenueLoading}
               >
-                <option value="today">Today</option>
-                <option value="7d">Last 7d</option>
-                <option value="30d">Last 30d</option>
-                <option value="mtd">MTD</option>
+              <option value="today">Today</option>
+              <option value="yesterday">Yesterday</option>
+
+              <option value="7d">Last 7 Days</option>
+              <option value="30d">Last 30 Days</option>
+
+              <option value="mtd">Month to Date (MTD)</option>
+              <option value="q1">Q1 (Jan–Mar)</option>
+              <option value="q2">Q2 (Apr–Jun)</option>
+              <option value="q3">Q3 (Jul–Sep)</option>
+              <option value="q4">Q4 (Oct–Dec)</option>
+
+              <option value="this_year">This Year</option>
+              <option value="last_year">Last Year</option>
        
               </select>
             </div>
