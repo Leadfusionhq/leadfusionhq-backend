@@ -45,6 +45,7 @@ interface DashboardStats {
   newLeads: number;
   contactedLeads: number;
   convertedLeads: number;
+  boberdoLeads: number;
   balance: number;
   lastPaymentDate?: string;
 }
@@ -87,8 +88,10 @@ export default function ClientDashboard() {
     newLeads: 0,
     contactedLeads: 0,
     convertedLeads: 0,
+    boberdoLeads: 0,
     balance: 0
   });
+
   
   const [recentLeads, setRecentLeads] = useState<RecentLead[]>([]);
   const [campaignPerformance, setCampaignPerformance] = useState<CampaignPerformance[]>([]);
@@ -136,9 +139,12 @@ export default function ClientDashboard() {
 
       // Process leads data
       const leads = Array.isArray(leadsRes?.data) ? leadsRes.data : [];
-      const newLeads = leads.filter((l: any) => l.status?.toLowerCase() === 'new').length;
-      const contactedLeads = leads.filter((l: any) => l.status?.toLowerCase() === 'contacted').length;
-      const convertedLeads = leads.filter((l: any) => l.status?.toLowerCase() === 'converted').length;
+      // Backend-real logic
+      const activeLeads = leads.filter((l: any) => l.status === "active").length;
+      const returnedLeads = leads.filter((l: any) => l.return_status !== "Not Returned").length;
+      const boberdoLeads    = leads.filter(l => l.source === "boberdo").length;
+      const manualLeads = leads.filter((l: any) => l.source === "manual").length;
+
 
       // Process billing data
       const balance = billingRes?.balance?.balance || 0;
@@ -149,12 +155,14 @@ export default function ClientDashboard() {
         activeCampaigns,
         completedCampaigns,
         totalLeads: leads.length,
-        newLeads,
-        contactedLeads,
-        convertedLeads,
+        newLeads: activeLeads,
+        contactedLeads: manualLeads,
+        convertedLeads: returnedLeads,
+        boberdoLeads: boberdoLeads,
         balance,
         lastPaymentDate
       });
+
 
       // Set low balance alert if balance is less than $100
       setLowBalanceAlert(balance < 100);
@@ -170,14 +178,31 @@ export default function ClientDashboard() {
       setRecentLeads(recent);
 
       // Process campaign performance
-      const performance = campaigns.slice(0, 5).map((campaign: any) => ({
-        id: campaign._id || '',
-        name: campaign.name || 'Unnamed Campaign',
-        totalLeads: campaign.leadCount || 0,
-        conversionRate: campaign.conversionRate || 0,
-        status: campaign.status || 'Active'
-      }));
+      const performance = campaigns.slice(0, 5).map((camp: any) => {
+        const totalLeads = camp.leadCount || 0;
+
+        const leadsForCamp = leads.filter(
+          l => l.campaign_id?._id === camp._id
+        );
+
+        const acceptedLeads = leadsForCamp.filter(
+          l => l.return_status === "Not Returned"
+        ).length;
+
+        const conversionRate =
+          totalLeads === 0 ? 0 : Number(((acceptedLeads / totalLeads) * 100).toFixed(2));
+
+        return {
+          id: camp._id,
+          name: camp.name || "Unnamed Campaign",
+          totalLeads,
+          conversionRate,
+          status: camp.status || "Active",
+        };
+      });
+
       setCampaignPerformance(performance);
+
 
     } catch (err) {
       console.error("Error fetching dashboard data:", err);
@@ -336,7 +361,7 @@ export default function ClientDashboard() {
           <StatCard
             title="Total Leads"
             mainValue={stats.totalLeads}
-            subtext={`New: ${stats.newLeads} | Contacted: ${stats.contactedLeads} | Converted: ${stats.convertedLeads}`}
+            subtext={`Active: ${stats.newLeads} | Manual: ${stats.contactedLeads} | Returned: ${stats.convertedLeads} | Boberdo: ${stats.boberdoLeads}`}
             icon={<PeopleIcon sx={{ fontSize: 40, color: '#2e7d32' }} />}
             color="#2e7d32"
             buttonText="View Leads"
