@@ -9,6 +9,7 @@ const { sendToN8nWebhook } = require('../../services/n8n/webhookService.js');
 const { createCampaignInBoberdoo ,updateCampaignInBoberdoo ,deleteCampaignFromBoberdoo} = require('../boberdoo/boberdoo.service');
 const { User } = require('../../models/user.model');
 const { campaignLogger } = require('../../utils/logger');
+const MAIL_HANDLER = require('../../mail/mails');
 
 // const createCampaign = async (data) => {
 //   try {
@@ -40,6 +41,7 @@ const createCampaign = async (data) => {
     // --- Create campaign ---
     const newCampaign = await Campaign.create(data);
     campaignLogger.info(`Campaign created in DB`, { user_id: data.user_id, campaign_id: newCampaign.campaign_id });
+
 
     // --- Initial populate ---
     let populatedCampaign = await Campaign.findById(newCampaign._id)
@@ -100,6 +102,8 @@ const createCampaign = async (data) => {
     } catch (n8nError) {
       campaignLogger.error('Failed to send N8N webhook', n8nError, { campaign_id: newCampaign.campaign_id });
     }
+
+    await MAIL_HANDLER.sendCampaignCreatedEmail(populatedCampaign);
 
     return newCampaign;
   } catch (error) {

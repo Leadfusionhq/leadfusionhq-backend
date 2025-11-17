@@ -725,7 +725,7 @@ async function updateCampaignInBoberdoo(campaignData, filterSetId, partnerId) {
       Filter_Set_Name: campaignData.name,
       Filter_Set_Price: campaignData.bid_price || 0,
       // Accepted_Sources: campaignData.accepted_sources?.join(",") || "properbusiness_solar,solarClosingSystem_solar",
-      Accepted_Sources:'',
+      // Accepted_Sources:'',
       Match_Priority: campaignData.match_priority || 5,
       Hourly_Limit: campaignData.hourly_limit ?? 0,
       Daily_Limit: campaignData.daily_limit ?? 0,

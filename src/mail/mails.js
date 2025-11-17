@@ -847,6 +847,78 @@ const sendTransactionEmail = async ({
   return resend.emails.send(payload);
 };
 
+async function sendCampaignCreatedEmail(campaign) {
+  try {
+    const toEmail = "mahadiqbal72462@gmail.com"; // <-- Mohad's email
+    // const toEmail = "jatindev1022@gmail.com"; // <-- Mohad's email
+
+
+    const partnerId = campaign?.user_id?.integrations?.boberdoo?.external_id || "N/A";
+    const filterSetId = campaign?.boberdoo_filter_set_id || "N/A";
+
+    // ---- Campaign Details Table ----
+    const campaignTable = `
+      <table cellpadding="0" cellspacing="0" border="0" 
+        style="width: 100%; font-family: Arial, sans-serif; font-size: 14px; 
+               color: #1e3a8a; line-height: 1.6; text-align: left;">
+
+        <tr>
+          <td style="padding: 4px 0; vertical-align: top;">
+            <strong style="color: #1e3a8a;">Campaign Name</strong>
+          </td>
+          <td style="padding: 4px 0; color: #1e40af;">${campaign.name}</td>
+        </tr>
+
+        <tr>
+          <td style="padding: 4px 0; vertical-align: top;">
+            <strong style="color: #1e3a8a;">Campaign ID</strong>
+          </td>
+          <td style="padding: 4px 0; color: #1e40af;">${campaign.campaign_id}</td>
+        </tr>
+
+        <tr>
+          <td style="padding: 4px 0; vertical-align: top;">
+            <strong style="color: #1e3a8a;">User Partner ID</strong>
+          </td>
+          <td style="padding: 4px 0; color: #1e40af;">${partnerId}</td>
+        </tr>
+
+        <tr>
+          <td style="padding: 4px 0; vertical-align: top;">
+            <strong style="color: #1e3a8a;">Filter Set ID</strong>
+          </td>
+          <td style="padding: 4px 0; color: #1e40af;">${filterSetId}</td>
+        </tr>
+
+      </table>
+    `;
+
+    // ---- Email Template ----
+    const html = createEmailTemplate({
+      title: "New Campaign Created",
+      mainText: `
+        <div style="font-size: 14px; color: #1e3a8a;">
+          Hi there,<br><br>
+          A new campaign has been created. The relevant information is listed below.<br><br>
+          ${campaignTable}
+        </div>
+      `,
+      footerText: "" // No footer
+    });
+
+    await resend.emails.send({
+      from: "LeadFusionHQ <noreply@leadfusionhq.com>",
+      to: toEmail,
+      subject: `New Campaign Created - ${campaign.name}`,
+      html,
+    });
+
+    console.log("📧 Campaign email sent to Mohad:", toEmail);
+
+  } catch (err) {
+    console.error("❌ Failed to send campaign creation email:", err.message);
+  }
+}
 
 
 
@@ -1248,6 +1320,7 @@ module.exports = {
   sendTestMail,
   sendLeadAssignEmail,
   sendLeadReturnEmail,
+
     // ✅ New Transaction Email Functions
     sendTransactionEmail,
     sendFundsAddedEmail,
@@ -1255,5 +1328,6 @@ module.exports = {
     sendLeadPaymentEmail,
     sendLowBalanceWarning,
     sendInsufficientBalanceEmail,
-    sendNewUserRegistrationToAdmin
+    sendNewUserRegistrationToAdmin,
+    sendCampaignCreatedEmail
 };
