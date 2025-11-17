@@ -98,7 +98,7 @@ const getRevenueFromNmi = async ({ start, end }) => {
       }
 
       const amountInCents = parseFloat(r.action?.amount) || 0;
-      const amountInDollars = amountInCents / 100;
+      const amountInDollars = amountInCents;
 
       return sum + amountInDollars;
     }, 0);
