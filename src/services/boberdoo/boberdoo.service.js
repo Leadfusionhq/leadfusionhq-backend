@@ -605,6 +605,12 @@ async function createCampaignInBoberdoo(campaignData, partnerId) {
     if (!leadTypeId)
       return { success: false, error: `Invalid lead type: ${campaignData.lead_type}` };
 
+        // NEW: Delivery type logic
+    const deliveryType =
+      campaignData.lead_type === "ROOFING"
+        ? "100281 - N8N to CRM DelieveryRoof"
+        : "100275 - LeadFusion HQ - boberdoo Lead API";
+
     const stateList = Array.isArray(campaignData.geography?.state)
       ? campaignData.geography.state.map(getStateAbbreviation).filter(Boolean).join(",")
       : getStateAbbreviation(campaignData.geography?.state);
@@ -652,7 +658,7 @@ async function createCampaignInBoberdoo(campaignData, partnerId) {
       Monthly_Limit: campaignData.monthly_limit ?? 0,
       Accept_Only_Reprocessed_Leads: "Yes",
       Filter_Set_Status: campaignData.status === "ACTIVE" ? 1 : 0,
-      Delivery_Type: "100275 - LeadFusion HQ - boberdoo Lead API",
+      Delivery_Type: deliveryType,
       State: stateList,
       Zip_Mode: zipMode,
       Zip: zipCodes, // ✅ Added
@@ -689,6 +695,12 @@ async function updateCampaignInBoberdoo(campaignData, filterSetId, partnerId) {
     const leadTypeId = CONSTANT_ENUM.BOBERDOO_LEAD_TYPE_MAP[campaignData.lead_type];
     if (!leadTypeId) return { success: false, error: `Invalid lead type: ${campaignData.lead_type}` };
     if (!filterSetId) return { success: false, error: "Filter_Set_ID is required for update" };
+
+    // NEW: Delivery type logic
+    const deliveryType =
+      campaignData.lead_type === "ROOFING"
+        ? "100281 - N8N to CRM DelieveryRoof"
+        : "100275 - LeadFusion HQ - boberdoo Lead API";
 
     const stateList = Array.isArray(campaignData.geography?.state)
       ? campaignData.geography.state.map(getStateAbbreviation).filter(Boolean).join(",")
@@ -733,7 +745,7 @@ async function updateCampaignInBoberdoo(campaignData, filterSetId, partnerId) {
       Monthly_Limit: campaignData.monthly_limit ?? 0,
       Accept_Only_Reprocessed_Leads: "Yes",
       Filter_Set_Status: campaignData.status === "ACTIVE" ? 1 : 0,
-      Delivery_Type: "100275 - LeadFusion HQ - boberdoo Lead API",
+      Delivery_Type: deliveryType,
       State: stateList,
       Zip_Mode: zipMode,
       Zip: zipCodes, // ✅ Added for update too
