@@ -42,10 +42,10 @@ interface DashboardStats {
   activeCampaigns: number;
   completedCampaigns: number;
   totalLeads: number;
-  newLeads: number;
-  contactedLeads: number;
-  convertedLeads: number;
-  boberdoLeads: number;
+  activeLeads: number;     // NEW
+  pendingLeads: number;    // NEW
+  returnedLeads: number;   // NEW
+  rejectedLeads: number; 
   balance: number;
   lastPaymentDate?: string;
 }
@@ -85,10 +85,11 @@ export default function ClientDashboard() {
     activeCampaigns: 0,
     completedCampaigns: 0,
     totalLeads: 0,
-    newLeads: 0,
-    contactedLeads: 0,
-    convertedLeads: 0,
-    boberdoLeads: 0,
+     activeLeads: 0,
+      pendingLeads: 0,
+      returnedLeads: 0,
+      rejectedLeads: 0,
+
     balance: 0
   });
 
@@ -97,6 +98,18 @@ export default function ClientDashboard() {
   const [campaignPerformance, setCampaignPerformance] = useState<CampaignPerformance[]>([]);
   const [loading, setLoading] = useState(true);
   const [lowBalanceAlert, setLowBalanceAlert] = useState(false);
+
+  // Lead Status Mapping
+  const LEAD_STATUS_MAP: Record<string, { label: string }> = {
+    'Not Returned': { label: 'Active' },
+    'Pending': { label: 'Pending Return' },
+    'Approved': { label: 'Returned' },
+    'Rejected': { label: 'Return Rejected' }
+  };
+
+  const getLeadStatus = (return_status: string) => {
+    return LEAD_STATUS_MAP[return_status] || LEAD_STATUS_MAP['Not Returned'];
+  };
 
   useEffect(() => {
     if (token) {
@@ -139,11 +152,12 @@ export default function ClientDashboard() {
 
       // Process leads data
       const leads = Array.isArray(leadsRes?.data) ? leadsRes.data : [];
+
       // Backend-real logic
-      const activeLeads = leads.filter((l: any) => l.status === "active").length;
-      const returnedLeads = leads.filter((l: any) => l.return_status !== "Not Returned").length;
-      const boberdoLeads    = leads.filter(l => l.source === "boberdo").length;
-      const manualLeads = leads.filter((l: any) => l.source === "manual").length;
+      const activeLeads = leads.filter(l => l.return_status === "Not Returned").length;
+      const pendingLeads = leads.filter(l => l.return_status === "Pending").length;
+      const returnedLeads = leads.filter(l => l.return_status === "Approved").length;
+      const rejectedLeads = leads.filter(l => l.return_status === "Rejected").length;
 
 
       // Process billing data
@@ -155,10 +169,12 @@ export default function ClientDashboard() {
         activeCampaigns,
         completedCampaigns,
         totalLeads: leads.length,
-        newLeads: activeLeads,
-        contactedLeads: manualLeads,
-        convertedLeads: returnedLeads,
-        boberdoLeads: boberdoLeads,
+          activeLeads,
+          pendingLeads,
+          returnedLeads,
+          rejectedLeads,
+
+
         balance,
         lastPaymentDate
       });
@@ -361,7 +377,7 @@ export default function ClientDashboard() {
           <StatCard
             title="Total Leads"
             mainValue={stats.totalLeads}
-            subtext={`Active: ${stats.newLeads} | Manual: ${stats.contactedLeads} | Returned: ${stats.convertedLeads} | Boberdo: ${stats.boberdoLeads}`}
+           subtext={`Active: ${stats.activeLeads} | Pending: ${stats.pendingLeads} | Returned: ${stats.returnedLeads} | Rejected: ${stats.rejectedLeads}`}
             icon={<PeopleIcon sx={{ fontSize: 40, color: '#2e7d32' }} />}
             color="#2e7d32"
             buttonText="View Leads"
