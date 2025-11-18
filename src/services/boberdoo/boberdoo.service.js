@@ -656,7 +656,7 @@ async function createCampaignInBoberdoo(campaignData, partnerId) {
       State: stateList,
       Zip_Mode: zipMode,
       Zip: zipCodes, // ✅ Added
-      Day_Of_Week_Accept_Leads: activeDays,
+      // Day_Of_Week_Accept_Leads: activeDays,
       // Time_Of_Day_Accept_Leads: timeRange, // ✅ global range
       Timezone: timezone, // ✅ NEW
     };

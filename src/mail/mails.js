@@ -1228,63 +1228,84 @@ const sendInsufficientBalanceEmail = async ({
   userName, 
   requiredAmount, 
   currentBalance,
-  leadId,
-  campaignName 
+  campaignName,
+  campaignId
 }) => {
+
   const insufficientContent = `
     <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 30px 0; background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); border-radius: 12px; border: 2px solid #dc2626; overflow: hidden;">
       <tr>
         <td style="padding: 30px;">
           <table width="100%" cellpadding="0" cellspacing="0" border="0">
+
+            <!-- ICON + HEADING -->
             <tr>
               <td style="text-align: center; padding-bottom: 20px;">
                 <div style="font-size: 60px; margin-bottom: 10px;">🚫</div>
                 <h3 style="margin: 0; color: #991b1b; font-size: 20px; font-weight: 700;">Insufficient Balance</h3>
               </td>
             </tr>
+
+            <!-- CAMPAIGN DETAILS -->
             <tr>
-              <td style="padding: 15px 0; text-align: center;">
+              <td style="padding: 10px 0; text-align: center;">
                 <p style="margin: 0; font-size: 15px; color: #7f1d1d; line-height: 24px;">
-                  Unable to assign lead <strong>${leadId}</strong> to campaign <strong>"${campaignName}"</strong>
+                  Unable to assign leads to campaign 
+                  <strong>"${campaignName}"</strong> (ID: <strong>${campaignId}</strong>)
                 </p>
               </td>
             </tr>
+
             <tr>
               <td style="padding: 20px 0;">
                 <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: white; border-radius: 8px; overflow: hidden;">
+
+                  <!-- REQUIRED AMOUNT -->
                   <tr>
                     <td style="padding: 15px 20px; border-bottom: 1px solid #fecaca;">
                       <table width="100%" cellpadding="0" cellspacing="0" border="0">
                         <tr>
-                          <td style="font-weight: 600; color: #7f1d1d; width: 50%;">Required Amount:</td>
-                          <td style="color: #dc2626; font-weight: 900; text-align: right; font-size: 22px;">$${parseFloat(requiredAmount).toFixed(2)}</td>
+                          <td style="font-weight: 600; color: #7f1d1d;">Required Balance (Lead Price):</td>
+                          <td style="color: #dc2626; font-weight: 900; text-align: right; font-size: 20px;">
+                            $${parseFloat(requiredAmount).toFixed(2)}
+                          </td>
                         </tr>
                       </table>
                     </td>
                   </tr>
+
+                  <!-- CURRENT BALANCE -->
                   <tr>
                     <td style="padding: 15px 20px; border-bottom: 1px solid #fecaca;">
                       <table width="100%" cellpadding="0" cellspacing="0" border="0">
                         <tr>
-                          <td style="font-weight: 600; color: #7f1d1d; width: 50%;">Current Balance:</td>
-                          <td style="color: #991b1b; font-weight: 700; text-align: right; font-size: 20px;">$${parseFloat(currentBalance).toFixed(2)}</td>
+                          <td style="font-weight: 600; color: #7f1d1d;">Current Balance:</td>
+                          <td style="color: #991b1b; font-weight: 700; text-align: right; font-size: 20px;">
+                            $${parseFloat(currentBalance).toFixed(2)}
+                          </td>
                         </tr>
                       </table>
                     </td>
                   </tr>
+
+                  <!-- AMOUNT NEEDED -->
                   <tr>
                     <td style="padding: 15px 20px; background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);">
                       <table width="100%" cellpadding="0" cellspacing="0" border="0">
                         <tr>
-                          <td style="font-weight: 700; color: #1e3a8a; width: 50%;">Amount Needed:</td>
-                          <td style="color: #2563eb; font-weight: 900; text-align: right; font-size: 24px;">$${parseFloat(requiredAmount - currentBalance).toFixed(2)}</td>
+                          <td style="font-weight: 700; color: #1e3a8a;">Amount Needed:</td>
+                          <td style="color: #2563eb; font-weight: 900; text-align: right; font-size: 22px;">
+                            $${parseFloat(requiredAmount - currentBalance).toFixed(2)}
+                          </td>
                         </tr>
                       </table>
                     </td>
                   </tr>
+
                 </table>
               </td>
             </tr>
+
           </table>
         </td>
       </tr>
@@ -1308,6 +1329,7 @@ const sendInsufficientBalanceEmail = async ({
     html,
   });
 };
+
 
 module.exports = {
   createEmailTemplate,

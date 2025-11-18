@@ -7,7 +7,9 @@ const CONSTANT_ENUM = require('../../helper/constant-enums.js');
 const { addCSVProcessingJob, getJobStatus } = require('../../queue/csvProcessor');
 const mongoose = require('mongoose');
 const { User } = require('../../models/user.model.js');
-
+const MAIL_HANDLER = require('../../mail/mails');
+const { sendToN8nWebhook, sendLowBalanceAlert} = require('../../services/n8n/webhookService.js');
+const { leadLogger } = require('../../utils/logger');
 // services/lead.service.js
 
 const createLead = async (data, options = {}) => {
@@ -525,6 +527,77 @@ const validatePrepaidCampaignBalance = async (campaign_id) => {
       );
 
       if (totalAvailable < leadCost) {
+
+
+     // 🔹 Call NEW LOW BALANCE API
+      try {
+        const lowBalanceResp = await sendLowBalanceAlert({
+          campaign_name: campaign.name,
+          filter_set_id: campaign.boberdoo_filter_set_id,
+          partner_id: campaignUser.integrations?.boberdoo?.external_id || "",
+          email: campaignUser.email
+        });
+
+
+        // define once at top of function
+
+
+        if (lowBalanceResp.success) {
+          leadLogger.info('Low Balance webhook sent successfully', {
+       
+            webhook_status: "success",
+            response: lowBalanceResp
+          });
+        } else {
+          leadLogger.warn('Low Balance webhook failed', {
+       
+            webhook_status: "failed",
+            error: lowBalanceResp.error || "Unknown error",
+            response: lowBalanceResp
+          });
+        }
+
+  
+      } catch (err) {
+        leadLogger.error('Fatal error while sending low balance webhook', err, {
+     
+          error: err.message
+        });
+      }
+      // 🔹 Send detailed insufficient balance email
+      try {
+        const emailResp = await MAIL_HANDLER.sendInsufficientBalanceEmail({
+          to: campaignUser.email,
+          userName: campaignUser.name || campaignUser.fullName || campaignUser.email,
+          requiredAmount: leadCost,
+          currentBalance: totalAvailable,
+          campaignName: campaign.name || `Campaign #${campaign._id}`,
+          campaignId: campaign._id
+        });
+
+        if (emailResp?.data?.id) {
+          leadLogger.info('Low Balance email sent successfully', {
+       
+            email_to: campaignUser.email,
+            response_id: emailResp.data.id
+          });
+        } else {
+          leadLogger.warn('Low Balance email sending failed', {
+       
+            email_to: campaignUser.email,
+            error: emailResp?.error || "Unknown error",
+            response: emailResp
+          });
+        }
+
+      } catch (err) {
+        leadLogger.error('Fatal error while sending low balance email', err, {
+     
+          error: err.message
+        });
+      }
+
+
         throw new ErrorHandler(400, 'Insufficient funds to create lead');
       }
 

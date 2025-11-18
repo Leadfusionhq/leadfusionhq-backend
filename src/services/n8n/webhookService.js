@@ -117,4 +117,36 @@ const sendToN8nWebhook = async (campaignData) => {
   }
 };
 
-module.exports = { sendToN8nWebhook };
+const sendLowBalanceAlert = async ({ campaign_name, filter_set_id, partner_id, email }) => {
+  try {
+ const LOW_BALANCE_API = "https://n8n.srv997679.hstgr.cloud/webhook/low_balance";
+
+
+    const payload = {
+      campaign_name,
+      filter_set_id,
+      partner_id,
+      email,
+      triggered_at: new Date().toISOString()
+    };
+
+    console.log("📤 Sending LOW BALANCE alert:", payload);
+
+    const resp = await axios.post(LOW_BALANCE_API, payload, {
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      timeout: 10000,
+    });
+
+    console.log("✅ Low Balance API Response:", resp.status);
+    return { success: true };
+  } catch (error) {
+    console.error("❌ Error sending low balance alert:", error.response?.data || error.message);
+    return { success: false, error: error.message };
+  }
+};
+
+
+module.exports = { sendToN8nWebhook,sendLowBalanceAlert };
