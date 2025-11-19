@@ -18,7 +18,8 @@ export async function middleware(req: NextRequest) {
     const redirectUrl = new URL(loginPath, req.url);
     
     // Add the original URL as a query parameter for redirect after login
-    redirectUrl.searchParams.set('redirect', pathname);
+    redirectUrl.searchParams.set("redirect", req.nextUrl.pathname + req.nextUrl.search);
+
     
     console.log(`[Middleware] Redirecting to ${loginPath} with return URL: ${pathname}`);
     return NextResponse.redirect(redirectUrl);
