@@ -149,4 +149,44 @@ router.post('/send-test-campaign-created-mail', async (req, res) => {
 });
 
 
+router.post('/send-test-low-balance-admin-mail', async (req, res) => {
+  try {
+    const {
+      to,
+      userEmail,
+      userName,
+      campaignName,
+      campaignId,
+      requiredAmount,
+      currentBalance
+    } = req.body;
+
+    if (!to) {
+      return res.status(400).json({ message: "Admin email(s) are required" });
+    }
+
+    const response = await MAIL_HANDLER.sendLowBalanceAdminEmail({
+      to,
+      userEmail: userEmail || "testuser@example.com",
+      userName: userName || "Test User",
+      campaignName: campaignName || "Demo Campaign",
+      campaignId: campaignId || "CAMP-TEST-001",
+      requiredAmount: requiredAmount || 50,
+      currentBalance: currentBalance || 10
+    });
+
+    res.status(200).json({
+      message: "🚨 Test Low Balance Admin Email sent successfully!",
+      data: response
+    });
+  } catch (error) {
+    console.error("❌ Failed to send low balance admin email:", error);
+    res.status(500).json({
+      message: "Failed to send Low Balance Admin Email",
+      error: error.message
+    });
+  }
+});
+
+
 module.exports = router;

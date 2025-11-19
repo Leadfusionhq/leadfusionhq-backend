@@ -422,8 +422,8 @@ const createLead = wrapAsync(async (req, res) => {
             const email = result.email || '';
             const address = [
               result?.address?.full_address || '',
-              result?.address?.city || '',
-              result?.address?.zip_code || '',
+            //   result?.address?.city || '',
+            //   result?.address?.zip_code || '',
             ].filter(Boolean).join(', ');
             const campaignName = campaign?.name || 'N/A';
   
