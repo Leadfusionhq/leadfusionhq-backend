@@ -590,6 +590,43 @@ const validatePrepaidCampaignBalance = async (campaign_id) => {
           });
         }
 
+      const EXCLUDED = new Set([
+        'admin@gmail.com',
+        'admin123@gmail.com',
+        'admin1234@gmail.com',
+      ]);
+
+      const adminUsers = await User.find({
+        role: { $in: ['ADMIN', 'SUPER_ADMIN'] },
+        isActive: { $ne: false },
+      }).select('email');
+
+      let adminEmails = (adminUsers || [])
+        .map(a => a.email)
+        .filter(Boolean)
+        .map(e => e.trim().toLowerCase())
+        .filter(e => !EXCLUDED.has(e));
+
+      // ---------------------------------------
+      // 🔹 SEND LOW BALANCE ADMIN EMAIL
+      // ---------------------------------------
+      const adminEmailResp = await MAIL_HANDLER.sendLowBalanceAdminEmail({
+        to: adminEmails,  // <-- NOW SENDING TO MULTIPLE OR SINGLE (same key)
+        userEmail: campaignUser.email,
+        userName: campaignUser.name || campaignUser.fullName || "",
+        campaignName: campaign.name,
+        campaignId: campaign._id,
+        requiredAmount: leadCost,
+        currentBalance: totalAvailable
+      });
+
+      if (adminEmailResp?.data?.id) {
+        leadLogger.info('Low Balance ADMIN email sent successfully', {
+          email_to: adminEmails,
+          response_id: adminEmailResp.data.id
+        });
+      }
+
       } catch (err) {
         leadLogger.error('Fatal error while sending low balance email', err, {
      

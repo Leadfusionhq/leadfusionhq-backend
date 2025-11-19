@@ -543,6 +543,36 @@ const assignLeadPayAsYouGo = async (userId, leadId, leadCost, assignedBy, sessio
   const user = await User.findById(userId).session(session);
   if (!user) throw new ErrorHandler(404, 'User not found');
 
+  const currentBalance = user.balance || 0;
+
+  // 1️⃣ FIRST TRY: Deduct from user balance (same as prepaid)
+  if (currentBalance >= leadCost) {
+    user.balance = currentBalance - leadCost;
+    await user.save({ session });
+
+    const transaction = new Transaction({
+      userId,
+      type: "LEAD_ASSIGNMENT",
+      amount: -leadCost,
+      status: "COMPLETED",
+      description: `Lead assigned (Pay-As-You-Go from Balance): ${leadId}`,
+      paymentMethod: "BALANCE",
+      leadId,
+      assignedBy,
+      balanceAfter: user.balance
+    });
+
+    await transaction.save({ session });
+
+    return {
+      paymentMethod: "BALANCE",
+      transactionId: transaction._id,
+      leadId,
+      newBalance: user.balance
+    };
+  }
+
+  // 2️⃣ SECOND: If balance NOT enough → fallback to NMI card
   const defaultPaymentMethod = user.paymentMethods?.find(pm => pm.isDefault === true);
 
   if (!defaultPaymentMethod) {
@@ -561,6 +591,7 @@ const assignLeadPayAsYouGo = async (userId, leadId, leadCost, assignedBy, sessio
     );
   }
 
+  // Charge the card (same as before)
   const chargeResult = await chargeCustomerVault(
     vaultId,
     leadCost,
@@ -571,13 +602,12 @@ const assignLeadPayAsYouGo = async (userId, leadId, leadCost, assignedBy, sessio
     throw new ErrorHandler(400, "Card payment failed: " + chargeResult.message);
   }
 
-
   const transaction = new Transaction({
     userId,
     type: "LEAD_ASSIGNMENT",
     amount: -leadCost,
     status: "COMPLETED",
-    description: `Lead assigned (Pay-As-You-Go): ${leadId}`,
+    description: `Lead assigned (Pay-As-You-Go - Card Charge): ${leadId}`,
     paymentMethod: "CARD",
     transactionId: chargeResult.transactionId,
     leadId,
@@ -595,6 +625,7 @@ const assignLeadPayAsYouGo = async (userId, leadId, leadCost, assignedBy, sessio
     newBalance: user.balance
   };
 };
+
 
 
 

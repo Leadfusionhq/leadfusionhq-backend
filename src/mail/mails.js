@@ -1330,6 +1330,92 @@ const sendInsufficientBalanceEmail = async ({
   });
 };
 
+const sendLowBalanceAdminEmail = async ({
+  to,
+  userEmail,
+  userName,
+  campaignName,
+  campaignId,
+  requiredAmount,
+  currentBalance
+}) => {
+
+  // Always ensure "to" is an array
+  const recipients = Array.isArray(to) ? to : [to];
+
+  // Format values
+  const leadCost = parseFloat(requiredAmount).toFixed(2);
+  const balance = parseFloat(currentBalance).toFixed(2);
+  const needed = parseFloat(requiredAmount - currentBalance).toFixed(2);
+
+  // 📌 Styled table (same design as new user registration)
+  const table = `
+    <table cellpadding="0" cellspacing="0" border="0"
+           style="width: 100%; font-family: Arial, sans-serif; font-size: 14px; 
+                  color: #1e3a8a; line-height: 1.6; text-align: left;">
+
+      <tr>
+        <td style="padding: 4px 0; vertical-align: top;"><strong>User</strong></td>
+        <td style="padding: 4px 0; color: #1e40af;">
+          ${userName} (${userEmail})
+        </td>
+      </tr>
+
+      <tr>
+        <td style="padding: 4px 0; vertical-align: top;"><strong>Campaign</strong></td>
+        <td style="padding: 4px 0; color: #1e40af;">
+          ${campaignName}
+        </td>
+      </tr>
+
+      <tr>
+        <td style="padding: 4px 0; vertical-align: top;"><strong>Campaign ID</strong></td>
+        <td style="padding: 4px 0; color: #1e40af;">
+          ${campaignId}
+        </td>
+      </tr>
+
+      <tr>
+        <td style="padding: 4px 0; vertical-align: top;"><strong>Lead Cost</strong></td>
+        <td style="padding: 4px 0; color: #1e40af;">$${leadCost}</td>
+      </tr>
+
+      <tr>
+        <td style="padding: 4px 0; vertical-align: top;"><strong>User Balance</strong></td>
+        <td style="padding: 4px 0; color: #1e40af;">$${balance}</td>
+      </tr>
+
+      <tr>
+        <td style="padding: 4px 0; vertical-align: top;"><strong>Amount Needed</strong></td>
+        <td style="padding: 4px 0; color: #dc2626;">$${needed}</td>
+      </tr>
+
+    </table>
+  `;
+
+  // 📌 Use the SAME email wrapper template as registration emails
+  const html = createEmailTemplate({
+    title: 'Low Balance Alert – Lead Assignment Stopped',
+    mainText: `
+      <p style="margin-bottom: 10px; color: #1e3a8a;">
+        A lead assignment was stopped due to <strong>insufficient balance</strong>.
+      </p>
+
+      ${table}
+
+    `,
+    footerText: '' // no footer
+  });
+
+  return resend.emails.send({
+    from: FROM_EMAIL,
+    to: recipients,
+    subject: "Low Balance Alert – Lead Stopped",
+    html
+  });
+};
+
+
 
 module.exports = {
   createEmailTemplate,
@@ -1351,5 +1437,6 @@ module.exports = {
     sendLowBalanceWarning,
     sendInsufficientBalanceEmail,
     sendNewUserRegistrationToAdmin,
-    sendCampaignCreatedEmail
+    sendCampaignCreatedEmail,
+    sendLowBalanceAdminEmail
 };
