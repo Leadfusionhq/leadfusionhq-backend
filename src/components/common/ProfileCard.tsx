@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 import { removeToken } from '@/utils/auth';
 import { logout } from '@/redux/auth/authSlice';
 import { useLoader } from '@/context/LoaderContext';
-
+import { toast } from 'react-toastify';
 interface ProfileCardProps {
   onClose?: () => void;
 }
@@ -45,15 +45,25 @@ const ProfileCard: React.FC<ProfileCardProps> = ({ onClose }) => {
       console.error("Logout failed", error);
       await new Promise(resolve => setTimeout(resolve, 800));
     } finally {
-      // Always clean up and navigate
-      removeToken();
-      dispatch(logout());
-      hideLoader(); // Explicitly hide loader
-      
-      // Use setTimeout to ensure state updates complete before navigation
-      setTimeout(() => {
-        router.replace("/login");
-      }, 50);
+ const role = user?.role;
+
+
+    removeToken();
+
+    dispatch(logout());
+    toast.dismiss();
+
+
+    const t = toast.success("Logged out successfully!", { autoClose: 2000 });
+
+    hideLoader(); // ⚠️ check if this covers whole screen
+
+
+    setTimeout(() => {
+      if (role === "ADMIN") router.replace("/admin-login");
+      else router.replace("/login");
+    }, 200);
+  
     }
   };
 
