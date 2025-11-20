@@ -1415,6 +1415,58 @@ const sendLowBalanceAdminEmail = async ({
   });
 };
 
+const sendCampaignResumedEmail = async ({ to, userName, email, partnerId }) => {
+    const html = createEmailTemplate({
+        title: '✅ Lead Service Resumed',
+        greeting: `Hello ${userName}!`,
+        mainText: `
+            <p>Your lead service has been resumed successfully.</p>
+            <p><strong>Partner ID:</strong> ${partnerId}</p>
+            <p><strong>Email:</strong> ${email}</p>
+        `,
+        footerText: 'If you have any questions, please contact support.'
+    });
+
+    return resend.emails.send({
+        from: FROM_EMAIL,
+        to,
+        subject: `✅ Lead Service Resumed`,
+        html
+    });
+};
+const sendCampaignResumedAdminEmail = async ({ to, userName, userEmail, partnerId }) => {
+    const recipients = Array.isArray(to) ? to : [to];
+
+    const table = `
+        <table cellpadding="0" cellspacing="0" border="0"
+               style="width: 100%; font-family: Arial, sans-serif; font-size: 14px; color: #1e3a8a; line-height: 1.6;">
+          <tr>
+            <td><strong>User</strong></td>
+            <td>${userName} (${userEmail})</td>
+          </tr>
+          <tr>
+            <td><strong>Partner ID</strong></td>
+            <td>${partnerId}</td>
+          </tr>
+        </table>
+    `;
+
+    const html = createEmailTemplate({
+        title: 'Lead Service Resumed – Balance Added',
+        mainText: `
+            <p>The lead assignment service for the user has been resumed after sufficient funds were added:</p>
+            ${table}
+        `,
+        footerText: ''
+    });
+
+    return resend.emails.send({
+        from: FROM_EMAIL,
+        to: recipients,
+        subject: `Lead Service Resumed – Partner ID ${partnerId}`,
+        html
+    });
+};
 
 
 module.exports = {
@@ -1438,5 +1490,8 @@ module.exports = {
     sendInsufficientBalanceEmail,
     sendNewUserRegistrationToAdmin,
     sendCampaignCreatedEmail,
-    sendLowBalanceAdminEmail
+    sendLowBalanceAdminEmail,
+    sendCampaignResumedEmail,
+    sendCampaignResumedAdminEmail
+
 };
