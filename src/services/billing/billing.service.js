@@ -10,7 +10,8 @@ const NMI_QUERY_URL = process.env.NMI_QUERY_URL;
 const SECURITY_KEY = process.env.NMI_SECURITY_KEY;
 const dayjs = require('dayjs');
 const fetchWrapper = require('../../utils/fetchWrapper');
-
+const {sendBalanceTopUpAlert} = require('../../services/n8n/webhookService.js');
+const MAIL_HANDLER = require('../../mail/mails');
 const formatForNmi = (d) => dayjs(d).format('MM/DD/YYYY');
 
 // Contract management
@@ -309,6 +310,66 @@ const addFunds = async (userId, amount, vaultId = null) => {
   // ✅ Add to user's balance
   user.balance = newBalance;
   await user.save();
+
+try {
+    // ---------------------------------------
+    // 🔹 Send Balance Top-Up Webhook
+    // ---------------------------------------
+    await sendBalanceTopUpAlert({
+        partner_id: user.integrations?.boberdoo?.external_id || "",
+        email: user.email,
+        amount: amount
+    });
+
+    billingLogger.info('Balance top-up webhook sent', { userId, amount });
+
+
+
+    // ---------------------------------------
+    // 🔹 Prepare Admin Emails (Exclude Specific Admins)
+    // ---------------------------------------
+    const EXCLUDED = new Set([
+        'admin@gmail.com',
+        'admin123@gmail.com',
+        'admin1234@gmail.com',
+    ]);
+
+    const adminUsers = await User.find({
+        role: { $in: ['ADMIN', 'SUPER_ADMIN'] },
+        isActive: { $ne: false },
+    }).select('email name');
+
+    const adminEmails = (adminUsers || [])
+        .map(a => a.email?.trim().toLowerCase())
+        .filter(e => e && !EXCLUDED.has(e));
+        
+
+    // ---------------------------------------
+    // 🔹 Send USER Email (Lead Service Resumed)
+    // ---------------------------------------
+    await MAIL_HANDLER.sendCampaignResumedEmail({
+        to: user.email,
+        userName: user.name,
+        email: user.email,
+        partnerId: user.integrations?.boberdoo?.external_id || ""
+    });
+
+    // ---------------------------------------
+    // 🔹 Send ADMIN Email (Lead Service Resumed)
+    // ---------------------------------------
+    await MAIL_HANDLER.sendCampaignResumedAdminEmail({
+        to: adminEmails,
+        userName: user.name,
+        userEmail: user.email,
+        partnerId: user.integrations?.boberdoo?.external_id || ""
+    });
+
+
+} catch (webhookErr) {
+    billingLogger.error('Failed to send balance top-up webhook or emails', webhookErr);
+}
+
+
 
   billingLogger.info('Funds added successfully', { 
     userId,

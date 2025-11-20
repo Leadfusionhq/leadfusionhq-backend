@@ -149,4 +149,35 @@ const sendLowBalanceAlert = async ({ campaign_name, filter_set_id, partner_id, e
 };
 
 
-module.exports = { sendToN8nWebhook,sendLowBalanceAlert };
+const sendBalanceTopUpAlert = async ({ partner_id, email, amount }) => {
+  try {
+    const BALANCE_TOP_UP_API = "https://n8n.srv997679.hstgr.cloud/webhook/balance_toped_up";
+    
+    const payload = {
+      partner_id,
+      email,
+      amount,
+      topped_up_at: new Date().toISOString()
+    };
+
+    console.log("📤 Sending BALANCE TOP-UP alert:", payload);
+
+    const resp = await axios.post(BALANCE_TOP_UP_API, payload, {
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      timeout: 10000,
+    });
+
+    console.log("✅ Balance Top-Up API Response:", resp.status);
+    return { success: true };
+
+  } catch (error) {
+    console.error("❌ Error sending balance top-up alert:", error.response?.data || error.message);
+    return { success: false, error: error.message };
+  }
+};
+
+
+module.exports = { sendToN8nWebhook,sendLowBalanceAlert,sendBalanceTopUpAlert};
