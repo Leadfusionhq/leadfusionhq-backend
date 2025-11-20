@@ -330,6 +330,32 @@ const createLead = wrapAsync(async (req, res) => {
         new_balance: billingResult.newBalance,
         lead_cost: leadCost,
       });
+      try {
+        const remainingBalance = billingResult.newBalance;
+
+        if (remainingBalance < leadCost) {
+            const owner = await User.findById(campaign.user_id);
+
+            await MAIL_HANDLER.sendLowBalanceWarningEmail({
+            to: owner.email,
+            userName: owner.name,
+            partnerId: owner.integrations?.boberdoo?.external_id || "N/A",
+            email: owner.email,
+            currentBalance: remainingBalance,
+            leadCost
+            });
+
+            leadLogger.warn('Low balance warning sent to user', {
+            campaignId: campaign._id,
+            userId: owner._id,
+            balance: remainingBalance
+            });
+        }
+
+        } catch (lowBalanceErr) {
+        leadLogger.error('Error in low balance check', lowBalanceErr);
+        }
+
   
       await session.commitTransaction();
       session.endSession();
