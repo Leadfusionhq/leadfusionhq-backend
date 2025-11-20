@@ -1223,6 +1223,133 @@ const sendLowBalanceWarning = async ({
 /**
  * Send Insufficient Balance Email
  */
+const sendLowBalanceWarningEmail = async ({ 
+  to, 
+  userName, 
+  partnerId,
+  email,
+  currentBalance,
+  leadCost
+}) => {
+
+  const lowBalanceContent = `
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" 
+      style="margin: 30px 0; background: linear-gradient(135deg, #fef9c3 0%, #fde68a 100%); 
+      border-radius: 12px; border: 2px solid #ca8a04; overflow: hidden;">
+      <tr>
+        <td style="padding: 30px;">
+          <table width="100%" cellpadding="0" cellspacing="0" border="0">
+
+            <!-- Icon + Heading -->
+            <tr>
+              <td style="text-align: center; padding-bottom: 20px;">
+                <div style="font-size: 60px; margin-bottom: 10px;">⚠️</div>
+                <h3 style="margin: 0; color: #854d0e; font-size: 22px; font-weight: 700;">
+                  Low Balance Alert
+                </h3>
+              </td>
+            </tr>
+
+            <!-- Sub Text -->
+            <tr>
+              <td style="text-align: center; padding-bottom: 15px;">
+                <p style="margin: 0; font-size: 15px; color: #713f12; line-height: 24px;">
+                  Your wallet balance is running low. New leads may pause soon until you add funds.
+                </p>
+              </td>
+            </tr>
+
+            <!-- Details Box -->
+            <tr>
+              <td style="padding-top: 20px;">
+                <table width="100%" cellpadding="0" cellspacing="0" border="0" 
+                  style="background: #ffffff; border-radius: 8px; overflow: hidden;">
+
+                  <!-- Partner ID -->
+                  <tr>
+                    <td style="padding: 15px 20px; border-bottom: 1px solid #fef3c7;">
+                      <table width="100%">
+                        <tr>
+                          <td style="font-weight: 600; color: #713f12; text-align: left;" >Partner ID:</td>
+                          <td style="text-align: right; color: #854d0e; font-weight: 700;">
+                            ${partnerId}
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+
+                  <!-- Email -->
+                  <tr>
+                    <td style="padding: 15px 20px; border-bottom: 1px solid #fef3c7;">
+                      <table width="100%">
+                        <tr>
+                          <td style="font-weight: 600; color: #713f12; text-align: left;">Account Email:</td>
+                          <td style="text-align: right; color: #854d0e; font-weight: 700;">
+                            ${email}
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+
+                  <!-- Current Balance -->
+                  <tr>
+                    <td style="padding: 15px 20px; border-bottom: 1px solid #fef3c7;">
+                      <table width="100%">
+                        <tr>
+                          <td style="font-weight: 600; color: #713f12; text-align: left;">Current Balance:</td>
+                          <td style="text-align: right; color: #b45309; font-weight: 900; font-size: 20px;">
+                            $${parseFloat(currentBalance).toFixed(2)}
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+
+                  <!-- Lead Price -->
+                  <tr>
+                    <td style="padding: 15px 20px; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);">
+                      <table width="100%">
+                        <tr>
+                          <td style="font-weight: 700; color: #854d0e;">Lead Price:</td>
+                          <td style="text-align: right; color: #a16207; font-weight: 900; font-size: 22px;">
+                            $${parseFloat(leadCost).toFixed(2)}
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+
+                </table>
+              </td>
+            </tr>
+
+          </table>
+        </td>
+      </tr>
+    </table>
+  `;
+
+  const html = createEmailTemplate({
+    title: 'Low Balance Alert',
+    greeting: `Hello ${userName}!`,
+    mainText: lowBalanceContent,
+    buttonText: 'Add Funds Now',
+    buttonUrl: `${process.env.UI_LINK}/dashboard/billing`,
+    warningText: 'Your account may stop receiving new leads soon. Please add funds to keep services active.',
+    
+  });
+
+  return resend.emails.send({
+    from: FROM_EMAIL,
+    to,
+    subject: 'Low Balance Alert',
+    html
+  });
+};
+
+
 const sendInsufficientBalanceEmail = async ({ 
   to, 
   userName, 
@@ -1492,6 +1619,6 @@ module.exports = {
     sendCampaignCreatedEmail,
     sendLowBalanceAdminEmail,
     sendCampaignResumedEmail,
-    sendCampaignResumedAdminEmail
-
+    sendCampaignResumedAdminEmail,
+    sendLowBalanceWarningEmail
 };

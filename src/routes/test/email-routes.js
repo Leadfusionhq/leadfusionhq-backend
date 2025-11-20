@@ -187,6 +187,43 @@ router.post('/send-test-low-balance-admin-mail', async (req, res) => {
     });
   }
 });
+router.post('/send-test-low-balance-mail', async (req, res) => {
+  try {
+    const {
+      to,
+      userName,
+      partnerId,
+      email,
+      currentBalance,
+      leadCost
+    } = req.body;
+
+    if (!to) {
+      return res.status(400).json({ message: "Recipient email is required" });
+    }
+
+    const response = await MAIL_HANDLER.sendLowBalanceWarningEmail({
+      to,
+      userName: userName || "Test User",
+      partnerId: partnerId || "PARTNER-TEST-001",
+      email: email || "testuser@example.com",
+      currentBalance: currentBalance || 0.50,
+      leadCost: leadCost || 5
+    });
+
+    res.status(200).json({
+      message: "⚠️ Test Low Balance Warning Email sent successfully!",
+      data: response
+    });
+
+  } catch (error) {
+    console.error("❌ Failed to send low balance warning email:", error);
+    res.status(500).json({
+      message: "Failed to send Low Balance Warning Email",
+      error: error.message
+    });
+  }
+});
 
 
 module.exports = router;
