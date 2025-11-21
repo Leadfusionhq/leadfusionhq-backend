@@ -12,7 +12,7 @@ const FormikSelect = ({
   label?: string; 
   options: { value: string; label: string }[];
   errorMessage?: string;
-} & FieldAttributes<string | number>) => (
+} & FieldAttributes<any>) => (
   <div className="w-full">
     {label && <label className="block text-[#1C1C1C] text-lg mb-2">{label}</label>}
     <Field

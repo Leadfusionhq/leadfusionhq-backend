@@ -1,7 +1,7 @@
 'use client';
 import { Field, ErrorMessage, FieldAttributes } from 'formik';
 
-const FormikCheckbox = ({ label, errorMessage, ...props }: { label?: string; errorMessage?: string } & FieldAttributes<boolean>) => (
+const FormikCheckbox = ({ label, errorMessage, ...props }: { label?: string; errorMessage?: string } & FieldAttributes<any>) => (
   <div className="w-full flex items-center space-x-2">
     <Field
       {...props}

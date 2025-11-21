@@ -62,7 +62,7 @@ const AddNewUser = () => {
   };
 
   // Custom Formik-compatible Input
-  const FormikInput = ({ label, ...props }: { label?: string } & FieldAttributes<string>) => (
+  const FormikInput = ({ label, ...props }: { label?: string } & FieldAttributes<any>) => (
     <div className="w-full">
       {label && <label className="block text-[#1C1C1C] text-lg mb-2">{label}</label>}
       <Field
