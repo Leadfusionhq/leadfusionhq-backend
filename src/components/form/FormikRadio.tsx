@@ -1,7 +1,7 @@
 'use client'
 import { Field, ErrorMessage, FieldAttributes } from 'formik';
 
-const FormikRadio = ({ label, errorMessage, ...props }: { label?: string; errorMessage?: string } & FieldAttributes<string | number>) => (
+const FormikRadio = ({ label, errorMessage, ...props }: { label?: string; errorMessage?: string } & FieldAttributes<any>) => (
   <div className="flex items-center space-x-2">
     <Field
       {...props}

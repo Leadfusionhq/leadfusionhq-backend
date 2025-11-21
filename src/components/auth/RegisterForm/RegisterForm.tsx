@@ -180,7 +180,7 @@ const RegisterForm = () => {
   };
 
   // Custom Formik-compatible Input
-  const FormikInput = ({ label, ...props }: { label?: string } & FieldAttributes<string>) => (
+  const FormikInput = ({ label, ...props }: { label?: string } & FieldAttributes<any>) => (
     <div className="w-full mb-2">
       {label && <label className="block text-[#1C1C1C] text-sm mb-1 font-medium">{label}</label>}
       <Field
