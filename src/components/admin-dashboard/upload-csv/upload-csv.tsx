@@ -57,6 +57,7 @@ const DATABASE_COLUMNS: DatabaseColumn[] = [
   { key: 'last_name', label: 'Last Name', required: true },
   { key: 'suffix', label: 'Suffix', required: false },
   { key: 'homeowner_desc', label: 'Homeowner Description', required: false },
+  { key: 'house_age', label: 'House Age Description', required: false },
   { key: 'gender', label: 'Gender', required: false },
   { key: 'age', label: 'Age', required: false },
   { key: 'dwelltype', label: 'Dwell Type', required: false },
@@ -151,6 +152,8 @@ export default function CSVUploadComponent() {
       mapping[header] = 'suffix';
     } else if (lowerHeader.includes('homeowner')) {
       mapping[header] = 'homeowner_desc';
+    } else if (lowerHeader.includes('houseage') || lowerHeader.includes('homeage') || lowerHeader.includes('house_age')) {
+      mapping[header] = 'house_age';
     } else if (lowerHeader.includes('gender')) {
       mapping[header] = 'gender';
     } else if (lowerHeader.includes('age')) {
