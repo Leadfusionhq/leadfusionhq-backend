@@ -333,7 +333,7 @@ const createLead = wrapAsync(async (req, res) => {
       try {
         const remainingBalance = billingResult.newBalance;
 
-        if (remainingBalance < leadCost) {
+        if (campaign.payment_type === "prepaid" && remainingBalance < leadCost)  {
             const owner = await User.findById(campaign.user_id);
 
             await MAIL_HANDLER.sendLowBalanceWarningEmail({
