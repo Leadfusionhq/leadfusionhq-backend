@@ -226,4 +226,84 @@ router.post('/send-test-low-balance-mail', async (req, res) => {
 });
 
 
+router.post('/send-test-failed-lead-payment-mail', async (req, res) => {
+  try {
+    const {
+      to,
+      userName,
+      leadId,
+      amount,
+      cardLast4,
+      errorMessage
+    } = req.body;
+
+    if (!to) {
+      return res.status(400).json({ message: "Recipient email is required" });
+    }
+
+    const response = await MAIL_HANDLER.sendFailedLeadPaymentEmail({
+      to,
+      userName: userName || "Test User",
+      leadId: leadId || "LEAD-TEST-001",
+      amount: amount || 10,
+      cardLast4: cardLast4 || "4242",
+      errorMessage: errorMessage || "Test payment failure"
+    });
+
+    res.status(200).json({
+      message: "❌ Test Failed Payment Email sent to user!",
+      data: response
+    });
+
+  } catch (error) {
+    console.error("❌ Failed to send user failed-payment email:", error);
+    res.status(500).json({
+      message: "Failed to send user failed-payment email",
+      error: error.message
+    });
+  }
+});
+
+
+router.post('/send-test-failed-lead-payment-admin-mail', async (req, res) => {
+  try {
+    const {
+      to,
+      userName,
+      userEmail,
+      leadId,
+      amount,
+      cardLast4,
+      errorMessage
+    } = req.body;
+
+    if (!to || !Array.isArray(to)) {
+      return res.status(400).json({ message: "Admin email array is required" });
+    }
+
+    const response = await MAIL_HANDLER.sendFailedLeadPaymentAdminEmail({
+      to,
+      userName: userName || "Test User",
+      userEmail: userEmail || "testuser@example.com",
+      leadId: leadId || "LEAD-TEST-001",
+      amount: amount || 10,
+      cardLast4: cardLast4 || "4242",
+      errorMessage: errorMessage || "Test admin failure message"
+    });
+
+    res.status(200).json({
+      message: "⚠️ Test Failed Payment Admin Email sent!",
+      data: response
+    });
+
+  } catch (error) {
+    console.error("❌ Failed to send admin failed-payment email:", error);
+    res.status(500).json({
+      message: "Failed to send admin failed-payment email",
+      error: error.message
+    });
+  }
+});
+
+
 module.exports = router;

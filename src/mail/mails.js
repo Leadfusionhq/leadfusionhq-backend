@@ -1595,6 +1595,68 @@ const sendCampaignResumedAdminEmail = async ({ to, userName, userEmail, partnerI
     });
 };
 
+const sendFailedLeadPaymentEmail = async ({ to, userName, leadId, amount, cardLast4, errorMessage }) => {
+  const html = createEmailTemplate({
+    title: '❌ Lead Payment Failed',
+    greeting: `Hello ${userName},`,
+    mainText: `
+      <p>Your Pay-As-You-Go payment for a new lead has failed.</p>
+
+      <table cellpadding="6" style="width:100%; border-collapse: collapse;">
+        <tr><td><strong>Lead ID:</strong></td><td>${leadId}</td></tr>
+        <tr><td><strong>Amount:</strong></td><td>$${amount}</td></tr>
+        <tr><td><strong>Card Used:</strong></td><td>**** **** **** ${cardLast4}</td></tr>
+        <tr><td><strong>Error:</strong></td><td>${errorMessage}</td></tr>
+      </table>
+
+      <p>Please update your payment method to continue receiving leads.</p>
+    `,
+    footerText: 'If you need help, feel free to contact support.'
+  });
+
+  return resend.emails.send({
+    from: FROM_EMAIL,
+    to,
+    subject: "❌ Lead Payment Failed",
+    html
+  });
+};
+
+
+const sendFailedLeadPaymentAdminEmail = async ({ to, userName, userEmail, leadId, amount, cardLast4, errorMessage }) => {
+  const recipients = Array.isArray(to) ? to : [to];
+
+  const table = `
+    <table cellpadding="6" cellspacing="0" style="width:100%; border-collapse: collapse;">
+      <tr><td><strong>User Name</strong></td><td>${userName}</td></tr>
+      <tr><td><strong>User Email</strong></td><td>${userEmail}</td></tr>
+      <tr><td><strong>Lead ID</strong></td><td>${leadId}</td></tr>
+      <tr><td><strong>Amount</strong></td><td>$${amount}</td></tr>
+      <tr><td><strong>Card Used</strong></td><td>**** **** **** ${cardLast4}</td></tr>
+      <tr><td><strong>Error</strong></td><td>${errorMessage}</td></tr>
+    </table>
+  `;
+
+  const html = createEmailTemplate({
+    title: 'Lead Payment Failed – User Attempted Card Charge',
+    mainText: `
+      <p>A Pay-As-You-Go lead charge has failed for the following user:</p>
+      ${table}
+    `,
+    footerText: ''
+  });
+
+  return resend.emails.send({
+    from: FROM_EMAIL,
+    to: recipients,
+    subject: `Lead Payment Failed – ${userEmail}`,
+    html
+  });
+};
+
+
+
+
 
 module.exports = {
   createEmailTemplate,
@@ -1620,5 +1682,7 @@ module.exports = {
     sendLowBalanceAdminEmail,
     sendCampaignResumedEmail,
     sendCampaignResumedAdminEmail,
-    sendLowBalanceWarningEmail
+    sendLowBalanceWarningEmail,
+    sendFailedLeadPaymentEmail,
+    sendFailedLeadPaymentAdminEmail,
 };

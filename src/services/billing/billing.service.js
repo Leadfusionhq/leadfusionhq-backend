@@ -659,7 +659,76 @@ const assignLeadPayAsYouGo = async (userId, leadId, leadCost, assignedBy, sessio
     `Lead assignment: ${leadId}`
   );
 
+
+  // ❌ PAYMENT FAILED → send email to user + admin
   if (!chargeResult.success) {
+
+    // --------------------------
+    // 1️⃣ SEND USER FAILURE MAIL
+    // --------------------------
+    try {
+      await MAIL_HANDLER.sendFailedLeadPaymentEmail({
+        to: user.email,
+        userName: user.name || user.fullName || user.email,
+        leadId,
+        amount: leadCost,
+        cardLast4,
+        errorMessage: chargeResult.message
+      });
+    } catch (emailErr) {
+      console.log("User failed payment email error:", emailErr.message);
+
+      // ❗ Throw errorHandler inside catch as requested
+      throw new ErrorHandler(
+        500,
+        "Failed to send user failed-payment email: " + emailErr.message
+      );
+    }
+
+    // ---------------------------
+    // 2️⃣ SEND ADMIN FAILURE MAIL
+    // ---------------------------
+    try {
+      const EXCLUDED = new Set([
+        "admin@gmail.com",
+        "admin123@gmail.com",
+        "admin1234@gmail.com"
+      ]);
+
+      const adminUsers = await User.find({
+        role: { $in: ["ADMIN", "SUPER_ADMIN"] },
+        isActive: { $ne: false }
+      }).select("email");
+
+      let adminEmails = (adminUsers || [])
+        .map(a => a.email)
+        .filter(Boolean)
+        .map(e => e.trim().toLowerCase())
+        .filter(e => !EXCLUDED.has(e)); // exclude unwanted emails
+
+      await MAIL_HANDLER.sendFailedLeadPaymentAdminEmail({
+        to: adminEmails,
+        userEmail: user.email,
+        userName: user.name || user.fullName || "",
+        leadId,
+        amount: leadCost,
+        cardLast4,
+        errorMessage: chargeResult.message
+      });
+
+    } catch (emailErr) {
+      console.log("Admin failed payment email error:", emailErr.message);
+
+      // ❗ Throw errorHandler inside catch as requested
+      throw new ErrorHandler(
+        500,
+        "Failed to send admin failed-payment email: " + emailErr.message
+      );
+    }
+
+    // --------------------------------------------------
+    // 3️⃣ FINALLY throw the actual payment failure error
+    // --------------------------------------------------
     throw new ErrorHandler(400, "Card payment failed: " + chargeResult.message);
   }
 
