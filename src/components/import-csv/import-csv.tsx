@@ -45,6 +45,11 @@ export const REQUIRED_COLUMNS = [
   "not_import",
 ];
 
+// Actual required columns (excluding "not_import" which is just a placeholder)
+const ACTUAL_REQUIRED_COLUMNS = REQUIRED_COLUMNS.filter(
+  (col) => col !== "not_import"
+);
+
 const regexList: RegExp[] = [
   /(phone|mobile|contact|number)/i,
   /(first|fname|f_name|given|name)/i,
@@ -289,6 +294,19 @@ export default function CSVImport() {
         setIsLoading(false);
         return;
       }
+
+      // Validate that at least some required columns are mapped (not just "not_import")
+      const mappedRequiredColumns = Object.values(finalMapping).filter(
+        (v) => v && v !== "" && v !== "not_import"
+      );
+      if (mappedRequiredColumns.length === 0) {
+        setShowMapping(true);
+        toast.warn(
+          "Please map at least some required columns (not just 'not_import') before importing."
+        );
+        setIsLoading(false);
+        return;
+      }
     } else {
       // Auto-build mapping
       finalMapping = headersInCSV.reduce((acc: Mapping, csvCol) => {
@@ -313,8 +331,26 @@ export default function CSVImport() {
       // push prefilled mapping into state so MappingStep shows those values
       setMapping(finalMapping);
 
-      // If any mapping entries are blank (""), we must show the mapping UI and let user finish mapping
+      // Check if any mapping entries are blank (""), requiring manual mapping
       const needsManual = Object.values(finalMapping).some((v) => v === "");
+      
+      // Check if any actual required columns are mapped (not just "not_import")
+      const mappedRequiredColumns = Object.values(finalMapping).filter(
+        (v) => v && v !== "" && v !== "not_import"
+      );
+      const hasRequiredColumns = mappedRequiredColumns.length > 0;
+
+      // If no required columns are mapped, force user to map them
+      if (!hasRequiredColumns) {
+        setShowMapping(true);
+        toast.warn(
+          "No required columns found in CSV. Please map at least some required columns before importing."
+        );
+        setIsLoading(false);
+        return;
+      }
+
+      // If any mapping entries are blank (""), we must show the mapping UI and let user finish mapping
       if (needsManual) {
         setShowMapping(true);
         toast.info("Some CSV columns look like matches — please confirm mappings.");
