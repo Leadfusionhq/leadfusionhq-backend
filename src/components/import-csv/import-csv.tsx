@@ -5,6 +5,18 @@ import { toast } from "react-toastify";
 import { CSV_API } from "@/utils/apiUrl";
 import Papa from "papaparse";
 import axiosWrapper from "@/utils/api";
+import {
+  ArrowRightAlt,
+  ArrowRightAltOutlined,
+  ArrowRightOutlined,
+  ReplayOutlined,
+} from "@mui/icons-material";
+import {
+  ArrowUp,
+  ArrowUpCircle,
+  LucideArrowUpCircle,
+  UploadCloudIcon,
+} from "lucide-react";
 
 const NEXT_PUBLIC_CSV_API_TOKEN = process.env.NEXT_PUBLIC_CSV_API_TOKEN;
 
@@ -124,13 +136,19 @@ function MappingStep({
       <button
         onClick={onSubmit}
         disabled={isLoading || !isMappingComplete}
-        className={`w-full px-4 py-2 text-white rounded-lg transition-colors ${
+        className={`w-full px-4 py-2 flex justify-center gap-2 items-center text-white rounded-lg transition-colors ${
           isLoading || !isMappingComplete
             ? "bg-black/60 cursor-not-allowed"
             : "bg-black hover:bg-black/80"
         }`}
       >
-        {isLoading ? "Submitting..." : "Submit Mapping"}
+        {isLoading ? (
+          "Submitting..."
+        ) : (
+          <>
+            Submit Mapping <UploadCloudIcon />{" "}
+          </>
+        )}
       </button>
     </div>
   );
@@ -249,165 +267,173 @@ export default function CSVImport() {
     return uploadedParts.sort((a, b) => a.PartNumber - b.PartNumber);
   };
 
- const handleSubmit = async (providedMapping?: Mapping) => {
-  if (!file) {
-    toast.warn("Please select a CSV file");
-    return;
-  }
-  if (!selectedSourceId) {
-    toast.warn("Please select a source");
-    return;
-  }
-
-  try {
-    setIsLoading(true);
-
-    // 1️⃣ Read CSV headers & normalize
-    const headersInCSV = (await getCSVHeaders(file)).map((h) =>
-      h.trim().toLowerCase()
-    );
-    setCsvHeaders(headersInCSV);
-
-    // 2️⃣ Build mapping (either use providedMapping from the UI,
-    // or auto-generate a mapping if this is the first pass)
-    let finalMapping: Mapping;
-    if (providedMapping) {
-      // Use the mapping user submitted from MappingStep
-      finalMapping = providedMapping;
-
-      // Ensure the provided mapping covers all CSV headers (and none are empty)
-      const missingFromProvided = headersInCSV.filter((h) => !(h in finalMapping));
-      if (missingFromProvided.length > 0) {
-        // unexpected, but show mapping UI
-        setShowMapping(true);
-        toast.info(`Please map the CSV columns: ${missingFromProvided.join(", ")}`);
-        setIsLoading(false);
-        return;
-      }
-
-      const stillUnmapped = headersInCSV.some(
-        (h) => !finalMapping[h] || finalMapping[h] === ""
-      );
-      if (stillUnmapped) {
-        setShowMapping(true);
-        toast.info("Please finish mapping all CSV columns before continuing.");
-        setIsLoading(false);
-        return;
-      }
-
-      // Validate that at least some required columns are mapped (not just "not_import")
-      const mappedRequiredColumns = Object.values(finalMapping).filter(
-        (v) => v && v !== "" && v !== "not_import"
-      );
-      if (mappedRequiredColumns.length === 0) {
-        setShowMapping(true);
-        toast.warn(
-          "Please map at least some required columns (not just 'not_import') before importing."
-        );
-        setIsLoading(false);
-        return;
-      }
-    } else {
-      // Auto-build mapping
-      finalMapping = headersInCSV.reduce((acc: Mapping, csvCol) => {
-        const exactMatch = REQUIRED_COLUMNS.find(
-          (dbCol) => dbCol.toLowerCase() === csvCol
-        );
-
-        if (exactMatch) {
-          // Auto map exact matches
-          acc[csvCol] = exactMatch;
-        } else {
-          // If any regex matches -> require manual selection
-          const isPartial = regexList.some((regex) => regex.test(csvCol));
-          if (isPartial) {
-            acc[csvCol] = ""; // force user to pick in MappingStep
-          } else {
-            acc[csvCol] = "not_import"; // auto exclude extras
-          }
-        }
-        return acc;
-      }, {});
-      // push prefilled mapping into state so MappingStep shows those values
-      setMapping(finalMapping);
-
-      // Check if any mapping entries are blank (""), requiring manual mapping
-      const needsManual = Object.values(finalMapping).some((v) => v === "");
-      
-      // Check if any actual required columns are mapped (not just "not_import")
-      const mappedRequiredColumns = Object.values(finalMapping).filter(
-        (v) => v && v !== "" && v !== "not_import"
-      );
-      const hasRequiredColumns = mappedRequiredColumns.length > 0;
-
-      // If no required columns are mapped, force user to map them
-      if (!hasRequiredColumns) {
-        setShowMapping(true);
-        toast.warn(
-          "No required columns found in CSV. Please map at least some required columns before importing."
-        );
-        setIsLoading(false);
-        return;
-      }
-
-      // If any mapping entries are blank (""), we must show the mapping UI and let user finish mapping
-      if (needsManual) {
-        setShowMapping(true);
-        toast.info("Some CSV columns look like matches — please confirm mappings.");
-        setIsLoading(false);
-        return; // wait for user to map and call handleSubmit(mapping)
-      }
+  const handleSubmit = async (providedMapping?: Mapping) => {
+    if (!file) {
+      toast.warn("Please select a CSV file");
+      return;
+    }
+    if (!selectedSourceId) {
+      toast.warn("Please select a source");
+      return;
     }
 
-    // If we reached here -> mapping is complete (either auto or user-provided)
-    // Proceed with multipart upload flow
+    try {
+      setIsLoading(true);
 
-    // 3️⃣ Request multipart upload
-    toast.info("Requesting multipart upload...");
-    const startResp = (await axiosWrapper(
-      "post",
-      CSV_API.CREATE_MULTIPART_UPLOAD,
-      { fileName: file.name, fileSize: file.size },
-      NEXT_PUBLIC_CSV_API_TOKEN
-    )) as StartMultipartResponse;
+      // 1️⃣ Read CSV headers & normalize
+      const headersInCSV = (await getCSVHeaders(file)).map((h) =>
+        h.trim().toLowerCase()
+      );
+      setCsvHeaders(headersInCSV);
 
-    const { uploadId, key: fileKey, presignedUrls, chunkSize } = startResp;
+      // 2️⃣ Build mapping (either use providedMapping from the UI,
+      // or auto-generate a mapping if this is the first pass)
+      let finalMapping: Mapping;
+      if (providedMapping) {
+        // Use the mapping user submitted from MappingStep
+        finalMapping = providedMapping;
 
-    // 4️⃣ Upload parts in parallel
-    toast.info("Uploading parts...");
-    const parts = await uploadMultipart(file, presignedUrls, chunkSize);
+        // Ensure the provided mapping covers all CSV headers (and none are empty)
+        const missingFromProvided = headersInCSV.filter(
+          (h) => !(h in finalMapping)
+        );
+        if (missingFromProvided.length > 0) {
+          // unexpected, but show mapping UI
+          setShowMapping(true);
+          toast.info(
+            `Please map the CSV columns: ${missingFromProvided.join(", ")}`
+          );
+          setIsLoading(false);
+          return;
+        }
 
-    // 5️⃣ Complete multipart upload
-    toast.info("Completing multipart upload...");
-    await axiosWrapper(
-      "post",
-      CSV_API.COMPLETE_MULTIPART_UPLOAD,
-      { key: fileKey, uploadId, parts },
-      NEXT_PUBLIC_CSV_API_TOKEN
-    );
+        const stillUnmapped = headersInCSV.some(
+          (h) => !finalMapping[h] || finalMapping[h] === ""
+        );
+        if (stillUnmapped) {
+          setShowMapping(true);
+          toast.info(
+            "Please finish mapping all CSV columns before continuing."
+          );
+          setIsLoading(false);
+          return;
+        }
 
-    // 6️⃣ Tell backend to process file
-    toast.info("Processing CSV in background...");
-    const res = (await axiosWrapper(
-      "post",
-      CSV_API.IMPORT_MAPPED_CSV,
-      {
-        s3Key: fileKey,
-        data_source_id: selectedSourceId,
-        mapping: finalMapping,
-      },
-      NEXT_PUBLIC_CSV_API_TOKEN
-    )) as UploadSuccessResponse;
+        // Validate that at least some required columns are mapped (not just "not_import")
+        const mappedRequiredColumns = Object.values(finalMapping).filter(
+          (v) => v && v !== "" && v !== "not_import"
+        );
+        if (mappedRequiredColumns.length === 0) {
+          setShowMapping(true);
+          toast.warn(
+            "Please map at least some required columns (not just 'not_import') before importing."
+          );
+          setIsLoading(false);
+          return;
+        }
+      } else {
+        // Auto-build mapping
+        finalMapping = headersInCSV.reduce((acc: Mapping, csvCol) => {
+          const exactMatch = REQUIRED_COLUMNS.find(
+            (dbCol) => dbCol.toLowerCase() === csvCol
+          );
 
-    toast.success(res.message || "CSV queued for processing!");
-    resetState();
-  } catch (err: any) {
-    console.error(err);
-    toast.error(err?.error || err?.message || "CSV upload failed");
-  } finally {
-    setIsLoading(false);
-  }
-};
+          if (exactMatch) {
+            // Auto map exact matches
+            acc[csvCol] = exactMatch;
+          } else {
+            // If any regex matches -> require manual selection
+            const isPartial = regexList.some((regex) => regex.test(csvCol));
+            if (isPartial) {
+              acc[csvCol] = ""; // force user to pick in MappingStep
+            } else {
+              acc[csvCol] = "not_import"; // auto exclude extras
+            }
+          }
+          return acc;
+        }, {});
+        // push prefilled mapping into state so MappingStep shows those values
+        setMapping(finalMapping);
+
+        // Check if any mapping entries are blank (""), requiring manual mapping
+        const needsManual = Object.values(finalMapping).some((v) => v === "");
+
+        // Check if any actual required columns are mapped (not just "not_import")
+        const mappedRequiredColumns = Object.values(finalMapping).filter(
+          (v) => v && v !== "" && v !== "not_import"
+        );
+        const hasRequiredColumns = mappedRequiredColumns.length > 0;
+
+        // If no required columns are mapped, force user to map them
+        if (!hasRequiredColumns) {
+          setShowMapping(true);
+          toast.warn(
+            "No required columns found in CSV. Please map at least some required columns before importing."
+          );
+          setIsLoading(false);
+          return;
+        }
+
+        // If any mapping entries are blank (""), we must show the mapping UI and let user finish mapping
+        if (needsManual) {
+          setShowMapping(true);
+          toast.info(
+            "Some CSV columns look like matches — please confirm mappings."
+          );
+          setIsLoading(false);
+          return; // wait for user to map and call handleSubmit(mapping)
+        }
+      }
+
+      // If we reached here -> mapping is complete (either auto or user-provided)
+      // Proceed with multipart upload flow
+
+      // 3️⃣ Request multipart upload
+      toast.info("Requesting multipart upload...");
+      const startResp = (await axiosWrapper(
+        "post",
+        CSV_API.CREATE_MULTIPART_UPLOAD,
+        { fileName: file.name, fileSize: file.size },
+        NEXT_PUBLIC_CSV_API_TOKEN
+      )) as StartMultipartResponse;
+
+      const { uploadId, key: fileKey, presignedUrls, chunkSize } = startResp;
+
+      // 4️⃣ Upload parts in parallel
+      toast.info("Uploading parts...");
+      const parts = await uploadMultipart(file, presignedUrls, chunkSize);
+
+      // 5️⃣ Complete multipart upload
+      toast.info("Completing multipart upload...");
+      await axiosWrapper(
+        "post",
+        CSV_API.COMPLETE_MULTIPART_UPLOAD,
+        { key: fileKey, uploadId, parts },
+        NEXT_PUBLIC_CSV_API_TOKEN
+      );
+
+      // 6️⃣ Tell backend to process file
+      toast.info("Processing CSV in background...");
+      const res = (await axiosWrapper(
+        "post",
+        CSV_API.IMPORT_MAPPED_CSV,
+        {
+          s3Key: fileKey,
+          data_source_id: selectedSourceId,
+          mapping: finalMapping,
+        },
+        NEXT_PUBLIC_CSV_API_TOKEN
+      )) as UploadSuccessResponse;
+
+      toast.success(res.message || "CSV queued for processing!");
+      resetState();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.error || err?.message || "CSV upload failed");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="p-6 max-w-2xl w-full bg-white rounded-lg shadow-md space-y-6">
@@ -418,7 +444,8 @@ export default function CSVImport() {
           <select
             value={selectedSourceId}
             onChange={(e) => setSelectedSourceId(e.target.value)}
-            className="w-full p-2 border rounded"
+            disabled={isLoading || showMapping}
+            className="w-full p-2 border rounded disabled:opacity-40"
           >
             <option value="">-- Select a Source --</option>
             {sources.map((src, i) => (
@@ -434,14 +461,45 @@ export default function CSVImport() {
 
       {/* File Input */}
       <div className="space-y-4">
-        <h2 className="text-xl font-semibold text-gray-800">Upload CSV</h2>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".csv"
-          onChange={(e) => setFile(e.target.files?.[0] || null)}
-          className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-black file:text-white hover:file:bg-gray-800"
-        />
+        {!showMapping && (
+          <>
+            <h2 className="text-xl font-semibold text-gray-800">Upload CSV</h2>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv"
+              id="csv-file-drop"
+              onChange={(e) => setFile(e.target.files?.[0] || null)}
+              className="hidden w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-black file:text-white hover:file:bg-gray-800"
+            />
+          </>
+        )}
+        <label
+          htmlFor="csv-file-drop"
+          className={showMapping ? "w-full"  : `*:p-4 flex flex-col overflow-hidden ${file ? "" : "items-center justify-center"} w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-gray-500`}
+        >
+          {file ? (
+            <div className="flex flex-col rounded-lg">
+              <div className="bg-slate-100 p-3 rounded-lg ring-gray-200 border border-gray-300">
+                <p className="font-mono text-gray-700">
+                  {file.name.replace(".csv", "")}
+                </p>
+                <p className="font-mono text-xs text-gray-500">
+                  {(file.size / 1024).toFixed(2)} MB /{" "}
+                  {file.type.split("/")[1].toUpperCase()}
+                </p>
+              </div>
+              {!showMapping && <p className="text-sm text-gray-500">Click to change file</p>}
+            </div>
+          ) : (
+            <div className="text-center">
+              <ArrowUpCircle className="mx-auto mb-2 text-gray-400" size={32} />
+              <p className="text-gray-600">
+                Click to select a CSV file to upload
+              </p>
+            </div>
+          )}
+        </label>
       </div>
 
       {/* Mapping Step */}
@@ -467,7 +525,22 @@ export default function CSVImport() {
               : "bg-black hover:bg-black/80"
           }`}
         >
-          {isLoading ? "Processing..." : "Process CSV"}
+          {isLoading ? (
+            "Processing..."
+          ) : (
+            <>
+              Process CSV <ArrowRightAltOutlined />
+            </>
+          )}
+        </button>
+      )}
+
+      {file && (
+        <button
+          onClick={resetState}
+          className="w-full -mt-3 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+        >
+          Reset <ReplayOutlined />
         </button>
       )}
     </div>
