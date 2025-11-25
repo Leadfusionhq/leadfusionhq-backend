@@ -640,6 +640,17 @@ async function createCampaignInBoberdoo(campaignData, partnerId) {
         ? (campaignData.geography?.coverage?.partial?.zip_codes || []).join(",")
         : "";
 
+        let roofingFields = {};
+
+    if (campaignData.lead_type === "ROOFING") {
+      roofingFields = {
+        Project_Type: "0",
+        Homeowner: "0",
+        Roof_Material: "0",
+      };
+    }
+
+
     const payload = {
       Key: CAMPAIGN_API_KEY,
       API_Action: CREATE_CAMPAIGN_ACTION,
@@ -662,9 +673,10 @@ async function createCampaignInBoberdoo(campaignData, partnerId) {
       State: stateList,
       Zip_Mode: zipMode,
       Zip: zipCodes, // ✅ Added
-      // Day_Of_Week_Accept_Leads: activeDays,
+      Day_Of_Week_Accept_Leads: activeDays,
       // Time_Of_Day_Accept_Leads: timeRange, // ✅ global range
       Timezone: timezone, // ✅ NEW
+    ...roofingFields,
     };
 
     console.log("🟢 Payload sent to Boberdoo (Create):", payload);
@@ -726,6 +738,15 @@ async function updateCampaignInBoberdoo(campaignData, filterSetId, partnerId) {
         ? (campaignData.geography?.coverage?.partial?.zip_codes || []).join(",")
         : "";
 
+        let roofingFields = {};
+    if (campaignData.lead_type === "ROOFING") {
+      roofingFields = {
+        Project_Type: "0",
+        Homeowner: "0",
+        Roof_Material: "0",
+      };
+    }
+
     const payload = {
       Key: CAMPAIGN_API_KEY,
       API_Action: CREATE_CAMPAIGN_ACTION,
@@ -749,8 +770,11 @@ async function updateCampaignInBoberdoo(campaignData, filterSetId, partnerId) {
       State: stateList,
       Zip_Mode: zipMode,
       Zip: zipCodes, // ✅ Added for update too
+      Day_Of_Week_Accept_Leads: activeDays,
       // Time_Of_Day_Accept_Leads: timeRange, // ✅ global range
       Timezone: timezone, // ✅ NEW
+        // ✅ Merge roofing fields conditionally
+      ...roofingFields,
     };
 
     console.log("🟡 Payload sent to Boberdoo (Update):", payload);

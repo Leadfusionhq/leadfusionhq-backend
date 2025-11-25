@@ -10,9 +10,20 @@ const WEBHOOK_DELETE_URL = 'https://n8n.srv997679.hstgr.cloud/webhook/delete';
 
 const sendToN8nWebhook = async (campaignData) => {
   try {
+
+    // -----------------------------------------------
+    // GET ACTIVE DAYS (send DB values directly)
+    // -----------------------------------------------
+    const activeDays = campaignData?.delivery?.schedule?.days
+      ?.filter(day => day.active)
+      ?.map(day => day.day)   // <-- using DB value
+      || [];
+
+
     // ✅ Resolve multiple states (abbreviations)
     let stateAbbrs = [];
     const stateVal = campaignData?.geography?.state;
+
 
     if (Array.isArray(stateVal)) {
       const stateDocs = await State.find({ _id: { $in: stateVal } }).select('abbreviation');
@@ -88,7 +99,9 @@ const sendToN8nWebhook = async (campaignData) => {
 
       // NEW FIELDS
       lead_type: leadTypeKey,
-      boberdoo_lead_type_id: boberdooTypeId
+      boberdoo_lead_type_id: boberdooTypeId,
+      active_days: activeDays,
+
     };
 
 
