@@ -1061,8 +1061,8 @@ const sendBoberdoLeadNotifications = async (lead, campaign, billingResult) => {
         const email = lead.email || '';
         const address = [
           lead?.address?.full_address || '',
-          lead?.address?.city || '',
-          lead?.address?.zip_code || '',
+          // lead?.address?.city || '',
+          // lead?.address?.zip_code || '',
         ].filter(Boolean).join(', ');
         const campaignName = campaign?.name || 'N/A';
 
