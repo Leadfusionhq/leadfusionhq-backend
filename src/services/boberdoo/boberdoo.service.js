@@ -667,7 +667,7 @@ async function createCampaignInBoberdoo(campaignData, partnerId) {
       Daily_Limit: campaignData.daily_limit ?? 0,
       Weekly_Limit: campaignData.weekly_limit ?? 0,
       Monthly_Limit: campaignData.monthly_limit ?? 0,
-      Accept_Only_Reprocessed_Leads: "Yes",
+   
       Filter_Set_Status: campaignData.status === "ACTIVE" ? 1 : 0,
       Delivery_Type: deliveryType,
       State: stateList,
@@ -764,7 +764,7 @@ async function updateCampaignInBoberdoo(campaignData, filterSetId, partnerId) {
       Daily_Limit: campaignData.daily_limit ?? 0,
       Weekly_Limit: campaignData.weekly_limit ?? 0,
       Monthly_Limit: campaignData.monthly_limit ?? 0,
-      Accept_Only_Reprocessed_Leads: "Yes",
+      
       Filter_Set_Status: campaignData.status === "ACTIVE" ? 1 : 0,
       Delivery_Type: deliveryType,
       State: stateList,
