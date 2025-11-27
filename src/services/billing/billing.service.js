@@ -679,16 +679,16 @@ const assignLeadPayAsYouGo = async (userId, leadId, leadCost, assignedBy, sessio
         errorMessage: chargeResult.message
       });
     } catch (emailErr) {
-  billingLogger.error(
-    "Failed to send user failed-payment email",
-    emailErr,
-    {
-      user_id: user._id,
-      lead_id: leadId,
-      amount: leadCost,
-      card_last4: last4,
-      error_source: "sendFailedLeadPaymentEmail"
-    }
+    billingLogger.error(
+      "Failed to send user failed-payment email",
+      emailErr,
+      {
+        user_id: user._id,
+        lead_id: leadId,
+        amount: leadCost,
+        card_last4: last4,
+        error_source: "sendFailedLeadPaymentEmail"
+      }
   );
 
   throw new ErrorHandler(
@@ -729,23 +729,25 @@ const assignLeadPayAsYouGo = async (userId, leadId, leadCost, assignedBy, sessio
       });
 
     } catch (emailErr) {
-  billingLogger.error(
-    "Failed to send admin failed-payment email",
-    emailErr,
-    {
-      user_id: user._id,
-      lead_id: leadId,
-      amount: leadCost,
-      card_last4: last4,
-      error_source: "sendFailedLeadPaymentAdminEmail"
-    }
-  );
+    billingLogger.error(
+      "Failed to send admin failed-payment email",
+      emailErr,
+      {
+        user_id: user._id,
+        lead_id: leadId,
+        amount: leadCost,
+        card_last4: last4,
+        error_source: "sendFailedLeadPaymentAdminEmail"
+      }
+    );
 
-  throw new ErrorHandler(
-    500,
-    "Failed to send admin failed-payment email: " + emailErr.message
-  );
-}
+    throw new ErrorHandler(
+      500,
+      "Failed to send admin failed-payment email: " + emailErr.message
+    );
+  }
+
+  
 
     // --------------------------------------------------
     // 3️⃣ FINALLY throw the actual payment failure error
