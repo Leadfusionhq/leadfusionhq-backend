@@ -433,12 +433,19 @@ const chargeCustomerVault = async (customerVaultId, amount, description = '') =>
 
     const success = responseCode === '1';
 
-    billingLogger.info('NMI charge processed', {
+    const logData = {
       success,
       responseCode,
       transactionId,
-      message: responseMessage
-    });
+      message: responseMessage,
+    };
+
+    if (success) {
+      billingLogger.info('NMI charge approved', logData);
+    } else {
+      billingLogger.error('NMI charge declined', logData);
+    }
+
 
     // ✅ Return complete data including card details
     return {
