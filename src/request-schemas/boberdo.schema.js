@@ -14,7 +14,8 @@ const postLead = {
         
         // Contact
         phone_number: Joi.string().required(),
-        email: Joi.string().email().allow('').optional(),
+        email: Joi.string().allow('').optional(),
+
         
         // Address
         address: Joi.object({
