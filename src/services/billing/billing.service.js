@@ -642,6 +642,12 @@ const assignLeadPayAsYouGo = async (userId, leadId, leadCost, assignedBy, sessio
       "No default payment method found. Please add or set a default card."
     );
   }
+    // Prepare card details for logs/emails
+  const brand = defaultPaymentMethod.brand || "Card";
+  const last4 = defaultPaymentMethod.cardLastFour || "N/A";
+
+  const paymentMethodDisplay = `${brand} •••• ${last4}`;
+
 
   const vaultId = defaultPaymentMethod.customerVaultId;
 
@@ -672,12 +678,12 @@ const assignLeadPayAsYouGo = async (userId, leadId, leadCost, assignedBy, sessio
         userName: user.name || user.fullName || user.email,
         leadId,
         amount: leadCost,
-        cardLast4,
+        cardLast4: last4,
         errorMessage: chargeResult.message
       });
     } catch (emailErr) {
       console.log("User failed payment email error:", emailErr.message);
-
+      
       // ❗ Throw errorHandler inside catch as requested
       throw new ErrorHandler(
         500,
@@ -712,7 +718,7 @@ const assignLeadPayAsYouGo = async (userId, leadId, leadCost, assignedBy, sessio
         userName: user.name || user.fullName || "",
         leadId,
         amount: leadCost,
-        cardLast4,
+        cardLast4: last4,
         errorMessage: chargeResult.message
       });
 
