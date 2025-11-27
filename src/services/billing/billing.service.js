@@ -669,9 +669,6 @@ const assignLeadPayAsYouGo = async (userId, leadId, leadCost, assignedBy, sessio
   // ❌ PAYMENT FAILED → send email to user + admin
   if (!chargeResult.success) {
 
-    // --------------------------
-    // 1️⃣ SEND USER FAILURE MAIL
-    // --------------------------
     try {
       await MAIL_HANDLER.sendFailedLeadPaymentEmail({
         to: user.email,
@@ -682,14 +679,23 @@ const assignLeadPayAsYouGo = async (userId, leadId, leadCost, assignedBy, sessio
         errorMessage: chargeResult.message
       });
     } catch (emailErr) {
-      console.log("User failed payment email error:", emailErr.message);
-      
-      // ❗ Throw errorHandler inside catch as requested
-      throw new ErrorHandler(
-        500,
-        "Failed to send user failed-payment email: " + emailErr.message
-      );
+  billingLogger.error(
+    "Failed to send user failed-payment email",
+    emailErr,
+    {
+      user_id: user._id,
+      lead_id: leadId,
+      amount: leadCost,
+      card_last4: last4,
+      error_source: "sendFailedLeadPaymentEmail"
     }
+  );
+
+  throw new ErrorHandler(
+    500,
+    "Failed to send user failed-payment email: " + emailErr.message
+  );
+}
 
     // ---------------------------
     // 2️⃣ SEND ADMIN FAILURE MAIL
@@ -723,14 +729,23 @@ const assignLeadPayAsYouGo = async (userId, leadId, leadCost, assignedBy, sessio
       });
 
     } catch (emailErr) {
-      console.log("Admin failed payment email error:", emailErr.message);
-
-      // ❗ Throw errorHandler inside catch as requested
-      throw new ErrorHandler(
-        500,
-        "Failed to send admin failed-payment email: " + emailErr.message
-      );
+  billingLogger.error(
+    "Failed to send admin failed-payment email",
+    emailErr,
+    {
+      user_id: user._id,
+      lead_id: leadId,
+      amount: leadCost,
+      card_last4: last4,
+      error_source: "sendFailedLeadPaymentAdminEmail"
     }
+  );
+
+  throw new ErrorHandler(
+    500,
+    "Failed to send admin failed-payment email: " + emailErr.message
+  );
+}
 
     // --------------------------------------------------
     // 3️⃣ FINALLY throw the actual payment failure error
