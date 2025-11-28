@@ -291,7 +291,17 @@ const regularUserSchema = new mongoose.Schema({
     version: { type: String, default: null },
     acceptedAt: { type: Date, default: null },
     ipAddress: { type: String, default: null },
+  },
+  payment_error: {
+    type: Boolean,
+    default: false
+  },
+  last_payment_error_message: {
+    type: String,
+    default: null
   }
+
+
 });
 
 const RegularUser = User.discriminator(CONSTANT_ENUM.USER_ROLE.USER, regularUserSchema);

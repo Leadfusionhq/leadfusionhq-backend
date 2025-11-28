@@ -11,6 +11,8 @@ const path = require('path');
 const fs = require("fs");
 const  Campaign  = require('../models/campaign.model');
 const CampaignServices = require('../services/campaign/campaign.service');
+const {sendBalanceTopUpAlert} = require('../services/n8n/webhookService.js');
+const User = require('../models/user.model');
 
 const getAllUsers = wrapAsync(async (req, res) => {
     const data = await UserServices.getAllUsersService(); 
@@ -255,6 +257,34 @@ const resyncBoberdoo = wrapAsync(async (req, res) => {
   const result = await syncUserToBoberdooById(userId);
   sendResponse(res, { result }, 'Boberdoo resync attempted', 200);
 });
+
+const sendBalanceTopUpWebhook = wrapAsync(async (req, res) => {
+  const { userId } = req.params;
+
+  // Guard: allow only self or admin
+  if (
+    req.user.role !== CONSTANT_ENUM.USER_ROLE.ADMIN &&
+    String(req.user._id) !== String(userId)
+  ) {
+    throw new ErrorHandler(403, 'Forbidden');
+  }
+
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new ErrorHandler(404, 'User not found');
+  }
+
+  const partner_id = user.integrations?.boberdoo?.external_id || null;
+
+  const result = await sendBalanceTopUpAlert({
+    partner_id,
+    email: user.email,
+    amount: undefined  // 🔥 No amount sent from frontend
+  });
+
+  sendResponse(res, { result }, 'Balance top-up webhook sent', 200);
+});
+
 module.exports = {
  getAllUsers,
  getAllAdmins,
@@ -270,4 +300,5 @@ module.exports = {
  getMyProfile,
  updateMyProfile,
  changeMyPassword,
+ sendBalanceTopUpWebhook,
 };

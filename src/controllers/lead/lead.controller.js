@@ -317,7 +317,8 @@ const createLead = wrapAsync(async (req, res) => {
         result._id,
         leadCost,
         assignedBy,
-        session
+        session,
+        campaign
     );
     } else {
     throw new ErrorHandler(400, "Invalid campaign payment type.");
