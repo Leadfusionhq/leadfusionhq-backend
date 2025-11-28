@@ -13,6 +13,7 @@ const fetchWrapper = require('../../utils/fetchWrapper');
 const {sendBalanceTopUpAlert} = require('../../services/n8n/webhookService.js');
 const MAIL_HANDLER = require('../../mail/mails');
 const formatForNmi = (d) => dayjs(d).format('MM/DD/YYYY');
+const { sendToN8nWebhook, sendLowBalanceAlert} = require('../../services/n8n/webhookService.js');
 
 // Contract management
 const getCurrentContract = async () => {
@@ -600,13 +601,13 @@ const assignLeadPrepaid = async (userId, leadId, leadCost, assignedBy, session) 
 
 
 
-const assignLeadPayAsYouGo = async (userId, leadId, leadCost, assignedBy, session) => {
+const assignLeadPayAsYouGo = async (userId, leadId, leadCost, assignedBy, session, campaignMeta = {}) => {
   const user = await User.findById(userId).session(session);
   if (!user) throw new ErrorHandler(404, 'User not found');
 
   const currentBalance = user.balance || 0;
 
-  // 1️⃣ FIRST TRY: Deduct from user balance (same as prepaid)
+  // 1️⃣ FIRST TRY: Deduct from BALANCE
   if (currentBalance >= leadCost) {
     user.balance = currentBalance - leadCost;
     await user.save({ session });
@@ -633,42 +634,52 @@ const assignLeadPayAsYouGo = async (userId, leadId, leadCost, assignedBy, sessio
     };
   }
 
-  // 2️⃣ SECOND: If balance NOT enough → fallback to NMI card
+  // 2️⃣ FALLBACK: NMI CARD CHARGE
   const defaultPaymentMethod = user.paymentMethods?.find(pm => pm.isDefault === true);
-
   if (!defaultPaymentMethod) {
-    throw new ErrorHandler(
-      400,
-      "No default payment method found. Please add or set a default card."
-    );
+    throw new ErrorHandler(400, "No default payment method found.");
   }
-    // Prepare card details for logs/emails
+
   const brand = defaultPaymentMethod.brand || "Card";
   const last4 = defaultPaymentMethod.cardLastFour || "N/A";
-
-  const paymentMethodDisplay = `${brand} •••• ${last4}`;
-
-
   const vaultId = defaultPaymentMethod.customerVaultId;
 
   if (!vaultId) {
-    throw new ErrorHandler(
-      400,
-      "Default payment method does not have a valid customerVaultId."
-    );
+    throw new ErrorHandler(400, "Default payment method missing customerVaultId.");
   }
 
-  // Charge the card (same as before)
-  const chargeResult = await chargeCustomerVault(
-    vaultId,
-    leadCost,
-    `Lead assignment: ${leadId}`
-  );
+  const chargeResult = await chargeCustomerVault(vaultId, leadCost, `Lead assignment: ${leadId}`);
 
+  // ❌ PAYMENT FAILED
+if (!chargeResult.success) {
+    const responseCode = String(chargeResult.responseCode);
 
-  // ❌ PAYMENT FAILED → send email to user + admin
-  if (!chargeResult.success) {
+    // 2️⃣ Low Balance webhook only for responseCode = 2
+    if (responseCode === "2") {
+      try {
+        await sendLowBalanceAlert({
+          campaign_name: campaignMeta?.name || "Campaign",
+          filter_set_id: campaignMeta?.boberdoo_filter_set_id || "",
+          partner_id: user.integrations?.boberdoo?.external_id || "",
+          email: user.email
+        });
 
+        billingLogger.info("LOW BALANCE webhook sent", {
+          user_id: user._id,
+          responseCode,
+          amount: leadCost
+        });
+      } catch (err) {
+        billingLogger.error("Low balance webhook failed", err);
+      }
+    }
+
+    // Save payment error & message
+    user.payment_error = true;
+    user.last_payment_error_message = chargeResult.message || "Card payment failed";
+    await user.save({ session });
+
+    // EMAIL USER
     try {
       await MAIL_HANDLER.sendFailedLeadPaymentEmail({
         to: user.email,
@@ -679,82 +690,47 @@ const assignLeadPayAsYouGo = async (userId, leadId, leadCost, assignedBy, sessio
         errorMessage: chargeResult.message
       });
     } catch (emailErr) {
-    billingLogger.error(
-      "Failed to send user failed-payment email",
-      emailErr,
-      {
-        user_id: user._id,
-        lead_id: leadId,
-        amount: leadCost,
-        card_last4: last4,
-        error_source: "sendFailedLeadPaymentEmail"
-      }
-  );
+      billingLogger.error("User failed-payment email failed", emailErr);
+    }
 
-  throw new ErrorHandler(
-    500,
-    "Failed to send user failed-payment email: " + emailErr.message
-  );
-}
-
-    // ---------------------------
-    // 2️⃣ SEND ADMIN FAILURE MAIL
-    // ---------------------------
+    // EMAIL ADMINS
     try {
-      const EXCLUDED = new Set([
-        "admin@gmail.com",
-        "admin123@gmail.com",
-        "admin1234@gmail.com"
-      ]);
+      const EXCLUDED = new Set(["admin@gmail.com", "admin123@gmail.com", "admin1234@gmail.com"]);
 
       const adminUsers = await User.find({
         role: { $in: ["ADMIN", "SUPER_ADMIN"] },
         isActive: { $ne: false }
       }).select("email");
 
-      let adminEmails = (adminUsers || [])
-        .map(a => a.email)
-        .filter(Boolean)
-        .map(e => e.trim().toLowerCase())
-        .filter(e => !EXCLUDED.has(e)); // exclude unwanted emails
+      let adminEmails = adminUsers
+        .map(a => a.email?.trim().toLowerCase())
+        .filter(e => e && !EXCLUDED.has(e));
 
       await MAIL_HANDLER.sendFailedLeadPaymentAdminEmail({
         to: adminEmails,
         userEmail: user.email,
-        userName: user.name || user.fullName || "",
+        userName: user.name || "",
         leadId,
         amount: leadCost,
         cardLast4: last4,
         errorMessage: chargeResult.message
       });
-
     } catch (emailErr) {
-    billingLogger.error(
-      "Failed to send admin failed-payment email",
-      emailErr,
-      {
-        user_id: user._id,
-        lead_id: leadId,
-        amount: leadCost,
-        card_last4: last4,
-        error_source: "sendFailedLeadPaymentAdminEmail"
-      }
-    );
+      billingLogger.error("Admin failed-payment email failed", emailErr);
+    }
 
-    throw new ErrorHandler(
-      500,
-      "Failed to send admin failed-payment email: " + emailErr.message
-    );
-  }
-
-  
-
-    // --------------------------------------------------
-    // 3️⃣ FINALLY throw the actual payment failure error
-    // --------------------------------------------------
     throw new ErrorHandler(400, "Card payment failed: " + chargeResult.message);
   }
 
+
+  // 3️⃣ SUCCESSFUL CARD PAYMENT → CLEAR PAYMENT ERROR
+  if (user.payment_error) {
+    user.payment_error = false;
+    user.last_payment_error_message = null;
+    await user.save({ session });
+  }
+
+  // Save transaction
   const transaction = new Transaction({
     userId,
     type: "LEAD_ASSIGNMENT",
@@ -765,7 +741,7 @@ const assignLeadPayAsYouGo = async (userId, leadId, leadCost, assignedBy, sessio
     transactionId: chargeResult.transactionId,
     leadId,
     assignedBy,
-    balanceAfter: user.balance
+    balanceAfter: user.balance || 0
   });
 
   await transaction.save({ session });
@@ -775,9 +751,10 @@ const assignLeadPayAsYouGo = async (userId, leadId, leadCost, assignedBy, sessio
     transactionId: transaction._id,
     gatewayTransactionId: chargeResult.transactionId,
     leadId,
-    newBalance: user.balance
+    newBalance: user.balance || 0
   };
 };
+
 
 
 
