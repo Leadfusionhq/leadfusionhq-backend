@@ -20,7 +20,8 @@ export const API_URL = {
     GET_USER_BY_ID: `${USER_API_BASE}/:userId`,
     DELETE_USER_BY_ID: `${USER_API_BASE}/:userId`,
     SYNC_BOMBERDO:`${USER_API_BASE}/:userId/boberdoo/resync`,
-    
+    SEND_BALANCE_TOPUP_WEBHOOK: `${USER_API_BASE}/:userId/balance/topup-webhook`,
+
     GET_MY_PROFILE: `${USER_API_BASE}/me/profile`,
     UPDATE_MY_PROFILE: `${USER_API_BASE}/me/profile`,
     CHANGE_MY_PASSWORD: `${USER_API_BASE}/me/change-password`,

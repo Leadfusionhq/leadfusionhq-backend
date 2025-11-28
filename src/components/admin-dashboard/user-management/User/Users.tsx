@@ -26,6 +26,7 @@ type User = {
     zipCode?: string;
     image?: string;
     balance?: number;
+    payment_error?: boolean;
     integrations?: {
       boberdoo?: {
           external_id?: string | null;
@@ -33,6 +34,7 @@ type User = {
           last_sync_at?: string | null;
           last_error?: string | null;
       };
+    
   };
 };
 
@@ -63,6 +65,13 @@ type SyncBoberdooResponse = {
         };
       };
     };
+  };
+};
+
+type WebhookResponse = {
+  result?: {
+    success?: boolean;
+    error?: string;
   };
 };
 
@@ -305,7 +314,35 @@ export default function UserTable() {
           return Boolean(user.integrations?.boberdoo?.external_id);
         };
     
-    
+    const handleSendTopUpWebhook = async (row: User) => {
+      const toastId = toast.loading(`Sending webhook for ${row.email}...`);
+
+      try {
+        const url = API_URL.SEND_BALANCE_TOPUP_WEBHOOK.replace(':userId', row._id);
+
+        const response = await axiosWrapper('post', url, {}, token ?? undefined) as WebhookResponse;
+
+        if (!response?.result?.success) {
+          throw new Error(response?.result?.error || "Webhook failed");
+        }
+
+        toast.update(toastId, {
+          render: 'Webhook sent successfully',
+          type: 'success',
+          isLoading: false,
+          autoClose: 3000,
+        });
+      } catch (err: any) {
+        toast.update(toastId, {
+          render: err.message || "Webhook failed",
+          type: 'error',
+          isLoading: false,
+          autoClose: 5000,
+        });
+      }
+    };
+
+
 
     // State for action menu
     const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
@@ -522,6 +559,18 @@ export default function UserTable() {
                 Sync to Boberdoo
                 </MenuItem>
               )}
+
+          {menuRow?.payment_error && (
+                <MenuItem
+                  onClick={() => {
+                    if (menuRow) handleSendTopUpWebhook(menuRow);
+                    handleMenuClose();
+                  }}
+                >
+                  Send Balance Top-Up Webhook
+                </MenuItem>
+              )}
+
               <MenuItem
                 onClick={() => {
                   if (menuRow) handleDeleteClick(menuRow);
