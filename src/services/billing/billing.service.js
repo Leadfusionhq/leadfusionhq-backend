@@ -651,10 +651,10 @@ const assignLeadPayAsYouGo = async (userId, leadId, leadCost, assignedBy, sessio
   const chargeResult = await chargeCustomerVault(vaultId, leadCost, `Lead assignment: ${leadId}`);
 
   // ❌ PAYMENT FAILED
+// ❌ PAYMENT FAILED
 if (!chargeResult.success) {
     const responseCode = String(chargeResult.responseCode);
 
-    // 2️⃣ Low Balance webhook only for responseCode = 2
     if (responseCode === "2") {
       try {
         await sendLowBalanceAlert({
@@ -674,12 +674,26 @@ if (!chargeResult.success) {
       }
     }
 
-    // Save payment error & message
+    /**
+     * ❗ CRITICAL FIX:
+     * End the transaction BEFORE saving payment_error,
+     * otherwise MongoDB rolls it back.
+     */
+    await session.abortTransaction();
+    session.endSession();
+
+    // Now save the payment_error OUTSIDE the transaction
     user.payment_error = true;
     user.last_payment_error_message = chargeResult.message || "Card payment failed";
-    await user.save({ session });
+    await user.save();
 
-    // EMAIL USER
+    billingLogger.error("❗PAYMENT ERROR FLAG UPDATED (OUTSIDE TRANSACTION)", {
+      user_id: user._id,
+      payment_error: user.payment_error,
+      message: user.last_payment_error_message
+    });
+
+    // Send emails (outside transaction)
     try {
       await MAIL_HANDLER.sendFailedLeadPaymentEmail({
         to: user.email,
@@ -693,7 +707,6 @@ if (!chargeResult.success) {
       billingLogger.error("User failed-payment email failed", emailErr);
     }
 
-    // EMAIL ADMINS
     try {
       const EXCLUDED = new Set(["admin@gmail.com", "admin123@gmail.com", "admin1234@gmail.com"]);
 
@@ -720,7 +733,8 @@ if (!chargeResult.success) {
     }
 
     throw new ErrorHandler(400, "Card payment failed: " + chargeResult.message);
-  }
+}
+
 
 
   // 3️⃣ SUCCESSFUL CARD PAYMENT → CLEAR PAYMENT ERROR
