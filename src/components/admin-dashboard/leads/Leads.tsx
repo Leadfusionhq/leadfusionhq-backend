@@ -51,6 +51,7 @@ type Lead = {
   language: string;
   geography: string;
   delivery: string;
+  payment_status?: "paid" | "payment_pending";
 };
 // + add
 type CampaignOption = { _id: string; name: string };
@@ -100,6 +101,18 @@ export default function LeadTable() {
     // or: const statuses = Object.values(LEAD_STATUS);
   ];
 
+
+const getPaymentStatus = (status?: string | null) => {
+  // If payment_status is undefined, null, or empty - treat as "paid" (for old leads)
+  if (!status) {
+    return { label: "Paid", color: "#4caf50" };
+  }
+  return PAYMENT_STATUS_MAP[status] || { label: "Paid", color: "#4caf50" };
+};
+
+
+
+
 // ✅ ADD THIS - Lead Status Mapping
 const LEAD_STATUS_MAP: Record<string, { label: string; color: string }> = {
   'Not Returned': { label: 'Active', color: '#4caf50' },
@@ -107,6 +120,16 @@ const LEAD_STATUS_MAP: Record<string, { label: string; color: string }> = {
   'Approved': { label: 'Returned', color: '#2196f3' },
   'Rejected': { label: 'Return Rejected', color: '#f44336' }
 };
+
+const PAYMENT_STATUS_MAP: Record<string, { label: string; color: string }> = {
+  paid: { label: "Paid", color: "#4caf50" },
+  pending: { label: "Pending", color: "#ff9800" },
+  failed: { label: "Failed", color: "#f44336" },
+  refunded: { label: "Refunded", color: "#2196f3" },
+};
+
+
+
 
 const getLeadStatus = (return_status: string) => {
   return LEAD_STATUS_MAP[return_status] || LEAD_STATUS_MAP['Not Returned'];
@@ -512,6 +535,30 @@ const hasFilters = !!(selectedCampaign || selectedStatus || selectedState);
       sortable: true,
       width: "160px",
     },
+    {
+      name: "Payment Status",
+      selector: (row) => row.payment_status,
+      cell: (row) =>
+        row._id.startsWith("skeleton") ? (
+          <Skeleton variant="text" width={120} animation="wave" />
+        ) : (
+          <Chip
+            label={getPaymentStatus(row.payment_status || "").label}
+            size="small"
+            sx={{
+              minWidth: "100px",
+              backgroundColor: getPaymentStatus(row.payment_status || "").color,
+              color: "#fff",
+              fontWeight: 500,
+              fontSize: "12px",
+            }}
+          />
+        ),
+      sortable: true,
+      width: "160px",
+    },
+
+
     {
       name: "Email",
       selector: (row) => row.email,
