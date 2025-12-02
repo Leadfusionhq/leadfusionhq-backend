@@ -292,6 +292,26 @@ const regularUserSchema = new mongoose.Schema({
     acceptedAt: { type: Date, default: null },
     ipAddress: { type: String, default: null },
   },
+    // ✅ ADD THESE NEW FIELDS
+  pending_payment: {
+    amount: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    count: {
+      type: Number,
+      default: 0,
+      min: 0
+    }
+  },
+  stopped_campaigns: [{
+    campaign_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Campaign' },
+    campaign_name: { type: String },
+    filter_set_id: { type: String },
+    stopped_at: { type: Date, default: Date.now },
+    reason: { type: String, enum: ['low_balance', 'card_declined', 'manual'], default: 'low_balance' }
+  }],
   payment_error: {
     type: Boolean,
     default: false
