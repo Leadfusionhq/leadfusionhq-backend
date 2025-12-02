@@ -1074,6 +1074,49 @@ const sendBoberdoLeadNotifications = async (lead, campaign, billingResult) => {
       }
     }
 
+     try {
+      const EXCLUDED = new Set([
+        'admin@gmail.com',
+        'admin123@gmail.com',
+        'admin1234@gmail.com',
+      ]);
+
+      const adminUsers = await User.find({
+        role: { $in: ['ADMIN', 'SUPER_ADMIN'] },
+        isActive: { $ne: false }
+      }).select('email');
+
+      let adminEmails = (adminUsers || [])
+        .map(a => a.email)
+        .filter(Boolean)
+        .map(e => e.trim().toLowerCase())
+        .filter(e => !EXCLUDED.has(e));
+
+      if (adminEmails.length > 0) {
+        await MAIL_HANDLER.sendLeadAssignAdminEmail({
+          to: adminEmails,
+          userName: campaignOwner.name || campaignOwner.fullName || 'N/A',
+          userEmail: campaignOwner.email,
+          leadName: lead.lead_id,
+          assignedBy: 'Boberdoo Integration',
+          leadDetailsUrl: `${process.env.UI_LINK}/dashboard/leads/${lead._id}`,
+          campaignName: campaign.name,
+          leadData: lead,
+          realleadId: lead._id,
+        });
+
+        leadLogger.info('Boberdoo lead assignment admin email sent successfully', {
+          ...logMeta,
+          admin_count: adminEmails.length,
+        });
+      }
+    } catch (err) {
+      leadLogger.error('Failed to send Boberdoo lead assignment admin email', err, {
+        ...logMeta,
+        error: err.message,
+      });
+    }
+
     // ✅ SMS delivery
     if (campaign?.delivery?.method?.includes('phone') && campaign?.delivery?.phone?.numbers) {
       try {

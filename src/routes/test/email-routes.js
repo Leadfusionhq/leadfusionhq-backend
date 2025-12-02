@@ -596,4 +596,63 @@ router.post('/send-test-pending-leads-success-single', async (req, res) => {
     });
   }
 });
+
+
+// ========================================
+// ✅ TEST: Lead Assignment Admin Email
+// ========================================
+router.post('/send-test-lead-assign-admin-mail', async (req, res) => {
+  try {
+    const {
+      to,
+      userName,
+      userEmail,
+      campaignName
+    } = req.body;
+
+    if (!to) {
+      return res.status(400).json({ message: "Admin email(s) required" });
+    }
+
+    const testLeadData = {
+      first_name: "John",
+      last_name: "Doe",
+      phone_number: "+1 (555) 123-4567",
+      email: "john.doe@example.com",
+      address: {
+        full_address: "123 Main St, New York, NY 10001",
+        street: "123 Main St",
+        city: "New York",
+        state: { name: "New York" },
+        zip_code: "10001"
+      },
+      lead_id: "LED-TEST-001",
+      note: "This is a test lead note"
+    };
+
+    const response = await MAIL_HANDLER.sendLeadAssignAdminEmail({
+      to: Array.isArray(to) ? to : [to],
+      userName: userName || "Test Campaign Owner",
+      userEmail: userEmail || "owner@example.com",
+      leadName: "LED-TEST-001",
+      assignedBy: "Test System",
+      leadDetailsUrl: "https://www.leadfusionhq.com/dashboard/leads/test123",
+      campaignName: campaignName || "Test Campaign",
+      leadData: testLeadData,
+      realleadId: "test123"
+    });
+
+    res.status(200).json({
+      message: "✅ Test Lead Assignment Admin Email sent!",
+      data: response
+    });
+
+  } catch (error) {
+    console.error("❌ Failed to send lead assignment admin email:", error);
+    res.status(500).json({
+      message: "Failed to send lead assignment admin email",
+      error: error.message
+    });
+  }
+});
 module.exports = router;
