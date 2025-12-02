@@ -5,6 +5,7 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM_EMAIL = 'Leadfusionhq <noreply@leadfusionhq.com>';
 
 const { generateTransactionReceipt } = require('../services/pdf/receiptGenerator');
+const { formatFullAddress, makeAddressLink } = require('../utils/address.utile');
 
 const createEmailTemplate = ({
   title = '',
@@ -271,21 +272,36 @@ const sendLeadAssignEmail = async ({ to, name, leadName, assignedBy, leadDetails
     ? `<a href="tel:${phone_number}" style="color: #000; text-decoration: none;">${phone_number}</a>` 
     : 'N/A';
 
-  // ✅ Address parts
-  const addressParts = [
-    address.street,
-    address?.full_address,
-    address.city,
-    address.state?.name || address.state, 
-    address.zip_code
-  ].filter(Boolean); 
+  // const addressParts = [
+    // address.street,
+    // address?.full_address,
+    // address.city,
+    // address.state?.name || address.state, 
+    // address.zip_code
+  // ].filter(Boolean); 
   
-  const fullAddress = addressParts.length > 0 ? addressParts.join(', ') : 'N/A';
-  
-  // ✅ Address with black Google Maps link
-  const addressDisplay = fullAddress !== 'N/A'
-    ? `<a href="https://maps.google.com/?q=${encodeURIComponent(fullAddress)}" target="_blank" rel="noopener noreferrer" style="color: #000; text-decoration: none;">${fullAddress}</a>`
-    : fullAddress;
+  // const fullAddress = addressParts.length > 0 ? addressParts.join(', ') : 'N/A';
+//  const composedAddressParts = [
+//     address?.street,
+//     address?.city,
+//     address?.state?.name || address?.state,
+//     address?.zip_code
+//   ].filter(Boolean);
+
+//   const composedAddress = composedAddressParts.join(', ');
+
+//   const fullAddress = address?.full_address || composedAddress || 'N/A';
+  const fullAddress = formatFullAddress(address);
+  const addressDisplay = makeAddressLink(fullAddress);
+
+  // const addressDisplay = fullAddress !== 'N/A'
+  //   ? `<a href="https://maps.google.com/?q=${encodeURIComponent(fullAddress)}" 
+  //         target="_blank" 
+  //         rel="noopener noreferrer" 
+  //         style="color: #000; text-decoration: none;">
+  //         ${fullAddress}
+  //     </a>`
+  //   : fullAddress;
 
   const leadDetailsLink = `https://www.leadfusionhq.com/dashboard/leads/${realleadId}`;
   
@@ -430,21 +446,43 @@ const sendLeadReturnEmail = async ({ adminEmails, lead, campaign, returnedBy, re
     ? `<a href="tel:${phone_number}" style="color: #000; text-decoration: none;">${phone_number}</a>` 
     : 'N/A';
 
-  // ✅ Address parts
-  const addressParts = [
-    address.street,
-    address.full_address,
-    address.city,
-    address.state?.name || address.state, 
-    address.zip_code
-  ].filter(Boolean); 
+  // const addressParts = [
+  //   address.street,
+  //   address.full_address,
+  //   address.city,
+  //   address.state?.name || address.state, 
+  //   address.zip_code
+  // ].filter(Boolean); 
   
-  const fullAddress = addressParts.length > 0 ? addressParts.join(', ') : 'N/A';
+  // const fullAddress = addressParts.length > 0 ? addressParts.join(', ') : 'N/A';
   
-  // ✅ Address with black Google Maps link
-  const addressDisplay = fullAddress !== 'N/A'
-    ? `<a href="https://maps.google.com/?q=${encodeURIComponent(fullAddress)}" target="_blank" rel="noopener noreferrer" style="color: #000; text-decoration: none;">${fullAddress}</a>`
-    : fullAddress;
+  // const addressDisplay = fullAddress !== 'N/A'
+  //   ? `<a href="https://maps.google.com/?q=${encodeURIComponent(fullAddress)}" target="_blank" rel="noopener noreferrer" style="color: #000; text-decoration: none;">${fullAddress}</a>`
+  //   : fullAddress;
+  // const composedAddressParts = [
+  //   address?.street,
+  //   address?.city,
+  //   address?.state?.name || address?.state,
+  //   address?.zip_code
+  // ].filter(Boolean);
+
+  // const composedAddress = composedAddressParts.join(', ');
+
+  // const fullAddress = address?.full_address || composedAddress || 'N/A';
+
+  const fullAddress = formatFullAddress(address);
+
+  const addressDisplay = makeAddressLink(fullAddress);
+
+  // const addressDisplay = fullAddress !== 'N/A'
+  //   ? `<a href="https://maps.google.com/?q=${encodeURIComponent(fullAddress)}" 
+  //         target="_blank" 
+  //         rel="noopener noreferrer" 
+  //         style="color: #000; text-decoration: none;">
+  //         ${fullAddress}
+  //     </a>`
+  //   : fullAddress;
+
 
   const mainText = `
     <div style="max-width: 600px; margin: 0; padding: 0;">
@@ -1037,14 +1075,26 @@ const sendLeadPaymentEmail = async ({
   const fullName = `${first_name} ${last_name}`.trim() || leadName || 'N/A';
   
   const addressParts = [
-    address.street,
+    // address.street,
     address?.full_address,
-    address.city,
-    address.state?.name || address.state, 
-    address.zip_code
+    // address.city,
+    // address.state?.name || address.state, 
+    // address.zip_code
   ].filter(Boolean);
   
-  const fullAddress = full_address ?? 'N/A';
+  // const fullAddress = full_address ?? 'N/A';
+
+  // const composedAddressParts = [
+  //   address?.street,
+  //   address?.city,
+  //   address?.state?.name || address?.state,
+  //   address?.zip_code
+  // ].filter(Boolean);
+
+  // const composedAddress = composedAddressParts.join(', ');
+
+  // const fullAddress = address?.full_address || composedAddress || 'N/A';
+  const fullAddress = formatFullAddress(address);
 
   const leadDetailsSection = `
     <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 25px 0; background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); border-radius: 12px; border: 2px solid #3b82f6; overflow: hidden;">

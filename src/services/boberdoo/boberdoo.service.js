@@ -23,6 +23,7 @@ const CREATE_ACTION = 'createNewPartner'; // fixed here
 const CAMPAIGN_API_URL = process.env.BOBERDOO_CAMPAIGN_API_URL;
 const CAMPAIGN_API_KEY = process.env.BOBERDOO_CAMPAIGN_API_KEY;
 const CREATE_CAMPAIGN_ACTION = 'insertUpdateFilterSet';
+const { formatFullAddress } = require('../../utils/address.utile.js');
 
 
 const TIMEOUT_MS = Number(process.env.BOBERDOO_TIMEOUT_MS || 15000);
@@ -1079,11 +1080,13 @@ const sendBoberdoLeadNotifications = async (lead, campaign, billingResult) => {
         const fullName = `${lead.first_name || ''} ${lead.last_name || ''}`.trim();
         const phoneNumber = lead.phone_number || lead.phone || '';
         const email = lead.email || '';
-        const address = [
-          lead?.address?.full_address || '',
+        // const address = [
+          // lead?.address?.full_address || '',
           // lead?.address?.city || '',
           // lead?.address?.zip_code || '',
-        ].filter(Boolean).join(', ');
+        // ].filter(Boolean).join(', ');
+        const address = formatFullAddress(address);
+        
         const campaignName = campaign?.name || 'N/A';
 
         const MAX_NOTE_LENGTH = 100;

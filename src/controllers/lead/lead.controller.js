@@ -20,6 +20,7 @@ const { sendToN8nWebhook, sendLowBalanceAlert} = require('../../services/n8n/web
 // Create single lead
 const Campaign = require('../../models/campaign.model.js');
 const { leadLogger } = require('../../utils/logger');
+const { formatFullAddress } = require('../../utils/address.utile.js');
 
 // const createLead = wrapAsync(async (req, res) => {
 //     const session = await mongoose.startSession();
@@ -580,9 +581,11 @@ const createLead = wrapAsync(async (req, res) => {
             const fullName = `${result.first_name || ''} ${result.last_name || ''}`.trim();
             const phoneNumber = result.phone_number || result.phone || '';
             const email = result.email || '';
-            const address = [
-              result?.address?.full_address || '',
-            ].filter(Boolean).join(', ');
+            // const address = [
+            //   result?.address?.full_address || '',
+            // ].filter(Boolean).join(', ');
+            const address = formatFullAddress(address);
+            
             const campaignName = campaign?.name || 'N/A';
 
             const MAX_NOTE_LENGTH = 100;
