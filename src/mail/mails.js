@@ -1702,7 +1702,251 @@ const sendFailedLeadPaymentAdminEmail = async ({ to, userName, userEmail, leadId
   });
 };
 
+/**
+ * Email sent to USER when PENDING leads are successfully charged
+ * Shows ALL charged leads in one table
+ */
+const sendPendingLeadsPaymentSuccessEmail = async ({ 
+  to, 
+  userName, 
+  chargedLeads,  // Array of all charged leads
+  totalAmount,
+  newBalance,
+  paymentMethod,
+  cardLast4
+}) => {
+  // Build leads table rows
+  const leadsTableRows = chargedLeads.map((lead, index) => `
+    <tr style="background-color: ${index % 2 === 0 ? '#ffffff' : '#f8f9fa'};">
+      <td style="border: 1px solid #e0e0e0; padding: 10px; text-align: center;">${index + 1}</td>
+      <td style="border: 1px solid #e0e0e0; padding: 10px;">${lead.leadId}</td>
+      <td style="border: 1px solid #e0e0e0; padding: 10px;">${lead.firstName || ''} ${lead.lastName || ''}</td>
+      <td style="border: 1px solid #e0e0e0; padding: 10px;">${lead.email || 'N/A'}</td>
+      <td style="border: 1px solid #e0e0e0; padding: 10px;">${lead.phone || 'N/A'}</td>
+      <td style="border: 1px solid #e0e0e0; padding: 10px;">${lead.campaignName || 'N/A'}</td>
+      <td style="border: 1px solid #e0e0e0; padding: 10px; text-align: right;"><strong>$${lead.amount?.toFixed(2) || '0.00'}</strong></td>
+      <td style="border: 1px solid #e0e0e0; padding: 10px; text-align: center;">
+        <span style="background-color: #28a745; color: white; padding: 3px 8px; border-radius: 3px; font-size: 12px;">Active</span>
+      </td>
+    </tr>
+  `).join('');
 
+  const leadsTable = `
+    <table cellpadding="0" cellspacing="0" style="width:100%; border-collapse: collapse; border: 1px solid #e0e0e0; margin: 15px 0; font-size: 14px;">
+      <thead>
+        <tr style="background-color: #343a40; color: white;">
+          <th style="border: 1px solid #454d55; padding: 12px; text-align: center;">#</th>
+          <th style="border: 1px solid #454d55; padding: 12px; text-align: left;">Lead ID</th>
+          <th style="border: 1px solid #454d55; padding: 12px; text-align: left;">Name</th>
+          <th style="border: 1px solid #454d55; padding: 12px; text-align: left;">Email</th>
+          <th style="border: 1px solid #454d55; padding: 12px; text-align: left;">Phone</th>
+          <th style="border: 1px solid #454d55; padding: 12px; text-align: left;">Campaign</th>
+          <th style="border: 1px solid #454d55; padding: 12px; text-align: right;">Amount</th>
+          <th style="border: 1px solid #454d55; padding: 12px; text-align: center;">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${leadsTableRows}
+      </tbody>
+      <tfoot>
+        <tr style="background-color: #d4edda;">
+          <td colspan="6" style="border: 1px solid #c3e6cb; padding: 12px; text-align: right;"><strong>Total Charged:</strong></td>
+          <td style="border: 1px solid #c3e6cb; padding: 12px; text-align: right;"><strong style="font-size: 16px;">$${totalAmount?.toFixed(2) || '0.00'}</strong></td>
+          <td style="border: 1px solid #c3e6cb; padding: 12px; text-align: center;"><strong>${chargedLeads.length} Leads</strong></td>
+        </tr>
+      </tfoot>
+    </table>
+  `;
+
+  const summaryTable = `
+    <table cellpadding="8" cellspacing="0" style="width:100%; border-collapse: collapse; border: 1px solid #e0e0e0; margin: 15px 0;">
+      <tr style="background-color: #d4edda;">
+        <td style="border: 1px solid #c3e6cb; padding: 12px;"><strong>Total Leads Charged</strong></td>
+        <td style="border: 1px solid #c3e6cb; padding: 12px;"><strong>${chargedLeads.length}</strong></td>
+      </tr>
+      <tr>
+        <td style="border: 1px solid #e0e0e0; padding: 12px;"><strong>Total Amount Charged</strong></td>
+        <td style="border: 1px solid #e0e0e0; padding: 12px;"><strong style="color: #28a745;">$${totalAmount?.toFixed(2) || '0.00'}</strong></td>
+      </tr>
+      <tr style="background-color: #f5f5f5;">
+        <td style="border: 1px solid #e0e0e0; padding: 12px;"><strong>Payment Method</strong></td>
+        <td style="border: 1px solid #e0e0e0; padding: 12px;">${paymentMethod === 'CARD' ? `Card **** ${cardLast4}` : paymentMethod === 'MIXED' ? 'Balance + Card' : 'Account Balance'}</td>
+      </tr>
+      <tr>
+        <td style="border: 1px solid #e0e0e0; padding: 12px;"><strong>Remaining Balance</strong></td>
+        <td style="border: 1px solid #e0e0e0; padding: 12px;">$${newBalance?.toFixed(2) || '0.00'}</td>
+      </tr>
+    </table>
+  `;
+
+  const html = createEmailTemplate({
+    title: '✅ Pending Payments Successfully Processed',
+    greeting: `Hello ${userName},`,
+    mainText: `
+      <div style="background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 5px; padding: 15px; margin-bottom: 20px;">
+        <strong style="color: #155724; font-size: 18px;">🎉 Great News!</strong>
+        <p style="color: #155724; margin: 5px 0 0 0;">
+          <strong>${chargedLeads.length} pending payment${chargedLeads.length > 1 ? 's have' : ' has'}</strong> been successfully charged and ${chargedLeads.length > 1 ? 'are' : 'is'} now <strong>ACTIVE</strong>.
+        </p>
+      </div>
+
+      <p>The following leads were previously pending due to payment issues. After adding funds or updating your payment method, all pending payments have been processed successfully.</p>
+      
+      <h3 style="color: #333; margin-top: 25px;">📊 Payment Summary</h3>
+      ${summaryTable}
+      
+      <h3 style="color: #333; margin-top: 25px;">📋 Charged Leads Details</h3>
+      ${leadsTable}
+      
+      <div style="background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 5px; padding: 15px; margin-top: 20px;">
+        <strong style="color: #856404;">ℹ️ What happened?</strong>
+        <p style="color: #856404; margin: 5px 0 0 0;">
+          These leads were originally received but payment failed at that time. Once you added funds or your payment method was updated, we automatically charged all pending amounts and activated the leads.
+        </p>
+      </div>
+
+      <p style="margin-top: 20px;">All these leads are now available in your dashboard.</p>
+    `,
+    footerText: 'Thank you for using our service!'
+  });
+
+  return resend.emails.send({
+    from: FROM_EMAIL,
+    to,
+    subject: `✅ ${chargedLeads.length} Pending Payment${chargedLeads.length > 1 ? 's' : ''} Processed - $${totalAmount?.toFixed(2)} Charged`,
+    html
+  });
+};
+
+/**
+ * Email sent to ADMINS when PENDING leads are successfully charged
+ * Shows ALL charged leads in one table
+ */
+const sendPendingLeadsPaymentSuccessAdminEmail = async ({ 
+  to, 
+  userName,
+  userEmail,
+  chargedLeads,  // Array of all charged leads
+  totalAmount,
+  newBalance,
+  paymentMethod,
+  cardLast4
+}) => {
+  const recipients = Array.isArray(to) ? to : [to];
+
+  // Build leads table rows
+  const leadsTableRows = chargedLeads.map((lead, index) => `
+    <tr style="background-color: ${index % 2 === 0 ? '#ffffff' : '#f8f9fa'};">
+      <td style="border: 1px solid #e0e0e0; padding: 10px; text-align: center;">${index + 1}</td>
+      <td style="border: 1px solid #e0e0e0; padding: 10px;">${lead.leadId}</td>
+      <td style="border: 1px solid #e0e0e0; padding: 10px;">${lead.firstName || ''} ${lead.lastName || ''}</td>
+      <td style="border: 1px solid #e0e0e0; padding: 10px;">${lead.email || 'N/A'}</td>
+      <td style="border: 1px solid #e0e0e0; padding: 10px;">${lead.phone || 'N/A'}</td>
+      <td style="border: 1px solid #e0e0e0; padding: 10px;">${lead.campaignName || 'N/A'}</td>
+      <td style="border: 1px solid #e0e0e0; padding: 10px; text-align: right;"><strong>$${lead.amount?.toFixed(2) || '0.00'}</strong></td>
+      <td style="border: 1px solid #e0e0e0; padding: 10px; text-align: center;">
+        <span style="background-color: #28a745; color: white; padding: 3px 8px; border-radius: 3px; font-size: 12px;">Active</span>
+      </td>
+    </tr>
+  `).join('');
+
+  const leadsTable = `
+    <table cellpadding="0" cellspacing="0" style="width:100%; border-collapse: collapse; border: 1px solid #e0e0e0; margin: 15px 0; font-size: 14px;">
+      <thead>
+        <tr style="background-color: #343a40; color: white;">
+          <th style="border: 1px solid #454d55; padding: 12px; text-align: center;">#</th>
+          <th style="border: 1px solid #454d55; padding: 12px; text-align: left;">Lead ID</th>
+          <th style="border: 1px solid #454d55; padding: 12px; text-align: left;">Name</th>
+          <th style="border: 1px solid #454d55; padding: 12px; text-align: left;">Email</th>
+          <th style="border: 1px solid #454d55; padding: 12px; text-align: left;">Phone</th>
+          <th style="border: 1px solid #454d55; padding: 12px; text-align: left;">Campaign</th>
+          <th style="border: 1px solid #454d55; padding: 12px; text-align: right;">Amount</th>
+          <th style="border: 1px solid #454d55; padding: 12px; text-align: center;">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${leadsTableRows}
+      </tbody>
+      <tfoot>
+        <tr style="background-color: #d4edda;">
+          <td colspan="6" style="border: 1px solid #c3e6cb; padding: 12px; text-align: right;"><strong>Total Charged:</strong></td>
+          <td style="border: 1px solid #c3e6cb; padding: 12px; text-align: right;"><strong style="font-size: 16px;">$${totalAmount?.toFixed(2) || '0.00'}</strong></td>
+          <td style="border: 1px solid #c3e6cb; padding: 12px; text-align: center;"><strong>${chargedLeads.length} Leads</strong></td>
+        </tr>
+      </tfoot>
+    </table>
+  `;
+
+  const userTable = `
+    <table cellpadding="8" cellspacing="0" style="width:100%; border-collapse: collapse; border: 1px solid #e0e0e0; margin: 15px 0;">
+      <tr style="background-color: #cce5ff;">
+        <td style="border: 1px solid #b8daff; padding: 10px;"><strong>User Name</strong></td>
+        <td style="border: 1px solid #b8daff; padding: 10px;">${userName}</td>
+      </tr>
+      <tr>
+        <td style="border: 1px solid #e0e0e0; padding: 10px;"><strong>User Email</strong></td>
+        <td style="border: 1px solid #e0e0e0; padding: 10px;">${userEmail}</td>
+      </tr>
+    </table>
+  `;
+
+  const summaryTable = `
+    <table cellpadding="8" cellspacing="0" style="width:100%; border-collapse: collapse; border: 1px solid #e0e0e0; margin: 15px 0;">
+      <tr style="background-color: #d4edda;">
+        <td style="border: 1px solid #c3e6cb; padding: 12px;"><strong>Total Leads Charged</strong></td>
+        <td style="border: 1px solid #c3e6cb; padding: 12px;"><strong>${chargedLeads.length}</strong></td>
+      </tr>
+      <tr>
+        <td style="border: 1px solid #e0e0e0; padding: 12px;"><strong>Total Amount Charged</strong></td>
+        <td style="border: 1px solid #e0e0e0; padding: 12px;"><strong style="color: #28a745;">$${totalAmount?.toFixed(2) || '0.00'}</strong></td>
+      </tr>
+      <tr style="background-color: #f5f5f5;">
+        <td style="border: 1px solid #e0e0e0; padding: 12px;"><strong>Payment Method</strong></td>
+        <td style="border: 1px solid #e0e0e0; padding: 12px;">${paymentMethod === 'CARD' ? `Card **** ${cardLast4}` : paymentMethod === 'MIXED' ? 'Balance + Card' : 'Account Balance'}</td>
+      </tr>
+      <tr>
+        <td style="border: 1px solid #e0e0e0; padding: 12px;"><strong>User's Remaining Balance</strong></td>
+        <td style="border: 1px solid #e0e0e0; padding: 12px;">$${newBalance?.toFixed(2) || '0.00'}</td>
+      </tr>
+    </table>
+  `;
+
+  const html = createEmailTemplate({
+    title: 'Pending Payments Successfully Processed',
+    mainText: `
+      <div style="background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 5px; padding: 15px; margin-bottom: 20px;">
+        <strong style="color: #155724; font-size: 18px;"> Pending Payments Cleared</strong>
+        <p style="color: #155724; margin: 5px 0 0 0;">
+          <strong>${chargedLeads.length} pending payment${chargedLeads.length > 1 ? 's have' : ' has'}</strong> been successfully processed for this user.
+        </p>
+      </div>
+
+      <h3 style="color: #333; margin-top: 20px;"> User Details</h3>
+      ${userTable}
+      
+      <h3 style="color: #333; margin-top: 25px;"> Payment Summary</h3>
+      ${summaryTable}
+      
+      <h3 style="color: #333; margin-top: 25px;"> All Charged Leads</h3>
+      ${leadsTable}
+
+      <div style="background-color: #e2e3e5; border: 1px solid #d6d8db; border-radius: 5px; padding: 15px; margin-top: 20px;">
+        <strong style="color: #383d41;"> Status Change:</strong>
+        <p style="color: #383d41; margin: 5px 0 0 0;">
+          All ${chargedLeads.length} leads: <span style="color: #dc3545;">Pending</span> → <span style="color: #28a745;"><strong>Active</strong></span>
+        </p>
+      </div>
+    `,
+    footerText: ''
+  });
+
+  return resend.emails.send({
+    from: FROM_EMAIL,
+    to: recipients,
+    subject: `✅ ${chargedLeads.length} Pending Payments Processed - ${userEmail} - $${totalAmount?.toFixed(2)}`,
+    html
+  });
+};
 
 
 
@@ -1733,4 +1977,6 @@ module.exports = {
     sendLowBalanceWarningEmail,
     sendFailedLeadPaymentEmail,
     sendFailedLeadPaymentAdminEmail,
+    sendPendingLeadsPaymentSuccessEmail,
+    sendPendingLeadsPaymentSuccessAdminEmail,
 };
