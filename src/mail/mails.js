@@ -5,6 +5,7 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM_EMAIL = 'Leadfusionhq <noreply@leadfusionhq.com>';
 
 const { generateTransactionReceipt } = require('../services/pdf/receiptGenerator');
+const { formatFullAddress, makeAddressLink } = require('../utils/address.utile');
 
 const createEmailTemplate = ({
   title = '',
@@ -271,21 +272,36 @@ const sendLeadAssignEmail = async ({ to, name, leadName, assignedBy, leadDetails
     ? `<a href="tel:${phone_number}" style="color: #000; text-decoration: none;">${phone_number}</a>` 
     : 'N/A';
 
-  // ✅ Address parts
-  const addressParts = [
-    address.street,
-    address?.full_address,
-    address.city,
-    address.state?.name || address.state, 
-    address.zip_code
-  ].filter(Boolean); 
+  // const addressParts = [
+    // address.street,
+    // address?.full_address,
+    // address.city,
+    // address.state?.name || address.state, 
+    // address.zip_code
+  // ].filter(Boolean); 
   
-  const fullAddress = addressParts.length > 0 ? addressParts.join(', ') : 'N/A';
-  
-  // ✅ Address with black Google Maps link
-  const addressDisplay = fullAddress !== 'N/A'
-    ? `<a href="https://maps.google.com/?q=${encodeURIComponent(fullAddress)}" target="_blank" rel="noopener noreferrer" style="color: #000; text-decoration: none;">${fullAddress}</a>`
-    : fullAddress;
+  // const fullAddress = addressParts.length > 0 ? addressParts.join(', ') : 'N/A';
+//  const composedAddressParts = [
+//     address?.street,
+//     address?.city,
+//     address?.state?.name || address?.state,
+//     address?.zip_code
+//   ].filter(Boolean);
+
+//   const composedAddress = composedAddressParts.join(', ');
+
+//   const fullAddress = address?.full_address || composedAddress || 'N/A';
+  const fullAddress = formatFullAddress(address);
+  const addressDisplay = makeAddressLink(fullAddress);
+
+  // const addressDisplay = fullAddress !== 'N/A'
+  //   ? `<a href="https://maps.google.com/?q=${encodeURIComponent(fullAddress)}" 
+  //         target="_blank" 
+  //         rel="noopener noreferrer" 
+  //         style="color: #000; text-decoration: none;">
+  //         ${fullAddress}
+  //     </a>`
+  //   : fullAddress;
 
   const leadDetailsLink = `https://www.leadfusionhq.com/dashboard/leads/${realleadId}`;
   
@@ -385,7 +401,7 @@ const sendLeadAssignEmail = async ({ to, name, leadName, assignedBy, leadDetails
   `;
 
   const html = createEmailTemplate({
-    title: 'New Lead Assigned',
+    title: 'Lead Fusion - New Lead',
     mainText: mainText,
   });
 
@@ -430,21 +446,43 @@ const sendLeadReturnEmail = async ({ adminEmails, lead, campaign, returnedBy, re
     ? `<a href="tel:${phone_number}" style="color: #000; text-decoration: none;">${phone_number}</a>` 
     : 'N/A';
 
-  // ✅ Address parts
-  const addressParts = [
-    address.street,
-    address.full_address,
-    address.city,
-    address.state?.name || address.state, 
-    address.zip_code
-  ].filter(Boolean); 
+  // const addressParts = [
+  //   address.street,
+  //   address.full_address,
+  //   address.city,
+  //   address.state?.name || address.state, 
+  //   address.zip_code
+  // ].filter(Boolean); 
   
-  const fullAddress = addressParts.length > 0 ? addressParts.join(', ') : 'N/A';
+  // const fullAddress = addressParts.length > 0 ? addressParts.join(', ') : 'N/A';
   
-  // ✅ Address with black Google Maps link
-  const addressDisplay = fullAddress !== 'N/A'
-    ? `<a href="https://maps.google.com/?q=${encodeURIComponent(fullAddress)}" target="_blank" rel="noopener noreferrer" style="color: #000; text-decoration: none;">${fullAddress}</a>`
-    : fullAddress;
+  // const addressDisplay = fullAddress !== 'N/A'
+  //   ? `<a href="https://maps.google.com/?q=${encodeURIComponent(fullAddress)}" target="_blank" rel="noopener noreferrer" style="color: #000; text-decoration: none;">${fullAddress}</a>`
+  //   : fullAddress;
+  // const composedAddressParts = [
+  //   address?.street,
+  //   address?.city,
+  //   address?.state?.name || address?.state,
+  //   address?.zip_code
+  // ].filter(Boolean);
+
+  // const composedAddress = composedAddressParts.join(', ');
+
+  // const fullAddress = address?.full_address || composedAddress || 'N/A';
+
+  const fullAddress = formatFullAddress(address);
+
+  const addressDisplay = makeAddressLink(fullAddress);
+
+  // const addressDisplay = fullAddress !== 'N/A'
+  //   ? `<a href="https://maps.google.com/?q=${encodeURIComponent(fullAddress)}" 
+  //         target="_blank" 
+  //         rel="noopener noreferrer" 
+  //         style="color: #000; text-decoration: none;">
+  //         ${fullAddress}
+  //     </a>`
+  //   : fullAddress;
+
 
   const mainText = `
     <div style="max-width: 600px; margin: 0; padding: 0;">
@@ -577,79 +615,83 @@ const sendNewUserRegistrationToAdmin = async ({
   adminEmails, 
   userName, 
   userEmail,
+  companyName,
+  phoneNumber,
   registrationDate,
-  verificationDate,
   userRole = 'User'
 }) => {
-  // ✅ Filter out admin@gmail.com (double-check in case controller missed it)
+  // ✅ Filter unwanted admin emails
   const filteredAdmins = Array.isArray(adminEmails)
     ? adminEmails.filter(email => email && email.toLowerCase() !== 'admin@gmail.com')
     : [adminEmails].filter(email => email && email.toLowerCase() !== 'admin@gmail.com');
 
-  // If no valid admins after filtering, skip email
   if (filteredAdmins.length === 0) {
     console.log('⚠️ No admin emails to notify (admin@gmail.com excluded)');
     return null;
   }
 
+  // ✅ Simple left-aligned structure (like Brett Cooper layout)
   const userDetailsTable = `
-    <div style="max-width: 600px; margin: 0 auto;">
-      <div style="background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); 
-                  padding: 20px; border-radius: 12px; border-left: 5px solid #3b82f6; 
-                  margin: 20px 0;">
-        <table width="100%" cellpadding="0" cellspacing="0" border="0" 
-               style="font-family: Arial, sans-serif; font-size: 14px;">
-          <tr>
-            <td style="padding: 8px 0;">
-              <strong style="color: #1e3a8a; display: inline-block; width: 140px;"> User Name:</strong>
-              <span style="color: #1e40af; font-weight: 600;">${userName}</span>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding: 8px 0; border-top: 1px solid rgba(59, 130, 246, 0.2);">
-              <strong style="color: #1e3a8a; display: inline-block; width: 140px;"> Email:</strong>
-              <span style="color: #1e40af;">${userEmail}</span>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding: 8px 0; border-top: 1px solid rgba(59, 130, 246, 0.2);">
-              <strong style="color: #1e3a8a; display: inline-block; width: 140px;"> Role:</strong>
-              <span style="color: #1e40af;">${userRole}</span>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding: 8px 0; border-top: 1px solid rgba(59, 130, 246, 0.2);">
-              <strong style="color: #1e3a8a; display: inline-block; width: 140px;"> Registered:</strong>
-              <span style="color: #1e40af;">${registrationDate}</span>
-            </td>
-          </tr>
-          ${verificationDate ? `
-          <tr>
-            <td style="padding: 8px 0; border-top: 1px solid rgba(59, 130, 246, 0.2);">
-              <strong style="color: #1e3a8a; display: inline-block; width: 140px;"> Verified:</strong>
-              <span style="color: #10b981; font-weight: 600;">${verificationDate}</span>
-            </td>
-          </tr>
-          ` : ''}
-        </table>
-      </div>
+    <table cellpadding="0" cellspacing="0" border="0" 
+           style="width: 100%; font-family: Arial, sans-serif; font-size: 14px; 
+                  color: #1e3a8a; line-height: 1.6; text-align: left;">
       
-      <div style="background: #f0fdf4; padding: 15px; border-radius: 8px; 
-                  border-left: 4px solid #10b981; margin-top: 20px;">
-        <p style="margin: 0; color: #065f46; font-size: 13px; line-height: 1.6;">
-          <strong>✅ Status:</strong> User has successfully verified their email and completed registration.
-        </p>
-      </div>
-    </div>
+      <tr>
+        <td style="padding: 4px 0; vertical-align: top;">
+          <strong style="color: #1e3a8a;">User Name</strong>
+        </td>
+        <td style="padding: 4px 0; color: #1e40af;">${userName}</td>
+      </tr>
+
+      <tr>
+        <td style="padding: 4px 0; vertical-align: top;">
+          <strong style="color: #1e3a8a;">Email</strong>
+        </td>
+        <td style="padding: 4px 0;">
+          <a href="mailto:${userEmail}" style="color: #2563eb; text-decoration: none;">
+            ${userEmail}
+          </a>
+        </td>
+      </tr>
+
+      ${companyName ? `
+      <tr>
+        <td style="padding: 4px 0; vertical-align: top;">
+          <strong style="color: #1e3a8a;">Company Name</strong>
+        </td>
+        <td style="padding: 4px 0; color: #1e40af;">${companyName}</td>
+      </tr>` : ''}
+
+      ${phoneNumber ? `
+      <tr>
+        <td style="padding: 4px 0; vertical-align: top;">
+          <strong style="color: #1e3a8a;">Phone Number</strong>
+        </td>
+        <td style="padding: 4px 0; color: #1e40af;">${phoneNumber}</td>
+      </tr>` : ''}
+
+      <tr>
+        <td style="padding: 4px 0; vertical-align: top;">
+          <strong style="color: #1e3a8a;">Role</strong>
+        </td>
+        <td style="padding: 4px 0; color: #1e40af;">${userRole}</td>
+      </tr>
+
+      <tr>
+        <td style="padding: 4px 0; vertical-align: top;">
+          <strong style="color: #1e3a8a;">Registered</strong>
+        </td>
+        <td style="padding: 4px 0; color: #1e40af;">${registrationDate}</td>
+      </tr>
+    </table>
   `;
 
+  // ✅ Simple email body (no button, no footer)
   const html = createEmailTemplate({
     title: 'New User Registration',
-    greeting: 'Admin Team,',
+    // greeting: 'Admin Team,',
     mainText: userDetailsTable,
-    buttonText: 'View User in Dashboard',
-    buttonUrl: `${process.env.UI_LINK}/admin/users`,
-    footerText: 'This is an automated notification for new user registrations.'
+    footerText: '' // removed footer
   });
 
   return resend.emails.send({
@@ -659,6 +701,8 @@ const sendNewUserRegistrationToAdmin = async ({
     html,
   });
 };
+
+
 
 // Add these new email functions to your existing emailService.js
 const sendTransactionEmail = async ({ 
@@ -841,6 +885,78 @@ const sendTransactionEmail = async ({
   return resend.emails.send(payload);
 };
 
+async function sendCampaignCreatedEmail(campaign) {
+  try {
+    const toEmail = "mahadiqbal72462@gmail.com"; // <-- Mohad's email
+    // const toEmail = "jatindev1022@gmail.com"; // <-- Mohad's email
+
+
+    const partnerId = campaign?.user_id?.integrations?.boberdoo?.external_id || "N/A";
+    const filterSetId = campaign?.boberdoo_filter_set_id || "N/A";
+
+    // ---- Campaign Details Table ----
+    const campaignTable = `
+      <table cellpadding="0" cellspacing="0" border="0" 
+        style="width: 100%; font-family: Arial, sans-serif; font-size: 14px; 
+               color: #1e3a8a; line-height: 1.6; text-align: left;">
+
+        <tr>
+          <td style="padding: 4px 0; vertical-align: top;">
+            <strong style="color: #1e3a8a;">Campaign Name</strong>
+          </td>
+          <td style="padding: 4px 0; color: #1e40af;">${campaign.name}</td>
+        </tr>
+
+        <tr>
+          <td style="padding: 4px 0; vertical-align: top;">
+            <strong style="color: #1e3a8a;">Campaign ID</strong>
+          </td>
+          <td style="padding: 4px 0; color: #1e40af;">${campaign.campaign_id}</td>
+        </tr>
+
+        <tr>
+          <td style="padding: 4px 0; vertical-align: top;">
+            <strong style="color: #1e3a8a;">User Partner ID</strong>
+          </td>
+          <td style="padding: 4px 0; color: #1e40af;">${partnerId}</td>
+        </tr>
+
+        <tr>
+          <td style="padding: 4px 0; vertical-align: top;">
+            <strong style="color: #1e3a8a;">Filter Set ID</strong>
+          </td>
+          <td style="padding: 4px 0; color: #1e40af;">${filterSetId}</td>
+        </tr>
+
+      </table>
+    `;
+
+    // ---- Email Template ----
+    const html = createEmailTemplate({
+      title: "New Campaign Created",
+      mainText: `
+        <div style="font-size: 14px; color: #1e3a8a;">
+          Hi there,<br><br>
+          A new campaign has been created. The relevant information is listed below.<br><br>
+          ${campaignTable}
+        </div>
+      `,
+      footerText: "" // No footer
+    });
+
+    await resend.emails.send({
+      from: "LeadFusionHQ <noreply@leadfusionhq.com>",
+      to: toEmail,
+      subject: `New Campaign Created - ${campaign.name}`,
+      html,
+    });
+
+    console.log("📧 Campaign email sent to Mohad:", toEmail);
+
+  } catch (err) {
+    console.error("❌ Failed to send campaign creation email:", err.message);
+  }
+}
 
 
 
@@ -959,14 +1075,26 @@ const sendLeadPaymentEmail = async ({
   const fullName = `${first_name} ${last_name}`.trim() || leadName || 'N/A';
   
   const addressParts = [
-    address.street,
+    // address.street,
     address?.full_address,
-    address.city,
-    address.state?.name || address.state, 
-    address.zip_code
+    // address.city,
+    // address.state?.name || address.state, 
+    // address.zip_code
   ].filter(Boolean);
   
-  const fullAddress = full_address ?? 'N/A';
+  // const fullAddress = full_address ?? 'N/A';
+
+  // const composedAddressParts = [
+  //   address?.street,
+  //   address?.city,
+  //   address?.state?.name || address?.state,
+  //   address?.zip_code
+  // ].filter(Boolean);
+
+  // const composedAddress = composedAddressParts.join(', ');
+
+  // const fullAddress = address?.full_address || composedAddress || 'N/A';
+  const fullAddress = formatFullAddress(address);
 
   const leadDetailsSection = `
     <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 25px 0; background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); border-radius: 12px; border: 2px solid #3b82f6; overflow: hidden;">
@@ -1145,68 +1273,216 @@ const sendLowBalanceWarning = async ({
 /**
  * Send Insufficient Balance Email
  */
+const sendLowBalanceWarningEmail = async ({ 
+  to, 
+  userName, 
+  partnerId,
+  email,
+  currentBalance,
+  leadCost
+}) => {
+
+  const lowBalanceContent = `
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" 
+      style="margin: 30px 0; background: linear-gradient(135deg, #fef9c3 0%, #fde68a 100%); 
+      border-radius: 12px; border: 2px solid #ca8a04; overflow: hidden;">
+      <tr>
+        <td style="padding: 30px;">
+          <table width="100%" cellpadding="0" cellspacing="0" border="0">
+
+            <!-- Icon + Heading -->
+            <tr>
+              <td style="text-align: center; padding-bottom: 20px;">
+                <div style="font-size: 60px; margin-bottom: 10px;">⚠️</div>
+                <h3 style="margin: 0; color: #854d0e; font-size: 22px; font-weight: 700;">
+                  Low Balance Alert
+                </h3>
+              </td>
+            </tr>
+
+            <!-- Sub Text -->
+            <tr>
+              <td style="text-align: center; padding-bottom: 15px;">
+                <p style="margin: 0; font-size: 15px; color: #713f12; line-height: 24px;">
+                  Your wallet balance is running low. New leads may pause soon until you add funds.
+                </p>
+              </td>
+            </tr>
+
+            <!-- Details Box -->
+            <tr>
+              <td style="padding-top: 20px;">
+                <table width="100%" cellpadding="0" cellspacing="0" border="0" 
+                  style="background: #ffffff; border-radius: 8px; overflow: hidden;">
+
+                  <!-- Partner ID -->
+                  <tr>
+                    <td style="padding: 15px 20px; border-bottom: 1px solid #fef3c7;">
+                      <table width="100%">
+                        <tr>
+                          <td style="font-weight: 600; color: #713f12; text-align: left;" >Partner ID:</td>
+                          <td style="text-align: right; color: #854d0e; font-weight: 700;">
+                            ${partnerId}
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+
+                  <!-- Email -->
+                  <tr>
+                    <td style="padding: 15px 20px; border-bottom: 1px solid #fef3c7;">
+                      <table width="100%">
+                        <tr>
+                          <td style="font-weight: 600; color: #713f12; text-align: left;">Account Email:</td>
+                          <td style="text-align: right; color: #854d0e; font-weight: 700;">
+                            ${email}
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+
+                  <!-- Current Balance -->
+                  <tr>
+                    <td style="padding: 15px 20px; border-bottom: 1px solid #fef3c7;">
+                      <table width="100%">
+                        <tr>
+                          <td style="font-weight: 600; color: #713f12; text-align: left;">Current Balance:</td>
+                          <td style="text-align: right; color: #b45309; font-weight: 900; font-size: 20px;">
+                            $${parseFloat(currentBalance).toFixed(2)}
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+
+                  <!-- Lead Price -->
+                  <tr>
+                    <td style="padding: 15px 20px; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);">
+                      <table width="100%">
+                        <tr>
+                          <td style="font-weight: 700; color: #854d0e;">Lead Price:</td>
+                          <td style="text-align: right; color: #a16207; font-weight: 900; font-size: 22px;">
+                            $${parseFloat(leadCost).toFixed(2)}
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+
+                </table>
+              </td>
+            </tr>
+
+          </table>
+        </td>
+      </tr>
+    </table>
+  `;
+
+  const html = createEmailTemplate({
+    title: 'Low Balance Alert',
+    greeting: `Hello ${userName}!`,
+    mainText: lowBalanceContent,
+    buttonText: 'Add Funds Now',
+    buttonUrl: `${process.env.UI_LINK}/dashboard/billing`,
+    warningText: 'Your account may stop receiving new leads soon. Please add funds to keep services active.',
+    
+  });
+
+  return resend.emails.send({
+    from: FROM_EMAIL,
+    to,
+    subject: 'Low Balance Alert',
+    html
+  });
+};
+
+
 const sendInsufficientBalanceEmail = async ({ 
   to, 
   userName, 
   requiredAmount, 
   currentBalance,
-  leadId,
-  campaignName 
+  campaignName,
+  campaignId
 }) => {
+
   const insufficientContent = `
     <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 30px 0; background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); border-radius: 12px; border: 2px solid #dc2626; overflow: hidden;">
       <tr>
         <td style="padding: 30px;">
           <table width="100%" cellpadding="0" cellspacing="0" border="0">
+
+            <!-- ICON + HEADING -->
             <tr>
               <td style="text-align: center; padding-bottom: 20px;">
                 <div style="font-size: 60px; margin-bottom: 10px;">🚫</div>
                 <h3 style="margin: 0; color: #991b1b; font-size: 20px; font-weight: 700;">Insufficient Balance</h3>
               </td>
             </tr>
+
+            <!-- CAMPAIGN DETAILS -->
             <tr>
-              <td style="padding: 15px 0; text-align: center;">
+              <td style="padding: 10px 0; text-align: center;">
                 <p style="margin: 0; font-size: 15px; color: #7f1d1d; line-height: 24px;">
-                  Unable to assign lead <strong>${leadId}</strong> to campaign <strong>"${campaignName}"</strong>
+                  Unable to assign leads to campaign 
+                  <strong>"${campaignName}"</strong> (ID: <strong>${campaignId}</strong>)
                 </p>
               </td>
             </tr>
+
             <tr>
               <td style="padding: 20px 0;">
                 <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: white; border-radius: 8px; overflow: hidden;">
+
+                  <!-- REQUIRED AMOUNT -->
                   <tr>
                     <td style="padding: 15px 20px; border-bottom: 1px solid #fecaca;">
                       <table width="100%" cellpadding="0" cellspacing="0" border="0">
                         <tr>
-                          <td style="font-weight: 600; color: #7f1d1d; width: 50%;">Required Amount:</td>
-                          <td style="color: #dc2626; font-weight: 900; text-align: right; font-size: 22px;">$${parseFloat(requiredAmount).toFixed(2)}</td>
+                          <td style="font-weight: 600; color: #7f1d1d;">Required Balance (Lead Price):</td>
+                          <td style="color: #dc2626; font-weight: 900; text-align: right; font-size: 20px;">
+                            $${parseFloat(requiredAmount).toFixed(2)}
+                          </td>
                         </tr>
                       </table>
                     </td>
                   </tr>
+
+                  <!-- CURRENT BALANCE -->
                   <tr>
                     <td style="padding: 15px 20px; border-bottom: 1px solid #fecaca;">
                       <table width="100%" cellpadding="0" cellspacing="0" border="0">
                         <tr>
-                          <td style="font-weight: 600; color: #7f1d1d; width: 50%;">Current Balance:</td>
-                          <td style="color: #991b1b; font-weight: 700; text-align: right; font-size: 20px;">$${parseFloat(currentBalance).toFixed(2)}</td>
+                          <td style="font-weight: 600; color: #7f1d1d;">Current Balance:</td>
+                          <td style="color: #991b1b; font-weight: 700; text-align: right; font-size: 20px;">
+                            $${parseFloat(currentBalance).toFixed(2)}
+                          </td>
                         </tr>
                       </table>
                     </td>
                   </tr>
+
+                  <!-- AMOUNT NEEDED -->
                   <tr>
                     <td style="padding: 15px 20px; background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);">
                       <table width="100%" cellpadding="0" cellspacing="0" border="0">
                         <tr>
-                          <td style="font-weight: 700; color: #1e3a8a; width: 50%;">Amount Needed:</td>
-                          <td style="color: #2563eb; font-weight: 900; text-align: right; font-size: 24px;">$${parseFloat(requiredAmount - currentBalance).toFixed(2)}</td>
+                          <td style="font-weight: 700; color: #1e3a8a;">Amount Needed:</td>
+                          <td style="color: #2563eb; font-weight: 900; text-align: right; font-size: 22px;">
+                            $${parseFloat(requiredAmount - currentBalance).toFixed(2)}
+                          </td>
                         </tr>
                       </table>
                     </td>
                   </tr>
+
                 </table>
               </td>
             </tr>
+
           </table>
         </td>
       </tr>
@@ -1231,6 +1507,205 @@ const sendInsufficientBalanceEmail = async ({
   });
 };
 
+const sendLowBalanceAdminEmail = async ({
+  to,
+  userEmail,
+  userName,
+  campaignName,
+  campaignId,
+  requiredAmount,
+  currentBalance
+}) => {
+
+  // Always ensure "to" is an array
+  const recipients = Array.isArray(to) ? to : [to];
+
+  // Format values
+  const leadCost = parseFloat(requiredAmount).toFixed(2);
+  const balance = parseFloat(currentBalance).toFixed(2);
+  const needed = parseFloat(requiredAmount - currentBalance).toFixed(2);
+
+  // 📌 Styled table (same design as new user registration)
+  const table = `
+    <table cellpadding="0" cellspacing="0" border="0"
+           style="width: 100%; font-family: Arial, sans-serif; font-size: 14px; 
+                  color: #1e3a8a; line-height: 1.6; text-align: left;">
+
+      <tr>
+        <td style="padding: 4px 0; vertical-align: top;"><strong>User</strong></td>
+        <td style="padding: 4px 0; color: #1e40af;">
+          ${userName} (${userEmail})
+        </td>
+      </tr>
+
+      <tr>
+        <td style="padding: 4px 0; vertical-align: top;"><strong>Campaign</strong></td>
+        <td style="padding: 4px 0; color: #1e40af;">
+          ${campaignName}
+        </td>
+      </tr>
+
+      <tr>
+        <td style="padding: 4px 0; vertical-align: top;"><strong>Campaign ID</strong></td>
+        <td style="padding: 4px 0; color: #1e40af;">
+          ${campaignId}
+        </td>
+      </tr>
+
+      <tr>
+        <td style="padding: 4px 0; vertical-align: top;"><strong>Lead Cost</strong></td>
+        <td style="padding: 4px 0; color: #1e40af;">$${leadCost}</td>
+      </tr>
+
+      <tr>
+        <td style="padding: 4px 0; vertical-align: top;"><strong>User Balance</strong></td>
+        <td style="padding: 4px 0; color: #1e40af;">$${balance}</td>
+      </tr>
+
+      <tr>
+        <td style="padding: 4px 0; vertical-align: top;"><strong>Amount Needed</strong></td>
+        <td style="padding: 4px 0; color: #dc2626;">$${needed}</td>
+      </tr>
+
+    </table>
+  `;
+
+  // 📌 Use the SAME email wrapper template as registration emails
+  const html = createEmailTemplate({
+    title: 'Low Balance Alert – Lead Assignment Stopped',
+    mainText: `
+      <p style="margin-bottom: 10px; color: #1e3a8a;">
+        A lead assignment was stopped due to <strong>insufficient balance</strong>.
+      </p>
+
+      ${table}
+
+    `,
+    footerText: '' // no footer
+  });
+
+  return resend.emails.send({
+    from: FROM_EMAIL,
+    to: recipients,
+    subject: "Low Balance Alert – Lead Stopped",
+    html
+  });
+};
+
+const sendCampaignResumedEmail = async ({ to, userName, email, partnerId }) => {
+    const html = createEmailTemplate({
+        title: '✅ Lead Service Resumed',
+        greeting: `Hello ${userName}!`,
+        mainText: `
+            <p>Your lead service has been resumed successfully.</p>
+            <p><strong>Partner ID:</strong> ${partnerId}</p>
+            <p><strong>Email:</strong> ${email}</p>
+        `,
+        footerText: 'If you have any questions, please contact support.'
+    });
+
+    return resend.emails.send({
+        from: FROM_EMAIL,
+        to,
+        subject: `✅ Lead Service Resumed`,
+        html
+    });
+};
+const sendCampaignResumedAdminEmail = async ({ to, userName, userEmail, partnerId }) => {
+    const recipients = Array.isArray(to) ? to : [to];
+
+    const table = `
+        <table cellpadding="0" cellspacing="0" border="0"
+               style="width: 100%; font-family: Arial, sans-serif; font-size: 14px; color: #1e3a8a; line-height: 1.6;">
+          <tr>
+            <td><strong>User</strong></td>
+            <td>${userName} (${userEmail})</td>
+          </tr>
+          <tr>
+            <td><strong>Partner ID</strong></td>
+            <td>${partnerId}</td>
+          </tr>
+        </table>
+    `;
+
+    const html = createEmailTemplate({
+        title: 'Lead Service Resumed – Balance Added',
+        mainText: `
+            <p>The lead assignment service for the user has been resumed after sufficient funds were added:</p>
+            ${table}
+        `,
+        footerText: ''
+    });
+
+    return resend.emails.send({
+        from: FROM_EMAIL,
+        to: recipients,
+        subject: `Lead Service Resumed – Partner ID ${partnerId}`,
+        html
+    });
+};
+
+const sendFailedLeadPaymentEmail = async ({ to, userName, leadId, amount, cardLast4, errorMessage }) => {
+  const html = createEmailTemplate({
+    title: '❌ Lead Payment Failed',
+    greeting: `Hello ${userName},`,
+    mainText: `
+      <p>Your Pay-As-You-Go payment for a new lead has failed.</p>
+      <table cellpadding="6" style="width:100%; border-collapse: collapse;">
+        <tr><td><strong>Lead ID:</strong></td><td>${leadId}</td></tr>
+        <tr><td><strong>Amount:</strong></td><td>$${amount}</td></tr>
+        <tr><td><strong>Card Used:</strong></td><td>**** **** **** ${cardLast4}</td></tr>
+        <tr><td><strong>Error:</strong></td><td>${errorMessage}</td></tr>
+      </table>
+      <p>Please update your payment method to continue receiving leads.</p>
+    `,
+    footerText: 'If you need help, feel free to contact support.'
+  });
+
+  return resend.emails.send({
+    from: FROM_EMAIL,
+    to,
+    subject: "❌ Lead Payment Failed",
+    html
+  });
+};
+
+
+const sendFailedLeadPaymentAdminEmail = async ({ to, userName, userEmail, leadId, amount, cardLast4, errorMessage }) => {
+  const recipients = Array.isArray(to) ? to : [to];
+
+  const table = `
+    <table cellpadding="6" cellspacing="0" style="width:100%; border-collapse: collapse;">
+      <tr><td><strong>User Name</strong></td><td>${userName}</td></tr>
+      <tr><td><strong>User Email</strong></td><td>${userEmail}</td></tr>
+      <tr><td><strong>Lead ID</strong></td><td>${leadId}</td></tr>
+      <tr><td><strong>Amount</strong></td><td>$${amount}</td></tr>
+      <tr><td><strong>Card Used</strong></td><td>**** **** **** ${cardLast4}</td></tr>
+      <tr><td><strong>Error</strong></td><td>${errorMessage}</td></tr>
+    </table>
+  `;
+
+  const html = createEmailTemplate({
+    title: 'Lead Payment Failed – User Attempted Card Charge',
+    mainText: `
+      <p>A Pay-As-You-Go lead charge has failed for the following user:</p>
+      ${table}
+    `,
+    footerText: ''
+  });
+
+  return resend.emails.send({
+    from: FROM_EMAIL,
+    to: recipients,
+    subject: `Lead Payment Failed – ${userEmail}`,
+    html
+  });
+};
+
+
+
+
+
 module.exports = {
   createEmailTemplate,
   sendVerificationEmail,
@@ -1242,6 +1717,7 @@ module.exports = {
   sendTestMail,
   sendLeadAssignEmail,
   sendLeadReturnEmail,
+
     // ✅ New Transaction Email Functions
     sendTransactionEmail,
     sendFundsAddedEmail,
@@ -1249,5 +1725,12 @@ module.exports = {
     sendLeadPaymentEmail,
     sendLowBalanceWarning,
     sendInsufficientBalanceEmail,
-    sendNewUserRegistrationToAdmin
+    sendNewUserRegistrationToAdmin,
+    sendCampaignCreatedEmail,
+    sendLowBalanceAdminEmail,
+    sendCampaignResumedEmail,
+    sendCampaignResumedAdminEmail,
+    sendLowBalanceWarningEmail,
+    sendFailedLeadPaymentEmail,
+    sendFailedLeadPaymentAdminEmail,
 };

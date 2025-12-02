@@ -49,6 +49,42 @@ const getRevenueFromGateway = wrapAsync(async (req, res) => {
       from = dayjs(start).startOf('day');
       to = dayjs(end).endOf('day');
     }
+        // 🔥 NEW RANGES ADDED
+    if (range === 'yesterday') {
+        from = dayjs().subtract(1, 'day').startOf('day');
+        to = dayjs().subtract(1, 'day').endOf('day');
+    }
+
+    if (range === 'this_year') {
+        from = dayjs().startOf('year');
+        to = dayjs().endOf('day');
+    }
+
+    if (range === 'last_year') {
+        from = dayjs().subtract(1, 'year').startOf('year');
+        to = dayjs().subtract(1, 'year').endOf('year');
+    }
+
+    if (range === 'q1') {
+        from = dayjs().month(0).startOf('month');   // Jan 1
+        to = dayjs().month(2).endOf('month');       // Mar 31
+    }
+
+    if (range === 'q2') {
+        from = dayjs().month(3).startOf('month');   // Apr 1
+        to = dayjs().month(5).endOf('month');       // Jun 30
+    }
+
+    if (range === 'q3') {
+        from = dayjs().month(6).startOf('month');   // Jul 1
+        to = dayjs().month(8).endOf('month');       // Sep 30
+    }
+
+    if (range === 'q4') {
+        from = dayjs().month(9).startOf('month');   // Oct 1
+        to = dayjs().month(11).endOf('month');      // Dec 31
+    }
+
   
     const { totalAmount: sales, count: salesCount } = await getRevenueFromNmi({ start: from, end: to });
   
@@ -318,7 +354,7 @@ const getBalance = wrapAsync(async (req, res) => {
 });
 
 const getTransactions = wrapAsync(async (req, res) => {
-    const user_id = req.user._id;
+    const user_id = req.query.userId || req.user?._id
     const { page, limit } = getPaginationParams(req.query);
     const filters = extractFilters(req.query, ['type', 'status', 'dateFrom', 'dateTo']);
     

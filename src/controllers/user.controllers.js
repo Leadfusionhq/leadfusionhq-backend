@@ -11,7 +11,9 @@ const path = require('path');
 const fs = require("fs");
 const  Campaign  = require('../models/campaign.model');
 const CampaignServices = require('../services/campaign/campaign.service');
-
+const {sendBalanceTopUpAlert} = require('../services/n8n/webhookService.js');
+const User = require('../models/user.model');
+const { billingLogger } = require('../utils/logger');
 const getAllUsers = wrapAsync(async (req, res) => {
     const data = await UserServices.getAllUsersService(); 
     sendResponse(res, { data }, 'Users fetched successfully.', 200); 
@@ -255,6 +257,67 @@ const resyncBoberdoo = wrapAsync(async (req, res) => {
   const result = await syncUserToBoberdooById(userId);
   sendResponse(res, { result }, 'Boberdoo resync attempted', 200);
 });
+
+const sendBalanceTopUpWebhook = wrapAsync(async (req, res) => {
+  const { userId } = req.params;
+
+  // Guard: allow only self or admin
+  if (
+    req.user.role !== CONSTANT_ENUM.USER_ROLE.ADMIN &&
+    String(req.user._id) !== String(userId)
+  ) {
+    throw new ErrorHandler(403, 'Forbidden');
+  }
+
+  const user = await UserServices.getUserByID(userId);
+  if (!user) {
+    throw new ErrorHandler(404, 'User not found');
+  }
+
+  const partner_id = user.integrations?.boberdoo?.external_id || null;
+
+  // 🔵 LOG: Webhook trigger attempt
+  billingLogger.info("Sending Balance Top-Up webhook", {
+    user_id: user._id,
+    email: user.email,
+    partner_id
+  });
+
+  const result = await sendBalanceTopUpAlert({
+    partner_id,
+    email: user.email,
+    amount: undefined,
+    user_id: user._id  // ✅ ADD THIS
+  });
+
+  // 🔵 LOG: Webhook response details
+  billingLogger.info("Balance Top-Up webhook response", {
+    user_id: user._id,
+    webhook_success: result?.success,
+    webhook_result: result
+  });
+
+  // 🟢 Reset payment_error when webhook success
+  if (result?.success === true) {
+    billingLogger.info("Clearing payment_error because top-up webhook succeeded", {
+      user_id: user._id,
+      before: user.payment_error
+    });
+
+    user.payment_error = false;
+    user.last_payment_error_message = null;
+    await user.save();
+
+    billingLogger.info("payment_error updated", {
+      user_id: user._id,
+      after: user.payment_error
+    });
+  }
+
+  sendResponse(res, { result }, 'Balance top-up webhook sent', 200);
+});
+
+
 module.exports = {
  getAllUsers,
  getAllAdmins,
@@ -270,4 +333,5 @@ module.exports = {
  getMyProfile,
  updateMyProfile,
  changeMyPassword,
+ sendBalanceTopUpWebhook,
 };

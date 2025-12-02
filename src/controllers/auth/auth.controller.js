@@ -10,6 +10,7 @@ const { randomNumberGenerate, isEmpty } = require('../../utils/utils');
 const OTP = require('../../models/otp.model');
 const { syncUserToBoberdooById } = require('../../services/boberdoo/boberdoo.service');
 const { User } = require('../../models/user.model');
+const { logger } = require('../../utils/logger');
 // const registerUser = wrapAsync(async (req, res) => {
 //     const userPayload = req.body;
 
@@ -29,16 +30,25 @@ const registerUser = wrapAsync(async (req, res) => {
     const userPayload = req.body;
   
     const { user } = await AuthService.registerUser(userPayload);
-  
-    // ✅ ONLY send verification email - NO Boberdoo sync yet
+
+    console.log('✅ User registered successfully:', { userId: user._id, email: user.email, name: user.name });
+    logger.info('User registered successfully', { userId: user._id, email: user.email, name: user.name });
+
+    // Send verification email
     MAIL_HANDLER.sendVerificationEmail({
       to: user?.email,
       name: user?.name,
       token: user?.verificationToken,
-    }).catch((e) => console.error('❌ Verification email error:', e.message));
-  
+    }).then(() => {
+      console.log('📧 Verification email sent to:', user.email);
+      logger.info('Verification email sent', { userId: user._id, email: user.email });
+    }).catch((e) => {
+      console.error('❌ Failed to send verification email:', e.message);
+      logger.error('Failed to send verification email', e, { userId: user._id, email: user.email });
+    });
+
     sendResponse(res, { user }, 'Success! Please verify your email to activate your account.', 201);
-  });
+});
 
 
 const loginWithEmail = wrapAsync(async (req, res) => {
@@ -106,30 +116,29 @@ const verifyEmail = wrapAsync(async (req, res) => {
   if (!token) throw new ErrorHandler(400, 'Verification token is required');
 
   const user = await AuthService.verifyEmailService(token);
-  console.log('✅ Email verified for user:', user.email, { userId: user._id, role: user.role, createdAt: user.createdAt });
 
+  // Existing console log
+  console.log('✅ Email verified for user:', user.email, { userId: user._id, role: user.role, createdAt: user.createdAt });
+  // Added logger
+  logger.info('Email verified for user', { userId: user._id, email: user.email, role: user.role, createdAt: user.createdAt });
+
+  // Async Boberdoo sync
   (async () => {
     try {
       console.log('🚀 Starting Boberdoo sync for verified user:', user._id);
+      logger.info('Starting Boberdoo sync for verified user', { userId: user._id });
+
       const result = await syncUserToBoberdooById(user._id);
+
       console.log('✅ Boberdoo sync (verify):', result);
+      logger.info('Boberdoo sync (verify) completed', { userId: user._id, result });
     } catch (err) {
       console.error('❌ Boberdoo sync exception (verify):', err.message);
+      logger.error('Boberdoo sync exception (verify)', err, { userId: user._id });
     }
   })();
 
   try {
-    const mailKeys = Object.keys(MAIL_HANDLER || {});
-    console.log('[MAIL_HANDLER] exported keys:', mailKeys);
-    if (typeof MAIL_HANDLER?.sendNewUserRegistrationToAdmin !== 'function') {
-      console.error('❌ MAIL_HANDLER.sendNewUserRegistrationToAdmin not found');
-    }
-  } catch (e) {
-    console.error('❌ MAIL_HANDLER inspection failed:', e.message);
-  }
-
-  try {
-    // Exclude these admin emails from notifications
     const EXCLUDED = new Set([
       'admin@gmail.com',
       'admin123@gmail.com',
@@ -141,20 +150,15 @@ const verifyEmail = wrapAsync(async (req, res) => {
       isActive: { $ne: false },
     }).select('_id email name role');
 
-    console.log(`[AdminLookup] Found ${adminUsers?.length || 0} admins`, adminUsers);
-
     let adminEmails = (adminUsers || [])
       .map(a => a.email)
       .filter(Boolean)
       .map(e => e.trim().toLowerCase())
-      .filter(e => !EXCLUDED.has(e)); // <-- exclude here
+      .filter(e => !EXCLUDED.has(e));
 
-    // Deduplicate
     adminEmails = [...new Set(adminEmails)];
 
-    if (!adminEmails.length) {
-      console.warn('⚠️ No valid admin emails found after exclusions. Skipping admin notification.');
-    } else {
+    if (adminEmails.length) {
       const registrationDate = user.createdAt
         ? new Date(user.createdAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
         : new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
@@ -162,9 +166,11 @@ const verifyEmail = wrapAsync(async (req, res) => {
       const verificationDate = new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
 
       const mailPayload = {
-        to: adminEmails, // most mailers expect "to"
+        adminEmails,
         userName: user.name,
         userEmail: user.email,
+        companyName: user.companyName || 'N/A',
+        phoneNumber: user.phoneNumber || 'N/A',
         userRole: user.role || 'User',
         registrationDate,
         verificationDate,
@@ -172,6 +178,7 @@ const verifyEmail = wrapAsync(async (req, res) => {
       };
 
       console.log('[AdminEmail] Prepared payload:', { recipients: adminEmails, subject: mailPayload.subject });
+      logger.info('Prepared admin notification email', { userId: user._id, recipients: adminEmails, subject: mailPayload.subject });
 
       const info = await MAIL_HANDLER.sendNewUserRegistrationToAdmin(mailPayload);
 
@@ -182,29 +189,27 @@ const verifyEmail = wrapAsync(async (req, res) => {
         response: info?.response,
         envelope: info?.envelope,
       });
-
-      if (info?.rejected?.length) {
-        console.warn('[AdminEmail] Some recipients were rejected:', info.rejected);
-      }
-
-      console.log('✅ Admin notification sent for new user:', user.email, {
-        adminCount: adminEmails.length,
-        adminEmails
+      logger.info('Admin notification email sent', { 
+        userId: user._id, 
+        messageId: info?.messageId || info?.id, 
+        accepted: info?.accepted, 
+        rejected: info?.rejected, 
+        response: info?.response, 
+        envelope: info?.envelope 
       });
+    } else {
+      console.warn('⚠️ No valid admin emails found after exclusions. Skipping admin notification.');
+      logger.warn('No valid admin emails found after exclusions. Skipping admin notification.', { userId: user._id });
     }
   } catch (err) {
-    console.error('❌ Admin notification failed:', {
-      message: err?.message,
-      code: err?.code,
-      stack: err?.stack,
-      response: err?.response,
-      status: err?.status,
-      data: err?.response?.data,
-    });
+    console.error('❌ Admin notification failed:', err);
+    logger.error('Admin notification failed', err, { userId: user._id });
   }
 
   sendResponse(res, {}, 'Email successfully verified');
 });
+
+
 
 const sendOtpOnEmail = wrapAsync(async (req, res) => {
     const { email } = req.body;

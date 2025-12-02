@@ -98,7 +98,7 @@ const getRevenueFromNmi = async ({ start, end }) => {
       }
 
       const amountInCents = parseFloat(r.action?.amount) || 0;
-      const amountInDollars = amountInCents / 100;
+      const amountInDollars = amountInCents;
 
       return sum + amountInDollars;
     }, 0);
@@ -214,6 +214,131 @@ const createCustomerVault = async (cardInfo) => {
 
 // In nmi.service.js - Update chargeCustomerVault function
 
+// const chargeCustomerVault = async (customerVaultId, amount, description = '') => {
+//   billingLogger.info('Starting NMI charge process', {
+//     vaultId: customerVaultId,
+//     amount,
+//     description
+//   });
+
+//   if (!SECURITY_KEY) {
+//     billingLogger.error('NMI security key not configured');
+//     return {
+//       success: false,
+//       message: 'Payment configuration error: Missing security key'
+//     };
+//   }
+
+//   if (!NMI_API_URL || !NMI_API_URL.startsWith('http')) {
+//     billingLogger.error('NMI API URL not configured properly');
+//     return {
+//       success: false,
+//       message: 'Payment configuration error: Invalid API URL'
+//     };
+//   }
+
+//   // ✅ Get card details for response
+//   const result = await User.aggregate([
+//     { $unwind: "$paymentMethods" },
+//     { $match: { "paymentMethods.customerVaultId": customerVaultId } },
+//     {
+//       $project: {
+//         _id: 0,
+//         cvv: "$paymentMethods.cvv",
+//         cardLastFour: "$paymentMethods.cardLastFour", // ✅ Use consistent field name
+//         brand: "$paymentMethods.brand" // ✅ Use consistent field name
+//       }
+//     }
+//   ]);
+
+//   const cvv = result.length > 0 ? result[0].cvv : null;
+//   const cardType = result.length > 0 ? result[0].brand : 'Card';
+//   const last4 = result.length > 0 ? result[0].cardLastFour : '****';
+
+//   if (cvv == null) {
+//     return {
+//       success: false,
+//       message: 'Update Your Card Details'
+//     };
+//   }
+
+//   const payload = {
+//     security_key: SECURITY_KEY,
+//     type: 'sale',
+//     customer_vault_id: customerVaultId,
+//     amount: amount.toFixed(2),
+//     order_description: description || 'Customer charge',
+//     cvv: cvv,
+//   };
+
+//   billingLogger.info('Sending charge request to NMI', {
+//     vaultId: customerVaultId,
+//     amount: amount.toFixed(2)
+//   });
+
+//   try {
+//     const response = await fetchWrapper(
+//       'POST',
+//       NMI_API_URL,
+//       payload,
+//       null,
+//       false,
+//       true
+//     );
+
+//     billingLogger.info('NMI charge response received');
+
+//     let responseText;
+//     if (typeof response === 'string') {
+//       responseText = response;
+//     } else if (response && typeof response === 'object') {
+//       responseText = response.data || response.text || JSON.stringify(response);
+//     } else {
+//       responseText = String(response);
+//     }
+
+//     const responseMatch = responseText.match(/response=(\d+)/);
+//     const responseCode = responseMatch ? responseMatch[1] : null;
+
+//     const transactionIdMatch = responseText.match(/transactionid=([^&\s]+)/);
+//     const transactionId = transactionIdMatch ? transactionIdMatch[1] : null;
+
+//     const responseTextMatch = responseText.match(/responsetext=([^&\s]+)/);
+//     const responseMessage = responseTextMatch ? decodeURIComponent(responseTextMatch[1].replace(/\+/g, ' ')) : '';
+
+//     const success = responseCode === '1';
+
+//     billingLogger.info('NMI charge processed', {
+//       success,
+//       responseCode,
+//       transactionId,
+//       message: responseMessage
+//     });
+
+//     // ✅ Return complete data including card details
+//     return {
+//       success,
+//       transactionId,
+//       responseCode,
+//       message: responseMessage,
+//       rawResponse: responseText,
+//       paymentMethod: `${cardType} •••• ${last4}`, // ✅ Formatted display
+//       cardType: cardType, // ✅ Card brand
+//       last4: last4 // ✅ Last 4 digits
+//     };
+
+//   } catch (error) {
+//     billingLogger.error('NMI charge request failed', error);
+//     return {
+//       success: false,
+//       message: 'Payment processing failed',
+//       error: error.message
+//     };
+//   }
+// };
+
+
+
 const chargeCustomerVault = async (customerVaultId, amount, description = '') => {
   billingLogger.info('Starting NMI charge process', {
     vaultId: customerVaultId,
@@ -308,12 +433,19 @@ const chargeCustomerVault = async (customerVaultId, amount, description = '') =>
 
     const success = responseCode === '1';
 
-    billingLogger.info('NMI charge processed', {
+    const logData = {
       success,
       responseCode,
       transactionId,
-      message: responseMessage
-    });
+      message: responseMessage,
+    };
+
+    if (success) {
+      billingLogger.info('NMI charge approved', logData);
+    } else {
+      billingLogger.error('NMI charge declined', logData);
+    }
+
 
     // ✅ Return complete data including card details
     return {
@@ -336,6 +468,8 @@ const chargeCustomerVault = async (customerVaultId, amount, description = '') =>
     };
   }
 };
+
+
 
 const getCustomerVault = async (customerVaultId) => {
   const payload = {

@@ -201,9 +201,25 @@ const leadSchema = new mongoose.Schema({
   // Status and Metadata
   status: {
     type: String,
-    enum: ['active', 'inactive', 'contacted', 'converted', 'invalid'],
+    enum: ['active', 'inactive', 'contacted', 'converted', 'invalid','payment_pending'],
     default: 'active',
     index: true
+  },
+    // NEW: Payment tracking fields
+  payment_status: {
+    type: String,
+    enum: ['paid', 'pending', 'failed', 'refunded'],
+    default: 'paid',
+    index: true
+  },
+  lead_cost: {
+    type: Number,
+    default: 0
+  },
+
+  payment_error_message: {
+    type: String,
+    default: null
   },
   
   // Processing Information

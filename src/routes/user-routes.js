@@ -25,6 +25,8 @@ const API = {
     GET_CONTRACT_STATUS: '/:userId/contract/status',
     CHECK_CONTRACT: '/:userId/contract/check',
     SYNC_BOMBERDO:'/:userId/boberdoo/resync',
+    SEND_BALANCE_TOPUP_WEBHOOK: '/:userId/balance/topup-webhook',
+
 };
 
 // Apply authentication to all routes
@@ -109,5 +111,16 @@ userRouter.post(
     authorizedRoles([CONSTANT_ENUM.USER_ROLE.ADMIN, CONSTANT_ENUM.USER_ROLE.USER]),
     UserController.resyncBoberdoo
   );
+
+  // below existing SYNC_BOMBERDO route
+userRouter.post(
+  API.SEND_BALANCE_TOPUP_WEBHOOK,
+  authorizedRoles([
+    CONSTANT_ENUM.USER_ROLE.ADMIN,
+    CONSTANT_ENUM.USER_ROLE.USER
+  ]),
+  UserController.sendBalanceTopUpWebhook
+);
+
 
 module.exports = userRouter;
