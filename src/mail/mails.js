@@ -273,11 +273,11 @@ const sendLeadAssignEmail = async ({ to, name, leadName, assignedBy, leadDetails
 
   // ✅ Address parts
   const addressParts = [
-    address.street,
+    // address.street,
     address?.full_address,
-    address.city,
-    address.state?.name || address.state, 
-    address.zip_code
+    // address.city,
+    // address.state?.name || address.state, 
+    // address.zip_code
   ].filter(Boolean); 
   
   const fullAddress = addressParts.length > 0 ? addressParts.join(', ') : 'N/A';
