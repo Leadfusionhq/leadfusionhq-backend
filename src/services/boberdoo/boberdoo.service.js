@@ -16,7 +16,8 @@ const { leadLogger } = require('../../utils/logger');
 const API_URL = (process.env.BOBERDOO_API_URL || 'https://leadfusionhq.leadportal.com/apiJSON.php').trim();
 const API_KEY = (process.env.BOBERDOO_API_KEY || '').trim();
 const API_UPDATE_KEY =(process.env.BOBERDOO_UPDATE_API_KEY || '').trim(); 
-
+const { sendToN8nWebhook, sendLowBalanceAlert} = require('../../services/n8n/webhookService.js');
+const { billingLogger } = require('../../utils/logger');
 const CREATE_ACTION = 'createNewPartner'; // fixed here
 
 const CAMPAIGN_API_URL = process.env.BOBERDOO_CAMPAIGN_API_URL;
@@ -893,116 +894,134 @@ const processBoberdoLead = async (leadData) => {
 
         // ✅ 4. Check prepaid balance
         const leadCost = campaign.bid_price || 0;
-        if (campaign.payment_type === 'prepaid') {
-            const campaignUser = await User.findById(campaign.user_id);
-            if (!campaignUser) {
-                throw new ErrorHandler(404, 'Campaign user not found');
-            }
+        // if (campaign.payment_type === 'prepaid') {
+        //     const campaignUser = await User.findById(campaign.user_id);
+        //     if (!campaignUser) {
+        //         throw new ErrorHandler(404, 'Campaign user not found');
+        //     }
 
-            const totalAvailable = (campaignUser.balance || 0) + (campaignUser.refundMoney || 0);
-            if (totalAvailable < leadCost) {
-                throw new ErrorHandler(400, `Insufficient funds for campaign "${campaign.name}". Required: $${leadCost}, Available: $${totalAvailable}`);
-            }
-        }
-
-        // ✅ 5. Generate unique lead ID
-        const lead_id = await generateUniqueLeadId();
-
-        // ✅ 6. Prepare lead data
-        const preparedLead = {
-            lead_id,
-            user_id: campaign.user_id,
-            campaign_id: campaign._id,
-            first_name: leadData.first_name,
-            last_name: leadData.last_name,
-            middle_name: leadData.middle_name,
-            suffix: leadData.suffix,
-            phone_number: leadData.phone_number,
-            email: leadData.email,
-            age: leadData.age,
-            gender: leadData.gender,
-            address: {
-                street: leadData.address.street,
-                city: leadData.address.city,
-                state: state._id,
-                zip_code: leadData.address.zip_code,
-                full_address: leadData.address.full_address || 
-                    `${leadData.address.street}, ${leadData.address.city}, ${state.abbreviation} ${leadData.address.zip_code}`,
-                coordinates: leadData.address.coordinates,
-                place_id: leadData.address.place_id
-            },
-            note: leadData.note,
-            source: 'boberdo',
-            status: 'active',
-            boberdo_metadata: {
-                external_id: leadData.external_lead_id,
-                filter_set_id: leadData.filter_set_id,
-                source_campaign: leadData.source_info,
-                received_at: new Date()
-            }
-        };
-
-        // ✅ 7. Create lead
-        const newLead = await Lead.create([preparedLead], { session });
-        const createdLead = newLead[0];
-
-        console.log('✅ Lead created:', {
-            lead_id: createdLead.lead_id,
-            internal_id: createdLead._id
-        });
-
-        // ✅ 8. Process billing if prepaid
-        // let billingResult = null;
-        // if (campaign.payment_type === 'prepaid' && leadCost > 0) {
-        //     billingResult = await BillingServices.assignLeadNew(
-        //         campaign.user_id,
-        //         createdLead._id,
-        //         leadCost,
-        //         campaign.user_id,
-        //         session
-        //     );
-        //     console.log('✅ Billing processed:', billingResult);
+        //     const totalAvailable = (campaignUser.balance || 0) + (campaignUser.refundMoney || 0);
+        //     if (totalAvailable < leadCost) {
+        //         throw new ErrorHandler(400, `Insufficient funds for campaign "${campaign.name}". Required: $${leadCost}, Available: $${totalAvailable}`);
+        //     }
         // }
-        let billingResult;
-        
-        if (campaign.payment_type === "prepaid" && leadCost > 0) {
+
+        // ✅ 5. Generate unique lead ID (STAYS THE SAME)
+      const lead_id = await generateUniqueLeadId();
+
+      // ✅ 6. TRY BILLING FIRST (MOVED BEFORE LEAD CREATION)
+      let billingResult;
+
+      if (campaign.payment_type === "prepaid" && leadCost > 0) {
         billingResult = await BillingServices.assignLeadPrepaid(
-            campaign.user_id,
-            createdLead._id,
-            leadCost,
-            campaign.user_id,
-            session
+          campaign.user_id,
+          lead_id,  // ← Changed from createdLead._id to lead_id
+          leadCost,
+          campaign.user_id,
+          session
         );
-        } else if (campaign.payment_type === "payasyougo") {
+      } else if (campaign.payment_type === "payasyougo") {
         billingResult = await BillingServices.assignLeadPayAsYouGo(
-            campaign.user_id,
-            createdLead._id,
-            leadCost,
-            campaign.user_id,
-            session,
-            campaign
+          campaign.user_id,
+          lead_id,  // ← Changed from createdLead._id to lead_id
+          leadCost,
+          campaign.user_id,
+          session,
+          campaign
         );
-        } else {
+      } else {
         throw new ErrorHandler(400, "Invalid campaign payment type.");
+      }
+
+      // ✅ NEW: Check payment result
+      const isPaid = billingResult.success;
+      console.log(`💳 Payment result: ${isPaid ? 'SUCCESS' : 'FAILED'} - ${billingResult.message || ''}`);
+
+      // ✅ 7. Prepare lead data (UPDATED)
+      const preparedLead = {
+        lead_id,
+        user_id: campaign.user_id,
+        campaign_id: campaign._id,
+        first_name: leadData.first_name,
+        last_name: leadData.last_name,
+        middle_name: leadData.middle_name,
+        suffix: leadData.suffix,
+        phone_number: leadData.phone_number,
+        email: leadData.email,
+        age: leadData.age,
+        gender: leadData.gender,
+        address: {
+          street: leadData.address.street,
+          city: leadData.address.city,
+          state: state._id,
+          zip_code: leadData.address.zip_code,
+          full_address: leadData.address.full_address || 
+            `${leadData.address.street}, ${leadData.address.city}, ${state.abbreviation} ${leadData.address.zip_code}`,
+          coordinates: leadData.address.coordinates,
+          place_id: leadData.address.place_id
+        },
+        note: leadData.note,
+        source: 'boberdo',
+        
+        // ✅ NEW: Set status based on payment result
+        status: isPaid ? 'active' : 'payment_pending',
+        payment_status: isPaid ? 'paid' : 'pending',
+        lead_cost: leadCost,
+        transaction_id: isPaid ? billingResult.transactionId : null,
+        original_cost: leadCost,
+        payment_error_message: isPaid ? null : billingResult.message,
+        
+        boberdo_metadata: {
+          external_id: leadData.external_lead_id,
+          filter_set_id: leadData.filter_set_id,
+          source_campaign: leadData.source_info,
+          received_at: new Date()
         }
+      };
 
-        // ✅ 9. Commit transaction
-        await session.commitTransaction();
-        session.endSession();
+      // ✅ 8. Create lead
+      const newLead = await Lead.create([preparedLead], { session });
+      const createdLead = newLead[0];
 
-        // ✅ 10. Populate lead for response
-        const populatedLead = await Lead.findById(createdLead._id)
-            .populate('campaign_id', 'name campaign_id')
-            .populate('address.state', 'name abbreviation');
+      console.log('✅ Lead created:', {
+        lead_id: createdLead.lead_id,
+        internal_id: createdLead._id,
+        status: createdLead.status,
+        payment_status: createdLead.payment_status
+      });
 
-        // ✅ 11. Send notifications (deferred async to avoid session conflict)
+    // ✅ 9. Commit transaction
+      await session.commitTransaction();
+      session.endSession();
+
+      // ✅ 10. Populate lead for response
+      const populatedLead = await Lead.findById(createdLead._id)
+        .populate('campaign_id', 'name campaign_id')
+        .populate('address.state', 'name abbreviation');
+
+      // ✅ 11. Handle based on payment result
+      if (isPaid) {
+        // Send notifications for successful payment
         process.nextTick(() => {
           sendBoberdoLeadNotifications(populatedLead, campaign, billingResult)
             .then(() => console.log('✅ Boberdo notifications sent successfully'))
             .catch(err => console.error('❌ Failed to send Boberdo lead notifications:', err));
         });
+      } else {
+        // Handle payment failure
+        process.nextTick(async () => {
+          await BillingServices.handlePaymentFailure({
+            userId: campaign.user_id,
+            leadId: lead_id,
+            leadCost,
+            campaign,
+            billingResult,
+            logger: billingLogger
+          });
+        });
+      }
 
-        return populatedLead;
+      return populatedLead;
 
     } catch (error) {
         await session.abortTransaction();
@@ -1135,6 +1154,6 @@ module.exports = {
   createCampaignInBoberdoo,
   updateCampaignInBoberdoo,
   deleteCampaignFromBoberdoo,
-
+  sendBoberdoLeadNotifications,
   processBoberdoLead,
  };

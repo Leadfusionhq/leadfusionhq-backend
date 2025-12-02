@@ -319,7 +319,8 @@ try {
     await sendBalanceTopUpAlert({
         partner_id: user.integrations?.boberdoo?.external_id || "",
         email: user.email,
-        amount: amount
+        amount: amount,
+        user_id: user._id
     });
 
     billingLogger.info('Balance top-up webhook sent', { userId, amount });
@@ -566,12 +567,18 @@ const assignLeadNew = async (userId, leadId, leadCost, assignedBy, session) => {
 
 const assignLeadPrepaid = async (userId, leadId, leadCost, assignedBy, session) => {
   const user = await User.findById(userId).session(session);
-  if (!user) throw new ErrorHandler(404, 'User not found');
+  // ✅ CHANGE 1: Return instead of throw
+  if (!user) {
+    return { success: false, error: 'USER_NOT_FOUND', message: 'User not found' };
+    // OLD: throw new ErrorHandler(404, 'User not found');
+  }
 
   const currentBalance = user.balance || 0;
 
   if (currentBalance < leadCost) {
-    throw new ErrorHandler(400, 'Insufficient balance to assign lead');
+    // throw new ErrorHandler(400, 'Insufficient balance to assign lead');
+    return { success: false, error: 'INSUFFICIENT_BALANCE', message: `Insufficient balance. Required: $${leadCost}, Available: $${currentBalance}` };
+
   }
 
   user.balance = currentBalance - leadCost;
@@ -592,6 +599,7 @@ const assignLeadPrepaid = async (userId, leadId, leadCost, assignedBy, session) 
   await transaction.save({ session });
 
   return {
+    success: true, 
     paymentMethod: "BALANCE",
     newBalance: user.balance,
     leadId,
@@ -603,7 +611,9 @@ const assignLeadPrepaid = async (userId, leadId, leadCost, assignedBy, session) 
 
 const assignLeadPayAsYouGo = async (userId, leadId, leadCost, assignedBy, session, campaignMeta = {}) => {
   const user = await User.findById(userId).session(session);
-  if (!user) throw new ErrorHandler(404, 'User not found');
+  if (!user) {
+    return { success: false, error: 'USER_NOT_FOUND', message: 'User not found' };
+  }
 
   const currentBalance = user.balance || 0;
 
@@ -627,6 +637,7 @@ const assignLeadPayAsYouGo = async (userId, leadId, leadCost, assignedBy, sessio
     await transaction.save({ session });
 
     return {
+      success: true,
       paymentMethod: "BALANCE",
       transactionId: transaction._id,
       leadId,
@@ -637,105 +648,38 @@ const assignLeadPayAsYouGo = async (userId, leadId, leadCost, assignedBy, sessio
   // 2️⃣ FALLBACK: NMI CARD CHARGE
   const defaultPaymentMethod = user.paymentMethods?.find(pm => pm.isDefault === true);
   if (!defaultPaymentMethod) {
-    throw new ErrorHandler(400, "No default payment method found.");
+    return {
+      success: false,
+      error: 'NO_PAYMENT_METHOD',
+      message: 'No default payment method found'
+    };
   }
 
-  const brand = defaultPaymentMethod.brand || "Card";
   const last4 = defaultPaymentMethod.cardLastFour || "N/A";
   const vaultId = defaultPaymentMethod.customerVaultId;
 
   if (!vaultId) {
-    throw new ErrorHandler(400, "Default payment method missing customerVaultId.");
+    return { success: false, error: 'INVALID_VAULT', message: 'Default payment method missing customerVaultId' };
   }
 
   const chargeResult = await chargeCustomerVault(vaultId, leadCost, `Lead assignment: ${leadId}`);
 
-  // ❌ PAYMENT FAILED
-// ❌ PAYMENT FAILED
-if (!chargeResult.success) {
-    const responseCode = String(chargeResult.responseCode);
-
-    if (responseCode === "2") {
-      try {
-        await sendLowBalanceAlert({
-          campaign_name: campaignMeta?.name || "Campaign",
-          filter_set_id: campaignMeta?.boberdoo_filter_set_id || "",
-          partner_id: user.integrations?.boberdoo?.external_id || "",
-          email: user.email
-        });
-
-        billingLogger.info("LOW BALANCE webhook sent", {
-          user_id: user._id,
-          responseCode,
-          amount: leadCost
-        });
-      } catch (err) {
-        billingLogger.error("Low balance webhook failed", err);
-      }
-    }
-
-    /**
-     * ❗ CRITICAL FIX:
-     * End the transaction BEFORE saving payment_error,
-     * otherwise MongoDB rolls it back.
-     */
-    await session.abortTransaction();
-    session.endSession();
-
-    // Now save the payment_error OUTSIDE the transaction
-    user.payment_error = true;
-    user.last_payment_error_message = chargeResult.message || "Card payment failed";
-    await user.save();
-
-    billingLogger.error("❗PAYMENT ERROR FLAG UPDATED (OUTSIDE TRANSACTION)", {
+  // ❌ PAYMENT FAILED - Just return, caller handles everything
+  if (!chargeResult.success) {
+    billingLogger.error("Card charge failed", {
       user_id: user._id,
-      payment_error: user.payment_error,
-      message: user.last_payment_error_message
+      responseCode: chargeResult.responseCode,
+      message: chargeResult.message
     });
 
-    // Send emails (outside transaction)
-    try {
-      await MAIL_HANDLER.sendFailedLeadPaymentEmail({
-        to: user.email,
-        userName: user.name || user.fullName || user.email,
-        leadId,
-        amount: leadCost,
-        cardLast4: last4,
-        errorMessage: chargeResult.message
-      });
-    } catch (emailErr) {
-      billingLogger.error("User failed-payment email failed", emailErr);
-    }
-
-    try {
-      const EXCLUDED = new Set(["admin@gmail.com", "admin123@gmail.com", "admin1234@gmail.com"]);
-
-      const adminUsers = await User.find({
-        role: { $in: ["ADMIN", "SUPER_ADMIN"] },
-        isActive: { $ne: false }
-      }).select("email");
-
-      let adminEmails = adminUsers
-        .map(a => a.email?.trim().toLowerCase())
-        .filter(e => e && !EXCLUDED.has(e));
-
-      await MAIL_HANDLER.sendFailedLeadPaymentAdminEmail({
-        to: adminEmails,
-        userEmail: user.email,
-        userName: user.name || "",
-        leadId,
-        amount: leadCost,
-        cardLast4: last4,
-        errorMessage: chargeResult.message
-      });
-    } catch (emailErr) {
-      billingLogger.error("Admin failed-payment email failed", emailErr);
-    }
-
-    throw new ErrorHandler(400, "Card payment failed: " + chargeResult.message);
-}
-
-
+    return {
+      success: false,
+      error: 'CARD_DECLINED',
+      message: chargeResult.message || 'Card payment failed',
+      responseCode: chargeResult.responseCode,
+      cardLast4: last4
+    };
+  }
 
   // 3️⃣ SUCCESSFUL CARD PAYMENT → CLEAR PAYMENT ERROR
   if (user.payment_error) {
@@ -744,7 +688,6 @@ if (!chargeResult.success) {
     await user.save({ session });
   }
 
-  // Save transaction
   const transaction = new Transaction({
     userId,
     type: "LEAD_ASSIGNMENT",
@@ -761,6 +704,7 @@ if (!chargeResult.success) {
   await transaction.save({ session });
 
   return {
+    success: true,
     paymentMethod: "CARD",
     transactionId: transaction._id,
     gatewayTransactionId: chargeResult.transactionId,
@@ -769,6 +713,133 @@ if (!chargeResult.success) {
   };
 };
 
+/**
+ * Handle payment failure - updates user, sends webhook, emails
+ * Used by both createLead and processBoberdoLead
+ */
+const handlePaymentFailure = async ({
+  userId,
+  leadId,
+  leadCost,
+  campaign,
+  billingResult,
+  logger = console
+}) => {
+  try {
+    logger.info?.('Starting payment failure handling...', { user_id: userId });
+
+    const owner = await User.findById(userId);
+
+    if (!owner) {
+      logger.error?.('Owner not found for payment error update', { user_id: userId });
+      return { success: false, error: 'Owner not found' };
+    }
+
+    // ✅ 1. Update pending_payment
+    // This bypasses Mongoose schema validation and updates directly
+    await User.collection.updateOne(
+      { _id: owner._id },
+      {
+        $inc: {
+          "pending_payment.amount": leadCost,
+          "pending_payment.count": 1
+        },
+        $set: {
+          payment_error: true,
+          last_payment_error_message: billingResult.message || 'Payment failed'
+        }
+      }
+    );
+
+    logger.info?.('🧾 pending_payment updated', {
+      user_id: userId,
+      lead_id: leadId
+    });
+
+    // ✅ 2. Update payment_error flag
+    await User.updateOne(
+      { _id: owner._id },
+      {
+        $set: {
+          payment_error: true,
+          last_payment_error_message: billingResult.message || 'Payment failed'
+        }
+      }
+    );
+
+    logger.info?.('✅ Payment error flag updated', {
+      user_id: owner._id,
+      payment_error: true,
+      message: billingResult.message
+    });
+
+    // ✅ 3. Send stop webhook
+    try {
+      await sendLowBalanceAlert({
+        campaign_name: campaign.name,
+        filter_set_id: campaign.boberdoo_filter_set_id,
+        partner_id: owner.integrations?.boberdoo?.external_id || "",
+        email: owner.email,
+        user_id: owner._id,
+        campaign_id: campaign._id
+      });
+      logger.info?.('Stop webhook sent for payment failure');
+    } catch (webhookErr) {
+      logger.error?.('Failed to send stop webhook', webhookErr);
+    }
+
+    // ✅ 4. Send failure email to USER
+    try {
+      await MAIL_HANDLER.sendFailedLeadPaymentEmail({
+        to: owner.email,
+        userName: owner.name || owner.fullName || owner.email,
+        leadId: leadId,
+        amount: leadCost,
+        cardLast4: billingResult.cardLast4 || "N/A",
+        errorMessage: billingResult.message
+      });
+      logger.info?.('User failure email sent');
+    } catch (emailErr) {
+      logger.error?.("User failed-payment email failed", emailErr);
+    }
+
+    // ✅ 5. Send failure email to ADMINS
+    try {
+      const EXCLUDED = new Set(["admin@gmail.com", "admin123@gmail.com", "admin1234@gmail.com"]);
+
+      const adminUsers = await User.find({
+        role: { $in: ["ADMIN", "SUPER_ADMIN"] },
+        isActive: { $ne: false }
+      }).select("email");
+
+      let adminEmails = adminUsers
+        .map(a => a.email?.trim().toLowerCase())
+        .filter(e => e && !EXCLUDED.has(e));
+
+      await MAIL_HANDLER.sendFailedLeadPaymentAdminEmail({
+        to: adminEmails,
+        userEmail: owner.email,
+        userName: owner.name || "",
+        leadId: leadId,
+        amount: leadCost,
+        cardLast4: billingResult.cardLast4 || "N/A",
+        errorMessage: billingResult.message
+      });
+      logger.info?.('Admin failure email sent');
+    } catch (emailErr) {
+      logger.error?.("Admin failed-payment email failed", emailErr);
+    }
+
+    logger.info?.('✅ Payment failure handling completed', { user_id: owner._id });
+
+    return { success: true };
+
+  } catch (err) {
+    logger.error?.('❌ Error handling payment failure', err);
+    console.error('❌ Payment failure handling error:', err);
+    return { success: false, error: err.message };
+  }
+};
 
 
 
@@ -1282,7 +1353,7 @@ module.exports = {
   assignLeadNew,
   addBalanceByAdmin,
   getRevenueFromNmi,
-
+handlePaymentFailure,
 
   assignLeadPrepaid,
   assignLeadPayAsYouGo,

@@ -286,7 +286,8 @@ const sendBalanceTopUpWebhook = wrapAsync(async (req, res) => {
   const result = await sendBalanceTopUpAlert({
     partner_id,
     email: user.email,
-    amount: undefined
+    amount: undefined,
+    user_id: user._id  // ✅ ADD THIS
   });
 
   // 🔵 LOG: Webhook response details

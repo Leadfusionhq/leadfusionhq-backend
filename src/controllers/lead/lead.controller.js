@@ -18,7 +18,7 @@ const mongoose = require('mongoose');
 const { User } = require('../../models/user.model.js');
 const { sendToN8nWebhook, sendLowBalanceAlert} = require('../../services/n8n/webhookService.js');
 // Create single lead
-
+const Campaign = require('../../models/campaign.model.js');
 const { leadLogger } = require('../../utils/logger');
 
 // const createLead = wrapAsync(async (req, res) => {
@@ -77,7 +77,7 @@ const { leadLogger } = require('../../utils/logger');
 //       });
   
 //       await session.commitTransaction();
-//       session.endSession();
+//       session.endSession();payment_error
   
 //       const campaign = result.campaign_id;
 //       const campaignOwner = await User.findById(campaign.user_id);
@@ -252,217 +252,252 @@ const { leadLogger } = require('../../utils/logger');
 
 
 const createLead = wrapAsync(async (req, res) => {
-    const session = await mongoose.startSession();
-    session.startTransaction();
-  
-    const logMeta = {
-      user_id: req?.user?._id,
-      user_role: req?.user?.role,
-      route: req.originalUrl,
-      action: 'Create Lead',
-    };
-  
-    try {
-      leadLogger.info('Starting lead creation process', logMeta);
-  
-      const { campaign_id } = req.body;
-      const user_id = req.user._id;
-  
-      if (!campaign_id) {
-        leadLogger.warn('Missing campaign_id during lead creation', logMeta);
-        throw new ErrorHandler(400, 'Campaign ID is required');
-      }
-  
-      const { campaignData, leadCost } = await LeadServices.validatePrepaidCampaignBalance(campaign_id);
-      leadLogger.info('Validated campaign balance', { ...logMeta, campaign_id, leadCost });
-  
-      const lead_id = await generateUniqueLeadId();
-      let leadData = { ...req.body, user_id, lead_id };
-  
-      const result = await LeadServices.createLead(leadData, { session });
-      await result.populate('campaign_id');
-      await result.populate('address.state');
-  
-      leadLogger.info('Lead created successfully in database', {
-        ...logMeta,
-        lead_id: result.lead_id,
-        campaign_name: result.campaign_id?.name,
-        campaign_owner_id: result.campaign_id?.user_id,
-      });
-  
-      const assignedBy = req.user._id;
-    //   const billingResult = await BillingServices.assignLeadNew(
-    //     campaignData.user_id,
-    //     result._id,
-    //     leadCost,
-    //     assignedBy,
-    //     session
-    //   );
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-    const campaign = result.campaign_id;
+  const logMeta = {
+    user_id: req?.user?._id,
+    user_role: req?.user?.role,
+    route: req.originalUrl,
+    action: 'Create Lead',
+  };
 
+  try {
+    leadLogger.info('Starting lead creation process', logMeta);
+
+    const { campaign_id } = req.body;
+    const user_id = req.user._id;
+
+    if (!campaign_id) {
+      leadLogger.warn('Missing campaign_id during lead creation', logMeta);
+      throw new ErrorHandler(400, 'Campaign ID is required');
+    }
+
+    // ========================================
+    // ✅ GET CAMPAIGN DATA
+    // ========================================
+    const campaign = await Campaign.findById(campaign_id);
+    if (!campaign) {
+      throw new ErrorHandler(404, 'Campaign not found');
+    }
+    const leadCost = campaign.bid_price || 0;
+
+    leadLogger.info('Got campaign data', { ...logMeta, campaign_id, leadCost });
+
+    const lead_id = await generateUniqueLeadId();
+    const assignedBy = req.user._id;
+
+    // ========================================
+    // ✅ TRY BILLING FIRST (before creating lead)
+    // ========================================
     let billingResult;
 
     if (campaign.payment_type === "prepaid") {
-    billingResult = await BillingServices.assignLeadPrepaid(
-        campaignData.user_id,
-        result._id,
+      billingResult = await BillingServices.assignLeadPrepaid(
+        campaign.user_id,
+        lead_id,
         leadCost,
         assignedBy,
         session
-    );
+      );
     } else if (campaign.payment_type === "payasyougo") {
-    billingResult = await BillingServices.assignLeadPayAsYouGo(
-        campaignData.user_id,
-        result._id,
+      billingResult = await BillingServices.assignLeadPayAsYouGo(
+        campaign.user_id,
+        lead_id,
         leadCost,
         assignedBy,
         session,
         campaign
-    );
+      );
     } else {
-    throw new ErrorHandler(400, "Invalid campaign payment type.");
+      throw new ErrorHandler(400, "Invalid campaign payment type.");
     }
 
-  
+    // ========================================
+    // ✅ CHECK PAYMENT RESULT
+    // ========================================
+    const isPaid = billingResult.success;
+    leadLogger.info(`Payment result: ${isPaid ? 'SUCCESS' : 'FAILED'}`, {
+      ...logMeta,
+      error: billingResult.message || null
+    });
+
+    // ========================================
+    // ✅ CREATE LEAD WITH STATUS BASED ON PAYMENT
+    // ========================================
+    let leadData = {
+      ...req.body,
+      user_id: campaign.user_id,
+      lead_id,
+      status: isPaid ? 'active' : 'payment_pending',
+      payment_status: isPaid ? 'paid' : 'pending',
+      lead_cost: leadCost,
+      transaction_id: isPaid ? billingResult.transactionId : null,
+      original_cost: leadCost,
+      payment_error_message: isPaid ? null : billingResult.message
+    };
+
+    const result = await LeadServices.createLead(leadData, { session });
+    await result.populate('campaign_id');
+    await result.populate('address.state');
+
+    leadLogger.info('Lead created successfully in database', {
+      ...logMeta,
+      lead_id: result.lead_id,
+      status: result.status,
+      payment_status: result.payment_status,
+      campaign_name: result.campaign_id?.name,
+      campaign_owner_id: result.campaign_id?.user_id,
+    });
+
+    // ========================================
+    // ✅ IF PAYMENT SUCCEEDED - Do existing low balance check (for prepaid)
+    // ========================================
+    if (isPaid) {
       leadLogger.info('Billing and balance updated successfully', {
         ...logMeta,
         transaction_id: billingResult.transactionId,
         new_balance: billingResult.newBalance,
         lead_cost: leadCost,
       });
+
+      // Your existing low balance check for PREPAID
       try {
         const remainingBalance = billingResult.newBalance;
 
-        if (campaign.payment_type === "prepaid" && remainingBalance < leadCost)  {
-            const owner = await User.findById(campaign.user_id);
+        if (campaign.payment_type === "prepaid" && remainingBalance < leadCost) {
+          const owner = await User.findById(campaign.user_id);
 
-            // 1️⃣ TRIGGER WEBHOOK FIRST (to stop n8n lead flow)
-            try {
-                const lowBalanceResp = await sendLowBalanceAlert({
-                    campaign_name: campaign.name,
-                    filter_set_id: campaign.boberdoo_filter_set_id,
-                    partner_id: owner.integrations?.boberdoo?.external_id || "",
-                    email: owner.email
-                });
-
-                if (lowBalanceResp.success) {
-                    leadLogger.info("Low Balance webhook sent successfully", {
-                        campaignId: campaign._id,
-                        response: lowBalanceResp
-                    });
-                } else {
-                    leadLogger.warn("Low Balance webhook failed", {
-                        campaignId: campaign._id,
-                        error: lowBalanceResp.error || "Unknown error",
-                        response: lowBalanceResp
-                    });
-                }
-            } catch (err) {
-                leadLogger.error("Fatal error while sending low balance webhook", err, {
-                    error: err.message
-                });
-            }
-
-
-            // 2️⃣ SEND LOW BALANCE EMAIL TO USER
-            try {
-                const emailResp = await MAIL_HANDLER.sendInsufficientBalanceEmail({
-                    to: owner.email,
-                    userName: owner.name || owner.fullName || owner.email,
-                    requiredAmount: leadCost,
-                    currentBalance: remainingBalance,
-                    campaignName: campaign.name || `Campaign #${campaign._id}`,
-                    campaignId: campaign._id
-                });
-
-                if (emailResp?.data?.id) {
-                    leadLogger.info("Low Balance email sent successfully", {
-                        email_to: owner.email,
-                        response_id: emailResp.data.id
-                    });
-                } else {
-                    leadLogger.warn("Low Balance email sending failed", {
-                        email_to: owner.email,
-                        error: emailResp?.error || "Unknown error",
-                        response: emailResp
-                    });
-                }
-            } catch (err) {
-                leadLogger.error("Fatal error sending low balance user email", err, {
-                    error: err.message
-                });
-            }
-
-
-            // 3️⃣ SEND LOW BALANCE EMAIL TO ADMINS
-            try {
-                const EXCLUDED = new Set([
-                    'admin@gmail.com',
-                    'admin123@gmail.com',
-                    'admin1234@gmail.com',
-                ]);
-
-                const adminUsers = await User.find({
-                    role: { $in: ['ADMIN', 'SUPER_ADMIN'] },
-                    isActive: { $ne: false }
-                }).select('email');
-
-                let adminEmails = (adminUsers || [])
-                    .map(a => a.email)
-                    .filter(Boolean)
-                    .map(e => e.trim().toLowerCase())
-                    .filter(e => !EXCLUDED.has(e));
-
-                const adminEmailResp = await MAIL_HANDLER.sendLowBalanceAdminEmail({
-                    to: adminEmails,
-                    userEmail: owner.email,
-                    userName: owner.name || owner.fullName || "",
-                    campaignName: campaign.name,
-                    campaignId: campaign._id,
-                    requiredAmount: leadCost,
-                    currentBalance: remainingBalance
-                });
-
-                if (adminEmailResp?.data?.id) {
-                    leadLogger.info("Low Balance ADMIN email sent successfully", {
-                        email_to: adminEmails,
-                        response_id: adminEmailResp.data.id
-                    });
-                } else {
-                    leadLogger.warn("Low Balance ADMIN email failed", {
-                        email_to: adminEmails,
-                        error: adminEmailResp?.error || "Unknown error",
-                        response: adminEmailResp
-                    });
-                }
-
-            } catch (err) {
-                leadLogger.error("Fatal error sending low balance admin email", err, {
-                    error: err.message
-                });
-            }
-
-
-            leadLogger.warn("Low balance flow completed (webhook + user email + admin email)", {
-                campaignId: campaign._id,
-                userId: owner._id,
-                balance: remainingBalance
+          // 1️⃣ TRIGGER WEBHOOK FIRST (to stop n8n lead flow)
+          try {
+            const lowBalanceResp = await sendLowBalanceAlert({
+              campaign_name: campaign.name,
+              filter_set_id: campaign.boberdoo_filter_set_id,
+              partner_id: owner.integrations?.boberdoo?.external_id || "",
+              email: owner.email,
+              user_id: owner._id,
+              campaign_id: campaign._id
             });
-        }
 
-        } catch (lowBalanceErr) {
+            if (lowBalanceResp.success) {
+              leadLogger.info("Low Balance webhook sent successfully", {
+                campaignId: campaign._id,
+                response: lowBalanceResp
+              });
+            } else {
+              leadLogger.warn("Low Balance webhook failed", {
+                campaignId: campaign._id,
+                error: lowBalanceResp.error || "Unknown error",
+                response: lowBalanceResp
+              });
+            }
+          } catch (err) {
+            leadLogger.error("Fatal error while sending low balance webhook", err, {
+              error: err.message
+            });
+          }
+
+          // 2️⃣ SEND LOW BALANCE EMAIL TO USER (unchanged)
+          try {
+            const emailResp = await MAIL_HANDLER.sendInsufficientBalanceEmail({
+              to: owner.email,
+              userName: owner.name || owner.fullName || owner.email,
+              requiredAmount: leadCost,
+              currentBalance: remainingBalance,
+              campaignName: campaign.name || `Campaign #${campaign._id}`,
+              campaignId: campaign._id
+            });
+
+            if (emailResp?.data?.id) {
+              leadLogger.info("Low Balance email sent successfully", {
+                email_to: owner.email,
+                response_id: emailResp.data.id
+              });
+            } else {
+              leadLogger.warn("Low Balance email sending failed", {
+                email_to: owner.email,
+                error: emailResp?.error || "Unknown error",
+                response: emailResp
+              });
+            }
+          } catch (err) {
+            leadLogger.error("Fatal error sending low balance user email", err, {
+              error: err.message
+            });
+          }
+
+          // 3️⃣ SEND LOW BALANCE EMAIL TO ADMINS (unchanged)
+          try {
+            const EXCLUDED = new Set([
+              'admin@gmail.com',
+              'admin123@gmail.com',
+              'admin1234@gmail.com',
+            ]);
+
+            const adminUsers = await User.find({
+              role: { $in: ['ADMIN', 'SUPER_ADMIN'] },
+              isActive: { $ne: false }
+            }).select('email');
+
+            let adminEmails = (adminUsers || [])
+              .map(a => a.email)
+              .filter(Boolean)
+              .map(e => e.trim().toLowerCase())
+              .filter(e => !EXCLUDED.has(e));
+
+            const adminEmailResp = await MAIL_HANDLER.sendLowBalanceAdminEmail({
+              to: adminEmails,
+              userEmail: owner.email,
+              userName: owner.name || owner.fullName || "",
+              campaignName: campaign.name,
+              campaignId: campaign._id,
+              requiredAmount: leadCost,
+              currentBalance: remainingBalance
+            });
+
+            if (adminEmailResp?.data?.id) {
+              leadLogger.info("Low Balance ADMIN email sent successfully", {
+                email_to: adminEmails,
+                response_id: adminEmailResp.data.id
+              });
+            } else {
+              leadLogger.warn("Low Balance ADMIN email failed", {
+                email_to: adminEmails,
+                error: adminEmailResp?.error || "Unknown error",
+                response: adminEmailResp
+              });
+            }
+
+          } catch (err) {
+            leadLogger.error("Fatal error sending low balance admin email", err, {
+              error: err.message
+            });
+          }
+
+          leadLogger.warn("Low balance flow completed (webhook + user email + admin email)", {
+            campaignId: campaign._id,
+            userId: owner._id,
+            balance: remainingBalance
+          });
+        }
+      } catch (lowBalanceErr) {
         leadLogger.error('Error in low balance check', lowBalanceErr);
-        }
+      }
+    }
 
-  
-      await session.commitTransaction();
-      session.endSession();
-  
-    //   const campaign = result.campaign_id;
+    // ========================================
+    // ✅ COMMIT TRANSACTION - Lead is now saved!
+    // ========================================
+    await session.commitTransaction();
+    session.endSession();
+
+    // ========================================
+    // ✅ POST-COMMIT: Handle based on payment result
+    // ========================================
+    if (isPaid) {
+      // (POST-COMMIT flows unchanged)
       const campaignOwner = await User.findById(campaign.user_id);
-  
-      // Send lead payment transaction email
+
       try {
         await MAIL_HANDLER.sendLeadPaymentEmail({
           to: campaignOwner.email,
@@ -483,7 +518,7 @@ const createLead = wrapAsync(async (req, res) => {
             address: result.address
           }
         });
-  
+
         leadLogger.info('Lead payment email sent successfully', {
           ...logMeta,
           email_to: campaignOwner.email,
@@ -495,7 +530,7 @@ const createLead = wrapAsync(async (req, res) => {
           error: emailErr.message
         });
       }
-  
+
       const message = 'New Lead has been assigned to your campaign!';
       try {
         await NotificationServices.createNotification(
@@ -506,16 +541,16 @@ const createLead = wrapAsync(async (req, res) => {
           0,
           `/dashboard/leads`
         );
-  
+
         leadLogger.info('Notification created successfully', {
           ...logMeta,
           recipient_id: campaign.user_id,
         });
-  
+
         if (campaign?.delivery?.method?.includes('email') && campaign?.delivery?.email?.addresses) {
           try {
             const emailSubjectFromCampaign = campaign?.delivery?.email?.subject?.trim();
-  
+
             await MAIL_HANDLER.sendLeadAssignEmail({
               to: campaign.delivery.email.addresses,
               name: campaignOwner.name || 'Campaign User',
@@ -525,9 +560,9 @@ const createLead = wrapAsync(async (req, res) => {
               campaignName: campaign.name,
               leadData: leadData,
               realleadId: result._id,
-              subject: emailSubjectFromCampaign || `Lead Fusion - New Lead"`,
+              subject: emailSubjectFromCampaign || `Lead Fusion - New Lead`,
             });
-  
+
             leadLogger.info('Lead assignment email sent successfully', {
               ...logMeta,
               email_to: campaign.delivery.email.addresses,
@@ -539,7 +574,7 @@ const createLead = wrapAsync(async (req, res) => {
             });
           }
         }
-  
+
         if (campaign?.delivery?.method?.includes('phone') && campaign?.delivery?.phone?.numbers) {
           try {
             const fullName = `${result.first_name || ''} ${result.last_name || ''}`.trim();
@@ -547,33 +582,31 @@ const createLead = wrapAsync(async (req, res) => {
             const email = result.email || '';
             const address = [
               result?.address?.full_address || '',
-            //   result?.address?.city || '',
-            //   result?.address?.zip_code || '',
             ].filter(Boolean).join(', ');
             const campaignName = campaign?.name || 'N/A';
-  
+
             const MAX_NOTE_LENGTH = 100;
             let notes = result.note || 'No notes provided';
             if (notes.length > MAX_NOTE_LENGTH) notes = notes.substring(0, MAX_NOTE_LENGTH) + '...';
-  
+
             const smsMessage = `New Lead Assigned
-  
-  Name: ${fullName}
-  Phone: ${phoneNumber}
-  Email: ${email}
-  Address: ${address}
-  Lead ID: ${result.lead_id}
-  Campaign: ${campaignName}
-  Notes: ${notes}
-  
-  View Lead: ${process.env.UI_LINK}/dashboard/leads/${result._id}`;
-  
+
+Name: ${fullName}
+Phone: ${phoneNumber}
+Email: ${email}
+Address: ${address}
+Lead ID: ${result.lead_id}
+Campaign: ${campaignName}
+Notes: ${notes}
+
+View Lead: ${process.env.UI_LINK}/dashboard/leads/${result._id}`;
+
             const smsResult = await SmsServices.sendSms({
               to: campaign.delivery.phone.numbers,
               message: smsMessage,
               from: process.env.SMS_SENDER_ID || '+18563908470',
             });
-  
+
             if (smsResult.success) {
               leadLogger.info('Lead assignment SMS sent successfully', {
                 ...logMeta,
@@ -592,34 +625,64 @@ const createLead = wrapAsync(async (req, res) => {
             });
           }
         }
-  
+
       } catch (err) {
         leadLogger.error('Failed during notification or delivery process', err, {
           ...logMeta,
           error: err.message
         });
       }
-  
+
       leadLogger.info('Lead creation process completed successfully', {
         ...logMeta,
         lead_id: result.lead_id
       });
-  
+
       sendResponse(res, { leadData: result }, 'Lead has been created successfully', 201);
-  
-    } catch (err) {
-      await session.abortTransaction();
-      session.endSession();
-  
-      leadLogger.error('Error during lead creation process', err, {
+
+    } else {
+    // ========================================
+    // ✅ PAYMENT FAILED
+    // ========================================
+    leadLogger.warn('Payment failed, lead saved as pending', {
         ...logMeta,
-        error: err.message,
-        stack: err.stack
-      });
-  
-      throw err;
+        lead_id: result.lead_id,
+        error: billingResult.message
+    });
+
+    // Handle payment failure async
+    (async () => {
+        await BillingServices.handlePaymentFailure({
+        userId: campaign.user_id,
+        leadId: result.lead_id,
+        leadCost,
+        campaign,
+        billingResult,
+        logger: leadLogger
+        });
+    })();
+
+    // Return response immediately
+    sendResponse(res, {
+        leadData: result,
+        paymentStatus: 'pending'
+    }, 'Lead saved with pending payment - will be activated once payment is processed', 201);
     }
-  });
+
+  } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
+
+    leadLogger.error('Error during lead creation process', err, {
+      ...logMeta,
+      error: err.message,
+      stack: err.stack
+    });
+
+    throw err;
+  }
+});
+
 
 
 const getLeads = wrapAsync(async (req, res) => {
