@@ -415,6 +415,188 @@ const sendLeadAssignEmail = async ({ to, name, leadName, assignedBy, leadDetails
   });
 };
 
+/**
+ * Email sent to ADMINS when a new lead is assigned
+ * Same structure as sendLeadAssignEmail but includes campaign owner info
+ */
+const sendLeadAssignAdminEmail = async ({ 
+  to, 
+  userName,
+  userEmail,
+  leadName, 
+  assignedBy, 
+  leadDetailsUrl, 
+  campaignName, 
+  leadData, 
+  realleadId, 
+  subject 
+}) => {
+  const recipients = Array.isArray(to) 
+    ? to 
+    : to.split(',').map(email => email.trim());
+
+  const {
+    first_name,
+    last_name,
+    phone_number,
+    email,
+    address = {},
+    lead_id,
+    note,
+    _id,
+  } = leadData;
+
+  const fullName = `${first_name || ''} ${last_name || ''}`.trim() || 'N/A';
+  const emailDisplay = email || 'N/A';
+
+  // ✅ Phone with black clickable link
+  const phoneDisplay = phone_number 
+    ? `<a href="tel:${phone_number}" style="color: #000; text-decoration: none;">${phone_number}</a>` 
+    : 'N/A';
+
+  const fullAddress = formatFullAddress(address);
+  const addressDisplay = makeAddressLink(fullAddress);
+
+  const leadDetailsLink = `https://www.leadfusionhq.com/dashboard/leads/${realleadId}`;
+
+  // ✅ Gmail-style table layout - same as sendLeadAssignEmail with user info added
+  const mainText = `
+    <div style="max-width: 600px; margin: 0; padding: 0;">
+
+      <!-- ✅ Campaign Owner Info Section (Admin Only) -->
+      <table cellpadding="0" cellspacing="0" border="0" style="width: 100%; font-family: Arial, sans-serif; font-size: 14px; border: 1px solid #b8daff; border-radius: 4px; background: #e7f3ff; margin-bottom: 15px;">
+        <tr>
+          <td style="padding: 12px 15px;">
+            <table cellpadding="0" cellspacing="0" border="0" style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 3px 10px 3px 0; vertical-align: top; width: 110px; text-align: left;">
+                  <strong style="color: #004085;">User Name:</strong>
+                </td>
+                <td style="padding: 3px 0; vertical-align: top; text-align: left; color: #004085;">
+                  ${userName || 'N/A'}
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 3px 10px 3px 0; vertical-align: top; width: 110px; text-align: left;">
+                  <strong style="color: #004085;">User Email:</strong>
+                </td>
+                <td style="padding: 3px 0; vertical-align: top; text-align: left; color: #004085;">
+                  ${userEmail || 'N/A'}
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+
+      <!-- ✅ Lead Details Section (Same as sendLeadAssignEmail) -->
+      <table cellpadding="0" cellspacing="0" border="0" style="width: 100%; font-family: Arial, sans-serif; font-size: 14px; border: 1px solid #ddd; border-radius: 4px; background: #fff;">
+        <tr>
+          <td style="padding: 15px;">
+            
+            <table cellpadding="0" cellspacing="0" border="0" style="width: 100%; border-collapse: collapse;">
+              
+              <tr>
+                <td style="padding: 5px 10px 5px 0; vertical-align: top; width: 90px; text-align: left;">
+                  <strong style="color: #555;">Name:</strong>
+                </td>
+                <td style="padding: 5px 0; vertical-align: top; text-align: left; color: #333;">
+                  ${fullName}
+                </td>
+              </tr>
+              
+              <tr>
+                <td style="padding: 5px 10px 5px 0; vertical-align: top; width: 90px; text-align: left;">
+                  <strong style="color: #555;">Phone:</strong>
+                </td>
+                <td style="padding: 5px 0; vertical-align: top; text-align: left; color: #333;">
+                  ${phoneDisplay}
+                </td>
+              </tr>
+              
+              <tr>
+                <td style="padding: 5px 10px 5px 0; vertical-align: top; width: 90px; text-align: left;">
+                  <strong style="color: #555;">Email:</strong>
+                </td>
+                <td style="padding: 5px 0; vertical-align: top; text-align: left; color: #333; word-break: break-word;">
+                  ${emailDisplay}
+                </td>
+              </tr>
+              
+              <tr>
+                <td style="padding: 5px 10px 5px 0; vertical-align: top; width: 90px; text-align: left;">
+                  <strong style="color: #555;">Address:</strong>
+                </td>
+                <td style="padding: 5px 0; vertical-align: top; text-align: left; color: #333; line-height: 1.4;">
+                  ${addressDisplay}
+                </td>
+              </tr>
+              
+              <tr>
+                <td style="padding: 5px 10px 5px 0; vertical-align: top; width: 90px; text-align: left;">
+                  <strong style="color: #555;">Lead ID:</strong>
+                </td>
+                <td style="padding: 5px 0; vertical-align: top; text-align: left; color: #333;">
+                  ${lead_id}
+                </td>
+              </tr>
+              
+              <tr>
+                <td style="padding: 5px 10px 5px 0; vertical-align: top; width: 90px; text-align: left;">
+                  <strong style="color: #555;">Campaign:</strong>
+                </td>
+                <td style="padding: 5px 0; vertical-align: top; text-align: left; color: #333;">
+                  ${campaignName}
+                </td>
+              </tr>
+              
+              ${note ? `
+              <tr>
+                <td style="padding: 5px 10px 5px 0; vertical-align: top; width: 90px; text-align: left;">
+                  <strong style="color: #555;">Note:</strong>
+                </td>
+                <td style="padding: 5px 0; vertical-align: top; text-align: left; color: #333;">
+                  ${note}
+                </td>
+              </tr>` : ''}
+              
+              <tr>
+                <td colspan="2" style="padding: 10px 0 5px 0; border-top: 1px solid #eee;">
+                </td>
+              </tr>
+              
+              <tr>
+                <td style="padding: 5px 10px 5px 0; vertical-align: top; width: 90px; text-align: left;">
+                  <strong style="color: #555;">View Lead:</strong>
+                </td>
+                <td style="padding: 5px 0; vertical-align: top; text-align: left; color: #333; word-break: break-all;">
+                  ${leadDetailsLink}
+                </td>
+              </tr>
+              
+            </table>
+            
+          </td>
+        </tr>
+      </table>
+    </div>
+  `;
+
+  const html = createEmailTemplate({
+    title: 'Lead Fusion - New Lead',
+    mainText: mainText,
+  });
+
+  const finalSubject = (subject && subject.trim()) || `New Lead Assigned - ${campaignName} - ${userEmail}`;
+
+  return resend.emails.send({
+    from: FROM_EMAIL,
+    to: recipients,
+    subject: finalSubject,
+    html,
+  });
+};
+
 const sendLeadReturnEmail = async ({ adminEmails, lead, campaign, returnedBy, returnStatus, returnReason, returnComments }) => {
   const {
     first_name,
@@ -1960,6 +2142,7 @@ module.exports = {
   sendNotificationEmail,
   sendTestMail,
   sendLeadAssignEmail,
+  sendLeadAssignAdminEmail,
   sendLeadReturnEmail,
 
     // ✅ New Transaction Email Functions
