@@ -603,9 +603,17 @@ const createLead = wrapAsync(async (req, res) => {
                 assignedBy: req.user?.name || 'System',
                 leadDetailsUrl: `${process.env.UI_LINK}/dashboard/leads/${result._id}`,
                 campaignName: campaign.name,
-                leadData: leadData,
+
+                note: leadData.note ?? "",
+
+                leadData: {
+                  ...(result.toObject ? result.toObject() : result),
+                  note: result.note ?? ""
+                },
+
                 realleadId: result._id,
               });
+
 
               leadLogger.info('Lead assignment admin email sent successfully', {
                 ...logMeta,
