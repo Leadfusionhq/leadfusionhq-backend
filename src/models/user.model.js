@@ -136,7 +136,7 @@ const baseUserSchema = new mongoose.Schema({
 }, options);
 
 // Password hashing middleware
-baseUserSchema.pre('save', async function(next) {
+baseUserSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
 
   try {
@@ -148,7 +148,7 @@ baseUserSchema.pre('save', async function(next) {
   }
 });
 
-baseUserSchema.pre('findOneAndUpdate', async function(next) {
+baseUserSchema.pre('findOneAndUpdate', async function (next) {
   const update = this.getUpdate();
 
   if (update.password) {
@@ -160,7 +160,7 @@ baseUserSchema.pre('findOneAndUpdate', async function(next) {
   next();
 });
 
-baseUserSchema.pre('findByIdAndUpdate', async function(next) {
+baseUserSchema.pre('findByIdAndUpdate', async function (next) {
   const update = this.getUpdate();
 
   if (update.password) {
@@ -173,12 +173,12 @@ baseUserSchema.pre('findByIdAndUpdate', async function(next) {
 });
 
 // ✅ Compare password method
-baseUserSchema.methods.comparePassword = async function(candidatePassword) {
+baseUserSchema.methods.comparePassword = async function (candidatePassword) {
   return bcrypt.compare(candidatePassword, this.password);
 };
 
 // 🧹 Cascade delete user's chats & messages
-baseUserSchema.pre('findOneAndDelete', async function(next) {
+baseUserSchema.pre('findOneAndDelete', async function (next) {
   try {
     const user = await this.model.findOne(this.getFilter());
     if (!user) return next();
@@ -292,7 +292,7 @@ const regularUserSchema = new mongoose.Schema({
     acceptedAt: { type: Date, default: null },
     ipAddress: { type: String, default: null },
   },
-    // ✅ ADD THESE NEW FIELDS
+  // ✅ ADD THESE NEW FIELDS
   pending_payment: {
     amount: {
       type: Number,
