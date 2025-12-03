@@ -1057,7 +1057,14 @@ const sendBoberdoLeadNotifications = async (lead, campaign, billingResult) => {
           assignedBy: 'Boberdo Integration',
           leadDetailsUrl: `${process.env.UI_LINK}/dashboard/leads/${lead._id}`,
           campaignName: campaign.name,
-          leadData: lead,
+           // ✅ Add this
+          note: lead.note ?? "",
+
+          // ✅ Replace this carefully
+          leadData: {
+            ...(lead.toObject ? lead.toObject() : lead),
+            note: lead.note ?? ""
+          },
           realleadId: lead._id,
           subject: `Lead Fusion - New Lead`,
         });
@@ -1101,7 +1108,14 @@ const sendBoberdoLeadNotifications = async (lead, campaign, billingResult) => {
           assignedBy: 'Boberdoo Integration',
           leadDetailsUrl: `${process.env.UI_LINK}/dashboard/leads/${lead._id}`,
           campaignName: campaign.name,
-          leadData: lead,
+           // ✅ Add this
+          note: lead.note ?? "",
+
+          // ✅ Replace this carefully
+          leadData: {
+            ...(lead.toObject ? lead.toObject() : lead),
+            note: lead.note ?? ""
+          },
           realleadId: lead._id,
         });
 
