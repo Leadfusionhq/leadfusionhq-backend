@@ -1142,7 +1142,7 @@ const sendBoberdoLeadNotifications = async (lead, campaign, billingResult) => {
           // lead?.address?.city || '',
           // lead?.address?.zip_code || '',
         // ].filter(Boolean).join(', ');
-        const address = formatFullAddress(address);
+        const address = formatFullAddress(lead.address);
         
         const campaignName = campaign?.name || 'N/A';
 

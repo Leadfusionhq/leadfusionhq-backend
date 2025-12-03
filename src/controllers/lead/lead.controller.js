@@ -636,7 +636,8 @@ const createLead = wrapAsync(async (req, res) => {
             // const address = [
             //   result?.address?.full_address || '',
             // ].filter(Boolean).join(', ');
-            const address = formatFullAddress(address);
+            const address = formatFullAddress(result.address);
+
             
             const campaignName = campaign?.name || 'N/A';
 
