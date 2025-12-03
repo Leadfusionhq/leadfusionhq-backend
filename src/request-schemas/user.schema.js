@@ -74,7 +74,7 @@ const createUserByAdmin = {
         lng: Joi.number().min(-180).max(180).optional(),
       }).optional(),
       place_id: Joi.string().optional(),
-    }).required(),
+    }).optional(),
 
     role: Joi.string()
       .valid(CONSTANT_ENUM.USER_ROLE.USER)
