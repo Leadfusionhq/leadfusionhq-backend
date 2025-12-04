@@ -3,8 +3,7 @@ const bcrypt = require('bcrypt');
 const CONSTANT_ENUM = require('../helper/constant-enums');
 
 // ✅ Import Chat and Message models
-const Chat = require('./chat.model');
-const Message = require('./message.model');
+
 
 
 const SALT_ROUNDS = 10;
@@ -178,12 +177,17 @@ baseUserSchema.methods.comparePassword = async function (candidatePassword) {
 };
 
 // 🧹 Cascade delete user's chats & messages
+// ✅ Cascade delete user's chats & messages
 baseUserSchema.pre('findOneAndDelete', async function (next) {
   try {
     const user = await this.model.findOne(this.getFilter());
     if (!user) return next();
 
     console.log(`🧹 Deleting all chats and messages for user: ${user._id}`);
+
+    // ✅ ONLY load models here (inside the middleware)
+    const Chat = mongoose.model('Chat');
+    const Message = mongoose.model('Message');
 
     // 1️⃣ Find all chats where the user is a participant
     const chats = await Chat.find({ participants: user._id });
