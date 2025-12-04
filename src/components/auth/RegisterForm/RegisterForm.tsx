@@ -116,7 +116,10 @@ const RegisterForm = () => {
       .oneOf([Yup.ref('password')], 'Passwords must match')
       .required('Confirm Password is required'),
     companyName: Yup.string().required('Company Name is required'),
-    phoneNumber: Yup.string().required('Phone Number is required'),
+    phoneNumber: Yup.string()
+    .required('Phone Number is required')
+    .matches(/^\d{10}$/, 'Phone number must be a valid 10-digit US number'),
+
     address: Yup.object().shape({
       full_address: Yup.string().required('Full address is required'),
       street: Yup.string().required('Street address is required'),
@@ -269,10 +272,31 @@ const RegisterForm = () => {
                         placeholder="Company Name *"
                       />
                       
-                      <FormikInput
+                      {/* <FormikInput
                         name="phoneNumber"
                         placeholder="Phone Number *"
+                      /> */}
+            
+
+                      <Field
+                        name="phoneNumber"
+                        value={values.phoneNumber}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                          // Remove every non-digit
+                          let clean = e.target.value.replace(/\D/g, '');
+
+                          // Keep max 10 digits
+                          if (clean.length > 10) clean = clean.slice(0, 10);
+
+                          setFieldValue("phoneNumber", clean);
+                        }}
+                        placeholder="Phone Number"
+                        className="h-[66px] border border-[#E0E0E0] rounded-[8px] px-5 text-[16px] font-inter bg-[#FFFFFF] text-[#1C1C1C] placeholder-[#999] focus:border-[#222] outline-none transition w-full"
                       />
+
+                      <ErrorMessage name="phoneNumber" component="div" className="text-red-500 text-xs mt-1" />
+
+
 
                       {/* Google Address Autocomplete */}
                       <div className="w-full mb-2">

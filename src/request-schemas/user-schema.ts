@@ -56,6 +56,14 @@ export const validateUserSchema = (data: UserRegistrationData) => {
       }, { status: 400 });
     }
 
+      // ✅ Phone Validation (exactly 10 digits)
+    const phoneRegex = /^\d{10}$/;
+    if (!phoneRegex.test(phoneNumber)) {
+      return NextResponse.json({
+        error: 'Phone number must be a valid 10-digit US number',
+      }, { status: 400 });
+    }
+
     if (!address) {
       return NextResponse.json({
         error: 'Address information is required',
@@ -110,6 +118,15 @@ export const validateUserUpdateSchema = (data: UserUpdateData) => {
         error: 'Company name and phone number are required for users',
       }, { status: 400 });
     }
+
+      // ✅ Phone Validation (exactly 10 digits)
+      const phoneRegex = /^\d{10}$/;
+      if (!phoneRegex.test(phoneNumber)) {
+        return NextResponse.json({
+          error: 'Phone number must be a valid 10-digit US number',
+        }, { status: 400 });
+      }
+
 
     // Validate address if provided
     if (address) {
