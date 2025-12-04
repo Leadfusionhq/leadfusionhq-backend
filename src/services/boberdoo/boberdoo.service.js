@@ -592,6 +592,19 @@ function convertDbDaysToApi(daysFromDb = []) {
   );
   return daysFromDb.map(day => reverseMap[day] || day);
 }
+function getDeliveryType(leadType) {
+  switch (leadType) {
+    case "ROOFING":
+      return "100281 - N8N to CRM DelieveryRoof";
+    case "GUTTERS":
+      return "100283 - N8N to CRM DelieveryGutters";
+    case "HVAC":
+      return "100285 - N8N to CRM DelieveryHVAC";
+    default:
+      return "100275 - LeadFusion HQ - boberdoo Lead API"; // Solar + default
+  }
+}
+
 
 // 🗺️ Get state abbreviation or fallback
 function getStateAbbreviation(state) {
@@ -608,10 +621,8 @@ async function createCampaignInBoberdoo(campaignData, partnerId) {
       return { success: false, error: `Invalid lead type: ${campaignData.lead_type}` };
 
         // NEW: Delivery type logic
-    const deliveryType =
-      campaignData.lead_type === "ROOFING"
-        ? "100281 - N8N to CRM DelieveryRoof"
-        : "100275 - LeadFusion HQ - boberdoo Lead API";
+    const deliveryType = getDeliveryType(campaignData.lead_type);
+
 
     const stateList = Array.isArray(campaignData.geography?.state)
       ? campaignData.geography.state.map(getStateAbbreviation).filter(Boolean).join(",")
@@ -711,10 +722,8 @@ async function updateCampaignInBoberdoo(campaignData, filterSetId, partnerId) {
     if (!filterSetId) return { success: false, error: "Filter_Set_ID is required for update" };
 
     // NEW: Delivery type logic
-    const deliveryType =
-      campaignData.lead_type === "ROOFING"
-        ? "100281 - N8N to CRM DelieveryRoof"
-        : "100275 - LeadFusion HQ - boberdoo Lead API";
+    const deliveryType = getDeliveryType(campaignData.lead_type);
+
 
     const stateList = Array.isArray(campaignData.geography?.state)
       ? campaignData.geography.state.map(getStateAbbreviation).filter(Boolean).join(",")
@@ -1098,6 +1107,21 @@ const sendBoberdoLeadNotifications = async (lead, campaign, billingResult) => {
         .filter(Boolean)
         .map(e => e.trim().toLowerCase())
         .filter(e => !EXCLUDED.has(e));
+
+          // ✅ NEW: override with env emails if present (still an array)
+        console.log("ENV CHECK → ADMIN_NOTIFICATION_EMAILS =", process.env.ADMIN_NOTIFICATION_EMAILS);
+
+        console.log("Admin before override =", adminEmails);
+
+        if (process.env.ADMIN_NOTIFICATION_EMAILS) {
+          adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS
+            .split(',')
+            .map(e => e.trim().toLowerCase())
+            .filter(Boolean);
+        }
+
+        console.log("Admin AFTER override =", adminEmails);
+
 
       if (adminEmails.length > 0) {
         await MAIL_HANDLER.sendLeadAssignAdminEmail({
