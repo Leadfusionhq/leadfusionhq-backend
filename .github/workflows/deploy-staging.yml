@@ -1,0 +1,20 @@
+name: Deploy Staging
+
+on:
+  push:
+    branches:
+      - staging
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Deploy to Staging Server
+      uses: appleboy/ssh-action@v0.1.10
+      with:
+        host: 148.230.93.69
+        username: ubuntu
+        key: ${{ secrets.SERVER_SSH_KEY }}
+        script: |
+          cd /home/ubuntu/var/www/html/leadfusionhq-staging
+          ./deploy.sh
