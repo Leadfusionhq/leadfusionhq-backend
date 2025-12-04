@@ -62,7 +62,7 @@ export const API_URL = {
     
 };
 
-/** ::::::::::::::::::FAQ ROUTES :::::::::::::::::: */
+/** ::::::::::::::::::FAQ ROUTES :::::::::::::::::: */ 
 
 const FAQ_API_BASE = `${API_BASE}/faqs`;
 
