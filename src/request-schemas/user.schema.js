@@ -28,9 +28,14 @@ const createUserByAdmin = {
       'any.required': 'Company name is required',
     }),
 
-    phoneNumber: Joi.string().required().messages({
-      'any.required': 'Phone number is required',
-    }),
+    phoneNumber: Joi.string()
+      .pattern(/^\d{10}$/)
+      .required()
+      .messages({
+        'string.pattern.base': 'Phone number must be a valid 10-digit US number',
+        'any.required': 'Phone number is required',
+      }),
+
 
     // Address object validation
     // address: Joi.object({
@@ -215,9 +220,14 @@ const updateUser = {
       'any.required': 'Company name is required',
     }),
 
-    phoneNumber: Joi.string().required().messages({
-      'any.required': 'Phone number is required',
-    }),
+    phoneNumber: Joi.string()
+      .pattern(/^\d{10}$/)
+      .required()
+      .messages({
+        'string.pattern.base': 'Phone number must be a valid 10-digit US number',
+        'any.required': 'Phone number is required',
+      }),
+
 
     // Address object validation (optional for updates)
     address: Joi.object({

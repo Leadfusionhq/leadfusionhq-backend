@@ -601,11 +601,28 @@ const validatePrepaidCampaignBalance = async (campaign_id) => {
         isActive: { $ne: false },
       }).select('email');
 
+      
+
       let adminEmails = (adminUsers || [])
         .map(a => a.email)
         .filter(Boolean)
         .map(e => e.trim().toLowerCase())
         .filter(e => !EXCLUDED.has(e));
+
+
+                  // ✅ NEW: override with env emails if present (still an array)
+        console.log("ENV CHECK → ADMIN_NOTIFICATION_EMAILS =", process.env.ADMIN_NOTIFICATION_EMAILS);
+
+        console.log("Admin before override =", adminEmails);
+
+        if (process.env.ADMIN_NOTIFICATION_EMAILS) {
+          adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS
+            .split(',')
+            .map(e => e.trim().toLowerCase())
+            .filter(Boolean);
+        }
+
+        console.log("Admin AFTER override =", adminEmails);
 
       // ---------------------------------------
       // 🔹 SEND LOW BALANCE ADMIN EMAIL

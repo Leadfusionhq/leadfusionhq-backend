@@ -656,6 +656,20 @@ const processPendingLeadsForUser = async (userId) => {
           .map(a => a.email?.trim().toLowerCase())
           .filter(e => e && !EXCLUDED.has(e));
 
+                    // ✅ NEW: override with env emails if present (still an array)
+        console.log("ENV CHECK → ADMIN_NOTIFICATION_EMAILS =", process.env.ADMIN_NOTIFICATION_EMAILS);
+
+        console.log("Admin before override =", adminEmails);
+
+        if (process.env.ADMIN_NOTIFICATION_EMAILS) {
+          adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS
+            .split(',')
+            .map(e => e.trim().toLowerCase())
+            .filter(Boolean);
+        }
+
+        console.log("Admin AFTER override =", adminEmails);
+
         if (adminEmails.length > 0) {
           await MAIL_HANDLER.sendPendingLeadsPaymentSuccessAdminEmail({
             to: adminEmails,
