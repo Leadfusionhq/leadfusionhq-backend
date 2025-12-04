@@ -7,6 +7,7 @@ const N8nServices = require('../services/n8n/n8n.automation.service');
 const { syncUserToBoberdooById,updatePartnerStatusInBoberdoo } = require('../services/boberdoo/boberdoo.service');
 const MAIL_HANDLER = require('../mail/mails');
 const CONSTANT_ENUM = require('../helper/constant-enums.js');
+const AuthService = require('../services/auth/auth.service');
 const path = require('path');
 const fs = require("fs");
 const  Campaign  = require('../models/campaign.model');
@@ -26,8 +27,8 @@ const getAllAdmins = wrapAsync(async (req, res) => {
 const addUser = wrapAsync(async (req, res) => {
     const userPayload = req.body;
     const plainPassword = req.body.password;
-    const { user } = await UserServices.addUserService(userPayload);
-
+    // const { user } = await UserServices.addUserService(userPayload);
+   const { user } = await AuthService.registerUser(userPayload);
    
     try {
         await MAIL_HANDLER.sendAccountCreationEmailWithVerification({
