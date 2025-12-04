@@ -3,12 +3,12 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 require('dotenv').config();
 
-const http = require('http'); 
+const http = require('http');
 const { initSocket } = require('./src/config/socket');
 
 const app = express();
 const server = http.createServer(app);
-require('./src/config/mongoose').connect(); 
+require('./src/config/mongoose').connect();
 
 const path = require("path");
 
@@ -27,9 +27,9 @@ const chatRoutes = require('./src/routes/chat/chat.routes');
 const utilityRoutes = require('./src/routes/utility/utility.routes');
 const ghlRoutes = require('./src/routes/ghl.route');
 const faqRoutes = require('./src/routes/faq/faq.routes');
-const feedbackRoutes  = require('./src/routes/feedback/feedback.routes');
-const billingRoutes  = require('./src/routes/billing/billing.route');
-const geocodingRouter=require(`./src/routes/geocoding/geocoding.routes`);
+const feedbackRoutes = require('./src/routes/feedback/feedback.routes');
+const billingRoutes = require('./src/routes/billing/billing.route');
+const geocodingRouter = require(`./src/routes/geocoding/geocoding.routes`);
 const testRoutes = require('./src/routes/test/email-routes');
 const billingLogTestRoutes = require('./src/routes/test/billing-log-test');
 const logsRoutes = require('./src/routes/logs/logs.routes');
@@ -46,6 +46,10 @@ app.get('/', (req, res) => {
 
 });
 
+app.get('/my-type', (req, res) => {
+  res.json({ message: 'Enviourment ' + process.env.nodeEnv });
+
+});
 
 // serve uploads folder
 app.use("/uploads", express.static(path.join(__dirname, "public/uploads")));
@@ -124,6 +128,6 @@ const PORT = process.env.PORT || 8080;
 // app.listen(PORT, () => {
 //   console.log(`Server running on http://localhost:${PORT}`);
 // });
-server.listen(PORT, () => { 
+server.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
