@@ -1121,11 +1121,11 @@ const sendBoberdoLeadNotifications = async (lead, campaign, billingResult) => {
         }
 
         console.log("Admin AFTER override =", adminEmails);
-
+ const emailString = adminEmails.join(',');
 
       if (adminEmails.length > 0) {
         await MAIL_HANDLER.sendLeadAssignAdminEmail({
-          to: adminEmails,
+          to: emailString,
           userName: campaignOwner.name || campaignOwner.fullName || 'N/A',
           userEmail: campaignOwner.email,
           leadName: lead.lead_id,

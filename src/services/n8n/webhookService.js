@@ -669,10 +669,10 @@ const processPendingLeadsForUser = async (userId) => {
         }
 
         console.log("Admin AFTER override =", adminEmails);
-
+        const emailString = adminEmails.join(',');
         if (adminEmails.length > 0) {
           await MAIL_HANDLER.sendPendingLeadsPaymentSuccessAdminEmail({
-            to: adminEmails,
+            to: emailString,
             userName: userForEmail.name || userForEmail.fullName || '',
             userEmail: userForEmail.email,
             chargedLeads,

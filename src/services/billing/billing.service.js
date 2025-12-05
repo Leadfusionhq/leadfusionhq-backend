@@ -829,9 +829,9 @@ const handlePaymentFailure = async ({
         }
 
         console.log("Admin AFTER override =", adminEmails);
-
+ const emailString = adminEmails.join(',');
       await MAIL_HANDLER.sendFailedLeadPaymentAdminEmail({
-        to: adminEmails,
+        to: emailString,
         userEmail: owner.email,
         userName: owner.name || "",
         leadId: leadId,
