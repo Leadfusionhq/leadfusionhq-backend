@@ -117,8 +117,13 @@ const RegisterForm = () => {
       .required('Confirm Password is required'),
     companyName: Yup.string().required('Company Name is required'),
     phoneNumber: Yup.string()
-    .required('Phone Number is required')
-    .matches(/^\d{10}$/, 'Phone number must be a valid 10-digit US number'),
+      .required('Phone Number is required')
+      .test('is-10-digits', 'Phone number must be exactly 10 digits', (value) => {
+        if (!value) return false;
+        const digitsOnly = value.replace(/\D/g, '');
+        return digitsOnly.length === 10;
+      })
+      .matches(/^\d{10}$/, 'Phone number must contain only digits'),
 
     address: Yup.object().shape({
       full_address: Yup.string().required('Full address is required'),
@@ -282,18 +287,27 @@ const RegisterForm = () => {
                         name="phoneNumber"
                         value={values.phoneNumber}
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                          // Remove every non-digit
                           let clean = e.target.value.replace(/\D/g, '');
-
-                          // Keep max 10 digits
-                          if (clean.length > 10) clean = clean.slice(0, 10);
-
+                          
+                          // ✅ Block 11th digit with toast
+                          if (clean.length > 10) {
+                            clean = clean.slice(0, 10);
+                            toast.error('Phone number cannot exceed 10 digits', {
+                              toastId: 'phone-limit',
+                              autoClose: 2000
+                            });
+                          }
+                          
                           setFieldValue("phoneNumber", clean);
                         }}
-                        placeholder="Phone Number"
-                        className="h-[66px] border border-[#E0E0E0] rounded-[8px] px-5 text-[16px] font-inter bg-[#FFFFFF] text-[#1C1C1C] placeholder-[#999] focus:border-[#222] outline-none transition w-full"
+                        placeholder="1234567890"
+                        maxLength={10}
+                        className={`h-[66px] border ${
+                          touched.phoneNumber && errors.phoneNumber 
+                            ? 'border-red-500' 
+                            : 'border-[#E0E0E0]'
+                        } rounded-[8px] px-5 text-[16px] font-inter bg-[#FFFFFF] text-[#1C1C1C] placeholder-[#999] focus:border-[#222] outline-none transition w-full`}
                       />
-
                       <ErrorMessage name="phoneNumber" component="div" className="text-red-500 text-xs mt-1" />
 
 

@@ -125,6 +125,14 @@ export default function LeadTable() {
     [token]
   );
 
+const isLeadReturnable = (createdAt: string) => {
+  const createdDate = new Date(createdAt);
+  const now = new Date();
+  const diffInDays = Math.floor((now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
+  return diffInDays <= 5;
+};
+
+
   // CSV Download Functions
 // CSV Download Functions
 const convertToCSV = (data: Lead[]): string => {
@@ -601,7 +609,7 @@ const convertToCSV = (data: Lead[]): string => {
               View
             </Button>
 
-            <Button
+            {/* <Button
               className="!bg-[#838383] !text-white hover:!bg-[#6b6b6b]"
               size="small"
               sx={{
@@ -613,7 +621,21 @@ const convertToCSV = (data: Lead[]): string => {
               onClick={() => handleReturnClick(row)}
             >
               Return
-            </Button>
+            </Button> */}
+
+             {/* Return Button — only if within 5 days */}
+            {isLeadReturnable(row.createdAt) &&
+              (row.return_status === "Not Returned" || row.return_status === "Rejected") &&
+              row.return_attempts < row.max_return_attempts && (
+                <Button
+                  variant="contained"
+                  color="error"
+                  size="small"
+                  onClick={() => handleReturnClick(row)}
+                >
+                  Return
+                </Button>
+            )}
           </div>
         ),
       ignoreRowClick: true,
