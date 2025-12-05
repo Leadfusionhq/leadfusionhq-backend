@@ -716,6 +716,8 @@ const returnLead = async (leadId, returnStatus, returnReason, returnComments) =>
     lead.return_attempts = attempts + 1; 
     lead.return_reason = returnReason;
     lead.return_comments = returnComments;
+    // NEW FIELD
+    lead.return_requested_at = new Date();
 
     await lead.save();
 

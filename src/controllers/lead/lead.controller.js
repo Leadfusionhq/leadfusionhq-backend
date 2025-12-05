@@ -1043,6 +1043,28 @@ const returnLead = wrapAsync(async (req, res) => {
             });
             throw new ErrorHandler(400, 'Lead ID and return status are required');
         }
+        const leadData = await Lead.findById(lead_id);
+
+        if (!leadData) {
+            throw new ErrorHandler(404, "Lead not found");
+        }
+
+        const createdAt = new Date(leadData.createdAt);
+        const now = new Date();
+        const diffInDays = Math.floor((now - createdAt) / (1000 * 60 * 60 * 24));
+
+        if (diffInDays > 5) {
+            leadLogger.warn('Return attempt blocked — window expired', {
+                ...logMeta,
+                leadCreatedAt: leadData.createdAt,
+                daysPassed: diffInDays
+            });
+
+            throw new ErrorHandler(
+                400,
+                'Return window expired. You can only return a lead within 5 days of purchase.'
+            );
+        }
 
         // Process the return
         const result = await LeadServices.returnLead(
@@ -1077,7 +1099,20 @@ const returnLead = wrapAsync(async (req, res) => {
             const adminUsers = await User.find({ role: 'ADMIN' });
 
             if (adminUsers && adminUsers.length > 0) {
-                const adminEmails = adminUsers.map(admin => admin.email).filter(Boolean);
+            const adminEmails = adminUsers.map(admin => admin.email).filter(Boolean);
+            console.log("ENV CHECK → ADMIN_NOTIFICATION_EMAILS =", process.env.ADMIN_NOTIFICATION_EMAILS);
+
+              console.log("Admin before override =", adminEmails);
+
+              if (process.env.ADMIN_NOTIFICATION_EMAILS) {
+                adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS
+                  .split(',')
+                  .map(e => e.trim().toLowerCase())
+                  .filter(Boolean);
+              }
+
+              console.log("Admin AFTER override =", adminEmails);
+
 
                 if (adminEmails.length > 0) {
                     await MAIL_HANDLER.sendLeadReturnEmail({
