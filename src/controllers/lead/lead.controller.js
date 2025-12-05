@@ -1099,7 +1099,7 @@ const returnLead = wrapAsync(async (req, res) => {
             const adminUsers = await User.find({ role: 'ADMIN' });
 
             if (adminUsers && adminUsers.length > 0) {
-            const adminEmails = adminUsers.map(admin => admin.email).filter(Boolean);
+            let adminEmails = adminUsers.map(admin => admin.email).filter(Boolean);
             console.log("ENV CHECK → ADMIN_NOTIFICATION_EMAILS =", process.env.ADMIN_NOTIFICATION_EMAILS);
 
               console.log("Admin before override =", adminEmails);
