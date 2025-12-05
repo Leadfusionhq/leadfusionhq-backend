@@ -628,9 +628,14 @@ const convertToCSV = (data: Lead[]): string => {
               (row.return_status === "Not Returned" || row.return_status === "Rejected") &&
               row.return_attempts < row.max_return_attempts && (
                 <Button
-                  variant="contained"
-                  color="error"
+                className="!bg-[#838383] !text-white hover:!bg-[#6b6b6b]"
                   size="small"
+                  sx={{
+                    fontSize: "12px",
+                    minWidth: "60px",
+                    height: "28px",
+                    textTransform: "capitalize",
+                  }}
                   onClick={() => handleReturnClick(row)}
                 >
                   Return
