@@ -2,13 +2,14 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 require('dotenv').config();
-
 const http = require('http'); 
 const { initSocket } = require('./src/config/socket');
-
+// const autoRejectReturnCron = require("./src/jobs/autoRejectReturnLead"); 
 const app = express();
 const server = http.createServer(app);
 require('./src/config/mongoose').connect(); 
+
+// autoRejectReturnCron();
 
 const path = require("path");
 
