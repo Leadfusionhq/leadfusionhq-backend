@@ -790,6 +790,164 @@ const sendLeadReturnEmail = async ({ adminEmails, lead, campaign, returnedBy, re
   });
 };
 
+const sendUserLeadReturnStatusEmail = async ({
+  userEmail,
+  userName,
+  leadData = {},
+  campaignName,
+  returnStatus,
+  returnReason,
+  returnComments,
+  refundAmount,
+  transactionId,
+  newBalance,
+  approvedBy
+}) => {
+
+  // Extract safely
+  const first_name = leadData.first_name || "N/A";
+  const last_name = leadData.last_name || "";
+  const phone_number = leadData.phone_number || "N/A";
+  const email = leadData.email || "N/A";
+  const address = leadData.address || {};
+  const lead_id = leadData._id || leadData.lead_id || "N/A";
+
+  const fullName = `${first_name} ${last_name}`.trim();
+  const phoneDisplay = phone_number !== "N/A"
+    ? `<a href="tel:${phone_number}" style="color:#000;text-decoration:none;">${phone_number}</a>`
+    : "N/A";
+
+  const fullAddress = formatFullAddress(address);
+  const addressDisplay = makeAddressLink(fullAddress);
+
+  const statusColor =
+    returnStatus === "Approved"
+      ? "#16a34a"
+      : returnStatus === "Rejected"
+      ? "#dc2626"
+      : "#f59e0b";
+
+  const mainText = `
+    <div style="max-width:600px;margin:0;padding:0;">
+
+      <!-- Status Badge -->
+      <div style="margin-bottom:15px;padding:12px;background:#f9fafb;
+        border-left:4px solid ${statusColor};border-radius:4px;font-size:14px;">
+        <strong>Your lead return request has been ${returnStatus}.</strong>
+      </div>
+
+      <!-- Main Details Table -->
+      <table cellpadding="0" cellspacing="0" border="0"
+        style="width:100%;border:1px solid #ddd;border-radius:6px;background:#fff;
+        font-size:14px;font-family:Arial,sans-serif;">
+        
+        <tr><td style="padding:15px;">
+          
+          <table cellpadding="0" cellspacing="0" style="width:100%;font-size:14px;">
+
+            <tr>
+              <td style="padding:6px 10px;font-weight:bold;width:150px;">Name:</td>
+              <td style="padding:6px 10px;">${fullName}</td>
+            </tr>
+
+            <tr>
+              <td style="padding:6px 10px;font-weight:bold;">Phone:</td>
+              <td style="padding:6px 10px;">${phoneDisplay}</td>
+            </tr>
+
+            <tr>
+              <td style="padding:6px 10px;font-weight:bold;">Email:</td>
+              <td style="padding:6px 10px;">${email}</td>
+            </tr>
+
+            <tr>
+              <td style="padding:6px 10px;font-weight:bold;">Address:</td>
+              <td style="padding:6px 10px;">${addressDisplay}</td>
+            </tr>
+
+            <tr>
+              <td style="padding:6px 10px;font-weight:bold;">Lead ID:</td>
+              <td style="padding:6px 10px;">${lead_id}</td>
+            </tr>
+
+            <tr>
+              <td style="padding:6px 10px;font-weight:bold;">Campaign:</td>
+              <td style="padding:6px 10px;">${campaignName}</td>
+            </tr>
+
+            ${
+              returnReason
+                ? `
+                  <tr>
+                    <td colspan="2" style="padding:12px 10px;border-top:1px solid #eee;">
+                      <strong style="color:#dc2626;">Return Reason:</strong><br>
+                      ${returnReason}
+                    </td>
+                  </tr>`
+                : ""
+            }
+
+            ${
+              returnComments
+                ? `
+                  <tr>
+                    <td colspan="2" style="padding:12px 10px;border-top:1px solid #eee;">
+                      <strong style="color:#dc2626;">Additional Comments:</strong><br>
+                      ${returnComments}
+                    </td>
+                  </tr>`
+                : ""
+            }
+
+            <!-- Refund Section -->
+            ${
+              returnStatus === "Approved"
+                ? `
+                  <tr>
+                    <td colspan="2" style="padding:15px;border-top:1px solid #eee;">
+                      <div style="padding:12px;background:#ecfdf5;border-left:4px solid #16a34a;
+                        border-radius:4px;line-height:20px;">
+                        <strong>Refund Processed:</strong><br>
+                        Amount: $${refundAmount}<br>
+                        Transaction ID: ${transactionId || "N/A"}<br>
+                        Updated Balance: $${newBalance}
+                      </div>
+                    </td>
+                  </tr>`
+                : ""
+            }
+
+          </table>
+
+        </td></tr>
+
+      </table>
+
+      <!-- Footer Note -->
+      <div style="margin-top:15px;padding:12px;background:#fef3c7;border-left:4px solid #f59e0b;
+        border-radius:4px;font-size:14px;">
+        If you have any questions, reply to this email and our support team will assist you.
+      </div>
+
+    </div>
+  `;
+
+  const html = createEmailTemplate({
+    title: `Lead Return ${returnStatus}`,
+    greeting: `Hello ${userName || "User"},`,
+    mainText
+  });
+
+  return resend.emails.send({
+    from: FROM_EMAIL,
+    to: userEmail,
+    subject: `Lead Return ${returnStatus} - Lead ${lead_id}`,
+    html
+  });
+};
+
+
+
 /**
  * Send New User Registration Notification to Admin
  */
@@ -2144,7 +2302,7 @@ module.exports = {
   sendLeadAssignEmail,
   sendLeadAssignAdminEmail,
   sendLeadReturnEmail,
-
+sendUserLeadReturnStatusEmail,
     // ✅ New Transaction Email Functions
     sendTransactionEmail,
     sendFundsAddedEmail,
