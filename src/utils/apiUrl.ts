@@ -9,6 +9,8 @@ const AUTH_API_BASE = `${API_BASE}/auth`;
 export const USER_API_BASE = `${API_BASE}/users`;
 const ADMIN_API_BASE = `${API_BASE}/admins`;
 
+const TEST_API_BASE = `${API_BASE}/test`;
+
 export const API_URL = {
 
     // Admin User Management URLs
@@ -19,6 +21,8 @@ export const API_URL = {
     UPDATE_USER: `${USER_API_BASE}/:userId`,
     GET_USER_BY_ID: `${USER_API_BASE}/:userId`,
     DELETE_USER_BY_ID: `${USER_API_BASE}/:userId`,
+    TOGGLE_USER_STATUS_BY_ID: `${USER_API_BASE}/:userId/toggle-status`,
+
     SYNC_BOMBERDO:`${USER_API_BASE}/:userId/boberdoo/resync`,
     SEND_BALANCE_TOPUP_WEBHOOK: `${USER_API_BASE}/:userId/balance/topup-webhook`,
 
@@ -59,10 +63,11 @@ export const API_URL = {
     SEND_VERIFICATION_EMAIL:`${AUTH_API_BASE}/send-verification-link`,
     VERIFY_EMAIL:`${AUTH_API_BASE}/verify-email`,
 
-    
+    // Add this new endpoint
+    RESEND_VERIFICATION_EMAIL: `${TEST_API_BASE}/resend-verification-email`,
 };
 
-/** ::::::::::::::::::FAQ ROUTES :::::::::::::::::: */
+/** ::::::::::::::::::FAQ ROUTES :::::::::::::::::: */ 
 
 const FAQ_API_BASE = `${API_BASE}/faqs`;
 
