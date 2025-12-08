@@ -790,6 +790,164 @@ const sendLeadReturnEmail = async ({ adminEmails, lead, campaign, returnedBy, re
   });
 };
 
+const sendUserLeadReturnStatusEmail = async ({
+  userEmail,
+  userName,
+  leadData = {},
+  campaignName,
+  returnStatus,
+  returnReason,
+  returnComments,
+  refundAmount,
+  transactionId,
+  newBalance,
+  approvedBy
+}) => {
+
+  // Extract safely
+  const first_name = leadData.first_name || "N/A";
+  const last_name = leadData.last_name || "";
+  const phone_number = leadData.phone_number || "N/A";
+  const email = leadData.email || "N/A";
+  const address = leadData.address || {};
+  const lead_id = leadData._id || leadData.lead_id || "N/A";
+
+  const fullName = `${first_name} ${last_name}`.trim();
+  const phoneDisplay = phone_number !== "N/A"
+    ? `<a href="tel:${phone_number}" style="color:#000;text-decoration:none;">${phone_number}</a>`
+    : "N/A";
+
+  const fullAddress = formatFullAddress(address);
+  const addressDisplay = makeAddressLink(fullAddress);
+
+  const statusColor =
+    returnStatus === "Approved"
+      ? "#16a34a"
+      : returnStatus === "Rejected"
+      ? "#dc2626"
+      : "#f59e0b";
+
+  const mainText = `
+    <div style="max-width:600px;margin:0;padding:0;">
+
+      <!-- Status Badge -->
+      <div style="margin-bottom:15px;padding:12px;background:#f9fafb;
+        border-left:4px solid ${statusColor};border-radius:4px;font-size:14px;">
+        <strong>Your lead return request has been ${returnStatus}.</strong>
+      </div>
+
+      <!-- Main Details Table -->
+      <table cellpadding="0" cellspacing="0" border="0"
+        style="width:100%;border:1px solid #ddd;border-radius:6px;background:#fff;
+        font-size:14px;font-family:Arial,sans-serif;">
+        
+        <tr><td style="padding:15px;">
+          
+          <table cellpadding="0" cellspacing="0" style="width:100%;font-size:14px;">
+
+            <tr>
+              <td style="padding:6px 10px;font-weight:bold;width:150px;">Name:</td>
+              <td style="padding:6px 10px;">${fullName}</td>
+            </tr>
+
+            <tr>
+              <td style="padding:6px 10px;font-weight:bold;">Phone:</td>
+              <td style="padding:6px 10px;">${phoneDisplay}</td>
+            </tr>
+
+            <tr>
+              <td style="padding:6px 10px;font-weight:bold;">Email:</td>
+              <td style="padding:6px 10px;">${email}</td>
+            </tr>
+
+            <tr>
+              <td style="padding:6px 10px;font-weight:bold;">Address:</td>
+              <td style="padding:6px 10px;">${addressDisplay}</td>
+            </tr>
+
+            <tr>
+              <td style="padding:6px 10px;font-weight:bold;">Lead ID:</td>
+              <td style="padding:6px 10px;">${lead_id}</td>
+            </tr>
+
+            <tr>
+              <td style="padding:6px 10px;font-weight:bold;">Campaign:</td>
+              <td style="padding:6px 10px;">${campaignName}</td>
+            </tr>
+
+            ${
+              returnReason
+                ? `
+                  <tr>
+                    <td colspan="2" style="padding:12px 10px;border-top:1px solid #eee;">
+                      <strong style="color:#dc2626;">Return Reason:</strong><br>
+                      ${returnReason}
+                    </td>
+                  </tr>`
+                : ""
+            }
+
+            ${
+              returnComments
+                ? `
+                  <tr>
+                    <td colspan="2" style="padding:12px 10px;border-top:1px solid #eee;">
+                      <strong style="color:#dc2626;">Additional Comments:</strong><br>
+                      ${returnComments}
+                    </td>
+                  </tr>`
+                : ""
+            }
+
+            <!-- Refund Section -->
+            ${
+              returnStatus === "Approved"
+                ? `
+                  <tr>
+                    <td colspan="2" style="padding:15px;border-top:1px solid #eee;">
+                      <div style="padding:12px;background:#ecfdf5;border-left:4px solid #16a34a;
+                        border-radius:4px;line-height:20px;">
+                        <strong>Refund Processed:</strong><br>
+                        Amount: $${refundAmount}<br>
+                        Transaction ID: ${transactionId || "N/A"}<br>
+                        Updated Balance: $${newBalance}
+                      </div>
+                    </td>
+                  </tr>`
+                : ""
+            }
+
+          </table>
+
+        </td></tr>
+
+      </table>
+
+      <!-- Footer Note -->
+      <div style="margin-top:15px;padding:12px;background:#fef3c7;border-left:4px solid #f59e0b;
+        border-radius:4px;font-size:14px;">
+        If you have any questions, reply to this email and our support team will assist you.
+      </div>
+
+    </div>
+  `;
+
+  const html = createEmailTemplate({
+    title: `Lead Return ${returnStatus}`,
+    greeting: `Hello ${userName || "User"},`,
+    mainText
+  });
+
+  return resend.emails.send({
+    from: FROM_EMAIL,
+    to: userEmail,
+    subject: `Lead Return ${returnStatus} - Lead ${lead_id}`,
+    html
+  });
+};
+
+
+
 /**
  * Send New User Registration Notification to Admin
  */
@@ -1067,7 +1225,7 @@ const sendTransactionEmail = async ({
   return resend.emails.send(payload);
 };
 
-async function sendCampaignCreatedEmail(campaign) {
+async function sendCampaignCreatedEmailtoN8N(campaign) {
   try {
     const toEmail = "mahadiqbal72462@gmail.com"; // <-- Mohad's email
     // const toEmail = "jatindev1022@gmail.com"; // <-- Mohad's email
@@ -1140,8 +1298,196 @@ async function sendCampaignCreatedEmail(campaign) {
   }
 }
 
+// Email to Admin
+async function sendCampaignCreatedEmailToAdmin(campaign) {
+  try {
+    console.log("ENV CHECK → ADMIN_NOTIFICATION_EMAILS =", process.env.ADMIN_NOTIFICATION_EMAILS);
 
+    let adminEmails = [];
 
+    if (process.env.ADMIN_NOTIFICATION_EMAILS) {
+      adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS
+        .split(',')
+        .map(e => e.trim().toLowerCase())
+        .filter(Boolean);
+    }
+
+    console.log("Admin emails for campaign creation =", adminEmails);
+
+    if (adminEmails.length === 0) {
+      console.log("⚠️ No admin emails configured for campaign creation notification");
+      return;
+    }
+
+    const userName = campaign?.user_id?.name || campaign?.user_id?.email || "N/A";
+    const campaignName = campaign?.name || "N/A";
+    const campaignId = campaign?.campaign_id || "N/A";
+    const syncStatus = campaign?.boberdoo_sync_status || "N/A";
+
+    // ---- Campaign Details Table ----
+    const campaignTable = `
+      <table cellpadding="0" cellspacing="0" border="0" 
+        style="width: 100%; font-family: Arial, sans-serif; font-size: 14px; 
+               color: #1e3a8a; line-height: 1.6; text-align: left;">
+
+        <tr>
+          <td style="padding: 4px 0; vertical-align: top;">
+            <strong style="color: #28282B;">User Name</strong>
+          </td>
+          <td style="padding: 4px 0; color: #1e40af;">${userName}</td>
+        </tr>
+
+        <tr>
+          <td style="padding: 4px 0; vertical-align: top;">
+            <strong style="color: #28282B;">Campaign Name</strong>
+          </td>
+          <td style="padding: 4px 0; color: #1e40af;">${campaignName}</td>
+        </tr>
+
+        <tr>
+          <td style="padding: 4px 0; vertical-align: top;">
+            <strong style="color: #28282B;">Campaign ID</strong>
+          </td>
+          <td style="padding: 4px 0; color: #1e40af;">${campaignId}</td>
+        </tr>
+
+        <tr>
+          <td style="padding: 4px 0; vertical-align: top;">
+            <strong style="color: #28282B;">Boberdoo Sync Status</strong>
+          </td>
+          <td style="padding: 4px 0; color: #1e40af;">${syncStatus}</td>
+        </tr>
+
+      </table>
+    `;
+
+    // ---- Email Template ----
+    const html = createEmailTemplate({
+      title: "New Campaign Created",
+      mainText: `
+        <div style="font-size: 14px; color: #1e3a8a;">
+          Hi Admin,<br><br>
+          A new campaign has been created. The relevant information is listed below.<br><br>
+          ${campaignTable}
+        </div>
+      `,
+      footerText: ""
+    });
+
+    const emailString = adminEmails.join(',');
+
+    await resend.emails.send({
+      from: "LeadFusionHQ <noreply@leadfusionhq.com>",
+      to: emailString,
+      subject: `New Campaign Created - ${campaignName}`,
+      html,
+    });
+
+    console.log("📧 Campaign creation email sent to admins:", emailString);
+
+  } catch (err) {
+    console.error("❌ Failed to send campaign creation email to admin:", err.message);
+    throw err;
+  }
+}
+
+// Email to User
+async function sendCampaignCreatedEmailToUser(campaign) {
+  try {
+    // 🔍 Add debugging to see what's coming in
+    console.log("🔍 sendCampaignCreatedEmailToUser - Campaign received");
+    console.log("🔍 Campaign ID:", campaign?.campaign_id);
+    console.log("🔍 Campaign user_id object:", campaign?.user_id);
+    console.log("🔍 User email:", campaign?.user_id?.email);
+
+    const userEmail = campaign?.user_id?.email;
+
+    if (!userEmail) {
+      console.log("⚠️ No user email found for campaign creation notification");
+      console.log("⚠️ Full campaign.user_id:", JSON.stringify(campaign?.user_id, null, 2));
+      return;
+    }
+
+    const campaignName = campaign?.name || "N/A";
+    const campaignId = campaign?.campaign_id || "N/A";
+    const syncStatus = campaign?.boberdoo_sync_status || "N/A";
+    const createdAt = campaign?.createdAt 
+      ? new Date(campaign.createdAt).toLocaleString('en-US', { 
+          dateStyle: 'medium', 
+          timeStyle: 'short' 
+        })
+      : "N/A";
+
+    // ---- Campaign Details Table ----
+    const campaignTable = `
+      <table cellpadding="0" cellspacing="0" border="0" 
+        style="width: 100%; font-family: Arial, sans-serif; font-size: 14px; 
+               color: #1e3a8a; line-height: 1.6; text-align: left;">
+
+        <tr>
+          <td style="padding: 4px 0; vertical-align: top;">
+            <strong style="color: #28282B;">Campaign Name</strong>
+          </td>
+          <td style="padding: 4px 0; color: #1e40af;">${campaignName}</td>
+        </tr>
+
+        <tr>
+          <td style="padding: 4px 0; vertical-align: top;">
+            <strong style="color: #28282B;">Campaign ID</strong>
+          </td>
+          <td style="padding: 4px 0; color: #1e40af;">${campaignId}</td>
+        </tr>
+
+        <tr>
+          <td style="padding: 4px 0; vertical-align: top;">
+            <strong style="color: #28282B;">Status</strong>
+          </td>
+          <td style="padding: 4px 0; color: #1e40af;">${campaign?.status || "ACTIVE"}</td>
+        </tr>
+
+        <tr>
+          <td style="padding: 4px 0; vertical-align: top;">
+            <strong style="color: #28282B;">Created At</strong>
+          </td>
+          <td style="padding: 4px 0; color: #1e40af;">${createdAt}</td>
+        </tr>
+
+      </table>
+    `;
+
+    // ---- Email Template ----
+    const html = createEmailTemplate({
+      title: "Campaign Created Successfully",
+      mainText: `
+        <div style="font-size: 14px; color: #1e3a8a;">
+          Hi there,<br><br>
+          Your campaign has been created successfully. The details are listed below.<br><br>
+          ${campaignTable}
+        </div>
+      `,
+      footerText: ""
+    });
+
+    console.log("📧 Attempting to send email to user:", userEmail);
+
+    const result = await resend.emails.send({
+      from: "LeadFusionHQ <noreply@leadfusionhq.com>",
+      to: userEmail,
+      subject: `Campaign Created - ${campaignName}`,
+      html,
+    });
+
+    console.log("✅ Campaign creation email sent to user:", userEmail);
+    console.log("✅ Resend response:", result);
+
+  } catch (err) {
+    console.error("❌ Failed to send campaign creation email to user");
+    console.error("❌ Error message:", err.message);
+    console.error("❌ Error stack:", err.stack);
+    console.error("❌ Full error object:", JSON.stringify(err, null, 2));
+    throw err;
+  }
+}
 
 /**
  * Send Funds Added Email
@@ -2144,7 +2490,7 @@ module.exports = {
   sendLeadAssignEmail,
   sendLeadAssignAdminEmail,
   sendLeadReturnEmail,
-
+sendUserLeadReturnStatusEmail,
     // ✅ New Transaction Email Functions
     sendTransactionEmail,
     sendFundsAddedEmail,
@@ -2153,7 +2499,7 @@ module.exports = {
     sendLowBalanceWarning,
     sendInsufficientBalanceEmail,
     sendNewUserRegistrationToAdmin,
-    sendCampaignCreatedEmail,
+    sendCampaignCreatedEmailtoN8N,
     sendLowBalanceAdminEmail,
     sendCampaignResumedEmail,
     sendCampaignResumedAdminEmail,
@@ -2162,4 +2508,6 @@ module.exports = {
     sendFailedLeadPaymentAdminEmail,
     sendPendingLeadsPaymentSuccessEmail,
     sendPendingLeadsPaymentSuccessAdminEmail,
+    sendCampaignCreatedEmailToAdmin,
+    sendCampaignCreatedEmailToUser
 };

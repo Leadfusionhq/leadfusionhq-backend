@@ -258,6 +258,12 @@ const leadSchema = new mongoose.Schema({
       trim: true,
       default: null
     },
+    return_requested_at: {
+      type: Date,
+      default: null,
+      index: true
+    },
+
     
   max_return_attempts: {
     type: Number,

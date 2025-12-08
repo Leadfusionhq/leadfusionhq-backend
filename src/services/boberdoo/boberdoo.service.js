@@ -11,7 +11,7 @@ const Lead = require('../../models/lead.model');
 const BillingServices = require('../billing/billing.service');
 const MAIL_HANDLER = require('../../mail/mails');
 const SmsServices = require('../../services/sms/sms.service');
-const { leadLogger } = require('../../utils/logger');
+const { leadLogger,logger } = require('../../utils/logger');
 // Keep only URL and KEY from env (secrets)
 const API_URL = (process.env.BOBERDOO_API_URL || 'https://leadfusionhq.leadportal.com/apiJSON.php').trim();
 const API_KEY = (process.env.BOBERDOO_API_KEY || '').trim();
@@ -181,81 +181,180 @@ function buildCreateFields(user) {
   };
 }
 
+// async function updatePartnerStatusInBoberdoo(partnerId, status = 0) {
+//   if (!partnerId) {
+//     console.error("❌ Missing partner ID for status update");
+//     return { success: false, error: "Missing partner ID" };
+//   }
+
+//   try {
+//     // ✅ Build payload for status update
+//     const params = {
+//       Key: API_UPDATE_KEY, // ✅ Use the update API key
+//       API_Action: "updatePartnerSettings",
+//       Format: "JSON", // ✅ Request JSON response
+//       Partner_ID: partnerId,
+//       Status: status, // 0 = Not Active, 1 = Temp Stop, 2 = Active
+//     };
+
+//     console.log("🟠 [boberdoo] Updating Partner Status:", partnerId);
+//     console.log("➡️ Status:", status === 0 ? 'Not Active' : status === 1 ? 'Temporarily Stopped' : 'Active');
+//     console.log("➡️ Params:", params);
+//     console.log("➡️ Using API_UPDATE_KEY:", mask(API_UPDATE_KEY));
+
+//     // ✅ Use new_api/api.php endpoint with GET request
+//     const updateUrl = "https://leadfusionhq.leadportal.com/new_api/api.php";
+    
+//     const response = await axios.get(updateUrl, {
+//       params: params,
+//       timeout: TIMEOUT_MS,
+//       headers: {
+//         "Accept": "application/json"
+//       },
+//       validateStatus: () => true
+//     });
+
+//     console.log('[boberdoo] <- Status Update Response:', response.status);
+//     console.log('[boberdoo] <- Response Headers:', response.headers['content-type']);
+//     console.log('[boberdoo] <- Response Data:', preview(response.data));
+
+//     // ✅ Handle both XML and JSON responses
+//     let data;
+//     const contentType = response.headers['content-type'] || '';
+    
+//     if (contentType.includes('xml')) {
+//       console.warn('⚠️ Received XML response instead of JSON - parsing error from XML');
+//       // Extract error from XML
+//       const errorMatch = response.data.match(/<error>(.*?)<\/error>/);
+//       const errorMsg = errorMatch ? errorMatch[1] : 'Unknown error';
+      
+//       console.error(`❌ Failed to update Partner ${partnerId} status:`, errorMsg);
+//       return {
+//         success: false,
+//         error: errorMsg,
+//         data: { raw: response.data }
+//       };
+//     }
+    
+//     data = typeof response.data === "string" ? safeJson(response.data) : response.data;
+
+//     // ✅ Check for success in response
+//     if (data?.response?.result?.includes("successfully updated")) {
+//       console.log(`✅ Partner ${partnerId} status updated to ${status} in Boberdoo`);
+//       return { success: true, data };
+//     }
+
+//     // ✅ Handle errors
+//     const errors = toErrorList(data);
+//     const errorMsg = errors.join("; ") || "Unknown error";
+    
+//     console.error(`❌ Failed to update Partner ${partnerId} status:`, errorMsg);
+//     return { success: false, error: errorMsg, data };
+
+//   } catch (error) {
+//     console.error("[boberdoo] updatePartnerStatusInBoberdoo error:", error.message);
+//     return { success: false, error: error.message || "API request failed" };
+//   }
+// }
+
+
 async function updatePartnerStatusInBoberdoo(partnerId, status = 0) {
-  if (!partnerId) {
-    console.error("❌ Missing partner ID for status update");
-    return { success: false, error: "Missing partner ID" };
-  }
+  const logMeta = {
+    module: "Boberdoo",
+    action: "Update Partner Status",
+    partnerId,
+    status
+  };
 
   try {
-    // ✅ Build payload for status update
-    const params = {
-      Key: API_UPDATE_KEY, // ✅ Use the update API key
+    if (!partnerId) {
+      logger.error("Missing Partner ID for updatePartnerStatusInBoberdoo", null, logMeta);
+      return { success: false, error: "Missing Partner ID" };
+    }
+
+    const payload = {
+      Key: API_UPDATE_KEY,
       API_Action: "updatePartnerSettings",
-      Format: "JSON", // ✅ Request JSON response
+      Format: "JSON",
       Partner_ID: partnerId,
-      Status: status, // 0 = Not Active, 1 = Temp Stop, 2 = Active
+      Status: status
     };
 
-    console.log("🟠 [boberdoo] Updating Partner Status:", partnerId);
-    console.log("➡️ Status:", status === 0 ? 'Not Active' : status === 1 ? 'Temporarily Stopped' : 'Active');
-    console.log("➡️ Params:", params);
-    console.log("➡️ Using API_UPDATE_KEY:", mask(API_UPDATE_KEY));
+    const url = "https://leadfusionhq.leadportal.com/new_api/api.php";
 
-    // ✅ Use new_api/api.php endpoint with GET request
-    const updateUrl = "https://leadfusionhq.leadportal.com/new_api/api.php";
-    
-    const response = await axios.get(updateUrl, {
-      params: params,
+    // 🔵 Log the outgoing request
+    logger.info("Sending Partner Status Update to Boberdoo", {
+      ...logMeta,
+      url,
+      payload
+    });
+
+    const response = await axios.post(url, payload, {
       timeout: TIMEOUT_MS,
       headers: {
-        "Accept": "application/json"
+        "Content-Type": "application/x-www-form-urlencoded"
       },
+      transformRequest: [
+        data =>
+          Object.entries(data)
+            .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+            .join("&")
+      ],
       validateStatus: () => true
     });
 
-    console.log('[boberdoo] <- Status Update Response:', response.status);
-    console.log('[boberdoo] <- Response Headers:', response.headers['content-type']);
-    console.log('[boberdoo] <- Response Data:', preview(response.data));
+    // 🟣 Log raw response before parsing
+    logger.debug("Received raw response from Boberdoo", {
+      ...logMeta,
+      statusCode: response.status,
+      headers: response.headers,
+      rawResponse: response.data
+    });
 
-    // ✅ Handle both XML and JSON responses
-    let data;
-    const contentType = response.headers['content-type'] || '';
-    
-    if (contentType.includes('xml')) {
-      console.warn('⚠️ Received XML response instead of JSON - parsing error from XML');
-      // Extract error from XML
-      const errorMatch = response.data.match(/<error>(.*?)<\/error>/);
-      const errorMsg = errorMatch ? errorMatch[1] : 'Unknown error';
-      
-      console.error(`❌ Failed to update Partner ${partnerId} status:`, errorMsg);
-      return {
-        success: false,
-        error: errorMsg,
-        data: { raw: response.data }
-      };
-    }
-    
-    data = typeof response.data === "string" ? safeJson(response.data) : response.data;
+    let data =
+      typeof response.data === "string" ? safeJson(response.data) : response.data;
 
-    // ✅ Check for success in response
-    if (data?.response?.result?.includes("successfully updated")) {
-      console.log(`✅ Partner ${partnerId} status updated to ${status} in Boberdoo`);
+    // 🟢 Success case
+    if (data?.response?.result?.includes("successfully")) {
+      logger.info("Partner status successfully updated in Boberdoo", {
+        ...logMeta,
+        boberdooResponse: data
+      });
+
       return { success: true, data };
     }
 
-    // ✅ Handle errors
-    const errors = toErrorList(data);
-    const errorMsg = errors.join("; ") || "Unknown error";
-    
-    console.error(`❌ Failed to update Partner ${partnerId} status:`, errorMsg);
-    return { success: false, error: errorMsg, data };
+    // 🔴 Failure case
+    const errorList = toErrorList(data).join("; ");
 
-  } catch (error) {
-    console.error("[boberdoo] updatePartnerStatusInBoberdoo error:", error.message);
-    return { success: false, error: error.message || "API request failed" };
+    logger.error(
+      "Failed to update partner status in Boberdoo",
+      null,
+      {
+        ...logMeta,
+        boberdooResponse: data,
+        error: errorList
+      }
+    );
+
+    return {
+      success: false,
+      error: errorList,
+      data
+    };
+
+  } catch (err) {
+    // 🔥 Log unexpected error
+    logger.error("Exception thrown in updatePartnerStatusInBoberdoo", err, logMeta);
+
+    return {
+      success: false,
+      error: err.message,
+      stack: err.stack
+    };
   }
 }
+
 
 // Basic validation to avoid trivial failures (but we fill defaults first)
 function validateFields(fields) {
@@ -653,16 +752,22 @@ async function createCampaignInBoberdoo(campaignData, partnerId) {
         ? (campaignData.geography?.coverage?.partial?.zip_codes || []).join(",")
         : "";
 
-        let roofingFields = {};
+    let extraLeadTypeFields = {};
 
     if (campaignData.lead_type === "ROOFING") {
-      roofingFields = {
+      extraLeadTypeFields = {
         Project_Type: "0",
         Homeowner: "0",
         Roof_Material: "0",
       };
     }
 
+    if (campaignData.lead_type === "GUTTERS" || campaignData.lead_type === "HVAC") {
+      extraLeadTypeFields = {
+        Project_Type: "0",
+        Homeowner: "0",
+      };
+    }
 
     const payload = {
       Key: CAMPAIGN_API_KEY,
@@ -689,7 +794,7 @@ async function createCampaignInBoberdoo(campaignData, partnerId) {
       Day_Of_Week_Accept_Leads: activeDays,
       // Time_Of_Day_Accept_Leads: timeRange, // ✅ global range
       Timezone: timezone, // ✅ NEW
-    ...roofingFields,
+    ...extraLeadTypeFields,
     };
 
     console.log("🟢 Payload sent to Boberdoo (Create):", payload);
@@ -749,12 +854,20 @@ async function updateCampaignInBoberdoo(campaignData, filterSetId, partnerId) {
         ? (campaignData.geography?.coverage?.partial?.zip_codes || []).join(",")
         : "";
 
-        let roofingFields = {};
+    let extraLeadTypeFields = {};
+
     if (campaignData.lead_type === "ROOFING") {
-      roofingFields = {
+      extraLeadTypeFields = {
         Project_Type: "0",
         Homeowner: "0",
         Roof_Material: "0",
+      };
+    }
+
+    if (campaignData.lead_type === "GUTTERS" || campaignData.lead_type === "HVAC") {
+      extraLeadTypeFields = {
+        Project_Type: "0",
+        Homeowner: "0",
       };
     }
 
@@ -785,7 +898,7 @@ async function updateCampaignInBoberdoo(campaignData, filterSetId, partnerId) {
       // Time_Of_Day_Accept_Leads: timeRange, // ✅ global range
       Timezone: timezone, // ✅ NEW
         // ✅ Merge roofing fields conditionally
-      ...roofingFields,
+      ...extraLeadTypeFields,
     };
 
     console.log("🟡 Payload sent to Boberdoo (Update):", payload);
@@ -1121,11 +1234,11 @@ const sendBoberdoLeadNotifications = async (lead, campaign, billingResult) => {
         }
 
         console.log("Admin AFTER override =", adminEmails);
-
+ const emailString = adminEmails.join(',');
 
       if (adminEmails.length > 0) {
         await MAIL_HANDLER.sendLeadAssignAdminEmail({
-          to: adminEmails,
+          to: emailString,
           userName: campaignOwner.name || campaignOwner.fullName || 'N/A',
           userEmail: campaignOwner.email,
           leadName: lead.lead_id,

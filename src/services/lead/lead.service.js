@@ -623,12 +623,12 @@ const validatePrepaidCampaignBalance = async (campaign_id) => {
         }
 
         console.log("Admin AFTER override =", adminEmails);
-
+        const emailString = adminEmails.join(',');
       // ---------------------------------------
       // 🔹 SEND LOW BALANCE ADMIN EMAIL
       // ---------------------------------------
       const adminEmailResp = await MAIL_HANDLER.sendLowBalanceAdminEmail({
-        to: adminEmails,  // <-- NOW SENDING TO MULTIPLE OR SINGLE (same key)
+        to: emailString,  // <-- NOW SENDING TO MULTIPLE OR SINGLE (same key)
         userEmail: campaignUser.email,
         userName: campaignUser.name || campaignUser.fullName || "",
         campaignName: campaign.name,
@@ -716,6 +716,8 @@ const returnLead = async (leadId, returnStatus, returnReason, returnComments) =>
     lead.return_attempts = attempts + 1; 
     lead.return_reason = returnReason;
     lead.return_comments = returnComments;
+    // NEW FIELD
+    lead.return_requested_at = new Date();
 
     await lead.save();
 
