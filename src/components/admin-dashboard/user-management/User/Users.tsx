@@ -15,6 +15,17 @@ import MoreVertIcon from "@mui/icons-material/MoreVert";
 import { toast } from 'react-toastify';
 import ConfirmDialog from "@/components/common/ConfirmDialog"; 
 
+type PaymentMethod = {
+  customerVaultId: string;
+  cardLastFour: string;
+  brand: string;
+  expiryMonth: string;
+  expiryYear: string;
+  isDefault: boolean;
+};
+
+
+
 type User = {
     _id: string;
     name: string;
@@ -34,8 +45,8 @@ type User = {
           last_sync_at?: string | null;
           last_error?: string | null;
       };
-    
   };
+    paymentMethods?: PaymentMethod[];
 };
 
 type ApiResponse = {
@@ -501,6 +512,31 @@ export default function UserTable() {
             ),
           sortable: true,
         },
+{
+  name: "Default Card",
+  selector: (row: User) => {
+    const defaultCard = row.paymentMethods?.find(pm => pm.isDefault);
+    return defaultCard ? `**** **** **** ${defaultCard.cardLastFour}` : "No default card";
+  },
+  cell: (row: User) => {
+    if (row._id.startsWith("skeleton")) {
+      return <Skeleton variant="text" width={120} />;
+    }
+
+    const defaultCard = row.paymentMethods?.find(pm => pm.isDefault);
+
+    return defaultCard ? (
+      <span>**** **** **** {defaultCard.cardLastFour}</span>
+    ) : (
+      // Here we render a styled cell for "No default card"
+      <div style={{ color: "#999", fontStyle: "italic" }}>No default card</div>
+    );
+  },
+  sortable: false,
+},
+
+
+
         
         {
           name: "Action",
