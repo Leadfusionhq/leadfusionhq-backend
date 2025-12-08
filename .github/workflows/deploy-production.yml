@@ -10,15 +10,19 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    - name: Deploy to Production Server
-      uses: appleboy/ssh-action@v0.1.10
-      with:
-        host: ${{ secrets.PROD_HOST }}
-        username: ${{ secrets.PROD_USER }}
-        key: ${{ secrets.PROD_SSH_KEY }}
-        script: |
-          cd /home/ubuntu/var/www/html/leadfusionhq-backend
-          ./deploy-production.sh
+      - name: Deploy to Production Server
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          port: 22
+          script: |
+            cd /home/ubuntu/var/www/html/leadfusionhq-backend
+            git fetch --all
+            git reset --hard origin/development
+            npm ci
+            pm2 reload leadfusion-api-test --update-env

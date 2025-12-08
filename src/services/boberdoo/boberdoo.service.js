@@ -653,16 +653,22 @@ async function createCampaignInBoberdoo(campaignData, partnerId) {
         ? (campaignData.geography?.coverage?.partial?.zip_codes || []).join(",")
         : "";
 
-        let roofingFields = {};
+    let extraLeadTypeFields = {};
 
     if (campaignData.lead_type === "ROOFING") {
-      roofingFields = {
+      extraLeadTypeFields = {
         Project_Type: "0",
         Homeowner: "0",
         Roof_Material: "0",
       };
     }
 
+    if (campaignData.lead_type === "GUTTERS" || campaignData.lead_type === "HVAC") {
+      extraLeadTypeFields = {
+        Project_Type: "",
+        Homeowner: "",
+      };
+    }
 
     const payload = {
       Key: CAMPAIGN_API_KEY,
@@ -689,7 +695,7 @@ async function createCampaignInBoberdoo(campaignData, partnerId) {
       Day_Of_Week_Accept_Leads: activeDays,
       // Time_Of_Day_Accept_Leads: timeRange, // ✅ global range
       Timezone: timezone, // ✅ NEW
-    ...roofingFields,
+    ...extraLeadTypeFields,
     };
 
     console.log("🟢 Payload sent to Boberdoo (Create):", payload);
@@ -749,12 +755,20 @@ async function updateCampaignInBoberdoo(campaignData, filterSetId, partnerId) {
         ? (campaignData.geography?.coverage?.partial?.zip_codes || []).join(",")
         : "";
 
-        let roofingFields = {};
+    let extraLeadTypeFields = {};
+
     if (campaignData.lead_type === "ROOFING") {
-      roofingFields = {
+      extraLeadTypeFields = {
         Project_Type: "0",
         Homeowner: "0",
         Roof_Material: "0",
+      };
+    }
+
+    if (campaignData.lead_type === "GUTTERS" || campaignData.lead_type === "HVAC") {
+      extraLeadTypeFields = {
+        Project_Type: "",
+        Homeowner: "",
       };
     }
 
@@ -785,7 +799,7 @@ async function updateCampaignInBoberdoo(campaignData, filterSetId, partnerId) {
       // Time_Of_Day_Accept_Leads: timeRange, // ✅ global range
       Timezone: timezone, // ✅ NEW
         // ✅ Merge roofing fields conditionally
-      ...roofingFields,
+      ...extraLeadTypeFields,
     };
 
     console.log("🟡 Payload sent to Boberdoo (Update):", payload);
