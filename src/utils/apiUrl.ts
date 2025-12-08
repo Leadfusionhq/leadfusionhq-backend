@@ -19,6 +19,8 @@ export const API_URL = {
     UPDATE_USER: `${USER_API_BASE}/:userId`,
     GET_USER_BY_ID: `${USER_API_BASE}/:userId`,
     DELETE_USER_BY_ID: `${USER_API_BASE}/:userId`,
+    TOGGLE_USER_STATUS_BY_ID: `${USER_API_BASE}/:userId/toggle-status`,
+
     SYNC_BOMBERDO:`${USER_API_BASE}/:userId/boberdoo/resync`,
     SEND_BALANCE_TOPUP_WEBHOOK: `${USER_API_BASE}/:userId/balance/topup-webhook`,
 

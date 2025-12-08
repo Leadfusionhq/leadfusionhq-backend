@@ -75,6 +75,11 @@ type WebhookResponse = {
   };
 };
 
+type ToggleStatusResponse = {
+  message: string;
+  success?: boolean;
+};
+
 
 export default function UserTable() {
     const [users, setUsers] = useState<User[]>([]); 
@@ -126,6 +131,38 @@ export default function UserTable() {
         },
         [token]
     );
+
+    const handleToggleUser = async (row: User) => {
+      const toastId = toast.loading("Updating user status...");
+
+      try {
+        const url = API_URL.TOGGLE_USER_STATUS_BY_ID.replace(":userId", row._id);
+
+        const response = await axiosWrapper(
+          "patch",
+          url,
+          {},
+          token ?? undefined
+        ) as ToggleStatusResponse;
+
+        toast.update(toastId, {
+          render: response?.message || "Status updated",
+          type: "success",
+          isLoading: false,
+          autoClose: 2500,
+        });
+
+        await fetchUsers(pagination.page, pagination.limit);
+
+      } catch (err: any) {
+        toast.update(toastId, {
+          render: err?.message || "Failed to update user status",
+          type: "error",
+          isLoading: false,
+          autoClose: 3000,
+        });
+      }
+    };
 
     useEffect(() => {
         if (token) {
@@ -416,6 +453,31 @@ export default function UserTable() {
                 ),
               sortable: true,
         },
+            
+        {
+            name: 'Status',
+            selector: (row: User) => (row.isActive ? 'Active' : 'Inactive'),
+            cell: (row) =>
+                row._id.startsWith("skeleton") ? (
+                  <Skeleton variant="text" width={80} />
+                ) : (
+                  <span
+                    style={{
+                      padding: "4px 10px",
+                      borderRadius: "12px",
+                      color: row.isActive ? "#155724" : "#721c24",
+                      backgroundColor: row.isActive ? "#d4edda" : "#f8d7da",
+                      fontWeight: 500,
+                      fontSize: "14px",
+                      display: "inline-block",
+                      textAlign: "center",
+                    }}
+                  >
+                    {row.isActive ? "Active" : "Inactive"}
+                  </span>
+                ),
+            sortable: true,
+        },
         {
           name: "Balance",
           selector: (row: User & { balance?: number }) =>
@@ -571,14 +633,15 @@ export default function UserTable() {
                 </MenuItem>
               )}
 
-              <MenuItem
-                onClick={() => {
-                  if (menuRow) handleDeleteClick(menuRow);
-                  handleMenuClose();
-                }}
-              >
-                Delete User Account
-              </MenuItem>
+          <MenuItem
+            onClick={() => {
+              if (menuRow) handleToggleUser(menuRow);
+              handleMenuClose();
+            }}
+          >
+            {menuRow?.isActive ? "Deactivate User" : "Activate User"}
+          </MenuItem>
+
 
             </Menu>
         </div>
