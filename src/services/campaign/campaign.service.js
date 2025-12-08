@@ -103,7 +103,10 @@ const createCampaign = async (data) => {
       campaignLogger.error('Failed to send N8N webhook', n8nError, { campaign_id: newCampaign.campaign_id });
     }
 
-   // Replace the non-blocking calls with this temporarily for debugging:
+    // --- Helper function to delay ---
+    const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+    // --- Send Emails with Delays (to respect Resend rate limit: 2 emails/sec) ---
     try {
       await MAIL_HANDLER.sendCampaignCreatedEmailtoN8N(populatedCampaign);
       campaignLogger.info('N8N email sent', { campaign_id: newCampaign.campaign_id });
@@ -111,12 +114,16 @@ const createCampaign = async (data) => {
       campaignLogger.error('Failed to send N8N email', err, { campaign_id: newCampaign.campaign_id });
     }
 
+    await delay(600); // Wait 600ms before next email
+
     try {
       await MAIL_HANDLER.sendCampaignCreatedEmailToAdmin(populatedCampaign);
       campaignLogger.info('Admin email sent', { campaign_id: newCampaign.campaign_id });
     } catch (err) {
       campaignLogger.error('Failed to send admin email', err, { campaign_id: newCampaign.campaign_id });
     }
+
+    await delay(600); // Wait 600ms before next email
 
     try {
       await MAIL_HANDLER.sendCampaignCreatedEmailToUser(populatedCampaign);
