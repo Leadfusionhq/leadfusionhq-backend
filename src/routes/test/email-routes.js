@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const MAIL_HANDLER = require('../../mail/mails');
+const { User } = require('../../models/user.model');
 
 router.post('/send-test-mail', async (req, res) => {
   const { to } = req.body;
@@ -655,4 +656,62 @@ router.post('/send-test-lead-assign-admin-mail', async (req, res) => {
     });
   }
 });
+
+// In your test routes or auth routes file
+router.post("/resend-verification-email", async (req, res) => {
+  try {
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({
+        message: "userId is required"
+      });
+    }
+
+    // Find user
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found"
+      });
+    }
+
+    if (user.isEmailVerified) {
+      return res.status(400).json({
+        message: "Email is already verified"
+      });
+    }
+
+    // Generate new verification token
+    const crypto = require('crypto');
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    // Update user with new token
+    user.verificationToken = verificationToken;
+    user.verificationTokenExpires = verificationTokenExpires;
+    await user.save();
+
+    // Send verification email
+    const response = await MAIL_HANDLER.sendVerificationEmail({
+      to: user.email,
+      name: user.name,
+      token: verificationToken
+    });
+
+    return res.status(200).json({
+      message: "✅ Verification email sent successfully!",
+      data: response
+    });
+
+  } catch (error) {
+    console.error("❌ Failed to resend verification email:", error);
+    return res.status(500).json({
+      message: "Failed to send verification email",
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;

@@ -120,7 +120,7 @@ const getAllUsersService = async (filter = {}, options = {}) => {
     ...filter,
         role:[CONSTANT_ENUM.USER_ROLE.USER],
     // isActive: true,
-    isEmailVerified: true,
+    // isEmailVerified: true,
 
   };
 
@@ -134,7 +134,7 @@ const getAllAdminsService = async (filter = {}, options = {}) => {
     ...filter,
         role:[CONSTANT_ENUM.USER_ROLE.ADMIN],
     // isActive: true,
-    isEmailVerified: true,
+    // isEmailVerified: true,
 
   };
 
