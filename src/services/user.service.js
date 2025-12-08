@@ -118,9 +118,10 @@ const getAllUsersService = async (filter = {}, options = {}) => {
 
   const query = {
     ...filter,
-    isActive: true,
+        role:[CONSTANT_ENUM.USER_ROLE.USER],
+    // isActive: true,
     isEmailVerified: true,
-    role:[CONSTANT_ENUM.USER_ROLE.USER],
+
   };
 
   return User.find(query);
@@ -131,9 +132,10 @@ const getAllAdminsService = async (filter = {}, options = {}) => {
 
   const query = {
     ...filter,
-    isActive: true,
+        role:[CONSTANT_ENUM.USER_ROLE.ADMIN],
+    // isActive: true,
     isEmailVerified: true,
-    role:[CONSTANT_ENUM.USER_ROLE.ADMIN],
+
   };
 
   return User.find(query);
