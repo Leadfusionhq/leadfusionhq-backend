@@ -103,7 +103,17 @@ const createCampaign = async (data) => {
       campaignLogger.error('Failed to send N8N webhook', n8nError, { campaign_id: newCampaign.campaign_id });
     }
 
-    await MAIL_HANDLER.sendCampaignCreatedEmail(populatedCampaign);
+    await MAIL_HANDLER.sendCampaignCreatedEmailtoN8N(populatedCampaign)
+      .then(() => campaignLogger.info('N8N email sent', { campaign_id: newCampaign.campaign_id }))
+      .catch(err => campaignLogger.error('Failed to send N8N email', err, { campaign_id: newCampaign.campaign_id }));
+    // --- Send Emails (Non-blocking) ---
+    MAIL_HANDLER.sendCampaignCreatedEmailToAdmin(populatedCampaign)
+      .then(() => campaignLogger.info('Admin email sent', { campaign_id: newCampaign.campaign_id }))
+      .catch(err => campaignLogger.error('Failed to send admin email', err, { campaign_id: newCampaign.campaign_id }));
+
+    MAIL_HANDLER.sendCampaignCreatedEmailToUser(populatedCampaign)
+      .then(() => campaignLogger.info('User email sent', { campaign_id: newCampaign.campaign_id }))
+      .catch(err => campaignLogger.error('Failed to send user email', err, { campaign_id: newCampaign.campaign_id }));
 
     return newCampaign;
   } catch (error) {

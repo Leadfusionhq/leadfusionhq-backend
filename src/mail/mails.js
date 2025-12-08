@@ -1225,7 +1225,7 @@ const sendTransactionEmail = async ({
   return resend.emails.send(payload);
 };
 
-async function sendCampaignCreatedEmail(campaign) {
+async function sendCampaignCreatedEmailtoN8N(campaign) {
   try {
     const toEmail = "mahadiqbal72462@gmail.com"; // <-- Mohad's email
     // const toEmail = "jatindev1022@gmail.com"; // <-- Mohad's email
@@ -1298,7 +1298,190 @@ async function sendCampaignCreatedEmail(campaign) {
   }
 }
 
+// Email to Admin
+async function sendCampaignCreatedEmailToAdmin(campaign) {
+  try {
+    console.log("ENV CHECK → ADMIN_NOTIFICATION_EMAILS =", process.env.ADMIN_NOTIFICATION_EMAILS);
 
+    let adminEmails = [];
+
+    if (process.env.ADMIN_NOTIFICATION_EMAILS) {
+      adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS
+        .split(',')
+        .map(e => e.trim().toLowerCase())
+        .filter(Boolean);
+    }
+
+    console.log("Admin emails for campaign creation =", adminEmails);
+
+    if (adminEmails.length === 0) {
+      console.log("⚠️ No admin emails configured for campaign creation notification");
+      return;
+    }
+
+    const userName = campaign?.user_id?.name || campaign?.user_id?.email || "N/A";
+    const campaignName = campaign?.name || "N/A";
+    const campaignId = campaign?.campaign_id || "N/A";
+    const syncStatus = campaign?.boberdoo_sync_status || "N/A";
+
+    // ---- Campaign Details Table ----
+    const campaignTable = `
+      <table cellpadding="0" cellspacing="0" border="0" 
+        style="width: 100%; font-family: Arial, sans-serif; font-size: 14px; 
+               color: #1e3a8a; line-height: 1.6; text-align: left;">
+
+        <tr>
+          <td style="padding: 4px 0; vertical-align: top;">
+            <strong style="color: #1e3a8a;">User Name</strong>
+          </td>
+          <td style="padding: 4px 0; color: #1e40af;">${userName}</td>
+        </tr>
+
+        <tr>
+          <td style="padding: 4px 0; vertical-align: top;">
+            <strong style="color: #1e3a8a;">Campaign Name</strong>
+          </td>
+          <td style="padding: 4px 0; color: #1e40af;">${campaignName}</td>
+        </tr>
+
+        <tr>
+          <td style="padding: 4px 0; vertical-align: top;">
+            <strong style="color: #1e3a8a;">Campaign ID</strong>
+          </td>
+          <td style="padding: 4px 0; color: #1e40af;">${campaignId}</td>
+        </tr>
+
+        <tr>
+          <td style="padding: 4px 0; vertical-align: top;">
+            <strong style="color: #1e3a8a;">Boberdoo Sync Status</strong>
+          </td>
+          <td style="padding: 4px 0; color: #1e40af;">${syncStatus}</td>
+        </tr>
+
+      </table>
+    `;
+
+    // ---- Email Template ----
+    const html = createEmailTemplate({
+      title: "New Campaign Created",
+      mainText: `
+        <div style="font-size: 14px; color: #1e3a8a;">
+          Hi Admin,<br><br>
+          A new campaign has been created. The relevant information is listed below.<br><br>
+          ${campaignTable}
+        </div>
+      `,
+      footerText: ""
+    });
+
+    const emailString = adminEmails.join(',');
+
+    await resend.emails.send({
+      from: "LeadFusionHQ <noreply@leadfusionhq.com>",
+      to: emailString,
+      subject: `New Campaign Created - ${campaignName}`,
+      html,
+    });
+
+    console.log("📧 Campaign creation email sent to admins:", emailString);
+
+  } catch (err) {
+    console.error("❌ Failed to send campaign creation email to admin:", err.message);
+    throw err;
+  }
+}
+
+// Email to User
+async function sendCampaignCreatedEmailToUser(campaign) {
+  try {
+    const userEmail = campaign?.user_id?.email;
+
+    if (!userEmail) {
+      console.log("⚠️ No user email found for campaign creation notification");
+      return;
+    }
+
+    const campaignName = campaign?.name || "N/A";
+    const campaignId = campaign?.campaign_id || "N/A";
+    const syncStatus = campaign?.boberdoo_sync_status || "N/A";
+    const createdAt = campaign?.createdAt 
+      ? new Date(campaign.createdAt).toLocaleString('en-US', { 
+          dateStyle: 'medium', 
+          timeStyle: 'short' 
+        })
+      : "N/A";
+
+    // ---- Campaign Details Table ----
+    const campaignTable = `
+      <table cellpadding="0" cellspacing="0" border="0" 
+        style="width: 100%; font-family: Arial, sans-serif; font-size: 14px; 
+               color: #1e3a8a; line-height: 1.6; text-align: left;">
+
+        <tr>
+          <td style="padding: 4px 0; vertical-align: top;">
+            <strong style="color: #1e3a8a;">Campaign Name</strong>
+          </td>
+          <td style="padding: 4px 0; color: #1e40af;">${campaignName}</td>
+        </tr>
+
+        <tr>
+          <td style="padding: 4px 0; vertical-align: top;">
+            <strong style="color: #1e3a8a;">Campaign ID</strong>
+          </td>
+          <td style="padding: 4px 0; color: #1e40af;">${campaignId}</td>
+        </tr>
+
+        <tr>
+          <td style="padding: 4px 0; vertical-align: top;">
+            <strong style="color: #1e3a8a;">Status</strong>
+          </td>
+          <td style="padding: 4px 0; color: #1e40af;">${campaign?.status || "ACTIVE"}</td>
+        </tr>
+
+        <tr>
+          <td style="padding: 4px 0; vertical-align: top;">
+            <strong style="color: #1e3a8a;">Boberdoo Sync Status</strong>
+          </td>
+          <td style="padding: 4px 0; color: #1e40af;">${syncStatus}</td>
+        </tr>
+
+        <tr>
+          <td style="padding: 4px 0; vertical-align: top;">
+            <strong style="color: #1e3a8a;">Created At</strong>
+          </td>
+          <td style="padding: 4px 0; color: #1e40af;">${createdAt}</td>
+        </tr>
+
+      </table>
+    `;
+
+    // ---- Email Template ----
+    const html = createEmailTemplate({
+      title: "Campaign Created Successfully",
+      mainText: `
+        <div style="font-size: 14px; color: #1e3a8a;">
+          Hi there,<br><br>
+          Your campaign has been created successfully. The details are listed below.<br><br>
+          ${campaignTable}
+        </div>
+      `,
+      footerText: ""
+    });
+
+    await resend.emails.send({
+      from: "LeadFusionHQ <noreply@leadfusionhq.com>",
+      to: userEmail,
+      subject: `Campaign Created - ${campaignName}`,
+      html,
+    });
+
+    console.log("📧 Campaign creation email sent to user:", userEmail);
+
+  } catch (err) {
+    console.error("❌ Failed to send campaign creation email to user:", err.message);
+    throw err;
+  }
+}
 
 
 /**
@@ -2311,7 +2494,7 @@ sendUserLeadReturnStatusEmail,
     sendLowBalanceWarning,
     sendInsufficientBalanceEmail,
     sendNewUserRegistrationToAdmin,
-    sendCampaignCreatedEmail,
+    sendCampaignCreatedEmailtoN8N,
     sendLowBalanceAdminEmail,
     sendCampaignResumedEmail,
     sendCampaignResumedAdminEmail,
@@ -2320,4 +2503,6 @@ sendUserLeadReturnStatusEmail,
     sendFailedLeadPaymentAdminEmail,
     sendPendingLeadsPaymentSuccessEmail,
     sendPendingLeadsPaymentSuccessAdminEmail,
+    sendCampaignCreatedEmailToAdmin,
+    sendCampaignCreatedEmailToUser
 };
