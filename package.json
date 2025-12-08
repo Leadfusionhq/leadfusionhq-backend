@@ -2,6 +2,7 @@
   "name": "lead-management-platform",
   "version": "0.1.0",
   "private": true,
+  "type":"module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -24,6 +25,7 @@
     "bcrypt": "^6.0.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
+    "dayjs": "^1.11.19",
     "formik": "^2.4.6",
     "jose": "^6.1.0",
     "js-cookie": "^3.0.5",

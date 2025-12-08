@@ -259,7 +259,6 @@ export const BILLING_API = {
     REVENUE_FROM_NMI: `${BILLING_API_BASE}/revenue-from-nmi`,
 };
 
-
 // constants/api-urls.js
 // Add to your existing API_URL object
 
@@ -272,9 +271,11 @@ export const GEOCODING_API = {
     REVERSE_GEOCODE: `${GEOCODING_API_BASE}/reverse`,
 };
 
-const LOGS_API_Base = `${API_BASE}/logs`;
+const LOGS_API_Base = `${API_IMPORT_BASE}/logs`;
 
 export const LOGS_API = {
+
+  GET_LOGS: `${LOGS_API_Base}/`,
   GET_ALL_LOGS: `${LOGS_API_Base}/all`,
   GET_LOG_DETAIL: (id: string) => `${LOGS_API_Base}/${id}`,
   GET_STATS: `${LOGS_API_Base}/stats`,
