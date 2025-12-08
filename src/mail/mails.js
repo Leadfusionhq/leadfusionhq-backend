@@ -1332,28 +1332,28 @@ async function sendCampaignCreatedEmailToAdmin(campaign) {
 
         <tr>
           <td style="padding: 4px 0; vertical-align: top;">
-            <strong style="color: #1e3a8a;">User Name</strong>
+            <strong style="color: #28282B;">User Name</strong>
           </td>
           <td style="padding: 4px 0; color: #1e40af;">${userName}</td>
         </tr>
 
         <tr>
           <td style="padding: 4px 0; vertical-align: top;">
-            <strong style="color: #1e3a8a;">Campaign Name</strong>
+            <strong style="color: #28282B;">Campaign Name</strong>
           </td>
           <td style="padding: 4px 0; color: #1e40af;">${campaignName}</td>
         </tr>
 
         <tr>
           <td style="padding: 4px 0; vertical-align: top;">
-            <strong style="color: #1e3a8a;">Campaign ID</strong>
+            <strong style="color: #28282B;">Campaign ID</strong>
           </td>
           <td style="padding: 4px 0; color: #1e40af;">${campaignId}</td>
         </tr>
 
         <tr>
           <td style="padding: 4px 0; vertical-align: top;">
-            <strong style="color: #1e3a8a;">Boberdoo Sync Status</strong>
+            <strong style="color: #28282B;">Boberdoo Sync Status</strong>
           </td>
           <td style="padding: 4px 0; color: #1e40af;">${syncStatus}</td>
         </tr>
@@ -1394,10 +1394,17 @@ async function sendCampaignCreatedEmailToAdmin(campaign) {
 // Email to User
 async function sendCampaignCreatedEmailToUser(campaign) {
   try {
+    // 🔍 Add debugging to see what's coming in
+    console.log("🔍 sendCampaignCreatedEmailToUser - Campaign received");
+    console.log("🔍 Campaign ID:", campaign?.campaign_id);
+    console.log("🔍 Campaign user_id object:", campaign?.user_id);
+    console.log("🔍 User email:", campaign?.user_id?.email);
+
     const userEmail = campaign?.user_id?.email;
 
     if (!userEmail) {
       console.log("⚠️ No user email found for campaign creation notification");
+      console.log("⚠️ Full campaign.user_id:", JSON.stringify(campaign?.user_id, null, 2));
       return;
     }
 
@@ -1419,35 +1426,28 @@ async function sendCampaignCreatedEmailToUser(campaign) {
 
         <tr>
           <td style="padding: 4px 0; vertical-align: top;">
-            <strong style="color: #1e3a8a;">Campaign Name</strong>
+            <strong style="color: #28282B;">Campaign Name</strong>
           </td>
           <td style="padding: 4px 0; color: #1e40af;">${campaignName}</td>
         </tr>
 
         <tr>
           <td style="padding: 4px 0; vertical-align: top;">
-            <strong style="color: #1e3a8a;">Campaign ID</strong>
+            <strong style="color: #28282B;">Campaign ID</strong>
           </td>
           <td style="padding: 4px 0; color: #1e40af;">${campaignId}</td>
         </tr>
 
         <tr>
           <td style="padding: 4px 0; vertical-align: top;">
-            <strong style="color: #1e3a8a;">Status</strong>
+            <strong style="color: #28282B;">Status</strong>
           </td>
           <td style="padding: 4px 0; color: #1e40af;">${campaign?.status || "ACTIVE"}</td>
         </tr>
 
         <tr>
           <td style="padding: 4px 0; vertical-align: top;">
-            <strong style="color: #1e3a8a;">Boberdoo Sync Status</strong>
-          </td>
-          <td style="padding: 4px 0; color: #1e40af;">${syncStatus}</td>
-        </tr>
-
-        <tr>
-          <td style="padding: 4px 0; vertical-align: top;">
-            <strong style="color: #1e3a8a;">Created At</strong>
+            <strong style="color: #28282B;">Created At</strong>
           </td>
           <td style="padding: 4px 0; color: #1e40af;">${createdAt}</td>
         </tr>
@@ -1468,21 +1468,26 @@ async function sendCampaignCreatedEmailToUser(campaign) {
       footerText: ""
     });
 
-    await resend.emails.send({
+    console.log("📧 Attempting to send email to user:", userEmail);
+
+    const result = await resend.emails.send({
       from: "LeadFusionHQ <noreply@leadfusionhq.com>",
       to: userEmail,
       subject: `Campaign Created - ${campaignName}`,
       html,
     });
 
-    console.log("📧 Campaign creation email sent to user:", userEmail);
+    console.log("✅ Campaign creation email sent to user:", userEmail);
+    console.log("✅ Resend response:", result);
 
   } catch (err) {
-    console.error("❌ Failed to send campaign creation email to user:", err.message);
+    console.error("❌ Failed to send campaign creation email to user");
+    console.error("❌ Error message:", err.message);
+    console.error("❌ Error stack:", err.stack);
+    console.error("❌ Full error object:", JSON.stringify(err, null, 2));
     throw err;
   }
 }
-
 
 /**
  * Send Funds Added Email
