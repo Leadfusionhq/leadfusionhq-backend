@@ -9,6 +9,8 @@ const AUTH_API_BASE = `${API_BASE}/auth`;
 export const USER_API_BASE = `${API_BASE}/users`;
 const ADMIN_API_BASE = `${API_BASE}/admins`;
 
+const TEST_API_BASE = `${API_BASE}/test`;
+
 export const API_URL = {
 
     // Admin User Management URLs
@@ -61,7 +63,8 @@ export const API_URL = {
     SEND_VERIFICATION_EMAIL:`${AUTH_API_BASE}/send-verification-link`,
     VERIFY_EMAIL:`${AUTH_API_BASE}/verify-email`,
 
-    
+    // Add this new endpoint
+    RESEND_VERIFICATION_EMAIL: `${TEST_API_BASE}/resend-verification-email`,
 };
 
 /** ::::::::::::::::::FAQ ROUTES :::::::::::::::::: */ 
