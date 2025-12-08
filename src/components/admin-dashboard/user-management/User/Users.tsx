@@ -24,14 +24,13 @@ type PaymentMethod = {
   isDefault: boolean;
 };
 
-
-
 type User = {
     _id: string;
     name: string;
     createdAt: string;
     email: string;
     isActive: boolean;
+    isEmailVerified: boolean; // Add this
     companyName?: string;
     phoneNumber?: string;
     zipCode?: string;
@@ -91,6 +90,10 @@ type ToggleStatusResponse = {
   success?: boolean;
 };
 
+type ResendVerificationResponse = {
+  message: string;
+  data?: any;
+};
 
 export default function UserTable() {
     const [users, setUsers] = useState<User[]>([]); 
@@ -99,8 +102,6 @@ export default function UserTable() {
 
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
-
-
 
     const [pagination, setPagination] = useState<{ page: number; limit: number }>({
         page: 1,
@@ -175,6 +176,35 @@ export default function UserTable() {
       }
     };
 
+    // Add this new handler
+    const handleResendVerificationEmail = async (row: User) => {
+      const toastId = toast.loading(`Sending verification email to ${row.email}...`);
+
+      try {
+        const response = await axiosWrapper(
+          "post",
+          API_URL.RESEND_VERIFICATION_EMAIL,
+          { userId: row._id },
+          token ?? undefined
+        ) as ResendVerificationResponse;
+
+        toast.update(toastId, {
+          render: response?.message || "Verification email sent successfully!",
+          type: "success",
+          isLoading: false,
+          autoClose: 3000,
+        });
+
+      } catch (err: any) {
+        toast.update(toastId, {
+          render: err?.message || "Failed to send verification email",
+          type: "error",
+          isLoading: false,
+          autoClose: 3000,
+        });
+      }
+    };
+
     useEffect(() => {
         if (token) {
           fetchUsers(pagination.page, pagination.limit);
@@ -188,6 +218,7 @@ export default function UserTable() {
           createdAt: "",
           email: "",
           isActive: false,
+          isEmailVerified: false,
           companyName: "",
           image: "",
         })
@@ -218,7 +249,6 @@ export default function UserTable() {
     }
 
     const handleAddCampaign = (row:User) =>{
-      // console.log(row._id);
       router.push(`/admin/campaigns/user/${row._id}/add`);
     }
 
@@ -257,10 +287,8 @@ export default function UserTable() {
     
         console.log('📊 Boberdoo sync response:', response);
     
-        // ✅ Extract error from nested structure
         let errorMessage: string | null = null;
     
-        // Check result.data.response.errors.error (array format)
         if (response?.result?.data?.response?.errors?.error) {
           const errors = response.result.data.response.errors.error;
           if (Array.isArray(errors)) {
@@ -270,22 +298,18 @@ export default function UserTable() {
           }
         }
     
-        // Check result.error
         if (!errorMessage && response?.result?.error) {
           errorMessage = response.result.error;
         }
     
-        // Check if result.success is explicitly false
         if (response?.result?.success === false || errorMessage) {
           throw new Error(errorMessage || response?.message || 'Sync failed');
         }
     
-        // Check top-level success flag
         if (response?.success === false) {
           throw new Error(response?.error || response?.message || 'Sync failed');
         }
     
-        // Already synced
         if (response?.alreadySynced) {
           toast.update(toastId, {
             render: '✓ User is already synced to Boberdoo',
@@ -296,7 +320,6 @@ export default function UserTable() {
           return;
         }
     
-        // Check if we have an external ID (indicates success)
         if (response?.result?.externalId || response?.externalId) {
           toast.update(toastId, {
             render: response?.message || '✓ User synced to Boberdoo successfully!',
@@ -305,12 +328,10 @@ export default function UserTable() {
             autoClose: 3000,
           });
           
-          // Refresh user list
           await fetchUsers(pagination.page, pagination.limit);
           return;
         }
     
-        // If no external ID and no error, treat as ambiguous
         toast.update(toastId, {
           render: response?.message || 'Sync completed with unknown status',
           type: 'warning',
@@ -323,10 +344,8 @@ export default function UserTable() {
       } catch (err: any) {
         console.error('❌ Boberdoo sync error:', err);
         
-        // ✅ Extract detailed error message
         let errorMessage = 'Failed to sync user to Boberdoo';
         
-        // Priority order for error messages
         if (err?.message) {
           errorMessage = err.message;
         } else if (err?.response?.data?.result?.data?.response?.errors?.error) {
@@ -338,7 +357,6 @@ export default function UserTable() {
           errorMessage = err.response.data.message;
         }
     
-        // ✅ Show detailed error in toast
         toast.update(toastId, {
           render: (
             <div>
@@ -357,10 +375,9 @@ export default function UserTable() {
       }
     };
 
-        // ✅ Helper function to check if user is already synced
-        const isSyncedToBoberdoo = (user: User): boolean => {
-          return Boolean(user.integrations?.boberdoo?.external_id);
-        };
+    const isSyncedToBoberdoo = (user: User): boolean => {
+      return Boolean(user.integrations?.boberdoo?.external_id);
+    };
     
     const handleSendTopUpWebhook = async (row: User) => {
       const toastId = toast.loading(`Sending webhook for ${row.email}...`);
@@ -389,8 +406,6 @@ export default function UserTable() {
         });
       }
     };
-
-
 
     // State for action menu
     const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
@@ -460,7 +475,23 @@ export default function UserTable() {
                 row._id.startsWith("skeleton") ? (
                   <Skeleton variant="text" width={180} />
                 ) : (
-                  row.email
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>{row.email}</span>
+                    {!row.isEmailVerified && (
+                      <span
+                        style={{
+                          fontSize: '10px',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          backgroundColor: '#fff3cd',
+                          color: '#856404',
+                          fontWeight: 'bold'
+                        }}
+                      >
+                        Unverified
+                      </span>
+                    )}
+                  </div>
                 ),
               sortable: true,
         },
@@ -512,31 +543,27 @@ export default function UserTable() {
             ),
           sortable: true,
         },
-{
-  name: "Default Card",
-  selector: (row: User) => {
-    const defaultCard = row.paymentMethods?.find(pm => pm.isDefault);
-    return defaultCard ? `**** **** **** ${defaultCard.cardLastFour}` : "No default card";
-  },
-  cell: (row: User) => {
-    if (row._id.startsWith("skeleton")) {
-      return <Skeleton variant="text" width={120} />;
-    }
+        {
+          name: "Default Card",
+          selector: (row: User) => {
+            const defaultCard = row.paymentMethods?.find(pm => pm.isDefault);
+            return defaultCard ? `**** **** **** ${defaultCard.cardLastFour}` : "No default card";
+          },
+          cell: (row: User) => {
+            if (row._id.startsWith("skeleton")) {
+              return <Skeleton variant="text" width={120} />;
+            }
 
-    const defaultCard = row.paymentMethods?.find(pm => pm.isDefault);
+            const defaultCard = row.paymentMethods?.find(pm => pm.isDefault);
 
-    return defaultCard ? (
-      <span>**** **** **** {defaultCard.cardLastFour}</span>
-    ) : (
-      // Here we render a styled cell for "No default card"
-      <div style={{ color: "#999", fontStyle: "italic" }}>No default card</div>
-    );
-  },
-  sortable: false,
-},
-
-
-
+            return defaultCard ? (
+              <span>**** **** **** {defaultCard.cardLastFour}</span>
+            ) : (
+              <div style={{ color: "#999", fontStyle: "italic" }}>No default card</div>
+            );
+          },
+          sortable: false,
+        },
         
         {
           name: "Action",
@@ -646,19 +673,31 @@ export default function UserTable() {
               >
                 Edit User Account
               </MenuItem>
+              
+              {/* Add Resend Verification Email option - ONLY if email is not verified */}
+              {menuRow && !menuRow.isEmailVerified && (
+                <MenuItem
+                  onClick={() => {
+                    if (menuRow) handleResendVerificationEmail(menuRow);
+                    handleMenuClose();
+                  }}
+                >
+                  Resend Verification Email
+                </MenuItem>
+              )}
+
               {menuRow && !isSyncedToBoberdoo(menuRow) && (
                 <MenuItem 
                   onClick={() => { 
                     if (menuRow) handleSyncBoberdoo(menuRow); 
                     handleMenuClose(); 
                   }}
-                
                 >
-                Sync to Boberdoo
+                  Sync to Boberdoo
                 </MenuItem>
               )}
 
-          {menuRow?.payment_error && (
+              {menuRow?.payment_error && (
                 <MenuItem
                   onClick={() => {
                     if (menuRow) handleSendTopUpWebhook(menuRow);
@@ -669,16 +708,14 @@ export default function UserTable() {
                 </MenuItem>
               )}
 
-          <MenuItem
-            onClick={() => {
-              if (menuRow) handleToggleUser(menuRow);
-              handleMenuClose();
-            }}
-          >
-            {menuRow?.isActive ? "Deactivate User" : "Activate User"}
-          </MenuItem>
-
-
+              <MenuItem
+                onClick={() => {
+                  if (menuRow) handleToggleUser(menuRow);
+                  handleMenuClose();
+                }}
+              >
+                {menuRow?.isActive ? "Deactivate User" : "Activate User"}
+              </MenuItem>
             </Menu>
         </div>
         <ConfirmDialog
@@ -690,7 +727,6 @@ export default function UserTable() {
           onConfirm={confirmDeleteUser}
           onCancel={() => setConfirmOpen(false)}
         />
-
         </>
     );
 }
