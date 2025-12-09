@@ -1,20 +1,51 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import { API_URL } from '@/utils/apiUrl';
 import axiosWrapper from '@/utils/api';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/redux/store';
-import DataTable, { TableColumn } from 'react-data-table-component';
-import Image from 'next/image';  
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-
-import { Skeleton, Box, Button, Typography, IconButton, Menu, MenuItem } from "@mui/material";
-import MoreVertIcon from "@mui/icons-material/MoreVert";
+import {
+  useReactTable,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  ColumnDef,
+  flexRender,
+  SortingState,
+  ColumnFiltersState,
+  VisibilityState,
+} from "@tanstack/react-table";
+import {
+  MoreVertical,
+  Search,
+  Filter,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Shield,
+  CreditCard,
+  History,
+  Trash2,
+  RefreshCcw,
+  Mail,
+  MoreHorizontal,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  Users as UsersIcon,
+  UserPlus,
+  UserCheck
+} from "lucide-react";
 import { toast } from 'react-toastify';
-import ConfirmDialog from "@/components/common/ConfirmDialog"; 
+import ConfirmDialog from "@/components/common/ConfirmDialog";
+import { Menu, MenuItem, IconButton } from "@mui/material";
 
+// --- Types ---
 type PaymentMethod = {
   customerVaultId: string;
   cardLastFour: string;
@@ -25,35 +56,36 @@ type PaymentMethod = {
 };
 
 type User = {
-    _id: string;
-    name: string;
-    createdAt: string;
-    email: string;
-    isActive: boolean;
-    isEmailVerified: boolean; // Add this
-    companyName?: string;
-    phoneNumber?: string;
-    zipCode?: string;
-    image?: string;
-    balance?: number;
-    payment_error?: boolean;
-    integrations?: {
-      boberdoo?: {
-          external_id?: string | null;
-          sync_status?: 'PENDING' | 'SUCCESS' | 'FAILED' | 'NOT_SYNCED';
-          last_sync_at?: string | null;
-          last_error?: string | null;
-      };
+  _id: string;
+  name: string;
+  createdAt: string;
+  email: string;
+  isActive: boolean;
+  isEmailVerified: boolean;
+  companyName?: string;
+  phoneNumber?: string;
+  zipCode?: string;
+  image?: string;
+  balance?: number;
+  payment_error?: boolean;
+  integrations?: {
+    boberdoo?: {
+      external_id?: string | null;
+      sync_status?: 'PENDING' | 'SUCCESS' | 'FAILED' | 'NOT_SYNCED';
+      last_sync_at?: string | null;
+      last_error?: string | null;
+    };
   };
-    paymentMethods?: PaymentMethod[];
+  paymentMethods?: PaymentMethod[];
 };
 
 type ApiResponse = {
-    data: User[];
-    page: number;
-    limit: number;
-    totalCount: number;
-    totalPages: number;
+  data: User[];
+  page: number;
+  limit: number;
+  totalCount?: number;
+  total?: number;
+  totalPages: number;
 };
 
 type SyncBoberdooResponse = {
@@ -69,7 +101,7 @@ type SyncBoberdooResponse = {
     externalId?: string;
     data?: {
       response?: {
-        result?:string;
+        result?: string;
         errors?: {
           error?: string | string[];
         };
@@ -95,638 +127,738 @@ type ResendVerificationResponse = {
   data?: any;
 };
 
+// --- Components ---
+
+const StatusBadge = ({ isActive }: { isActive: boolean }) => (
+  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${isActive
+    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+    : "bg-rose-50 text-rose-700 border-rose-200"
+    }`}>
+    <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${isActive ? "bg-emerald-600" : "bg-rose-600"}`}></span>
+    {isActive ? "Active" : "Inactive"}
+  </span>
+);
+
+const VerificationBadge = ({ verified }: { verified: boolean }) => {
+  if (verified) return null;
+  return (
+    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200 ml-2">
+      Unverified
+    </span>
+  )
+}
+
+const StatCard = ({ title, value, icon: Icon, color }: { title: string, value: string | number, icon: any, color: string }) => {
+
+  const isBlack = color.includes('bg-black');
+
+  return (
+    <div className={`p-6 rounded-2xl shadow-sm border flex items-center gap-4 transition-all duration-200 hover:scale-[1.01] hover:shadow-md ${isBlack ? "bg-black border-black text-white" : "bg-white border-gray-100"}`}>
+      <div className={`p-3 rounded-xl ${isBlack ? "bg-gray-800 text-white" : color}`}>
+        <Icon className={`w-6 h-6`} />
+      </div>
+      <div>
+        <p className={`text-sm font-medium ${isBlack ? "text-gray-400" : "text-gray-500"}`}>{title}</p>
+        <h3 className={`text-2xl font-bold mt-0.5 ${isBlack ? "text-white" : "text-gray-900"}`}>{value}</h3>
+      </div>
+    </div>
+  );
+};
+
 export default function UserTable() {
-    const [users, setUsers] = useState<User[]>([]); 
-    const [loading, setLoading] = useState<boolean>(true);
-    const [error, setError] = useState<string | null>(null);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
-    const [confirmOpen, setConfirmOpen] = useState(false);
-    const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
-    const [pagination, setPagination] = useState<{ page: number; limit: number }>({
-        page: 1,
-        limit: 6,
-    });
+  const [pagination, setPagination] = useState({
+    pageIndex: 0,
+    pageSize: 10,
+  });
+  const [totalRows, setTotalRows] = useState<number>(0);
 
-    const [totalRows, setTotalRows] = useState<number>(0);
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [globalFilter, setGlobalFilter] = useState("");
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
 
-    const token = useSelector((state: RootState) => state.auth.token);
-    const router = useRouter();
+  const [filterAnchorEl, setFilterAnchorEl] = useState<null | HTMLElement>(null);
+  const isFilterOpen = Boolean(filterAnchorEl);
 
-    const fetchUsers = useCallback(
-        async (pageNumber:number,pageSize:number) => {
-            try {
-                setLoading(true);
-                setError(null);
+  const handleFilterClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setFilterAnchorEl(event.currentTarget);
+  };
+  const handleFilterClose = () => {
+    setFilterAnchorEl(null);
+  };
 
-                const params = new URLSearchParams({
-                    page: pageNumber.toString(),
-                    limit: pageSize.toString(),
-                });
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
 
-                const response = (await axiosWrapper(
-                    "get",
-                    `${API_URL.GET_ALL_USERS}?${params.toString()}`,
-                    {},
-                    token ?? undefined
-                )) as ApiResponse;
+  const token = useSelector((state: RootState) => state.auth.token);
+  const router = useRouter();
 
-                setUsers(response.data); 
-                setTotalRows(response.totalCount); 
-            }
-            catch (err) {
-                console.error("Unable to get users:", err);
-                setError("Failed to fetch users");
-            } finally {
-                setLoading(false);
-            }
-        },
-        [token]
-    );
-
-    const handleToggleUser = async (row: User) => {
-      const toastId = toast.loading("Updating user status...");
-
+  const fetchUsers = useCallback(
+    async (pageNumber: number, pageSize: number, search?: string, status: 'ALL' | 'ACTIVE' | 'INACTIVE' = 'ALL') => {
       try {
-        const url = API_URL.TOGGLE_USER_STATUS_BY_ID.replace(":userId", row._id);
+        setLoading(true);
+        setError(null);
 
-        const response = await axiosWrapper(
-          "patch",
-          url,
+        const params = new URLSearchParams({
+          page: pageNumber.toString(),
+          limit: pageSize.toString(),
+          isEmailVerified: 'true'
+        });
+
+        if (search) {
+          params.append('search', search);
+        }
+
+        if (status !== 'ALL') {
+          params.append('isActive', status === 'ACTIVE' ? 'true' : 'false');
+        }
+
+        const response = (await axiosWrapper(
+          "get",
+          `${API_URL.GET_ALL_USERS}?${params.toString()}`,
           {},
           token ?? undefined
-        ) as ToggleStatusResponse;
+        )) as ApiResponse;
 
-        toast.update(toastId, {
-          render: response?.message || "Status updated",
-          type: "success",
-          isLoading: false,
-          autoClose: 2500,
-        });
-
-        await fetchUsers(pagination.page, pagination.limit);
-
-      } catch (err: any) {
-        toast.update(toastId, {
-          render: err?.message || "Failed to update user status",
-          type: "error",
-          isLoading: false,
-          autoClose: 3000,
-        });
+        setUsers(response.data || []);
+        setTotalRows(response.totalCount || response.total || 0);
       }
-    };
-
-    // Add this new handler
-    const handleResendVerificationEmail = async (row: User) => {
-      const toastId = toast.loading(`Sending verification email to ${row.email}...`);
-
-      try {
-        const response = await axiosWrapper(
-          "post",
-          API_URL.RESEND_VERIFICATION_EMAIL,
-          { userId: row._id },
-          token ?? undefined
-        ) as ResendVerificationResponse;
-
-        toast.update(toastId, {
-          render: response?.message || "Verification email sent successfully!",
-          type: "success",
-          isLoading: false,
-          autoClose: 3000,
-        });
-
-      } catch (err: any) {
-        toast.update(toastId, {
-          render: err?.message || "Failed to send verification email",
-          type: "error",
-          isLoading: false,
-          autoClose: 3000,
-        });
+      catch (err) {
+        console.error("Unable to get users:", err);
+        setError("Failed to fetch users");
+      } finally {
+        setLoading(false);
       }
-    };
+    },
+    [token]
+  );
 
-    useEffect(() => {
-        if (token) {
-          fetchUsers(pagination.page, pagination.limit);
+  useEffect(() => {
+    setPagination(prev => ({ ...prev, pageIndex: 0 }));
+  }, [globalFilter]);
+
+  useEffect(() => {
+    if (token) {
+      fetchUsers(pagination.pageIndex + 1, pagination.pageSize, globalFilter, statusFilter);
+    }
+  }, [token, pagination.pageIndex, pagination.pageSize, globalFilter, statusFilter, fetchUsers]);
+
+
+  const handleToggleUser = async (row: User) => {
+    const toastId = toast.loading("Updating user status...");
+    try {
+      const url = API_URL.TOGGLE_USER_STATUS_BY_ID.replace(":userId", row._id);
+      const response = await axiosWrapper("patch", url, {}, token ?? undefined) as ToggleStatusResponse;
+      toast.update(toastId, { render: response?.message || "Status updated", type: "success", isLoading: false, autoClose: 2500 });
+      fetchUsers(pagination.pageIndex + 1, pagination.pageSize, globalFilter, statusFilter);
+    } catch (err: any) {
+      toast.update(toastId, { render: err?.message || "Failed to update user status", type: "error", isLoading: false, autoClose: 3000 });
+    }
+  };
+
+  const handleResendVerificationEmail = async (row: User) => {
+    const toastId = toast.loading(`Sending verification email to ${row.email}...`);
+    try {
+      const response = await axiosWrapper("post", API_URL.RESEND_VERIFICATION_EMAIL, { userId: row._id }, token ?? undefined) as ResendVerificationResponse;
+      toast.update(toastId, { render: response?.message || "Verification email sent successfully!", type: "success", isLoading: false, autoClose: 3000 });
+    } catch (err: any) {
+      toast.update(toastId, { render: err?.message || "Failed to send verification email", type: "error", isLoading: false, autoClose: 3000 });
+    }
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!selectedUser) return;
+    try {
+      setLoading(true);
+      const url = API_URL.DELETE_USER_BY_ID.replace(':userId', selectedUser._id);
+      await axiosWrapper('delete', url, {}, token ?? undefined);
+      toast.success(`${selectedUser.name} deleted successfully`);
+      setUsers((prev) => prev.filter((u) => u._id !== selectedUser._id));
+    } catch (err) {
+      console.error('Failed to delete user:', err);
+      toast.error('Failed to delete user');
+    } finally {
+      setLoading(false);
+      setConfirmOpen(false);
+      setSelectedUser(null);
+    }
+  };
+
+  const handleSyncBoberdoo = async (row: User) => {
+    const toastId = toast.loading(`Syncing ${row.name} to Boberdoo...`);
+    try {
+      const url = API_URL.SYNC_BOMBERDO.replace(':userId', row._id);
+      const response = await axiosWrapper('post', url, {}, token ?? undefined) as SyncBoberdooResponse;
+
+      let errorMessage: string | null = null;
+      if (response?.result?.data?.response?.errors?.error) {
+        const errors = response.result.data.response.errors.error;
+        errorMessage = Array.isArray(errors) ? errors.join('; ') : String(errors);
+      }
+      if (!errorMessage && response?.result?.error) errorMessage = response.result.error;
+      if (response?.result?.success === false || errorMessage) throw new Error(errorMessage || response?.message || 'Sync failed');
+      if (response?.success === false) throw new Error(response?.error || response?.message || 'Sync failed');
+
+      if (response?.alreadySynced) {
+        toast.update(toastId, { render: '✓ User is already synced to Boberdoo', type: 'info', isLoading: false, autoClose: 3000 });
+        return;
+      }
+
+      if (response?.result?.externalId || response?.externalId) {
+        toast.update(toastId, { render: response?.message || '✓ User synced to Boberdoo successfully!', type: 'success', isLoading: false, autoClose: 3000 });
+        fetchUsers(pagination.pageIndex + 1, pagination.pageSize, globalFilter, statusFilter);
+        return;
+      }
+
+      toast.update(toastId, { render: response?.message || 'Sync completed with unknown status', type: 'warning', isLoading: false, autoClose: 3000 });
+      fetchUsers(pagination.pageIndex + 1, pagination.pageSize, globalFilter, statusFilter);
+
+    } catch (err: any) {
+      let errorMessage = 'Failed to sync user to Boberdoo';
+      if (err?.message) {
+        errorMessage = err.message;
+      } else if (err?.response?.data?.result?.data?.response?.errors?.error) {
+        const errors = err.response.data.result.data.response.errors.error;
+        errorMessage = Array.isArray(errors) ? errors.join('; ') : String(errors);
+      } else if (err?.response?.data?.error) {
+        errorMessage = err.response.data.error;
+      } else if (err?.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      }
+
+      toast.update(toastId, {
+        render: (
+          <div>
+            <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>Failed to sync to Boberdoo</div>
+            <div style={{ fontSize: '12px', opacity: 0.9 }}>{errorMessage}</div>
+          </div>
+        ),
+        type: 'error',
+        isLoading: false,
+        autoClose: 7000,
+      });
+    }
+  };
+
+  const handleSendTopUpWebhook = async (row: User) => {
+    const toastId = toast.loading(`Sending webhook for ${row.email}...`);
+    try {
+      const url = API_URL.SEND_BALANCE_TOPUP_WEBHOOK.replace(':userId', row._id);
+      const response = await axiosWrapper('post', url, {}, token ?? undefined) as WebhookResponse;
+      if (!response?.result?.success) throw new Error(response?.result?.error || "Webhook failed");
+      toast.update(toastId, { render: 'Webhook sent successfully', type: 'success', isLoading: false, autoClose: 3000 });
+    } catch (err: any) {
+      toast.update(toastId, { render: err.message || "Webhook failed", type: 'error', isLoading: false, autoClose: 5000 });
+    }
+  };
+
+
+  // --- Table Setup ---
+
+  const columns: ColumnDef<User>[] = useMemo(() => [
+    {
+      accessorKey: "name",
+      header: "User Profile",
+      cell: ({ row }) => (
+        <div className="flex items-center gap-3">
+          <div className="relative h-10 w-10 min-w-10 rounded-full overflow-hidden border border-gray-100 shadow-sm">
+            <Image
+              src={row.original.image || "/images/icons/User.svg"}
+              alt={row.original.name}
+              fill
+              className="object-cover"
+            />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-sm font-semibold text-gray-900">{row.original.name}</span>
+            <div className="flex items-center">
+              <span className="text-xs text-gray-500">{row.original.email}</span>
+              <VerificationBadge verified={row.original.isEmailVerified} />
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      accessorKey: "companyName",
+      header: "Company",
+      cell: ({ row }) => <span className="text-sm text-gray-700 font-medium">{row.original.companyName || "—"}</span>,
+    },
+    // --- NEW: Default Card Column ---
+    {
+      id: "defaultCard",
+      header: "Default Card",
+      cell: ({ row }) => {
+        const defaultCard = row.original.paymentMethods?.find(pm => pm.isDefault) || row.original.paymentMethods?.[0];
+
+        if (!defaultCard) {
+          return <span className="text-xs text-gray-400 italic">No card linked</span>;
         }
-    }, [token, pagination.page, pagination.limit, fetchUsers]);
 
-    const loadingSkeletonRows: User[] = Array.from({ length: pagination.limit }).map(
-        (_, i) => ({
-          _id: `skeleton-${i}`,
-          name: "",
-          createdAt: "",
-          email: "",
-          isActive: false,
-          isEmailVerified: false,
-          companyName: "",
-          image: "",
-        })
-    );
-
-    const formatDate = (dateString: string): string => {
-        const date = new Date(dateString);
-
-        const options: Intl.DateTimeFormatOptions = {
+        return (
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 bg-gray-50 rounded border border-gray-100">
+              <CreditCard className="w-4 h-4 text-gray-600" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-xs font-semibold text-gray-900 uppercase">{defaultCard.brand}</span>
+              <span className="text-[10px] text-gray-500">•••• {defaultCard.cardLastFour}</span>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "createdAt",
+      header: "Joined",
+      cell: ({ row }) => (
+        <span className="text-sm text-gray-600">
+          {new Date(row.original.createdAt).toLocaleDateString('en-US', {
             year: 'numeric',
             month: 'short',
             day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: true,
-        };
-
-        return date.toLocaleString('en-US', options);
-    };
-
-    const handleEdit = (row: User) => {
-        router.push(`/admin/user-management/user/${row._id}/edit`);
-    };
-
-    const handleAddBalance = (row:User) =>{
-      console.log(row._id);
-      router.push(`/admin/user-management/user/${row._id}/addBalance`);
+          })}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "isActive",
+      header: "Status",
+      cell: ({ row }) => <StatusBadge isActive={row.original.isActive} />,
+    },
+    {
+      accessorKey: "balance",
+      header: "Balance",
+      cell: ({ row }) => (
+        <span className={`text-sm font-semibold ${(row.original.balance ?? 0) > 0 ? "text-gray-900" : "text-gray-400"
+          }`}>
+          ${(row.original.balance ?? 0).toFixed(2)}
+        </span>
+      ),
+    },
+    {
+      id: "actions",
+      header: "",
+      cell: ({ row }) => {
+        const user = row.original;
+        return (
+          <ActionMenu
+            user={user}
+            onEdit={() => router.push(`/admin/user-management/user/${user._id}/edit`)}
+            onAddBalance={() => router.push(`/admin/user-management/user/${user._id}/addBalance`)}
+            onAddCampaign={() => router.push(`/admin/campaigns/user/${user._id}/add`)}
+            onDelete={() => { setSelectedUser(user); setConfirmOpen(true); }}
+            onResendVerification={() => handleResendVerificationEmail(user)}
+            onSyncBoberdoo={() => handleSyncBoberdoo(user)}
+            onToggleStatus={() => handleToggleUser(user)}
+            onSendWebhook={() => handleSendTopUpWebhook(user)}
+          />
+        )
+      }
     }
+  ], [router]);
 
-    const handleAddCampaign = (row:User) =>{
-      router.push(`/admin/campaigns/user/${row._id}/add`);
-    }
 
-    const handleDeleteClick = (row: User) => {
-      setSelectedUser(row);
-      setConfirmOpen(true);
-    };
+  const table = useReactTable({
+    data: users,
+    columns,
+    pageCount: Math.ceil(totalRows / pagination.pageSize),
+    state: {
+      pagination,
+      sorting,
+      columnFilters,
+      globalFilter,
+    },
+    onPaginationChange: setPagination,
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    onGlobalFilterChange: setGlobalFilter,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    manualPagination: true,
+    manualFiltering: true,
+    manualSorting: true,
+  });
 
-    const confirmDeleteUser = async () => {
-      if (!selectedUser) return;
-    
-      try {
-        setLoading(true);
-        const url = API_URL.DELETE_USER_BY_ID.replace(':userId', selectedUser._id);
-        await axiosWrapper('delete', url, {}, token ?? undefined);
-    
-        toast.success(`${selectedUser.name} deleted successfully`);
-        setUsers((prev) => prev.filter((u) => u._id !== selectedUser._id));
-      } catch (err) {
-        console.error('Failed to delete user:', err);
-        toast.error('Failed to delete user');
-      } finally {
-        setLoading(false);
-        setConfirmOpen(false);
-        setSelectedUser(null);
-      }
-    };
-    
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500">
 
-    const handleSyncBoberdoo = async (row: User) => {
-      const toastId = toast.loading(`Syncing ${row.name} to Boberdoo...`);
-    
-      try {
-        const url = API_URL.SYNC_BOMBERDO.replace(':userId', row._id);
-        const response = await axiosWrapper('post', url, {}, token ?? undefined) as SyncBoberdooResponse;
-    
-        console.log('📊 Boberdoo sync response:', response);
-    
-        let errorMessage: string | null = null;
-    
-        if (response?.result?.data?.response?.errors?.error) {
-          const errors = response.result.data.response.errors.error;
-          if (Array.isArray(errors)) {
-            errorMessage = errors.join('; ');
-          } else {
-            errorMessage = String(errors);
-          }
-        }
-    
-        if (!errorMessage && response?.result?.error) {
-          errorMessage = response.result.error;
-        }
-    
-        if (response?.result?.success === false || errorMessage) {
-          throw new Error(errorMessage || response?.message || 'Sync failed');
-        }
-    
-        if (response?.success === false) {
-          throw new Error(response?.error || response?.message || 'Sync failed');
-        }
-    
-        if (response?.alreadySynced) {
-          toast.update(toastId, {
-            render: '✓ User is already synced to Boberdoo',
-            type: 'info',
-            isLoading: false,
-            autoClose: 3000,
-          });
-          return;
-        }
-    
-        if (response?.result?.externalId || response?.externalId) {
-          toast.update(toastId, {
-            render: response?.message || '✓ User synced to Boberdoo successfully!',
-            type: 'success',
-            isLoading: false,
-            autoClose: 3000,
-          });
-          
-          await fetchUsers(pagination.page, pagination.limit);
-          return;
-        }
-    
-        toast.update(toastId, {
-          render: response?.message || 'Sync completed with unknown status',
-          type: 'warning',
-          isLoading: false,
-          autoClose: 3000,
-        });
-        
-        await fetchUsers(pagination.page, pagination.limit);
-    
-      } catch (err: any) {
-        console.error('❌ Boberdoo sync error:', err);
-        
-        let errorMessage = 'Failed to sync user to Boberdoo';
-        
-        if (err?.message) {
-          errorMessage = err.message;
-        } else if (err?.response?.data?.result?.data?.response?.errors?.error) {
-          const errors = err.response.data.result.data.response.errors.error;
-          errorMessage = Array.isArray(errors) ? errors.join('; ') : String(errors);
-        } else if (err?.response?.data?.error) {
-          errorMessage = err.response.data.error;
-        } else if (err?.response?.data?.message) {
-          errorMessage = err.response.data.message;
-        }
-    
-        toast.update(toastId, {
-          render: (
-            <div>
-              <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
-                Failed to sync to Boberdoo
-              </div>
-              <div style={{ fontSize: '12px', opacity: 0.9 }}>
-                {errorMessage}
-              </div>
+      {/* --- Header Section --- */}
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <StatCard
+          title="Total Users"
+          value={totalRows}
+          icon={UsersIcon}
+          color="text-white bg-black"
+        />
+        <StatCard
+          title="Active Users"
+          value={users.filter(u => u.isActive).length}
+          icon={UserCheck}
+          color="text-emerald-600 bg-emerald-100"
+        />
+        <div className="bg-gradient-to-br from-black to-gray-800 p-6 rounded-2xl shadow-lg text-white flex flex-col justify-between relative overflow-hidden group hover:shadow-xl transition-all cursor-pointer" onClick={() => router.push('/admin/user-management/user/add')}>
+          <div className="z-10">
+            <p className="text-gray-300 text-sm font-medium">Quick Action</p>
+            <h3 className="text-2xl font-bold mt-1">Add New User</h3>
+          </div>
+          <div className="z-10 mt-4 flex items-center text-sm font-medium text-gray-200 group-hover:text-white group-hover:translate-x-1 transition-all">
+            Create Account <ChevronRight size={16} className="ml-1" />
+          </div>
+          <UserPlus className="absolute right-[-10px] bottom-[-10px] w-24 h-24 text-white opacity-5 group-hover:scale-110 transition-transform" />
+        </div>
+      </div>
+
+
+      {/* --- Table Container --- */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+
+        {/* Controls Bar */}
+        <div className="p-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <h2 className="text-lg font-bold text-gray-900">User List</h2>
+
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <div className="relative group w-full sm:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-hover:text-black transition-colors" />
+              <input
+                type="text"
+                placeholder="Search by name, email..."
+                value={globalFilter ?? ""}
+                onChange={(e) => setGlobalFilter(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black/20 transition-all"
+              />
             </div>
-          ),
-          type: 'error',
-          isLoading: false,
-          autoClose: 7000,
-        });
-      }
-    };
-
-    const isSyncedToBoberdoo = (user: User): boolean => {
-      return Boolean(user.integrations?.boberdoo?.external_id);
-    };
-    
-    const handleSendTopUpWebhook = async (row: User) => {
-      const toastId = toast.loading(`Sending webhook for ${row.email}...`);
-
-      try {
-        const url = API_URL.SEND_BALANCE_TOPUP_WEBHOOK.replace(':userId', row._id);
-
-        const response = await axiosWrapper('post', url, {}, token ?? undefined) as WebhookResponse;
-
-        if (!response?.result?.success) {
-          throw new Error(response?.result?.error || "Webhook failed");
-        }
-
-        toast.update(toastId, {
-          render: 'Webhook sent successfully',
-          type: 'success',
-          isLoading: false,
-          autoClose: 3000,
-        });
-      } catch (err: any) {
-        toast.update(toastId, {
-          render: err.message || "Webhook failed",
-          type: 'error',
-          isLoading: false,
-          autoClose: 5000,
-        });
-      }
-    };
-
-    // State for action menu
-    const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
-    const [menuRow, setMenuRow] = useState<User | null>(null);
-
-    const isMenuOpen = Boolean(menuAnchorEl);
-
-    const handleMenuClick = (
-      event: React.MouseEvent<HTMLButtonElement>,
-      row: User
-    ) => {
-      setMenuAnchorEl(event.currentTarget);
-      setMenuRow(row);
-    };
-
-    const handleMenuClose = () => {
-      setMenuAnchorEl(null);
-      setMenuRow(null);
-    };
-
-    const columns: TableColumn<User>[] = [
-        {
-            name: 'User Profile',
-            cell: (row) =>
-                row._id.startsWith("skeleton") ? (
-                  <Skeleton variant="circular" width={40} height={40} />
-                ) : (
-                  <div style={{ display: "flex", alignItems: "center" }}>
-                    <Image
-                      src={row.image || "/images/icons/User.svg"}
-                      alt={row.name}
-                      width={40}
-                      height={40}
-                      style={{ borderRadius: "50%", marginRight: "10px" }}
-                    />
-                    <span>{row.name}</span>
-                  </div>
-                ),
-              sortable: true,
-        },
-        {
-            name: 'Company',
-            selector: (row: User) => row.companyName || '',
-            cell: (row) =>
-                row._id.startsWith("skeleton") ? (
-                  <Skeleton variant="text" width={120} />
-                ) : (
-                  row.companyName
-                ),
-              sortable: true,
-        },
-        {
-            name: 'Date & Time',
-            selector: (row: User) => formatDate(row.createdAt),
-            cell: (row) =>
-                row._id.startsWith("skeleton") ? (
-                  <Skeleton variant="text" width={150} />
-                ) : (
-                  formatDate(row.createdAt)
-                ),
-              sortable: true,
-        },
-        {
-            name: 'Email',
-            selector: (row: User) => row.email,
-            cell: (row) =>
-                row._id.startsWith("skeleton") ? (
-                  <Skeleton variant="text" width={180} />
-                ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span>{row.email}</span>
-                    {!row.isEmailVerified && (
-                      <span
-                        style={{
-                          fontSize: '10px',
-                          padding: '2px 6px',
-                          borderRadius: '4px',
-                          backgroundColor: '#fff3cd',
-                          color: '#856404',
-                          fontWeight: 'bold'
-                        }}
-                      >
-                        Unverified
-                      </span>
-                    )}
-                  </div>
-                ),
-              sortable: true,
-        },
-            
-        {
-            name: 'Status',
-            selector: (row: User) => (row.isActive ? 'Active' : 'Inactive'),
-            cell: (row) =>
-                row._id.startsWith("skeleton") ? (
-                  <Skeleton variant="text" width={80} />
-                ) : (
-                  <span
-                    style={{
-                      padding: "4px 10px",
-                      borderRadius: "12px",
-                      color: row.isActive ? "#155724" : "#721c24",
-                      backgroundColor: row.isActive ? "#d4edda" : "#f8d7da",
-                      fontWeight: 500,
-                      fontSize: "14px",
-                      display: "inline-block",
-                      textAlign: "center",
-                    }}
-                  >
-                    {row.isActive ? "Active" : "Inactive"}
-                  </span>
-                ),
-            sortable: true,
-        },
-        {
-          name: "Balance",
-          selector: (row: User & { balance?: number }) =>
-            row.balance !== undefined ? row.balance.toString() : "0",
-          cell: (row) =>
-            row._id.startsWith("skeleton") ? (
-              <Skeleton variant="text" width={100} />
-            ) : (
-              <span>$ {row.balance ?? 0}</span> 
-            ),
-          sortable: true,
-        },
-        {
-          name: 'Partner ID',
-          selector: (row: User) => row.integrations?.boberdoo?.external_id || '—',
-          cell: (row) =>
-            row._id.startsWith("skeleton") ? (
-              <Skeleton variant="text" width={120} />
-            ) : (
-              <span>{row.integrations?.boberdoo?.external_id || '—'}</span>
-            ),
-          sortable: true,
-        },
-        {
-          name: "Default Card",
-          selector: (row: User) => {
-            const defaultCard = row.paymentMethods?.find(pm => pm.isDefault);
-            return defaultCard ? `**** **** **** ${defaultCard.cardLastFour}` : "No default card";
-          },
-          cell: (row: User) => {
-            if (row._id.startsWith("skeleton")) {
-              return <Skeleton variant="text" width={120} />;
-            }
-
-            const defaultCard = row.paymentMethods?.find(pm => pm.isDefault);
-
-            return defaultCard ? (
-              <span>**** **** **** {defaultCard.cardLastFour}</span>
-            ) : (
-              <div style={{ color: "#999", fontStyle: "italic" }}>No default card</div>
-            );
-          },
-          sortable: false,
-        },
-        
-        {
-          name: "Action",
-          button: true,
-          cell: (row) =>
-            row._id.startsWith("skeleton") ? (
-              <Skeleton variant="rectangular" width={80} height={30} />
-            ) : (
-              <IconButton size="small" onClick={(e) => handleMenuClick(e, row)}>
-                <MoreVertIcon />
-              </IconButton>
-            ),
-          minWidth: "80px",
-          maxWidth: "100px",
-        },
-    ];
-
-    const customStyles = {
-        table: {
-            style: {
-                border: '1px solid #ddd',
-            },
-        },
-        headCells: {
-            style: {
-                fontWeight: 'bold',
-                backgroundColor: '#000000',
-                color: '#FFFFFF',
-                padding: '24px',
-                fontSize: '16px',
-            },
-        },
-        cells: {
-            style: {
-                padding: '24px',
-                fontSize: '16px',
-                border: '1px #01010117',
-            },
-        },
-    };
-
-    return (
-        <>
-        <div className="">
-            <div className="flex justify-between items-center pb-[30px]">
-                <h3 className="text-[24px] text-[#1C1C1C] text-[Inter]">List of Users</h3>
-
-                <Link href="/admin/user-management/user/add"
-                    className="w-[175px] h-[52px] bg-[#1C1C1C] text-white rounded-[5px] text-center flex justify-center items-center text-[16px] no-underline"
-                >
-                    Add New User
-                </Link>
-            </div>
-
-            <DataTable
-                columns={columns}
-                data={loading ? loadingSkeletonRows : users} 
-                pagination
-                paginationServer
-                paginationTotalRows={totalRows}
-                paginationDefaultPage={pagination.page} 
-                paginationPerPage={pagination.limit}
-                paginationRowsPerPageOptions={[6, 10, 15, 20]}
-                onChangePage={(page) => setPagination((prev) => ({ ...prev, page }))} 
-                onChangeRowsPerPage={(newLimit, page) => setPagination({ page, limit: newLimit })} 
-                customStyles={customStyles}
-                highlightOnHover
-                striped
-                dense
-            />
-
-            {/* Action menu */}
+            <button
+              onClick={handleFilterClick}
+              className={`flex items-center gap-2 px-3 py-2 border rounded-lg transition-all ${isFilterOpen || statusFilter !== 'ALL'
+                ? 'bg-black text-white border-black shadow-sm ring-2 ring-black/10'
+                : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                }`}
+              title="Filter"
+            >
+              <Filter size={16} className={statusFilter !== 'ALL' ? 'fill-current' : ''} />
+              <span className="text-sm font-medium hidden sm:inline">
+                {statusFilter !== 'ALL' ? 'Filter: Active' : 'Filter'}
+              </span>
+              {statusFilter !== 'ALL' && (
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 text-[10px] font-bold">1</span>
+              )}
+            </button>
             <Menu
-              anchorEl={menuAnchorEl}
-              open={isMenuOpen}
-              onClose={handleMenuClose}
-              anchorOrigin={{
-                vertical: "bottom",
-                horizontal: "right",
-              }}
-              transformOrigin={{
-                vertical: "top",
-                horizontal: "right",
+              anchorEl={filterAnchorEl}
+              open={isFilterOpen}
+              onClose={handleFilterClose}
+              transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+              anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+              PaperProps={{
+                sx: { width: 200, mt: 1, borderRadius: 2, boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }
               }}
             >
-              <MenuItem
-                onClick={() => {
-                  if (menuRow) handleAddBalance(menuRow);
-                  handleMenuClose();
-                }}
-              >
-                Add Balance
+              <div className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                Filter by Status
+              </div>
+              <MenuItem onClick={() => { setStatusFilter('ALL'); handleFilterClose(); }} selected={statusFilter === 'ALL'} className="text-sm">
+                All Users
               </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  if (menuRow) handleAddCampaign(menuRow);
-                  handleMenuClose();
-                }}
-              >
-                Add Campaign
+              <MenuItem onClick={() => { setStatusFilter('ACTIVE'); handleFilterClose(); }} selected={statusFilter === 'ACTIVE'} className="text-sm">
+                Active Only
               </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  if (menuRow) handleEdit(menuRow);
-                  handleMenuClose();
-                }}
-              >
-                Edit User Account
-              </MenuItem>
-              
-              {/* Add Resend Verification Email option - ONLY if email is not verified */}
-              {menuRow && !menuRow.isEmailVerified && (
-                <MenuItem
-                  onClick={() => {
-                    if (menuRow) handleResendVerificationEmail(menuRow);
-                    handleMenuClose();
-                  }}
-                >
-                  Resend Verification Email
-                </MenuItem>
-              )}
-
-              {menuRow && !isSyncedToBoberdoo(menuRow) && (
-                <MenuItem 
-                  onClick={() => { 
-                    if (menuRow) handleSyncBoberdoo(menuRow); 
-                    handleMenuClose(); 
-                  }}
-                >
-                  Sync to Boberdoo
-                </MenuItem>
-              )}
-
-              {menuRow?.payment_error && (
-                <MenuItem
-                  onClick={() => {
-                    if (menuRow) handleSendTopUpWebhook(menuRow);
-                    handleMenuClose();
-                  }}
-                >
-                  Send Balance Top-Up Webhook
-                </MenuItem>
-              )}
-
-              <MenuItem
-                onClick={() => {
-                  if (menuRow) handleToggleUser(menuRow);
-                  handleMenuClose();
-                }}
-              >
-                {menuRow?.isActive ? "Deactivate User" : "Activate User"}
+              <MenuItem onClick={() => { setStatusFilter('INACTIVE'); handleFilterClose(); }} selected={statusFilter === 'INACTIVE'} className="text-sm">
+                Inactive Only
               </MenuItem>
             </Menu>
+          </div>
         </div>
-        <ConfirmDialog
-          open={confirmOpen}
-          title="Delete User Account"
-          message={`Are you sure you want to delete ${
-            selectedUser?.name || "this user"
+
+        {/* Content */}
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50/50">
+                {table.getHeaderGroups().map((headerGroup) => (
+                  headerGroup.headers.map((header) => (
+                    <th
+                      key={header.id}
+                      className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap"
+                    >
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                          header.column.columnDef.header,
+                          header.getContext()
+                        )}
+                    </th>
+                  ))
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {loading ? (
+                // Skeleton Loading
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i} className="animate-pulse">
+                    <td className="px-6 py-4"><div className="h-10 w-10 bg-gray-100 rounded-full" /></td>
+                    <td className="px-6 py-4"><div className="h-4 w-32 bg-gray-100 rounded" /></td>
+                    <td className="px-6 py-4"><div className="h-4 w-24 bg-gray-100 rounded" /></td>
+                    <td className="px-6 py-4"><div className="h-4 w-24 bg-gray-100 rounded" /></td>
+                    <td className="px-6 py-4"><div className="h-6 w-16 bg-gray-100 rounded-full" /></td>
+                    <td className="px-6 py-4"><div className="h-4 w-16 bg-gray-100 rounded" /></td>
+                    <td className="px-6 py-4 text-right"><div className="h-8 w-8 bg-gray-100 rounded ml-auto" /></td>
+                  </tr>
+                ))
+              ) : table.getRowModel().rows?.length ? (
+                table.getRowModel().rows.map((row) => (
+                  <tr
+                    key={row.id}
+                    className="group hover:bg-blue-50/30 transition-colors"
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <td key={cell.id} className="px-6 py-4 whitespace-nowrap">
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={columns.length} className="px-6 py-24 text-center text-gray-500">
+                    <div className="flex flex-col items-center justify-center">
+                      <div className="h-16 w-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                        <Search className="h-8 w-8 text-gray-300" />
+                      </div>
+                      <p className="text-lg font-medium text-gray-900">No users found</p>
+                      <p className="text-sm text-gray-500 mt-1 max-w-xs mx-auto">
+                        We couldn't find any users matching your search. Try different keywords.
+                      </p>
+                      <button
+                        onClick={() => setGlobalFilter("")}
+                        className="mt-4 px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+                      >
+                        Clear Search
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-white">
+          <div className="flex-1 flex justify-between sm:hidden">
+            <button
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+              className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+              className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+          <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-gray-700">
+                Rows per page
+              </span>
+              <select
+                value={pagination.pageSize}
+                onChange={e => {
+                  table.setPageSize(Number(e.target.value))
+                }}
+                className="block w-20 py-1.5 px-2 text-base border-gray-300 focus:outline-none focus:ring-black focus:border-black sm:text-sm rounded-lg border bg-gray-50"
+              >
+                {[10, 20, 30, 40, 50].map(pageSize => (
+                  <option key={pageSize} value={pageSize}>
+                    {pageSize}
+                  </option>
+                ))}
+              </select>
+              <div className="h-4 w-px bg-gray-200 mx-2"></div>
+              <p className="text-sm text-gray-600">
+                <span className="font-medium text-gray-900">{(totalRows > 0 ? (pagination.pageIndex * pagination.pageSize) + 1 : 0)}</span> - <span className="font-medium text-gray-900">{Math.min((pagination.pageIndex + 1) * pagination.pageSize, totalRows)}</span> of <span className="font-medium text-gray-900">{totalRows}</span>
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                <button
+                  onClick={() => table.previousPage()}
+                  disabled={!table.getCanPreviousPage()}
+                  className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-200 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <span className="sr-only">Previous</span>
+                  <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+                </button>
+
+                {/* Advanced Pagination Logic */}
+                {(() => {
+                  const pageCount = table.getPageCount();
+                  const current = pagination.pageIndex;
+                  const maxButtons = 5;
+                  let start = Math.max(0, current - 2);
+                  let end = Math.min(pageCount, start + maxButtons);
+
+                  if (end - start < maxButtons) {
+                    start = Math.max(0, end - maxButtons);
+                  }
+
+                  const pages: number[] = [];
+                  for (let i = start; i < end; i++) {
+                    pages.push(i);
+                  }
+
+                  return pages.map(pageNum => (
+                    <button
+                      key={pageNum}
+                      onClick={() => table.setPageIndex(pageNum)}
+                      className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium transition-colors ${pagination.pageIndex === pageNum
+                        ? 'z-10 bg-black text-white border-black hover:bg-gray-800'
+                        : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                        }`}
+                    >
+                      {pageNum + 1}
+                    </button>
+                  ));
+                })()}
+
+                <button
+                  onClick={() => table.nextPage()}
+                  disabled={!table.getCanNextPage()}
+                  className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-200 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <span className="sr-only">Next</span>
+                  <ChevronRight className="h-5 w-5" aria-hidden="true" />
+                </button>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Delete User Account"
+        message={`Are you sure you want to delete ${selectedUser?.name || "this user"
           }? This will also remove their campaigns and related data.`}
-          onConfirm={confirmDeleteUser}
-          onCancel={() => setConfirmOpen(false)}
-        />
-        </>
-    );
+        onConfirm={confirmDeleteUser}
+        onCancel={() => setConfirmOpen(false)}
+      />
+    </div>
+  );
 }
+
+
+// Sub-component for Menu to keep cleaner
+const ActionMenu = ({
+  user,
+  onEdit,
+  onAddBalance,
+  onAddCampaign,
+  onDelete,
+  onResendVerification,
+  onSyncBoberdoo,
+  onToggleStatus,
+  onSendWebhook
+}: {
+  user: User;
+  onEdit: () => void;
+  onAddBalance: () => void;
+  onAddCampaign: () => void;
+  onDelete: () => void;
+  onResendVerification: () => void;
+  onSyncBoberdoo: () => void;
+  onToggleStatus: () => void;
+  onSendWebhook: () => void;
+}) => {
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const open = Boolean(anchorEl);
+
+  const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setAnchorEl(event.currentTarget);
+  };
+  const handleClose = () => {
+    setAnchorEl(null);
+  };
+
+  return (
+    <>
+      <div className="text-right">
+        <IconButton
+          onClick={handleClick}
+          size="small"
+          className="text-gray-400 hover:text-gray-600 hover:bg-gray-50"
+        >
+          <MoreHorizontal className="h-5 w-5" />
+        </IconButton>
+      </div>
+      <Menu
+        anchorEl={anchorEl}
+        open={open}
+        onClose={handleClose}
+        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+        PaperProps={{
+          elevation: 0,
+          sx: {
+            overflow: 'visible',
+            filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.08))',
+            mt: 1.5,
+            '& .MuiAvatar-root': {
+              width: 32,
+              height: 32,
+              ml: -0.5,
+              mr: 1,
+            },
+            borderRadius: '12px',
+            border: '1px solid #f3f4f6'
+          },
+        }}
+      >
+        <MenuItem onClick={() => { onAddBalance(); handleClose(); }} disableRipple className="text-sm font-medium text-gray-700 gap-2">
+          <CreditCard size={16} /> Add Balance
+        </MenuItem>
+        <MenuItem onClick={() => { onEdit(); handleClose(); }} disableRipple className="text-sm font-medium text-gray-700 gap-2">
+          <CheckCircle2 size={16} /> Edit Account
+        </MenuItem>
+        <MenuItem onClick={() => { onAddCampaign(); handleClose(); }} disableRipple className="text-sm font-medium text-gray-700 gap-2">
+          <Shield size={16} /> Add Campaign
+        </MenuItem>
+
+        {!user.isEmailVerified && (
+          <MenuItem onClick={() => { onResendVerification(); handleClose(); }} disableRipple className="text-sm font-medium text-gray-700 gap-2">
+            <Mail size={16} /> Resend Verification
+          </MenuItem>
+        )}
+
+        {!user.integrations?.boberdoo?.external_id && (
+          <MenuItem onClick={() => { onSyncBoberdoo(); handleClose(); }} disableRipple className="text-sm font-medium text-gray-700 gap-2">
+            <RefreshCcw size={16} /> Sync to Boberdoo
+          </MenuItem>
+        )}
+
+        <MenuItem onClick={() => { onToggleStatus(); handleClose(); }} disableRipple className={`text-sm font-medium gap-2 ${user.isActive ? 'text-amber-600' : 'text-green-600'}`}>
+          {user.isActive ? <XCircle size={16} /> : <CheckCircle2 size={16} />}
+          {user.isActive ? "Deactivate User" : "Activate User"}
+        </MenuItem>
+
+        <MenuItem onClick={() => { onDelete(); handleClose(); }} disableRipple className="text-sm font-medium text-red-600 gap-2">
+          <Trash2 size={16} /> Delete User
+        </MenuItem>
+      </Menu>
+    </>
+  );
+};
