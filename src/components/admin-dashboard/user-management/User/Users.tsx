@@ -855,9 +855,9 @@ const ActionMenu = ({
           {user.isActive ? "Deactivate User" : "Activate User"}
         </MenuItem>
 
-        <MenuItem onClick={() => { onDelete(); handleClose(); }} disableRipple className="text-sm font-medium text-red-600 gap-2">
+        {/* <MenuItem onClick={() => { onDelete(); handleClose(); }} disableRipple className="text-sm font-medium text-red-600 gap-2">
           <Trash2 size={16} /> Delete User
-        </MenuItem>
+        </MenuItem> */}
       </Menu>
     </>
   );
