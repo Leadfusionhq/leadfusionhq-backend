@@ -385,6 +385,18 @@ export default function UserTable() {
       ),
     },
     {
+      accessorKey: "integrations.boberdoo.external_id",
+      header: "Partner ID",
+      cell: ({ row }) => {
+        const partnerId = row.original.integrations?.boberdoo?.external_id;
+        return (
+          <span className={`text-sm font-medium ${partnerId ? "text-gray-900" : "text-gray-400 italic"}`}>
+            {partnerId || "--"}
+          </span>
+        );
+      },
+    },
+    {
       accessorKey: "companyName",
       header: "Company",
       cell: ({ row }) => <span className="text-sm text-gray-700 font-medium">{row.original.companyName || "—"}</span>,
