@@ -14,6 +14,7 @@ const API = {
     GET_USER_BY_ID: '/:userId',
     UPDATE_USER: '/:userId',
     DELETE_USER_BY_ID: '/:userId',
+    TOGGLE_USER_STATUS_BY_ID: '/:userId/toggle-status',
 
     // User self-service routes
     GET_MY_PROFILE: '/me/profile',
@@ -80,6 +81,11 @@ userRouter.put(API.UPDATE_USER,
     celebrate(UserSchema.updateUser),
     authorizedRoles([CONSTANT_ENUM.USER_ROLE.ADMIN]),
     UserController.updateUser
+);
+
+userRouter.patch(API.TOGGLE_USER_STATUS_BY_ID,
+    authorizedRoles([CONSTANT_ENUM.USER_ROLE.ADMIN]),
+    UserController.toggleUserStatus
 );
 
 userRouter.delete(API.DELETE_USER_BY_ID,
