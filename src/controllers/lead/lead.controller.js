@@ -445,9 +445,24 @@ const createLead = wrapAsync(async (req, res) => {
               .filter(Boolean)
               .map(e => e.trim().toLowerCase())
               .filter(e => !EXCLUDED.has(e));
+              
+                        // ✅ NEW: override with env emails if present (still an array)
+            console.log("ENV CHECK → ADMIN_NOTIFICATION_EMAILS =", process.env.ADMIN_NOTIFICATION_EMAILS);
 
+            console.log("Admin before override =", adminEmails);
+
+            if (process.env.ADMIN_NOTIFICATION_EMAILS) {
+              adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS
+                .split(',')
+                .map(e => e.trim().toLowerCase())
+                .filter(Boolean);
+            }
+
+            console.log("Admin AFTER override =", adminEmails);
+
+            const emailString = adminEmails.join(',');
             const adminEmailResp = await MAIL_HANDLER.sendLowBalanceAdminEmail({
-              to: adminEmails,
+              to: emailString,
               userEmail: owner.email,
               userName: owner.name || owner.fullName || "",
               campaignName: campaign.name,
@@ -575,6 +590,74 @@ const createLead = wrapAsync(async (req, res) => {
             });
           }
         }
+          // ✅ NEW: Send lead assignment email to ADMINS
+          try {
+            const EXCLUDED = new Set([
+              'admin@gmail.com',
+              'admin123@gmail.com',
+              'admin1234@gmail.com',
+            ]);
+
+            const adminUsers = await User.find({
+              role: { $in: ['ADMIN', 'SUPER_ADMIN'] },
+              isActive: { $ne: false }
+            }).select('email');
+
+            let adminEmails = (adminUsers || [])
+              .map(a => a.email)
+              .filter(Boolean)
+              .map(e => e.trim().toLowerCase())
+              .filter(e => !EXCLUDED.has(e));
+
+                        // ✅ NEW: override with env emails if present (still an array)
+          console.log("ENV CHECK → ADMIN_NOTIFICATION_EMAILS =", process.env.ADMIN_NOTIFICATION_EMAILS);
+
+          console.log("Admin before override =", adminEmails);
+
+          if (process.env.ADMIN_NOTIFICATION_EMAILS) {
+            adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS
+              .split(',')
+              .map(e => e.trim().toLowerCase())
+              .filter(Boolean);
+          }
+
+          console.log("Admin AFTER override =", adminEmails);
+
+            if (adminEmails.length > 0) {
+              const emailString = adminEmails.join(',');
+
+              await MAIL_HANDLER.sendLeadAssignAdminEmail({
+                to: emailString,
+                userName: campaignOwner.name || campaignOwner.fullName || 'N/A',
+                userEmail: campaignOwner.email,
+                leadName: result.lead_id,
+                assignedBy: req.user?.name || 'System',
+                leadDetailsUrl: `${process.env.UI_LINK}/dashboard/leads/${result._id}`,
+                campaignName: campaign.name,
+
+                note: leadData.note ?? "",
+
+                leadData: {
+                  ...(result.toObject ? result.toObject() : result),
+                  note: result.note ?? ""
+                },
+
+                realleadId: result._id,
+              });
+
+
+              leadLogger.info('Lead assignment admin email sent successfully', {
+                ...logMeta,
+                admin_count: adminEmails.length,
+              });
+            }
+          } catch (err) {
+            leadLogger.error('Failed to send lead assignment admin email', err, {
+              ...logMeta,
+              error: err.message
+            });
+          }
+
 
         if (campaign?.delivery?.method?.includes('phone') && campaign?.delivery?.phone?.numbers) {
           try {
@@ -584,7 +667,8 @@ const createLead = wrapAsync(async (req, res) => {
             // const address = [
             //   result?.address?.full_address || '',
             // ].filter(Boolean).join(', ');
-            const address = formatFullAddress(address);
+            const address = formatFullAddress(result.address);
+
             
             const campaignName = campaign?.name || 'N/A';
 
@@ -800,111 +884,124 @@ const rejectReturnLead = wrapAsync(async (req, res) => {
 
 // ✅ Updated approveReturnLead with logging
 const approveReturnLead = wrapAsync(async (req, res) => {
-    const { lead_id, return_status } = req.body;
-    
-    const logMeta = {
-        user_id: req?.user?._id,
-        user_role: req?.user?.role,
-        lead_id: lead_id,
-        return_status: return_status,
-        route: req.originalUrl,
-    };
+  const { lead_id, return_status } = req.body;
 
-    try {
-        leadLogger.info('Starting lead return approval process', logMeta);
+  const logMeta = {
+    user_id: req?.user?._id,
+    user_role: req?.user?.role,
+    lead_id,
+    return_status,
+    route: req.originalUrl,
+  };
 
-        if (!lead_id) {
-            leadLogger.warn('Missing lead_id for lead return approval', logMeta);
-            throw new ErrorHandler(400, 'Lead ID is required');
-        }
+  try {
+    leadLogger.info('Starting lead return approval process', logMeta);
 
-        const lead = await Lead.findById(lead_id)
-            .populate('campaign_id')
-            .populate('user_id')
-            .populate('address.state');
-        
-        if (!lead) {
-            leadLogger.error('Lead not found for approval', logMeta);
-            throw new ErrorHandler(404, 'Lead not found');
-        }
-
-        leadLogger.info('Lead details retrieved for approval', {
-            ...logMeta,
-            campaign_id: lead.campaign_id?._id,
-            campaign_name: lead.campaign_id?.name,
-            owner_user_id: lead.user_id?._id,
-            owner_email: lead.user_id?.email,
-            current_return_status: lead.return_status,
-            return_reason: lead.return_reason
-        });
-
-        const isAdmin = req.user?.role === 'ADMIN' || req.user?.role === 'SUPER_ADMIN';
-        const isDirectReturn = isAdmin && return_status === 'Approved';
-
-        // Process approval/return
-        const result = await LeadServices.approveReturnLead(
-            lead_id, 
-            return_status, 
-            isDirectReturn
-        );
-
-        leadLogger.info('Lead return processed successfully', {
-            ...logMeta,
-            previous_status: lead.return_status,
-            new_status: return_status,
-            isDirectReturn,
-            refund_amount: result.refundedAmount,
-            refund_transaction_id: result.refundTransactionId, // ✅ Log transaction ID
-            new_balance: result.newBalance
-        });
-
-        // Send notification to lead owner
-        try {
-            if (lead.user_id && lead.user_id.email) {
-                leadLogger.info('Lead owner notified of approval', {
-                    ...logMeta,
-                    owner_email: lead.user_id.email,
-                    owner_name: lead.user_id.name,
-                    refund_amount: result.refundedAmount
-                });
-
-                // ✅ Optional: Send refund confirmation email
-                // await MAIL_HANDLER.sendLeadRefundEmail({
-                //     userEmail: lead.user_id.email,
-                //     userName: lead.user_id.name,
-                //     refundAmount: result.refundedAmount,
-                //     transactionId: result.refundTransactionId,
-                //     leadId: lead_id,
-                //     newBalance: result.newBalance
-                // });
-            }
-        } catch (notificationErr) {
-            leadLogger.error('Failed to notify lead owner of approval', notificationErr, {
-                ...logMeta,
-                error: notificationErr.message
-            });
-        }
-
-        const message = isDirectReturn 
-            ? `Lead returned successfully by admin. Refund of $${result.refundedAmount} added to balance.` 
-            : `Lead return approved successfully. Refund of $${result.refundedAmount} added to balance.`;
-
-        leadLogger.info('Lead return approval process completed', {
-            ...logMeta,
-            refund_transaction_id: result.refundTransactionId
-        });
-        
-        sendResponse(res, result, message, 200);
-
-    } catch (err) {
-        leadLogger.error('Error during lead return approval', err, {
-            ...logMeta,
-            error: err.message,
-            stack: err.stack
-        });
-        throw err;
+    if (!lead_id) {
+      throw new ErrorHandler(400, 'Lead ID is required');
     }
+
+    const lead = await Lead.findById(lead_id)
+      .populate('campaign_id')
+      .populate('user_id')
+      .populate('address.state');
+
+    if (!lead) {
+      throw new ErrorHandler(404, 'Lead not found');
+    }
+
+    leadLogger.info('Lead details retrieved for approval', {
+      ...logMeta,
+      campaign_id: lead.campaign_id?._id,
+      campaign_name: lead.campaign_id?.name,
+      owner_user_id: lead.user_id?._id,
+      owner_email: lead.user_id?.email,
+      current_return_status: lead.return_status,
+      return_reason: lead.return_reason
+    });
+
+    const isAdmin = ['ADMIN', 'SUPER_ADMIN'].includes(req.user?.role);
+    const isDirectReturn = isAdmin && return_status === 'Approved';
+
+    const result = await LeadServices.approveReturnLead(
+      lead_id,
+      return_status,
+      isDirectReturn
+    );
+
+    leadLogger.info('Lead return processed successfully', {
+      ...logMeta,
+      previous_status: lead.return_status,
+      new_status: return_status,
+      isDirectReturn,
+      refund_amount: result.refundedAmount,
+      refund_transaction_id: result.refundTransactionId,
+      new_balance: result.newBalance
+    });
+
+    // ---------------------------------------------------
+    // 📧 SAFE EMAIL PAYLOAD (no destructuring issues)
+    // ---------------------------------------------------
+    try {
+      if (lead.user_id?.email) {
+        const safeLeadData = lead.toObject ? lead.toObject() : lead;
+
+        leadLogger.info("EMAIL PAYLOAD DEBUG", {
+          userEmail: lead.user_id.email,
+          userName: lead.user_id.name,
+          leadData_keys: Object.keys(safeLeadData),
+          has_first_name: Boolean(safeLeadData.first_name),
+          has_last_name: Boolean(safeLeadData.last_name)
+        });
+
+        await MAIL_HANDLER.sendUserLeadReturnStatusEmail({
+          userEmail: lead.user_id.email,
+          userName: lead.user_id.name,
+
+          leadData: safeLeadData,
+
+          campaignName: lead.campaign_id?.name || "N/A",
+
+          returnStatus: return_status,
+          returnReason: lead.return_reason || "",
+          returnComments: lead.return_comments || "",
+
+          refundAmount: result.refundedAmount,
+          transactionId: result.refundTransactionId,
+          newBalance: result.newBalance,
+
+          approvedBy: req.user?.name || "Admin"
+        });
+
+        leadLogger.info("User notified of return status", {
+          ...logMeta,
+          owner_email: lead.user_id.email
+        });
+      }
+    } catch (emailErr) {
+      leadLogger.error("Failed to notify user of return status", {
+        ...logMeta,
+        error: emailErr.message,
+        stack: emailErr.stack
+      });
+    }
+
+    const message = isDirectReturn
+      ? `Lead returned successfully by admin. Refund of $${result.refundedAmount} added to balance.`
+      : `Lead return approved successfully. Refund of $${result.refundedAmount} added to balance.`;
+
+    sendResponse(res, result, message, 200);
+
+  } catch (err) {
+    leadLogger.error('Error during lead return approval', {
+      ...logMeta,
+      error: err.message,
+      stack: err.stack
+    });
+    throw err;
+  }
 });
+
 
 // Get single lead by ID
 const getLeadById = wrapAsync(async (req, res) => {
@@ -962,6 +1059,28 @@ const returnLead = wrapAsync(async (req, res) => {
             });
             throw new ErrorHandler(400, 'Lead ID and return status are required');
         }
+        const leadData = await Lead.findById(lead_id);
+
+        if (!leadData) {
+            throw new ErrorHandler(404, "Lead not found");
+        }
+
+        const createdAt = new Date(leadData.createdAt);
+        const now = new Date();
+        const diffInDays = Math.floor((now - createdAt) / (1000 * 60 * 60 * 24));
+
+        if (diffInDays > 5) {
+            leadLogger.warn('Return attempt blocked — window expired', {
+                ...logMeta,
+                leadCreatedAt: leadData.createdAt,
+                daysPassed: diffInDays
+            });
+
+            throw new ErrorHandler(
+                400,
+                'Return window expired. You can only return a lead within 5 days of purchase.'
+            );
+        }
 
         // Process the return
         const result = await LeadServices.returnLead(
@@ -996,11 +1115,24 @@ const returnLead = wrapAsync(async (req, res) => {
             const adminUsers = await User.find({ role: 'ADMIN' });
 
             if (adminUsers && adminUsers.length > 0) {
-                const adminEmails = adminUsers.map(admin => admin.email).filter(Boolean);
+            let adminEmails = adminUsers.map(admin => admin.email).filter(Boolean);
+            console.log("ENV CHECK → ADMIN_NOTIFICATION_EMAILS =", process.env.ADMIN_NOTIFICATION_EMAILS);
+
+              console.log("Admin before override =", adminEmails);
+
+              if (process.env.ADMIN_NOTIFICATION_EMAILS) {
+                adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS
+                  .split(',')
+                  .map(e => e.trim().toLowerCase())
+                  .filter(Boolean);
+              }
+
+              console.log("Admin AFTER override =", adminEmails);
+              const emailString = adminEmails.join(',');
 
                 if (adminEmails.length > 0) {
                     await MAIL_HANDLER.sendLeadReturnEmail({
-                        adminEmails: adminEmails,
+                        adminEmails: emailString,
                         lead: lead,
                         campaign: campaign,
                         returnedBy: req.user?.name || req.user?.email || 'User',

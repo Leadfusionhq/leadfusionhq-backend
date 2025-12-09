@@ -3,8 +3,7 @@ const bcrypt = require('bcrypt');
 const CONSTANT_ENUM = require('../helper/constant-enums');
 
 // ✅ Import Chat and Message models
-const Chat = require('./chat.model');
-const Message = require('./message.model');
+
 
 
 const SALT_ROUNDS = 10;
@@ -136,7 +135,7 @@ const baseUserSchema = new mongoose.Schema({
 }, options);
 
 // Password hashing middleware
-baseUserSchema.pre('save', async function(next) {
+baseUserSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
 
   try {
@@ -148,7 +147,7 @@ baseUserSchema.pre('save', async function(next) {
   }
 });
 
-baseUserSchema.pre('findOneAndUpdate', async function(next) {
+baseUserSchema.pre('findOneAndUpdate', async function (next) {
   const update = this.getUpdate();
 
   if (update.password) {
@@ -160,7 +159,7 @@ baseUserSchema.pre('findOneAndUpdate', async function(next) {
   next();
 });
 
-baseUserSchema.pre('findByIdAndUpdate', async function(next) {
+baseUserSchema.pre('findByIdAndUpdate', async function (next) {
   const update = this.getUpdate();
 
   if (update.password) {
@@ -173,17 +172,22 @@ baseUserSchema.pre('findByIdAndUpdate', async function(next) {
 });
 
 // ✅ Compare password method
-baseUserSchema.methods.comparePassword = async function(candidatePassword) {
+baseUserSchema.methods.comparePassword = async function (candidatePassword) {
   return bcrypt.compare(candidatePassword, this.password);
 };
 
 // 🧹 Cascade delete user's chats & messages
-baseUserSchema.pre('findOneAndDelete', async function(next) {
+// ✅ Cascade delete user's chats & messages
+baseUserSchema.pre('findOneAndDelete', async function (next) {
   try {
     const user = await this.model.findOne(this.getFilter());
     if (!user) return next();
 
     console.log(`🧹 Deleting all chats and messages for user: ${user._id}`);
+
+    // ✅ ONLY load models here (inside the middleware)
+    const Chat = mongoose.model('Chat');
+    const Message = mongoose.model('Message');
 
     // 1️⃣ Find all chats where the user is a participant
     const chats = await Chat.find({ participants: user._id });
@@ -292,7 +296,7 @@ const regularUserSchema = new mongoose.Schema({
     acceptedAt: { type: Date, default: null },
     ipAddress: { type: String, default: null },
   },
-    // ✅ ADD THESE NEW FIELDS
+  // ✅ ADD THESE NEW FIELDS
   pending_payment: {
     amount: {
       type: Number,

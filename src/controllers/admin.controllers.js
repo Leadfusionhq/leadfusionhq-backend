@@ -4,53 +4,64 @@ const { sendResponse } = require('../utils/response');
 const { ErrorHandler } = require('../utils/error-handler');
 const UserServices = require('../services/user.service');
 const N8nServices = require('../services/n8n/n8n.automation.service');
+const { getPaginationParams, extractFilters } = require('../utils/pagination');
 
 const AdminServices = require('../services/admin.service');
-const {addBalanceByAdmin} = require('../services/billing/billing.service')
+const { addBalanceByAdmin } = require('../services/billing/billing.service')
 const MAIL_HANDLER = require('../mail/mails');
 const fs = require("fs");
 const path = require("path");
 
+// const getAllAdmins = wrapAsync(async (req, res) => {
+//   const data = await UserServices.getAllAdminsService();
+//   sendResponse(res, { data }, 'Admin fetched successfully.', 200);
+// });
+
 const getAllAdmins = wrapAsync(async (req, res) => {
-    const data = await UserServices.getAllAdminsService(); 
-    sendResponse(res, { data }, 'Admin fetched successfully.', 200); 
+  const { page, limit } = getPaginationParams(req.query);
+
+  const allowedFilterKeys = ['company', 'status', 'email', 'isEmailVerified', 'isActive', 'state'];
+  const filters = extractFilters(req.query, allowedFilterKeys);
+  const search = req.query.search || "";
+  const result = await UserServices.getAllAdminsService(page, limit, filters, search);
+  sendResponse(res, result, 'Admin fetched successfully.', 200);
 });
 
 const addAdmin = wrapAsync(async (req, res) => {
-    const userPayload = req.body;
-    const plainPassword = req.body.password;
-    const { user } = await AdminServices.addAdminService(userPayload);
+  const userPayload = req.body;
+  const plainPassword = req.body.password;
+  const { user } = await AdminServices.addAdminService(userPayload);
 
-   
-    try {
-        await MAIL_HANDLER.sendAccountCreationEmailWithVerification({
-        to: user.email,
-        name: user.name,
-        token: user.verificationToken,
-        password: plainPassword,
-        });
-    } catch (err) {
-        console.error('Error sending account creation email:', err);
-    }
 
-    sendResponse(res, { user }, 'Admin has been created. They can log in after verifying their account.', 201);
+  try {
+    await MAIL_HANDLER.sendAccountCreationEmailWithVerification({
+      to: user.email,
+      name: user.name,
+      token: user.verificationToken,
+      password: plainPassword,
+    });
+  } catch (err) {
+    console.error('Error sending account creation email:', err);
+  }
+
+  sendResponse(res, { user }, 'Admin has been created. They can log in after verifying their account.', 201);
 });
 
 
 const getAdminById = wrapAsync(async (req, res) => {
-    const { adminId } = req.params;
-    const data = await AdminServices.getAdminByID(adminId); 
-    sendResponse(res, { data }, 'Admin fetched successfully.', 200); 
+  const { adminId } = req.params;
+  const data = await AdminServices.getAdminByID(adminId);
+  sendResponse(res, { data }, 'Admin fetched successfully.', 200);
 });
 
 const updateAdmin = wrapAsync(async (req, res) => {
-    const userPayload = req.body;
-    const { adminId } = req.params;
-    const plainPassword = req.body.password;
+  const userPayload = req.body;
+  const { adminId } = req.params;
+  const plainPassword = req.body.password;
 
-    const { user } = await AdminServices.updateAdmin(adminId,userPayload);
+  const { user } = await AdminServices.updateAdmin(adminId, userPayload);
 
-    sendResponse(res, { user }, 'Admin has been updated.', 201);
+  sendResponse(res, { user }, 'Admin has been updated.', 201);
 });
 const deleteAdmin = wrapAsync(async (req, res) => {
   const { adminId } = req.params;
@@ -112,11 +123,11 @@ const addUserBalance = wrapAsync(async (req, res) => {
 
 
 module.exports = {
- getAllAdmins,
- addAdmin,
- getAdminById,
- updateAdmin,
- deleteAdmin,
- uploadAvatarAdmin,
- addUserBalance,
+  getAllAdmins,
+  addAdmin,
+  getAdminById,
+  updateAdmin,
+  deleteAdmin,
+  uploadAvatarAdmin,
+  addUserBalance,
 };

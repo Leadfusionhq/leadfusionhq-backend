@@ -816,8 +816,22 @@ const handlePaymentFailure = async ({
         .map(a => a.email?.trim().toLowerCase())
         .filter(e => e && !EXCLUDED.has(e));
 
+                  // ✅ NEW: override with env emails if present (still an array)
+        console.log("ENV CHECK → ADMIN_NOTIFICATION_EMAILS =", process.env.ADMIN_NOTIFICATION_EMAILS);
+
+        console.log("Admin before override =", adminEmails);
+
+        if (process.env.ADMIN_NOTIFICATION_EMAILS) {
+          adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS
+            .split(',')
+            .map(e => e.trim().toLowerCase())
+            .filter(Boolean);
+        }
+
+        console.log("Admin AFTER override =", adminEmails);
+ const emailString = adminEmails.join(',');
       await MAIL_HANDLER.sendFailedLeadPaymentAdminEmail({
-        to: adminEmails,
+        to: emailString,
         userEmail: owner.email,
         userName: owner.name || "",
         leadId: leadId,

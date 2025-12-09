@@ -11,20 +11,20 @@ const createUpload = require("../middleware/upload");
 const API = {
     GET_ALL_USERS: '/',
     ADD_USER: '/',
-    GET_USER_BY_ID:'/:userId',
-    UPDATE_USER:'/:userId',
-    DELETE_USER_BY_ID:'/:userId',
+    GET_USER_BY_ID: '/:userId',
+    UPDATE_USER: '/:userId',
+    DELETE_USER_BY_ID: '/:userId',
 
     // User self-service routes
     GET_MY_PROFILE: '/me/profile',
     UPDATE_MY_PROFILE: '/me/profile',
     CHANGE_MY_PASSWORD: '/me/change-password',
-    UPLOAD_MY_AVATAR: '/me/avatar', 
+    UPLOAD_MY_AVATAR: '/me/avatar',
 
     ACCEPT_CONTRACT: '/:userId/contract/accept',
     GET_CONTRACT_STATUS: '/:userId/contract/status',
     CHECK_CONTRACT: '/:userId/contract/check',
-    SYNC_BOMBERDO:'/:userId/boberdoo/resync',
+    SYNC_BOMBERDO: '/:userId/boberdoo/resync',
     SEND_BALANCE_TOPUP_WEBHOOK: '/:userId/balance/topup-webhook',
 
 };
@@ -33,18 +33,18 @@ const API = {
 userRouter.use(checkAuth);
 
 // Get current user's profile
-userRouter.get(API.GET_MY_PROFILE, 
+userRouter.get(API.GET_MY_PROFILE,
     UserController.getMyProfile
 );
 
 // Update current user's profile
-userRouter.put(API.UPDATE_MY_PROFILE, 
+userRouter.put(API.UPDATE_MY_PROFILE,
     celebrate(UserSchema.updateMyProfile),
     UserController.updateMyProfile
 );
 
 // Change current user's password
-userRouter.put(API.CHANGE_MY_PASSWORD, 
+userRouter.put(API.CHANGE_MY_PASSWORD,
     celebrate(UserSchema.changePassword),
     UserController.changeMyPassword
 );
@@ -55,16 +55,16 @@ userRouter.patch(API.UPLOAD_MY_AVATAR, uploadUser.single("avatar"), UserControll
 
 // Test route first
 userRouter.get('/test-route', (req, res) => {
-  res.json({ message: 'User routes are working!' });
+    res.json({ message: 'User routes are working!' });
 });
 
 // Admin-only routes
-userRouter.get(API.GET_ALL_USERS, 
-    authorizedRoles([CONSTANT_ENUM.USER_ROLE.ADMIN]), 
+userRouter.get(API.GET_ALL_USERS,
+    authorizedRoles([CONSTANT_ENUM.USER_ROLE.ADMIN]),
     UserController.getAllUsers
 );
 
-userRouter.post(API.ADD_USER, 
+userRouter.post(API.ADD_USER,
     celebrate(UserSchema.createUserByAdmin),
     authorizedRoles([CONSTANT_ENUM.USER_ROLE.ADMIN]),
     UserController.addUser
@@ -82,25 +82,25 @@ userRouter.put(API.UPDATE_USER,
     UserController.updateUser
 );
 
-userRouter.delete(API.DELETE_USER_BY_ID, 
+userRouter.delete(API.DELETE_USER_BY_ID,
     authorizedRoles([CONSTANT_ENUM.USER_ROLE.ADMIN]),
     UserController.deleteUser
 );
 
 // Contract routes - Allow both admin and users
-userRouter.put(API.ACCEPT_CONTRACT, 
+userRouter.put(API.ACCEPT_CONTRACT,
     celebrate(UserSchema.acceptContract),
-    authorizedRoles([CONSTANT_ENUM.USER_ROLE.ADMIN, CONSTANT_ENUM.USER_ROLE.USER]), 
+    authorizedRoles([CONSTANT_ENUM.USER_ROLE.ADMIN, CONSTANT_ENUM.USER_ROLE.USER]),
     UserController.acceptContract
 );
 
-userRouter.get(API.GET_CONTRACT_STATUS, 
+userRouter.get(API.GET_CONTRACT_STATUS,
     celebrate(UserSchema.getContractStatus),
     authorizedRoles([CONSTANT_ENUM.USER_ROLE.ADMIN, CONSTANT_ENUM.USER_ROLE.USER]),
     UserController.getContractStatus
 );
 
-userRouter.post(API.CHECK_CONTRACT, 
+userRouter.post(API.CHECK_CONTRACT,
     celebrate(UserSchema.checkContract),
     authorizedRoles([CONSTANT_ENUM.USER_ROLE.ADMIN, CONSTANT_ENUM.USER_ROLE.USER]),
     UserController.checkContractAcceptance
@@ -110,17 +110,21 @@ userRouter.post(
     API.SYNC_BOMBERDO,
     authorizedRoles([CONSTANT_ENUM.USER_ROLE.ADMIN, CONSTANT_ENUM.USER_ROLE.USER]),
     UserController.resyncBoberdoo
-  );
-
-  // below existing SYNC_BOMBERDO route
-userRouter.post(
-  API.SEND_BALANCE_TOPUP_WEBHOOK,
-  authorizedRoles([
-    CONSTANT_ENUM.USER_ROLE.ADMIN,
-    CONSTANT_ENUM.USER_ROLE.USER
-  ]),
-  UserController.sendBalanceTopUpWebhook
 );
 
+// below existing SYNC_BOMBERDO route
+userRouter.post(
+    API.SEND_BALANCE_TOPUP_WEBHOOK,
+    authorizedRoles([
+        CONSTANT_ENUM.USER_ROLE.ADMIN,
+        CONSTANT_ENUM.USER_ROLE.USER
+    ]),
+    UserController.sendBalanceTopUpWebhook
+);
+
+userRouter.delete(API.DELETE_USER_BY_ID,
+    authorizedRoles([CONSTANT_ENUM.USER_ROLE.ADMIN]),
+    UserController.deleteUser
+);
 
 module.exports = userRouter;

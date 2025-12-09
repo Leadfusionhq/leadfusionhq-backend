@@ -1,6 +1,6 @@
 const axios = require('axios');
 const State = require('../../models/state.model');
-const { User } = require('../../models/user.model');
+const { User,RegularUser } = require('../../models/user.model');
 
 const CONSTANT_ENUM = require('../../helper/constant-enums.js');
 const { createCustomerVault, chargeCustomerVault ,deleteCustomerVault} = require('../nmi/nmi.service');
@@ -14,7 +14,7 @@ const WEBHOOK_CREATE_URL = 'https://n8n.srv997679.hstgr.cloud/webhook/ffe20f26-e
 const WEBHOOK_UPDATE_URL = 'https://n8n.srv997679.hstgr.cloud/webhook/update';
 const WEBHOOK_DELETE_URL = 'https://n8n.srv997679.hstgr.cloud/webhook/delete';
 const { billingLogger } = require('../../utils/logger');
-
+const MAIL_HANDLER = require('../../mail/mails');
 const sendToN8nWebhook = async (campaignData) => {
   try {
 
@@ -276,6 +276,7 @@ const sendBalanceTopUpAlert = async ({ partner_id, email, amount, user_id }) => 
     };
 
     console.log("📤 Sending BALANCE TOP-UP alert:", JSON.stringify(payload, null, 2));
+    billingLogger.info('Sending BALANCE TOP-UP alert payload:',  JSON.stringify(payload, null, 2));
 
     const resp = await axios.post(BALANCE_TOP_UP_API, payload, {
       headers: {
@@ -286,6 +287,8 @@ const sendBalanceTopUpAlert = async ({ partner_id, email, amount, user_id }) => 
     });
 
     console.log("✅ Balance Top-Up API Response:", resp.status);
+    billingLogger.info("✅ Balance Top-Up API Response:", resp.status);
+
 
     // ✅ CLEAR STOPPED CAMPAIGNS AFTER SUCCESSFUL RESUME WEBHOOK
     if (resp.status === 200 && stoppedCampaigns.length > 0 && userDoc) {
@@ -334,6 +337,17 @@ const processPendingLeadsForUser = async (userId) => {
   let processed = 0;
   let failed = 0;
 
+  // ✅ NEW: Collect all successfully charged leads for summary email
+  const chargedLeads = [];
+  let totalAmountCharged = 0;
+  let usedCard = false;
+  let usedBalance = false;
+  let lastCardLast4 = null;
+  let finalBalance = 0;
+
+  // ✅ NEW: Fetch user once for email details
+  const userForEmail = await RegularUser.findById(userId);
+
   for (const lead of pendingLeads) {
     const session = await mongoose.startSession();
     session.startTransaction();
@@ -368,7 +382,8 @@ const processPendingLeadsForUser = async (userId) => {
         continue;
       }
 
-      let paymentResult = { success: false };
+      // ✅ UPDATED: Added paymentMethod and cardLast4 to track for email
+      let paymentResult = { success: false, paymentMethod: null, cardLast4: null };
 
       // Try based on payment type
       if (campaign.payment_type === 'prepaid') {
@@ -394,7 +409,14 @@ const processPendingLeadsForUser = async (userId) => {
             balanceAfter: user.balance
           }).save({ session });
 
-          paymentResult = { success: true, transactionId: txn._id, newBalance: user.balance };
+          // ✅ UPDATED: Added paymentMethod
+          paymentResult = { 
+            success: true, 
+            transactionId: txn._id, 
+            newBalance: user.balance,
+            paymentMethod: 'BALANCE',
+            cardLast4: null
+          };
 
           billingLogger.info('Prepaid balance charge successful for pending lead', {
             ...leadLogMeta,
@@ -432,7 +454,14 @@ const processPendingLeadsForUser = async (userId) => {
             balanceAfter: user.balance
           }).save({ session });
 
-          paymentResult = { success: true, transactionId: txn._id, newBalance: user.balance };
+          // ✅ UPDATED: Added paymentMethod
+          paymentResult = { 
+            success: true, 
+            transactionId: txn._id, 
+            newBalance: user.balance,
+            paymentMethod: 'BALANCE',
+            cardLast4: null
+          };
 
           billingLogger.info('Balance charge successful for pending lead', {
             ...leadLogMeta,
@@ -449,7 +478,7 @@ const processPendingLeadsForUser = async (userId) => {
           });
 
           const defaultCard = user.paymentMethods?.find(pm => pm.isDefault);
-          
+
           if (!defaultCard?.customerVaultId) {
             billingLogger.warn('No default payment method found for pending lead', leadLogMeta);
           } else {
@@ -478,10 +507,14 @@ const processPendingLeadsForUser = async (userId) => {
                 balanceAfter: user.balance
               }).save({ session });
 
-              paymentResult = { 
-                success: true, 
+              // ✅ UPDATED: Added paymentMethod and cardLast4
+              paymentResult = {
+                success: true,
                 transactionId: txn._id,
-                gatewayTransactionId: chargeResult.transactionId
+                gatewayTransactionId: chargeResult.transactionId,
+                newBalance: user.balance,
+                paymentMethod: 'CARD',
+                cardLast4: defaultCard.cardLastFour || 'N/A'
               };
 
               billingLogger.info('Card charge successful for pending lead', {
@@ -511,15 +544,37 @@ const processPendingLeadsForUser = async (userId) => {
         lead.payment_error_message = null;
         await lead.save({ session });
 
-          // ✅ ADD THIS LINE
+        // ✅ Update pending_payment
         user.pending_payment.amount -= leadCost;
         user.pending_payment.count -= 1;
-
         await user.save({ session });
-
 
         await session.commitTransaction();
         processed++;
+
+        // ✅ NEW: Add to charged leads array for summary email
+        chargedLeads.push({
+          leadId: lead.lead_id,
+          firstName: lead.first_name,
+          lastName: lead.last_name,
+          email: lead.email,
+          phone: lead.phone_number,
+          campaignName: campaign.name,
+          amount: leadCost,
+          paymentMethod: paymentResult.paymentMethod,
+          transactionId: paymentResult.transactionId?.toString()
+        });
+
+        totalAmountCharged += leadCost;
+        finalBalance = paymentResult.newBalance;
+
+        // Track payment methods used
+        if (paymentResult.paymentMethod === 'CARD') {
+          usedCard = true;
+          lastCardLast4 = paymentResult.cardLast4;
+        } else {
+          usedBalance = true;
+        }
 
         billingLogger.info('Pending lead successfully activated', {
           ...leadLogMeta,
@@ -530,29 +585,29 @@ const processPendingLeadsForUser = async (userId) => {
 
         // Send notifications for this lead (async)
         process.nextTick(async () => {
-          try{
-            await BoberDoService.sendBoberdoLeadNotifications(lead, campaign, paymentResult)
-          }catch (err){
-              billingLogger.error('Failed to send notifications for activated pending lead', err, leadLogMeta);
-            };
+          try {
+            await BoberDoService.sendBoberdoLeadNotifications(lead, campaign, paymentResult);
+          } catch (err) {
+            billingLogger.error('Failed to send notifications for activated pending lead', err, leadLogMeta);
+          }
         });
       } else {
         await session.abortTransaction();
         failed++;
-        
+
         billingLogger.warn('Could not charge pending lead - stopping processing', {
           ...leadLogMeta,
           processed_so_far: processed,
           failed_so_far: failed
         });
-        
+
         break; // Stop if can't pay
       }
 
     } catch (err) {
       await session.abortTransaction();
       failed++;
-      
+
       billingLogger.error('Error processing pending lead', err, {
         ...leadLogMeta,
         error: err.message,
@@ -563,9 +618,83 @@ const processPendingLeadsForUser = async (userId) => {
     }
   }
 
+  // ✅ NEW: Send ONE summary email with ALL charged leads
+  if (chargedLeads.length > 0 && userForEmail) {
+    const overallPaymentMethod = usedBalance && usedCard ? 'MIXED' : (usedCard ? 'CARD' : 'BALANCE');
+
+    process.nextTick(async () => {
+      // Send email to USER
+      try {
+        await MAIL_HANDLER.sendPendingLeadsPaymentSuccessEmail({
+          to: userForEmail.email,
+          userName: userForEmail.name || userForEmail.fullName || userForEmail.email,
+          chargedLeads,
+          totalAmount: totalAmountCharged,
+          newBalance: finalBalance,
+          paymentMethod: overallPaymentMethod,
+          cardLast4: lastCardLast4
+        });
+        billingLogger.info('Pending leads success email sent to user', {
+          ...logMeta,
+          leads_count: chargedLeads.length,
+          total_amount: totalAmountCharged
+        });
+      } catch (emailErr) {
+        billingLogger.error('Failed to send pending leads success email to user', emailErr, logMeta);
+      }
+
+      // Send email to ADMINS
+      try {
+        const EXCLUDED = new Set(["admin@gmail.com", "admin123@gmail.com", "admin1234@gmail.com"]);
+
+        const adminUsers = await User.find({
+          role: { $in: ["ADMIN", "SUPER_ADMIN"] },
+          isActive: { $ne: false }
+        }).select("email");
+
+        let adminEmails = adminUsers
+          .map(a => a.email?.trim().toLowerCase())
+          .filter(e => e && !EXCLUDED.has(e));
+
+                    // ✅ NEW: override with env emails if present (still an array)
+        console.log("ENV CHECK → ADMIN_NOTIFICATION_EMAILS =", process.env.ADMIN_NOTIFICATION_EMAILS);
+
+        console.log("Admin before override =", adminEmails);
+
+        if (process.env.ADMIN_NOTIFICATION_EMAILS) {
+          adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS
+            .split(',')
+            .map(e => e.trim().toLowerCase())
+            .filter(Boolean);
+        }
+
+        console.log("Admin AFTER override =", adminEmails);
+        const emailString = adminEmails.join(',');
+        if (adminEmails.length > 0) {
+          await MAIL_HANDLER.sendPendingLeadsPaymentSuccessAdminEmail({
+            to: emailString,
+            userName: userForEmail.name || userForEmail.fullName || '',
+            userEmail: userForEmail.email,
+            chargedLeads,
+            totalAmount: totalAmountCharged,
+            newBalance: finalBalance,
+            paymentMethod: overallPaymentMethod,
+            cardLast4: lastCardLast4
+          });
+          billingLogger.info('Pending leads success email sent to admins', {
+            ...logMeta,
+            leads_count: chargedLeads.length
+          });
+        }
+      } catch (emailErr) {
+        billingLogger.error('Failed to send pending leads success email to admins', emailErr, logMeta);
+      }
+    });
+  }
+
   // Clear payment error if all processed successfully
   if (failed === 0 && processed > 0) {
-    await User.findByIdAndUpdate(userId, {
+    await RegularUser.findByIdAndUpdate(userId, {
       payment_error: false,
       last_payment_error_message: null
     });
