@@ -319,6 +319,25 @@ const sendBalanceTopUpWebhook = wrapAsync(async (req, res) => {
   sendResponse(res, { result }, 'Balance top-up webhook sent', 200);
 });
 
+const deleteUser = wrapAsync(async (req, res) => {
+  const { userId } = req.params;
+
+  const user = await UserServices.getUserByID(userId);
+  if (!user) {
+    return sendResponse(res, null, 'User not found.', 404);
+  }
+  if (user.n8nUserId) {
+    try {
+      await N8nServices.deleteSubAccountById(user.n8nUserId);
+      console.log(`n8n user ${user.n8nUserId} deleted successfully.`);
+    } catch (err) {
+      console.error(`Failed to delete n8n user ${user.n8nUserId}:`, err.message);
+    }
+  }
+  await UserServices.hardDeleteUser(userId);
+
+  return sendResponse(res, null, 'User has been deleted.', 200);
+});
 
 module.exports = {
   getAllUsers,
@@ -336,4 +355,5 @@ module.exports = {
   updateMyProfile,
   changeMyPassword,
   sendBalanceTopUpWebhook,
+  deleteUser,
 };
