@@ -2,7 +2,7 @@ const { User } = require('../models/user.model');
 const { ErrorHandler } = require('../utils/error-handler');
 const OTP = require('../models/otp.model');
 const CONSTANT_ENUM = require('../helper/constant-enums');
-const { generateVerificationToken , getTokenExpiration } = require('../utils/token.utils');
+const { generateVerificationToken, getTokenExpiration } = require('../utils/token.utils');
 const { updatePartnerInBoberdoo } = require('../services/boberdoo/boberdoo.service');
 const getUserByEmail = async (email, includePassword = false) => {
   const projection = includePassword ? {} : { password: 0 };
@@ -58,21 +58,21 @@ const updateUserProfile = async (userId, updateData) => {
 
 const changeUserPassword = async (userId, currentPassword, newPassword) => {
   const user = await User.findById(userId).select('+password');
-  
+
   if (!user) {
-      throw new ErrorHandler(404, 'User not found');
+    throw new ErrorHandler(404, 'User not found');
   }
 
   // Verify current password
   const isPasswordValid = await user.comparePassword(currentPassword);
   if (!isPasswordValid) {
-      throw new ErrorHandler(401, 'Current password is incorrect');
+    throw new ErrorHandler(401, 'Current password is incorrect');
   }
 
   // Check if new password is same as current    
   const isSamePassword = await user.comparePassword(newPassword);
-    if (isSamePassword) {
-      throw new ErrorHandler(400, 'New password must be different from current password');
+  if (isSamePassword) {
+    throw new ErrorHandler(400, 'New password must be different from current password');
   }
 
   // Update password
@@ -113,37 +113,105 @@ const getOTPByEmail = async (email, otp) => await OTP.findOne({ email, otp });
 
 
 // For uesr::
-const getAllUsersService = async (filter = {}, options = {}) => {
-  const { limit = 10, skip = 0 } = options;
-
+const getAllUsersService = async (page, limit, filter = {}, search = "") => {
   const query = {
     ...filter,
-        role:[CONSTANT_ENUM.USER_ROLE.USER],
-    // isActive: true,
-    // isEmailVerified: true,
-
+    role: CONSTANT_ENUM.USER_ROLE.USER,
   };
 
-  return User.find(query);
+  if (search) {
+    const regex = new RegExp(search, "i");
+    query.$or = [
+      { name: regex },
+      { email: regex },
+      { company: regex }
+    ];
+  }
+
+  const skip = (page - 1) * limit;
+
+  const data = await User.find(query)
+    .limit(limit)
+    .skip(skip)
+    .lean();
+
+  const total = await User.countDocuments(query);
+
+  return {
+    data,
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit),
+  };
 };
 
-const getAllAdminsService = async (filter = {}, options = {}) => {
-  const { limit = 10, skip = 0 } = options;
 
+// const getAllUsersService = async (filter = {}, options = {}) => {
+//   const { limit = 10, skip = 0 } = options;
+
+//   const query = {
+//     ...filter,
+//         role:[CONSTANT_ENUM.USER_ROLE.USER],
+//     // isActive: true,
+//     // isEmailVerified: true,
+
+//   };
+
+//   return User.find(query);
+// };
+
+// const getAllAdminsService = async (filter = {}, options = {}) => {
+//   const { limit = 10, skip = 0 } = options;
+
+//   const query = {
+//     ...filter,
+//     role: [CONSTANT_ENUM.USER_ROLE.ADMIN],
+//     // isActive: true,
+//     // isEmailVerified: true,
+
+//   };
+
+//   return User.find(query);
+// };
+
+const getAllAdminsService = async (page, limit, filter = {}, search = "") => {
   const query = {
     ...filter,
-        role:[CONSTANT_ENUM.USER_ROLE.ADMIN],
-    // isActive: true,
-    // isEmailVerified: true,
-
+    role: CONSTANT_ENUM.USER_ROLE.ADMIN,
   };
 
-  return User.find(query);
+  if (search) {
+    const regex = new RegExp(search, "i");
+    query.$or = [
+      { name: regex },
+      { email: regex },
+      { company: regex }
+    ];
+  }
+
+  const skip = (page - 1) * limit;
+
+  const data = await User.find(query)
+    .limit(limit)
+    .skip(skip)
+    .lean();
+
+  const total = await User.countDocuments(query);
+
+  return {
+    data,
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit),
+  };
 };
+
 const addUserService = async (data) => {
   const { email, password, name, phoneNumber, companyName, region, country,
-   
-     } = data;
+
+  } = data;
   const normalizedEmail = email.toLowerCase();
 
   const existingUser = await getUserByEmail(normalizedEmail);
@@ -181,17 +249,17 @@ const updateContractAcceptance = async (userId, contractData) => {
   console.log('=== UPDATE CONTRACT START ===');
   console.log('User ID:', userId);
   console.log('Contract Data:', contractData);
-  
+
   try {
     const user = await User.findById(userId);
     console.log('Found user:', user ? user._id : 'NOT FOUND');
-    
+
     if (!user) {
       throw new ErrorHandler(404, 'User not found');
     }
 
     console.log('Current contractAcceptance:', user.contractAcceptance);
-    
+
     user.contractAcceptance = {
       version: contractData.version,
       acceptedAt: new Date(),
@@ -199,10 +267,10 @@ const updateContractAcceptance = async (userId, contractData) => {
     };
 
     console.log('New contractAcceptance to set:', user.contractAcceptance);
-    
+
     const updatedUser = await user.save();
     console.log('Saved user contractAcceptance:', updatedUser.contractAcceptance);
-    
+
     return updatedUser;
   } catch (error) {
     console.log('Error in updateContractAcceptance:', error);
@@ -211,27 +279,27 @@ const updateContractAcceptance = async (userId, contractData) => {
 };
 
 const getContractAcceptance = async (userId) => {
-  const user = await User.findById(userId, { 
-    'contractAcceptance': 1 
+  const user = await User.findById(userId, {
+    'contractAcceptance': 1
   }).exec();
-  
+
   if (!user) throw new ErrorHandler(404, 'User not found');
   return user.contractAcceptance;
 };
 
 const hasAcceptedContract = async (userId, version = null) => {
-  const user = await User.findById(userId, { 
-    'contractAcceptance': 1 
+  const user = await User.findById(userId, {
+    'contractAcceptance': 1
   }).exec();
-  
+
   if (!user) return false;
-  
+
   if (version) {
-    return user.contractAcceptance && 
-           user.contractAcceptance.version === version && 
-           user.contractAcceptance.acceptedAt !== null;
+    return user.contractAcceptance &&
+      user.contractAcceptance.version === version &&
+      user.contractAcceptance.acceptedAt !== null;
   }
-  
+
   return user.contractAcceptance && user.contractAcceptance.acceptedAt !== null;
 };
 
