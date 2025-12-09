@@ -4,52 +4,65 @@ const { sendResponse } = require('../utils/response');
 const { ErrorHandler } = require('../utils/error-handler');
 const UserServices = require('../services/user.service');
 const N8nServices = require('../services/n8n/n8n.automation.service');
-const { syncUserToBoberdooById,updatePartnerStatusInBoberdoo } = require('../services/boberdoo/boberdoo.service');
+const { syncUserToBoberdooById, updatePartnerStatusInBoberdoo } = require('../services/boberdoo/boberdoo.service');
 const MAIL_HANDLER = require('../mail/mails');
 const CONSTANT_ENUM = require('../helper/constant-enums.js');
 const AuthService = require('../services/auth/auth.service');
 const path = require('path');
 const fs = require("fs");
-const  Campaign  = require('../models/campaign.model');
+const Campaign = require('../models/campaign.model');
 const CampaignServices = require('../services/campaign/campaign.service');
-const {sendBalanceTopUpAlert} = require('../services/n8n/webhookService.js');
+const { sendBalanceTopUpAlert } = require('../services/n8n/webhookService.js');
 const { User } = require('../models/user.model');
-const { billingLogger ,logger} = require('../utils/logger');
+const { billingLogger, logger } = require('../utils/logger');
+const { getPaginationParams, extractFilters } = require('../utils/pagination');
 
 const getAllUsers = wrapAsync(async (req, res) => {
-    const data = await UserServices.getAllUsersService(); 
-    sendResponse(res, { data }, 'Users fetched successfully.', 200); 
+  const { page, limit } = getPaginationParams(req.query);
+
+  const allowedFilterKeys = ['company', 'status', 'email', 'isEmailVerified', 'isActive', 'state'];
+  const filters = extractFilters(req.query, allowedFilterKeys);
+  const search = req.query.search || "";
+  const result = await UserServices.getAllUsersService(page, limit, filters, search);
+
+  sendResponse(res, result, 'Users fetched successfully.', 200);
 });
+
 
 const getAllAdmins = wrapAsync(async (req, res) => {
-    const data = await UserServices.getAllAdminsService(); 
-    sendResponse(res, { data }, 'Admin fetched successfully.', 200); 
+  const { page, limit } = getPaginationParams(req.query);
+
+  const allowedFilterKeys = ['company', 'status', 'email', 'isEmailVerified', 'isActive', 'state'];
+  const filters = extractFilters(req.query, allowedFilterKeys);
+  const search = req.query.search || "";
+  const result = await UserServices.getAllAdminsService(page, limit, filters, search);
+  sendResponse(res, result, 'Admin fetched successfully.', 200);
 });
 const addUser = wrapAsync(async (req, res) => {
-    const userPayload = req.body;
-    const plainPassword = req.body.password;
-    // const { user } = await UserServices.addUserService(userPayload);
-   const { user } = await AuthService.registerUser(userPayload);
-   
-    try {
-        await MAIL_HANDLER.sendAccountCreationEmailWithVerification({
-        to: user.email,
-        name: user.name,
-        token: user.verificationToken,
-        password: plainPassword,
-        });
-    } catch (err) {
-        console.error('Error sending account creation email:', err);
-    }
+  const userPayload = req.body;
+  const plainPassword = req.body.password;
+  // const { user } = await UserServices.addUserService(userPayload);
+  const { user } = await AuthService.registerUser(userPayload);
 
-    sendResponse(res, { user }, 'User has been created. They can log in after verifying their account.', 201);
+  try {
+    await MAIL_HANDLER.sendAccountCreationEmailWithVerification({
+      to: user.email,
+      name: user.name,
+      token: user.verificationToken,
+      password: plainPassword,
+    });
+  } catch (err) {
+    console.error('Error sending account creation email:', err);
+  }
+
+  sendResponse(res, { user }, 'User has been created. They can log in after verifying their account.', 201);
 });
 
 
 const getMyProfile = wrapAsync(async (req, res) => {
   const userId = req.user._id; // From auth middleware
   const user = await UserServices.getUserByID(userId);
-  
+
   sendResponse(res, { user }, 'Profile fetched successfully.', 200);
 });
 
@@ -85,9 +98,9 @@ const changeMyPassword = wrapAsync(async (req, res) => {
 
   const userId = req.user._id;
   const { currentPassword, newPassword } = req.body;
-  
+
   await UserServices.changeUserPassword(userId, currentPassword, newPassword);
-  
+
   sendResponse(res, {}, 'Password changed successfully. Please login again.', 200);
 });
 
@@ -121,20 +134,20 @@ const uploadMyAvatar = wrapAsync(async (req, res) => {
 
 
 const getUserById = wrapAsync(async (req, res) => {
-    const { userId } = req.params;
-    const data = await UserServices.getUserByID(userId); 
-    sendResponse(res, { data }, 'Users fetched successfully.', 200); 
+  const { userId } = req.params;
+  const data = await UserServices.getUserByID(userId);
+  sendResponse(res, { data }, 'Users fetched successfully.', 200);
 });
 
 const updateUser = wrapAsync(async (req, res) => {
-    const userPayload = req.body;
-    // console.log('userPayload',userPayload)
-    const { userId } = req.params;
-    const plainPassword = req.body.password;
-    const { user } = await UserServices.updateUser(userId,userPayload);
+  const userPayload = req.body;
+  // console.log('userPayload',userPayload)
+  const { userId } = req.params;
+  const plainPassword = req.body.password;
+  const { user } = await UserServices.updateUser(userId, userPayload);
 
 
-    sendResponse(res, { user }, 'User has been updated.', 201);
+  sendResponse(res, { user }, 'User has been updated.', 201);
 });
 
 const toggleUserStatus = wrapAsync(async (req, res) => {
@@ -187,16 +200,16 @@ const toggleUserStatus = wrapAsync(async (req, res) => {
 const acceptContract = wrapAsync(async (req, res) => {
   const { userId } = req.params;
   const { version, ipAddress } = req.body;
-  
+
   const contractData = {
     version,
     ipAddress: ipAddress || req.ip // Get IP here in the controller
   };
 
   const updatedUser = await UserServices.updateContractAcceptance(userId, contractData);
-  
-  sendResponse(res, { 
-    contractAcceptance: updatedUser.contractAcceptance 
+
+  sendResponse(res, {
+    contractAcceptance: updatedUser.contractAcceptance
   }, 'Contract accepted successfully.', 200);
 });
 
@@ -204,17 +217,17 @@ const acceptContract = wrapAsync(async (req, res) => {
 const getContractStatus = wrapAsync(async (req, res) => {
   const { userId } = req.params;
   const { version } = req.query;
-  
+
   if (version) {
     const hasAccepted = await UserServices.hasAcceptedContract(userId, version);
-    sendResponse(res, { 
+    sendResponse(res, {
       hasAccepted,
-      version 
+      version
     }, 'Contract status retrieved.', 200);
   } else {
     const contractData = await UserServices.getContractAcceptance(userId);
-    sendResponse(res, { 
-      contractAcceptance: contractData 
+    sendResponse(res, {
+      contractAcceptance: contractData
     }, 'Contract acceptance data retrieved.', 200);
   }
 });
@@ -223,12 +236,12 @@ const getContractStatus = wrapAsync(async (req, res) => {
 const checkContractAcceptance = wrapAsync(async (req, res) => {
   const { userId } = req.params;
   const { version } = req.body;
-  
+
   const hasAccepted = await UserServices.hasAcceptedContract(userId, version);
-  
-  sendResponse(res, { 
+
+  sendResponse(res, {
     hasAccepted,
-    requiresAcceptance: !hasAccepted 
+    requiresAcceptance: !hasAccepted
   }, 'Contract acceptance check completed.', 200);
 });
 
@@ -308,19 +321,19 @@ const sendBalanceTopUpWebhook = wrapAsync(async (req, res) => {
 
 
 module.exports = {
- getAllUsers,
- getAllAdmins,
- addUser,
- getUserById,
- updateUser,
-toggleUserStatus,
- acceptContract,
- getContractStatus,
- checkContractAcceptance,
- resyncBoberdoo,
- uploadMyAvatar,
- getMyProfile,
- updateMyProfile,
- changeMyPassword,
- sendBalanceTopUpWebhook,
+  getAllUsers,
+  getAllAdmins,
+  addUser,
+  getUserById,
+  updateUser,
+  toggleUserStatus,
+  acceptContract,
+  getContractStatus,
+  checkContractAcceptance,
+  resyncBoberdoo,
+  uploadMyAvatar,
+  getMyProfile,
+  updateMyProfile,
+  changeMyPassword,
+  sendBalanceTopUpWebhook,
 };
