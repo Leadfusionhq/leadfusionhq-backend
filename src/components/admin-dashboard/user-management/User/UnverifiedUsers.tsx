@@ -34,6 +34,7 @@ import { toast } from 'react-toastify';
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 import { Menu, MenuItem, IconButton } from "@mui/material";
 import { getErrorMessage } from "@/utils/getErrorMessage";
+import useDebounce from '@/hooks/useDebounce';
 
 // --- Types (Reusing User type structure) ---
 type User = {
@@ -99,6 +100,7 @@ export default function UnverifiedUsersTable() {
     // Sorting & Filtering State
     const [sorting, setSorting] = useState<SortingState>([]);
     const [globalFilter, setGlobalFilter] = useState("");
+    const debouncedGlobalFilter = useDebounce(globalFilter, 300);
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
 
     const token = useSelector((state: RootState) => state.auth.token);
@@ -142,14 +144,14 @@ export default function UnverifiedUsersTable() {
     // Reset pagination when search changes
     useEffect(() => {
         setPagination(prev => ({ ...prev, pageIndex: 0 }));
-    }, [globalFilter]);
+    }, [debouncedGlobalFilter]);
 
     // Fetch Data
     useEffect(() => {
         if (token) {
-            fetchUnverifiedUsers(pagination.pageIndex + 1, pagination.pageSize, globalFilter);
+            fetchUnverifiedUsers(pagination.pageIndex + 1, pagination.pageSize, debouncedGlobalFilter);
         }
-    }, [token, pagination.pageIndex, pagination.pageSize, globalFilter, fetchUnverifiedUsers]);
+    }, [token, pagination.pageIndex, pagination.pageSize, debouncedGlobalFilter, fetchUnverifiedUsers]);
 
 
     const handleResendVerification = async (row: User) => {

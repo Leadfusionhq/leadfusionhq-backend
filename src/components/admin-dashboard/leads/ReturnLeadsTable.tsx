@@ -1,30 +1,47 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { LEADS_API } from "@/utils/apiUrl";
 import axiosWrapper from "@/utils/api";
 import { useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
-import DataTable, { TableColumn } from "react-data-table-component";
-import { 
-  Skeleton, 
-  Box, 
-  Button, 
-  Typography, 
-  IconButton, 
-  Menu, 
-  MenuItem,
+import {
+  useReactTable,
+  getCoreRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  ColumnDef,
+  flexRender,
+  SortingState,
+} from "@tanstack/react-table";
+import {
+  Skeleton,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  Chip
+  Button,
+  Box,
+  Typography
 } from "@mui/material";
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
-import MoreVertIcon from '@mui/icons-material/MoreVert';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import {
+  ChevronLeft,
+  ChevronRight,
+  MoreHorizontal,
+  Mail,
+  Phone,
+  Undo2,
+  Info,
+  Users,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  Filter
+} from "lucide-react";
 import ConfirmDialog from '@/components/common/ConfirmDialog';
+import { Menu, MenuItem, IconButton, Popover } from "@mui/material";
 
 type ReturnLead = {
   _id: string;
@@ -52,7 +69,7 @@ type ReturnLead = {
   note: string;
   return_reason?: string;
   return_comments?: string;
-  return_status: string; 
+  return_status: string;
   return_attempts?: number;
   returned_by?: {
     _id: string;
@@ -61,6 +78,7 @@ type ReturnLead = {
   createdAt: string;
   updatedAt: string;
   returned_at?: string;
+  max_return_attempts?: number;
 };
 
 type ApiResponse = {
@@ -74,7 +92,6 @@ type ApiResponse = {
   message?: string;
 };
 
-// Return reason labels mapping
 const RETURN_REASON_LABELS: { [key: string]: string } = {
   'invalid_contact': 'Invalid Contact',
   'duplicate': 'Duplicate Lead',
@@ -84,32 +101,57 @@ const RETURN_REASON_LABELS: { [key: string]: string } = {
   'other': 'Other',
 };
 
+// --- Styling Helpers ---
+const StatusBadge = ({ status }: { status: string }) => {
+  let colorClass = "bg-gray-100 text-gray-600 border-gray-200";
+
+  if (status === 'Pending') colorClass = "bg-amber-50 text-amber-700 border-amber-200";
+  else if (status === 'Approved') colorClass = "bg-emerald-50 text-emerald-700 border-emerald-200";
+  else if (status === 'Rejected') colorClass = "bg-red-50 text-red-700 border-red-200";
+
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium border capitalize whitespace-nowrap ${colorClass}`}>
+      {status}
+    </span>
+  );
+};
+
+const StatCard = ({ title, value, icon: Icon, color, subtext, onClick, active }: { title: string, value: string | number, icon: any, color: string, subtext?: string, onClick?: () => void, active?: boolean }) => {
+  return (
+    <div
+      onClick={onClick}
+      className={`p-6 rounded-2xl shadow-sm border flex items-center gap-4 transition-all duration-200 cursor-pointer 
+      ${active ? 'ring-2 ring-black shadow-md scale-[1.01]' : 'hover:scale-[1.01] hover:shadow-md bg-white border-gray-100'}`}
+    >
+      <div className={`p-3 rounded-xl ${color}`}>
+        <Icon className={`w-6 h-6`} />
+      </div>
+      <div>
+        <p className={`text-sm font-medium text-gray-500`}>{title}</p>
+        <h3 className={`text-2xl font-bold mt-0.5 text-gray-900`}>{value}</h3>
+        {subtext && <p className={`text-xs mt-1 text-gray-400`}>{subtext}</p>}
+      </div>
+    </div>
+  );
+};
+
 export default function ReturnLeadsTable() {
   const [returnLeads, setReturnLeads] = useState<ReturnLead[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [pagination, setPagination] = useState({ page: 1, limit: 10 });
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
   const [totalRows, setTotalRows] = useState<number>(0);
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
-  
-  // Menu state
-  const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
-  const [menuRow, setMenuRow] = useState<ReturnLead | null>(null);
-  const isMenuOpen = Boolean(menuAnchorEl);
+  const [sorting, setSorting] = useState<SortingState>([]);
 
-  // Detail dialog state
+  // Filter State
+  const [filterAnchorEl, setFilterAnchorEl] = useState<HTMLButtonElement | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>("");
+
+  // Dialogs
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
-  const [selectedLeadDetail, setSelectedLeadDetail] = useState<ReturnLead | any>(null);
-
-  // Confirm dialogs
-  const [approveDialog, setApproveDialog] = useState({
-    open: false,
-    lead: null as ReturnLead | null,
-  });
-  const [rejectDialog, setRejectDialog] = useState({
-    open: false,
-    lead: null as ReturnLead | null,
-  });
+  const [selectedLeadDetail, setSelectedLeadDetail] = useState<ReturnLead | null>(null);
+  const [approveDialog, setApproveDialog] = useState<{ open: boolean; lead: ReturnLead | null }>({ open: false, lead: null });
+  const [rejectDialog, setRejectDialog] = useState<{ open: boolean; lead: ReturnLead | null }>({ open: false, lead: null });
 
   const router = useRouter();
   const token = useSelector((state: RootState) => state.auth.token);
@@ -121,8 +163,9 @@ export default function ReturnLeadsTable() {
         setError(null);
 
         const params = new URLSearchParams({
-          page: pageNumber.toString(),
+          page: (pageNumber + 1).toString(),
           limit: pageSize.toString(),
+          ...(statusFilter && { status: statusFilter }),
         });
 
         const response = (await axiosWrapper(
@@ -132,7 +175,6 @@ export default function ReturnLeadsTable() {
           token ?? undefined
         )) as ApiResponse;
 
-        console.log("Return Leads Response:", response);
         setReturnLeads(response.data || []);
         setTotalRows(response.meta?.total || 0);
       } catch (err) {
@@ -142,642 +184,423 @@ export default function ReturnLeadsTable() {
         setLoading(false);
       }
     },
-    [token]
+    [token, statusFilter]
   );
 
   useEffect(() => {
     if (token) {
-      fetchReturnLeads(pagination.page, pagination.limit);
+      fetchReturnLeads(pagination.pageIndex, pagination.pageSize);
     }
-  }, [token, pagination.page, pagination.limit, fetchReturnLeads]);
+  }, [token, pagination.pageIndex, pagination.pageSize, statusFilter, fetchReturnLeads]);
 
-  const skeletonRows: ReturnLead[] = Array.from({ length: pagination.limit }).map((_, i) => ({
-    _id: `skeleton-${i}`,
-    lead_id: "",
-    first_name: "",
-    last_name: "",
-    email: "",
-    phone: "",
-    address: {
-      street: "",
-      city: "",
-      state: {
-        abbreviation: "",
-        name: "",
-        _id: ""
-      },
-      zip_code: "",
-    },
-    campaign_id: "",
-    note: "",
-    return_reason: "",
-    return_status: "",
-    createdAt: "",
-    updatedAt: "",
-  }));
 
-  // Menu handlers
-  const handleMenuClick = (event: React.MouseEvent<HTMLButtonElement>, row: ReturnLead) => {
-    setMenuAnchorEl(event.currentTarget);
-    setMenuRow(row);
-  };
-
-  const handleMenuClose = () => {
-    setMenuAnchorEl(null);
-    setMenuRow(null);
-  };
-
-  const handleView = (row: ReturnLead) => {
-    router.push(`/admin/leads/${row._id}`);
-    handleMenuClose();
-  };
-
-  const handleApprove = (row: ReturnLead) => {
-    setApproveDialog({ open: true, lead: row });
-    handleMenuClose();
-  };
-
-  const handleReject = (row: ReturnLead) => {
-    setRejectDialog({ open: true, lead: row });
-    handleMenuClose();
-  };
-
-  const confirmApprove = async () => {
-    if (!approveDialog.lead) return;
-    
-    try {
-      setLoading(true);
-      setActionLoading(approveDialog.lead._id);
-      
-      await axiosWrapper(
-        "patch",
-        LEADS_API.APPROVE_RETURN_LEAD,
-        { 
-          lead_id: approveDialog.lead._id,           
-          return_status: 'Approved' 
-        },
-        token ?? undefined
-      );
-
-      toast.success("Lead return approved successfully");
-      setApproveDialog({ open: false, lead: null });
-      fetchReturnLeads(pagination.page, pagination.limit);
-    } catch (err: any) {
-      console.error("Failed to approve return:", err);
-      const message = err?.response?.data?.message || "Failed to approve return request";
-      toast.error(message);
-    } finally {
-      setActionLoading(null);
-      setLoading(false);
-    }
-  };
-
-  const confirmReject = async () => {
-    if (!rejectDialog.lead) return;
-
-    try {
-      setLoading(true);
-      setActionLoading(rejectDialog.lead._id);
-
-      await axiosWrapper(
-        "patch",
-        LEADS_API.REJECT_RETURN_LEAD, 
-        { 
-          lead_id: rejectDialog.lead._id,           
-          return_status: 'Rejected' 
-        },
-        token ?? undefined
-      );
-
-      toast.success("Lead return rejected successfully");
-      setRejectDialog({ open: false, lead: null });
-      fetchReturnLeads(pagination.page, pagination.limit);
-    } catch (err: any) {
-      console.error("Failed to reject return:", err);
-      const message = err?.response?.data?.message || "Failed to reject return request";
-      toast.error(message);
-    } finally {
-      setActionLoading(null);
-      setLoading(false);
-    }
-  };
-
-  // Detail dialog handlers
+  // Actions
+  const handleApprove = (row: ReturnLead) => setApproveDialog({ open: true, lead: row });
+  const handleReject = (row: ReturnLead) => setRejectDialog({ open: true, lead: row });
   const handleViewDetails = (row: ReturnLead) => {
     setSelectedLeadDetail(row);
     setDetailDialogOpen(true);
   };
 
-  const handleCloseDetailDialog = () => {
-    setDetailDialogOpen(false);
-    setSelectedLeadDetail(null);
+  const confirmApprove = async () => {
+    if (!approveDialog.lead) return;
+    try {
+      await axiosWrapper("patch", LEADS_API.APPROVE_RETURN_LEAD, { lead_id: approveDialog.lead._id, return_status: 'Approved' }, token ?? undefined);
+      toast.success("Return approved");
+      setApproveDialog({ open: false, lead: null });
+      fetchReturnLeads(pagination.pageIndex, pagination.pageSize);
+    } catch (err: any) { toast.error(err?.message || "Failed to approve return"); }
   };
 
-  const columns: TableColumn<ReturnLead>[] = [
+  const confirmReject = async () => {
+    if (!rejectDialog.lead) return;
+    try {
+      await axiosWrapper("patch", LEADS_API.REJECT_RETURN_LEAD, { lead_id: rejectDialog.lead._id, return_status: 'Rejected' }, token ?? undefined);
+      toast.success("Return rejected");
+      setRejectDialog({ open: false, lead: null });
+      fetchReturnLeads(pagination.pageIndex, pagination.pageSize);
+    } catch (err: any) { toast.error(err?.message || "Failed to reject return"); }
+  };
+
+
+  const columns: ColumnDef<ReturnLead>[] = useMemo(() => [
     {
-      name: "Lead ID",
-      selector: (row) => row.lead_id,
-      cell: (row) =>
-        row._id.startsWith("skeleton") ? (
-          <Skeleton variant="text" width={120} animation="wave" />
-        ) : (
-          <div style={{ minWidth: "120px" }} className="font-medium text-gray-900">{row.lead_id}</div>
-        ),
-      sortable: true,
-    },
-    {
-      name: "Name",
-      selector: (row) => `${row.first_name} ${row.last_name}`,
-      cell: (row) =>
-        row._id.startsWith("skeleton") ? (
-          <Skeleton variant="text" width={150} animation="wave" />
-        ) : (
-          <div style={{ minWidth: "160px" }} className="font-medium text-gray-900">{`${row.first_name} ${row.last_name}`}</div>
-        ),
-      sortable: true,
-    },
-    {
-      name: "Email",
-      selector: (row) => row.email,
-      cell: (row) =>
-        row._id.startsWith("skeleton") ? (
-          <Skeleton variant="text" width={180} animation="wave" />
-        ) : (
-          <div style={{ minWidth: "200px" }} className="text-sm text-gray-600 whitespace-nowrap overflow-hidden text-ellipsis" title={row.email}>{row.email}</div>
-        ),
-      sortable: true,
-      width: "220px",
-    },
-    {
-      name: "Phone",
-      selector: (row) => row.phone || row.phone_number || '',
-      cell: (row) =>
-        row._id.startsWith("skeleton") ? (
-          <Skeleton variant="text" width={120} animation="wave" />
-        ) : (
-          <div style={{ minWidth: "130px" }} className="text-sm text-gray-600">{row.phone || row.phone_number || 'N/A'}</div>
-        ),
-      sortable: true,
-    },
-    {
-      name: "Return Reason",
-      selector: (row) => row.return_reason || '',
-      cell: (row) =>
-        row._id.startsWith("skeleton") ? (
-          <Skeleton variant="text" width={140} animation="wave" />
-        ) : (
-          <div style={{ minWidth: "160px" }} className="flex items-center gap-2">
-            <Chip 
-              label={RETURN_REASON_LABELS[row.return_reason || ''] || 'N/A'}
-              size="small"
-              color={row.return_reason === 'other' ? 'warning' : 'default'}
-              sx={{ fontSize: '12px' }}
-            />
-            {row.return_comments && (
-              <IconButton 
-                size="small" 
-                onClick={() => handleViewDetails(row)}
-                title="View details"
-              >
-                <InfoOutlinedIcon fontSize="small" color="primary" />
-              </IconButton>
-            )}
+      accessorKey: "lead_id",
+      header: "Lead Info",
+      cell: ({ row }) => (
+        <div className="flex flex-col">
+          <span className="text-sm font-semibold text-gray-900">{row.original.lead_id}</span>
+          <div className="flex items-center text-xs text-gray-500 mt-0.5 gap-1">
+            <span className="truncate max-w-[120px]">{typeof row.original.campaign_id === 'object' ? row.original.campaign_id.name : ''}</span>
           </div>
-        ),
-      sortable: true,
-      width: "180px",
+        </div>
+      ),
+      size: 140
     },
     {
-      name: "Action",
-      button: true,
-      cell: (row) =>
-        row._id.startsWith("skeleton") ? (
-          <Skeleton variant="rectangular" width={40} height={30} />
-        ) : (
-          <IconButton 
-            size="small" 
-            onClick={(e) => handleMenuClick(e, row)}
-            disabled={actionLoading === row._id}
-          >
-            <MoreVertIcon />
-          </IconButton>
-        ),
-      minWidth: "80px",
-      maxWidth: "100px",
-      ignoreRowClick: true,
-      allowOverflow: true,
-    }
-  ];
-
-  const handlePageChange = (page: number) => {
-    setPagination((prev) => ({ ...prev, page }));
-  };
-
-  const handlePerRowsChange = (newLimit: number, page: number) => {
-    setPagination({ page, limit: newLimit });
-  };
-
-  const customStyles = {
-    headCells: {
-      style: {
-        fontWeight: "bold",
-        backgroundColor: "#1C1C1C",
-        color: "#FFFFFF",
-        padding: "16px",
-        fontSize: "14px",
-        borderBottom: "2px solid #E0E0E0",
-      },
+      accessorKey: "first_name",
+      header: "Lead Name",
+      cell: ({ row }) => (
+        <div className="flex flex-col">
+          <span className="text-sm font-semibold text-gray-900">{row.original.first_name} {row.original.last_name}</span>
+          <span className="text-xs text-gray-500">{row.original.email}</span>
+        </div>
+      ),
+      size: 180
     },
-    cells: {
-      style: {
-        padding: "12px 16px",
-        fontSize: "14px",
-        borderBottom: "1px solid #E0E0E0",
-      },
-    },
-    rows: {
-      style: {
-        '&:hover': {
-          backgroundColor: "#F9F9F9",
-        },
-      },
-    },
-  };
-
-  return (
-    <>
-      <Box sx={{ padding: 2, marginTop: 4 }}>
-        <div className="flex justify-between items-center pb-[30px]">
-          <h3 className="text-[24px] text-[#1C1C1C] text-[Inter] font-semibold">
-            Returned Leads
-          </h3>
-          {totalRows > 0 && (
-            <div className="text-sm text-gray-600">
-              <span className="font-semibold">{totalRows}</span> pending return{totalRows !== 1 ? 's' : ''}
-            </div>
+    {
+      accessorKey: "return_reason",
+      header: "Return Reason",
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-amber-50 text-amber-700 text-xs font-semibold border border-amber-100">
+            {RETURN_REASON_LABELS[row.original.return_reason || ''] || row.original.return_reason || 'N/A'}
+          </span>
+          {row.original.return_comments && (
+            <button
+              onClick={() => handleViewDetails(row.original)}
+              className="p-1 hover:bg-gray-100 rounded-full transition-colors focus:outline-none"
+              title="View Comments"
+            >
+              <Info size={16} className="text-blue-500" />
+            </button>
           )}
         </div>
-
-        <DataTable
-          columns={columns}
-          data={loading ? skeletonRows : returnLeads}
-          customStyles={customStyles}
-          pagination
-          paginationServer
-          paginationTotalRows={totalRows}
-          paginationDefaultPage={pagination.page}
-          paginationPerPage={pagination.limit}
-          paginationRowsPerPageOptions={[10, 25, 50, 100]}
-          onChangePage={handlePageChange}
-          onChangeRowsPerPage={handlePerRowsChange}
-          highlightOnHover
-          striped
-          dense
-          persistTableHead
-          progressPending={false}
-          noDataComponent={
-            error ? (
-              <Typography color="error" sx={{ py: 4, textAlign: 'center' }}>
-                {error}
-              </Typography>
-            ) : !loading && returnLeads.length === 0 ? (
-              <Typography sx={{ py: 4, textAlign: 'center', color: 'gray' }}>
-                 No pending return requests
-              </Typography>
-            ) : null
-          }
+      ),
+      size: 160
+    },
+    {
+      header: "Requested",
+      cell: ({ row }) => (
+        <span className="text-sm text-gray-600">
+          {new Date(row.original.updatedAt).toLocaleDateString()}
+        </span>
+      ),
+      size: 120
+    },
+    {
+      accessorKey: "return_status",
+      header: "Status",
+      cell: ({ row }) => <StatusBadge status={row.original.return_status} />,
+      size: 120
+    },
+    {
+      id: "actions",
+      header: "",
+      cell: ({ row }) => (
+        <ActionMenu
+          lead={row.original}
+          onApprove={() => handleApprove(row.original)}
+          onReject={() => handleReject(row.original)}
+          onViewDetails={() => handleViewDetails(row.original)}
         />
-      </Box>
+      ),
+      size: 60
+    }
+  ], []);
 
-      {/* Three Dot Menu */}
-      <Menu
-        anchorEl={menuAnchorEl}
-        open={isMenuOpen}
-        onClose={handleMenuClose}
-        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-        transformOrigin={{ vertical: "top", horizontal: "right" }}
+  const table = useReactTable({
+    data: returnLeads,
+    columns,
+    pageCount: Math.ceil(totalRows / pagination.pageSize),
+    state: { pagination, sorting },
+    onPaginationChange: setPagination,
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    manualPagination: true,
+    manualSorting: true,
+  });
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500">
+
+      {/* Stats Section */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <StatCard
+          title="Total Requests"
+          value={totalRows}
+          subtext="All Return Requests"
+          icon={Undo2}
+          color="bg-purple-100 text-purple-700"
+        />
+        <StatCard
+          title="Pending Review"
+          value={returnLeads.filter(l => l.return_status === 'Pending').length}
+          subtext="On this page"
+          icon={AlertCircle}
+          color="bg-amber-100 text-amber-700"
+        />
+      </div>
+
+      {/* Header & Filters */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900 tracking-tight">Return Requests</h1>
+          <p className="text-sm text-gray-500 mt-1">Review and manage lead return requests.</p>
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            onClick={(e) => setFilterAnchorEl(e.currentTarget)}
+            className={`flex items-center gap-2 px-3 py-2 border rounded-lg transition-all ${Boolean(filterAnchorEl) || statusFilter
+              ? "bg-black text-white border-black shadow-md"
+              : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+              }`}
+          >
+            <Filter size={16} />
+            <span className="text-sm font-medium hidden sm:inline">Filters</span>
+            {statusFilter && (
+              <span className="flex h-2 w-2 rounded-full bg-red-500"></span>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Container */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50/50">
+                {table.getHeaderGroups().map(headerGroup => (
+                  headerGroup.headers.map(header => (
+                    <th key={header.id} className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider" style={{ width: header.column.getSize() }}>
+                      {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                    </th>
+                  ))
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {loading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i} className="animate-pulse">
+                    <td className="px-6 py-4"><div className="h-4 w-20 bg-gray-100 rounded" /></td>
+                    <td className="px-6 py-4"><div className="h-4 w-32 bg-gray-100 rounded" /></td>
+                    <td className="px-6 py-4"><div className="h-6 w-24 bg-gray-100 rounded" /></td>
+                    <td className="px-6 py-4"><div className="h-4 w-24 bg-gray-100 rounded" /></td>
+                    <td className="px-6 py-4"><div className="h-6 w-20 bg-gray-100 rounded" /></td>
+                    <td className="px-6 py-4"><div className="h-8 w-8 bg-gray-100 rounded ml-auto" /></td>
+                  </tr>
+                ))
+              ) : table.getRowModel().rows.length ? (
+                table.getRowModel().rows.map(row => (
+                  <tr key={row.id} className="group hover:bg-gray-50/80 transition-colors">
+                    {row.getVisibleCells().map(cell => (
+                      <td key={cell.id} className="px-6 py-4 align-top">
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={columns.length} className="px-6 py-24 text-center text-gray-500">
+                    <div className="flex flex-col items-center justify-center">
+                      <Undo2 className="h-12 w-12 text-gray-200 mb-4" />
+                      <p className="text-lg font-medium text-gray-900">No return requests</p>
+                      <p className="text-sm text-gray-500">All caught up!</p>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-white">
+          <div className="text-sm text-gray-500">
+            Showing <span className="font-medium text-gray-900">{(pagination.pageIndex * pagination.pageSize) + 1}</span> to <span className="font-medium text-gray-900">{Math.min((pagination.pageIndex + 1) * pagination.pageSize, totalRows)}</span> of <span className="font-medium text-gray-900">{totalRows}</span> results
+          </div>
+          <div className="flex items-center gap-2">
+            <select
+              value={pagination.pageSize}
+              onChange={e => table.setPageSize(Number(e.target.value))}
+              className="block w-full pl-3 pr-8 py-1.5 text-sm border-gray-300 focus:outline-none focus:ring-black focus:border-black rounded-lg border"
+            >
+              {[10, 20, 30, 50].map(pageSize => (
+                <option key={pageSize} value={pageSize}>Show {pageSize}</option>
+              ))}
+            </select>
+            <div className="flex rounded-md shadow-sm">
+              <button
+                onClick={() => table.previousPage()}
+                disabled={!table.getCanPreviousPage()}
+                className="relative inline-flex items-center px-3 py-1.5 rounded-l-lg border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button
+                onClick={() => table.nextPage()}
+                disabled={!table.getCanNextPage()}
+                className="relative inline-flex items-center px-3 py-1.5 rounded-r-lg border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Filter Popover */}
+      <Popover
+        open={Boolean(filterAnchorEl)}
+        anchorEl={filterAnchorEl}
+        onClose={() => setFilterAnchorEl(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+        PaperProps={{ sx: { p: 0, width: 280, borderRadius: '16px' } }}
       >
-        <MenuItem onClick={() => menuRow && handleView(menuRow)}>
-          View Lead
-        </MenuItem>
-        <MenuItem 
-          onClick={() => menuRow && handleApprove(menuRow)}
-          sx={{ color: 'success.main' }}
-        >
-          Approve Return
-          </MenuItem>
-        <MenuItem 
-          onClick={() => menuRow && handleReject(menuRow)}
-          sx={{ color: 'error.main' }}
-        >
-          Reject Return
-        </MenuItem>
-        {menuRow?.return_comments && (
-          <MenuItem onClick={() => {
-            if (menuRow) handleViewDetails(menuRow);
-            handleMenuClose();
-          }}>
-            View Details
-          </MenuItem>
-        )}
-      </Menu>
+        <div className="p-4 border-b border-gray-100">
+          <h3 className="font-semibold text-gray-900">Filter Returns</h3>
+        </div>
+        <div className="p-4 space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1.5 uppercase tracking-wide">Status</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full rounded-lg border-gray-200 text-sm"
+            >
+              <option value="">All Statuses</option>
+              {["Pending", "Approved", "Rejected"].map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="p-4 bg-gray-50 border-t border-gray-100 flex gap-2">
+          <button
+            onClick={() => { setStatusFilter(""); setFilterAnchorEl(null); }}
+            className="flex-1 px-4 py-2 bg-white border border-gray-200 text-gray-700 text-sm font-medium rounded-xl hover:bg-gray-50"
+          >
+            Clear
+          </button>
+          <button
+            onClick={() => { setFilterAnchorEl(null); }}
+            className="flex-1 px-4 py-2 bg-black text-white text-sm font-medium rounded-xl hover:bg-gray-800"
+          >
+            Done
+          </button>
+        </div>
+      </Popover>
+
+      {/* Confirm Dialogs */}
+      <ConfirmDialog
+        open={approveDialog.open}
+        title="Approve Return Request"
+        message={`Are you sure you want to approve the return request for ${approveDialog.lead?.first_name}?`}
+        onConfirm={confirmApprove}
+        onCancel={() => setApproveDialog({ open: false, lead: null })}
+      />
+      <ConfirmDialog
+        open={rejectDialog.open}
+        title="Reject Return Request"
+        message={`Are you sure you want to reject the return request for ${rejectDialog.lead?.first_name}?`}
+        onConfirm={confirmReject}
+        onCancel={() => setRejectDialog({ open: false, lead: null })}
+      />
 
       {/* Return Details Dialog */}
       <Dialog
         open={detailDialogOpen}
-        onClose={handleCloseDetailDialog}
+        onClose={() => setDetailDialogOpen(false)}
         maxWidth="sm"
         fullWidth
-        BackdropProps={{
-          style: {
-            backgroundColor: 'rgba(0, 0, 0, 0.3)',
-          }
-        }}
         sx={{
           '& .MuiDialog-paper': {
             borderRadius: '16px',
             boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)',
-            background: 'rgba(255, 255, 255, 0.95)',
-            backdropFilter: 'blur(10px)',
-            border: '1px solid rgba(255, 255, 255, 0.8)',
           }
         }}
       >
-        <DialogTitle
-          sx={{
-            fontSize: '20px',
-            fontWeight: '500',
-            padding: '28px 28px 16px',
-            color: '#374151',
-            background: 'transparent',
-            borderBottom: '1px solid #E5E7EB'
-          }}
-        >
-          Return Request Details
+        <DialogTitle sx={{ borderBottom: '1px solid #E5E7EB', padding: '20px 24px' }}>
+          <h3 className="text-lg font-semibold text-gray-900">Return Request Details</h3>
         </DialogTitle>
-
-        <DialogContent sx={{ padding: '24px 28px' }}>
+        <DialogContent sx={{ padding: '24px' }}>
           {selectedLeadDetail && (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-              {/* Lead Information */}
-              <Box>
-                <Typography 
-                  variant="subtitle2" 
-                  sx={{ 
-                    color: '#6B7280', 
-                    fontSize: '12px', 
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px',
-                    mb: 1 
-                  }}
-                >
-                  Lead Information
-                </Typography>
-                <Box sx={{ 
-                  backgroundColor: '#F9FAFB', 
-                  padding: '16px', 
-                  borderRadius: '10px',
-                  border: '1px solid #E5E7EB'
-                }}>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '12px' }}>
-                        Lead ID
-                      </Typography>
-                      <Typography variant="body2" sx={{ color: '#374151', fontWeight: '500', fontSize: '14px' }}>
-                        {selectedLeadDetail.lead_id}
-                      </Typography>
-                    </div>
-                    <div>
-                      <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '12px' }}>
-                        Name
-                      </Typography>
-                      <Typography variant="body2" sx={{ color: '#374151', fontWeight: '500', fontSize: '14px' }}>
-                        {selectedLeadDetail.first_name} {selectedLeadDetail.last_name}
-                      </Typography>
-                    </div>
-                    <div>
-                      <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '12px' }}>
-                        Email
-                      </Typography>
-                      <Typography 
-                        variant="body2" 
-                        sx={{ 
-                          color: '#374151', 
-                          fontSize: '13px',
-                          wordBreak: 'break-word'
-                        }}
-                      >
-                        {selectedLeadDetail.email}
-                      </Typography>
-                    </div>
-                    <div>
-                      <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '12px' }}>
-                        Phone
-                      </Typography>
-                      <Typography variant="body2" sx={{ color: '#374151', fontSize: '14px' }}>
-                        {selectedLeadDetail.phone || selectedLeadDetail.phone_number || 'N/A'}
-                      </Typography>
-                    </div>
+            <div className="space-y-6">
+              <div>
+                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Lead Information</h4>
+                <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 grid grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-xs text-gray-400 block">Lead ID</span>
+                    <span className="text-sm font-medium text-gray-900">{selectedLeadDetail.lead_id}</span>
                   </div>
-                </Box>
-              </Box>
-
-              {/* Return Information */}
-              <Box>
-                <Typography 
-                  variant="subtitle2" 
-                  sx={{ 
-                    color: '#6B7280', 
-                    fontSize: '12px', 
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px',
-                    mb: 1 
-                  }}
-                >
-                  Return Information
-                </Typography>
-                <Box sx={{ 
-                  backgroundColor: '#FEF3C7', 
-                  padding: '16px', 
-                  borderRadius: '10px',
-                  border: '1px solid #FDE68A'
-                }}>
-                  <div className="space-y-3">
-                    <div>
-                      <Typography variant="caption" sx={{ color: '#92400E', fontSize: '12px', fontWeight: '500' }}>
-                        Return Reason
-                      </Typography>
-                      <Box sx={{ mt: 0.5 }}>
-                        <Chip 
-                          label={RETURN_REASON_LABELS[selectedLeadDetail.return_reason || ''] || 'N/A'}
-                          size="small"
-                          sx={{ 
-                            backgroundColor: '#FCD34D',
-                            color: '#92400E',
-                            fontWeight: '500',
-                            fontSize: '13px'
-                          }}
-                        />
-                      </Box>
-                    </div>
-
-                    {selectedLeadDetail.return_attempts !== undefined && (
-                      <div>
-                        <Typography variant="caption" sx={{ color: '#92400E', fontSize: '12px', fontWeight: '500' }}>
-                          Return Attempt
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: '#78350F', fontSize: '14px', mt: 0.5 }}>
-                          {selectedLeadDetail.return_attempts} of {selectedLeadDetail.max_return_attempts || 2}
-                        </Typography>
-                      </div>
-                    )}
-
-                    {selectedLeadDetail.return_comments && (
-                      <div>
-                        <Typography variant="caption" sx={{ color: '#92400E', fontSize: '12px', fontWeight: '500' }}>
-                          Additional Comments
-                        </Typography>
-                        <Typography 
-                          variant="body2" 
-                          sx={{ 
-                            color: '#78350F', 
-                            fontSize: '14px',
-                            mt: 0.5,
-                            backgroundColor: '#FFFBEB',
-                            padding: '12px',
-                            borderRadius: '8px',
-                            border: '1px solid #FDE68A',
-                            whiteSpace: 'pre-wrap',
-                            lineHeight: '1.6'
-                          }}
-                        >
-                          {selectedLeadDetail.return_comments}
-                        </Typography>
-                      </div>
-                    )}
-
-                    <div>
-                      <Typography variant="caption" sx={{ color: '#92400E', fontSize: '12px', fontWeight: '500' }}>
-                        Return Status
-                      </Typography>
-                      <Box sx={{ mt: 0.5 }}>
-                        <Chip 
-                          label={selectedLeadDetail.return_status}
-                          size="small"
-                          color={
-                            selectedLeadDetail.return_status === 'Approved' ? 'success' :
-                            selectedLeadDetail.return_status === 'Rejected' ? 'error' :
-                            'warning'
-                          }
-                          sx={{ fontSize: '12px', fontWeight: '500' }}
-                        />
-                      </Box>
-                    </div>
-
-                    {selectedLeadDetail.updatedAt && (
-                      <div>
-                        <Typography variant="caption" sx={{ color: '#92400E', fontSize: '12px', fontWeight: '500' }}>
-                          Returned Date
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: '#78350F', fontSize: '14px', mt: 0.5 }}>
-                          {new Date(selectedLeadDetail.updatedAt).toLocaleString('en-US', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </Typography>
-                      </div>
-                    )}
+                  <div>
+                    <span className="text-xs text-gray-400 block">Name</span>
+                    <span className="text-sm font-medium text-gray-900">{selectedLeadDetail.first_name} {selectedLeadDetail.last_name}</span>
                   </div>
-                </Box>
-              </Box>
+                </div>
+              </div>
 
-              {/* Campaign Information */}
-              {typeof selectedLeadDetail.campaign_id === 'object' && selectedLeadDetail.campaign_id && (
-                <Box>
-                  <Typography 
-                    variant="subtitle2" 
-                    sx={{ 
-                      color: '#6B7280', 
-                      fontSize: '12px', 
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px',
-                      mb: 1 
-                    }}
-                  >
-                    Campaign
-                  </Typography>
-                  <Box sx={{ 
-                    backgroundColor: '#EFF6FF', 
-                    padding: '16px', 
-                    borderRadius: '10px',
-                    border: '1px solid #DBEAFE'
-                  }}>
-                    <Typography variant="body2" sx={{ color: '#1E40AF', fontWeight: '500', fontSize: '14px' }}>
-                      {selectedLeadDetail.campaign_id.name}
-                    </Typography>
-                    {selectedLeadDetail.campaign_id.lead_type && (
-                      <Typography variant="caption" sx={{ color: '#3B82F6', fontSize: '12px' }}>
-                        {selectedLeadDetail.campaign_id.lead_type}
-                      </Typography>
-                    )}
-                  </Box>
-                </Box>
-              )}
-            </Box>
+              <div>
+                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Return Information</h4>
+                <div className="bg-amber-50 rounded-xl p-4 border border-amber-100 space-y-3">
+                  <div>
+                    <span className="text-xs text-amber-600 block font-medium">Return Reason</span>
+                    <span className="text-sm font-medium text-amber-900">
+                      {RETURN_REASON_LABELS[selectedLeadDetail.return_reason || ''] || selectedLeadDetail.return_reason || 'N/A'}
+                    </span>
+                  </div>
+                  {selectedLeadDetail.return_comments && (
+                    <div>
+                      <span className="text-xs text-amber-600 block font-medium">Comments</span>
+                      <p className="text-sm text-amber-800 mt-1 bg-white/50 p-2 rounded border border-amber-100">
+                        {selectedLeadDetail.return_comments}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           )}
         </DialogContent>
-
-        <DialogActions
-          sx={{
-            padding: '20px 28px 28px',
-            gap: '12px',
-            justifyContent: 'center',
-            borderTop: '1px solid #E5E7EB'
-          }}
-        >
-          <Button
-            onClick={handleCloseDetailDialog}
-            sx={{
-              border: '1px solid #E5E7EB',
-              borderRadius: '10px',
-              padding: '10px 24px',
-              textTransform: 'none',
-              fontWeight: '400',
-              color: '#6B7280',
-              fontSize: '14px',
-              background: 'rgba(255, 255, 255, 0.8)',
-              '&:hover': {
-                backgroundColor: 'rgba(249, 250, 251, 0.9)',
-                borderColor: '#D1D5DB',
-              }
-            }}
-          >
+        <DialogActions sx={{ padding: '16px 24px', borderTop: '1px solid #E5E7EB' }}>
+          <Button onClick={() => setDetailDialogOpen(false)} variant="outlined" color="inherit" sx={{ borderRadius: '8px', textTransform: 'none' }}>
             Close
           </Button>
         </DialogActions>
       </Dialog>
-
-      {/* Approve Confirmation Dialog */}
-      <ConfirmDialog
-        open={approveDialog.open}
-        title="Approve Return Request"
-        message={`Are you sure you want to approve the return request for lead "${approveDialog.lead?.first_name} ${approveDialog.lead?.last_name}"? The lead will be returned and the user will be refunded.`}
-        onConfirm={confirmApprove}
-        onCancel={() => setApproveDialog({ open: false, lead: null })}
-      />
-
-      {/* Reject Confirmation Dialog */}
-      <ConfirmDialog
-        open={rejectDialog.open}
-        title="Reject Return Request"
-        message={`Are you sure you want to reject the return request for lead "${rejectDialog.lead?.first_name} ${rejectDialog.lead?.last_name}"? The user will be notified of the rejection.`}
-        onConfirm={confirmReject}
-        onCancel={() => setRejectDialog({ open: false, lead: null })}
-      />
-    </>
+    </div>
   );
+}
+
+const ActionMenu = ({ lead, onApprove, onReject, onViewDetails }: { lead: ReturnLead, onApprove: () => void, onReject: () => void, onViewDetails: () => void }) => {
+  const router = useRouter();
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const open = Boolean(anchorEl);
+
+  return (
+    <>
+      <div className="text-right">
+        <IconButton onClick={(e) => setAnchorEl(e.currentTarget)} size="small" className="text-gray-400 hover:text-gray-600 hover:bg-gray-50">
+          <MoreHorizontal className="h-5 w-5" />
+        </IconButton>
+      </div>
+      <Menu
+        anchorEl={anchorEl}
+        open={open}
+        onClose={() => setAnchorEl(null)}
+        PaperProps={{
+          elevation: 0,
+          sx: {
+            filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.08))',
+            mt: 0.5,
+            borderRadius: '12px',
+            border: '1px solid #f3f4f6'
+          },
+        }}
+      >
+        <MenuItem onClick={() => { router.push(`/admin/leads/${lead._id}`); setAnchorEl(null); }} className="text-sm">View Lead</MenuItem>
+
+        {lead.return_comments && (
+          <MenuItem onClick={() => { onViewDetails(); setAnchorEl(null); }} className="text-sm">View Request Details</MenuItem>
+        )}
+
+        <MenuItem onClick={() => { onApprove(); setAnchorEl(null); }} className="text-sm text-green-600">Approve Return</MenuItem>
+        <MenuItem onClick={() => { onReject(); setAnchorEl(null); }} className="text-sm text-red-600">Reject Return</MenuItem>
+      </Menu>
+    </>
+  )
 }

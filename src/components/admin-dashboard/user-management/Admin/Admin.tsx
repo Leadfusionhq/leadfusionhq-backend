@@ -34,6 +34,7 @@ import { toast } from 'react-toastify';
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 import { Menu, MenuItem, IconButton } from "@mui/material";
 import { getErrorMessage } from '@/utils/getErrorMessage';
+import useDebounce from '@/hooks/useDebounce';
 
 // --- Types ---
 type User = {
@@ -103,8 +104,10 @@ export default function AdminTable() {
   const [totalRows, setTotalRows] = useState<number>(0);
 
   // Sorting & Filtering State
+  // Sorting & Filtering State
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
+  const debouncedGlobalFilter = useDebounce(globalFilter, 300);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
 
   const token = useSelector((state: RootState) => state.auth.token);
@@ -148,13 +151,13 @@ export default function AdminTable() {
 
   useEffect(() => {
     setPagination(prev => ({ ...prev, pageIndex: 0 }));
-  }, [globalFilter]);
+  }, [debouncedGlobalFilter]);
 
   useEffect(() => {
     if (token) {
-      fetchUsers(pagination.pageIndex + 1, pagination.pageSize, globalFilter);
+      fetchUsers(pagination.pageIndex + 1, pagination.pageSize, debouncedGlobalFilter);
     }
-  }, [token, pagination.pageIndex, pagination.pageSize, globalFilter, fetchUsers]);
+  }, [token, pagination.pageIndex, pagination.pageSize, debouncedGlobalFilter, fetchUsers]);
 
   const confirmDeleteUser = async () => {
     if (!selectedUser) return;
