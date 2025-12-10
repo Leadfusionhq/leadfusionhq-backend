@@ -8,7 +8,7 @@ const { addCSVProcessingJob, getJobStatus } = require('../../queue/csvProcessor'
 const mongoose = require('mongoose');
 const { User } = require('../../models/user.model.js');
 const MAIL_HANDLER = require('../../mail/mails');
-const { sendToN8nWebhook, sendLowBalanceAlert} = require('../../services/n8n/webhookService.js');
+const { sendToN8nWebhook, sendLowBalanceAlert } = require('../../services/n8n/webhookService.js');
 const { leadLogger } = require('../../utils/logger');
 // services/lead.service.js
 
@@ -26,10 +26,10 @@ const createLead = async (data, options = {}) => {
     // 🔥 FIX: Ensure coordinates are properly formatted
     if (data.address?.coordinates) {
       const { lat, lng } = data.address.coordinates;
-      
-      if (lat !== undefined && lng !== undefined && 
-          lat !== null && lng !== null &&
-          lat !== '' && lng !== '') {
+
+      if (lat !== undefined && lng !== undefined &&
+        lat !== null && lng !== null &&
+        lat !== '' && lng !== '') {
         data.address.coordinates = {
           lat: Number(lat),
           lng: Number(lng)
@@ -64,7 +64,7 @@ const createLead = async (data, options = {}) => {
 
     // Create lead
     const newLead = await Lead.create([data], { session });
-    
+
     // Populate and return
     const populatedLead = await Lead.findById(newLead[0]._id)
       .populate('campaign_id')
@@ -85,7 +85,7 @@ const createLead = async (data, options = {}) => {
   }
 };
 
-const getLeads = async (page = 1, limit = 10, filters = {}) => {
+const getLeads = async (page = 1, limit = 10, filters = {}, search = "") => {
   try {
     const skip = (page - 1) * limit;
 
@@ -96,7 +96,22 @@ const getLeads = async (page = 1, limit = 10, filters = {}) => {
       ...(filters.status && { status: filters.status }),
       ...(filters.state && { 'address.state': normalizeId(filters.state) }),
     };
-    
+
+    if (search) {
+      const parts = search.trim().split(/\s+/);
+      const regexParts = parts.map(p => new RegExp(p, "i"));
+
+      query.$or = [];
+
+      regexParts.forEach(rgx => {
+        query.$or.push({ first_name: rgx });
+        query.$or.push({ middle_name: rgx });
+        query.$or.push({ last_name: rgx });
+
+        query.$or.push({ email: rgx });
+        query.$or.push({ phone: rgx });
+      });
+    }
 
     const [leads, total] = await Promise.all([
       Lead.find(query)
@@ -125,18 +140,62 @@ const getLeads = async (page = 1, limit = 10, filters = {}) => {
   }
 };
 
-const getLeadByUserId = async (page = 1, limit = 10, user_id, filters = {}) => {
+const getLeadByUserId = async (page = 1, limit = 10, user_id, filters = {}, search = "") => {
   const skip = (page - 1) * limit;
   const campaigns = await Campaign.find({ user_id }).select('_id');
+
   if (!campaigns.length) {
-    return { data: [], meta: { total: 0, page, limit, totalPages: 0 } };
+    return {
+      data: [],
+      meta: { total: 0, page, limit, totalPages: 0 }
+    };
   }
 
   const normalizeId = (val) => String(val).split('|')[0];
 
   const baseQuery = { campaign_id: { $in: campaigns.map(c => c._id) } };
+
   if (filters.status) baseQuery.status = filters.status;
   if (filters.state) baseQuery['address.state'] = normalizeId(filters.state);
+
+  if (search) {
+    const parts = search.trim().split(/\s+/);
+    const regexParts = parts.map(p => new RegExp(p, "i"));
+
+    baseQuery.$or = [];
+
+    regexParts.forEach(rgx => {
+      baseQuery.$or.push({ first_name: rgx });
+      baseQuery.$or.push({ middle_name: rgx });
+      baseQuery.$or.push({ last_name: rgx });
+
+      baseQuery.$or.push({ email: rgx });
+      baseQuery.$or.push({ phone: rgx });
+    });
+
+    baseQuery.$or.push({
+      $expr: {
+        $regexMatch: {
+          input: {
+            $trim: {
+              input: {
+                $concat: [
+                  "$first_name", " ",
+                  { $ifNull: ["$middle_name", ""] }, " ",
+                  "$last_name"
+                ]
+              }
+            }
+          },
+          regex: new RegExp(search, "i")
+        }
+      }
+    });
+  }
+
+
+
+
 
   const [leads, total] = await Promise.all([
     Lead.find(baseQuery)
@@ -151,9 +210,44 @@ const getLeadByUserId = async (page = 1, limit = 10, user_id, filters = {}) => {
 
   return {
     data: leads,
-    meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    meta: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    },
   };
 };
+
+// const getLeadByUserId = async (page = 1, limit = 10, user_id, filters = {}) => {
+//   const skip = (page - 1) * limit;
+//   const campaigns = await Campaign.find({ user_id }).select('_id');
+//   if (!campaigns.length) {
+//     return { data: [], meta: { total: 0, page, limit, totalPages: 0 } };
+//   }
+
+//   const normalizeId = (val) => String(val).split('|')[0];
+
+//   const baseQuery = { campaign_id: { $in: campaigns.map(c => c._id) } };
+//   if (filters.status) baseQuery.status = filters.status;
+//   if (filters.state) baseQuery['address.state'] = normalizeId(filters.state);
+
+//   const [leads, total] = await Promise.all([
+//     Lead.find(baseQuery)
+//       .populate('campaign_id', 'campaign_id name status lead_type exclusivity language geography delivery user_id note')
+//       .populate('address.state', 'name abbreviation')
+//       .sort({ createdAt: -1 })
+//       .skip(skip)
+//       .limit(limit)
+//       .lean(),
+//     Lead.countDocuments(baseQuery),
+//   ]);
+
+//   return {
+//     data: leads,
+//     meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+//   };
+// };
 
 const getLeadById = async (leadId, userId) => {
   // const lead = await Lead.findOne({ _id: leadId, user_id: userId }).lean();
@@ -167,11 +261,11 @@ const getLeadById = async (leadId, userId) => {
   // return lead;
 
   const lead = await Lead.findOne({ _id: leadId })
-  .populate({
-    path: 'campaign_id',
-  })
-  .populate('address.state', 'name abbreviation')
-  .lean();
+    .populate({
+      path: 'campaign_id',
+    })
+    .populate('address.state', 'name abbreviation')
+    .lean();
 
   if (!lead || String(lead.campaign_id?.user_id) !== String(userId)) {
     throw new ErrorHandler(404, 'Lead not found or access denied');
@@ -214,7 +308,7 @@ const updateLead = async (leadId, userId, role, updateData) => {
     if (updateData.address) {
       // Get existing lead
       const existingLead = await Lead.findOne(filter);
-      
+
       if (!existingLead) {
         throw new ErrorHandler(404, 'Lead not found or access denied');
       }
@@ -233,10 +327,10 @@ const updateLead = async (leadId, userId, role, updateData) => {
           console.log('⚠️ Coordinates removed');
         } else {
           const { lat, lng } = updateData.address.coordinates;
-          
-          if (lat !== undefined && lng !== undefined && 
-              lat !== null && lng !== null &&
-              lat !== '' && lng !== '') {
+
+          if (lat !== undefined && lng !== undefined &&
+            lat !== null && lng !== null &&
+            lat !== '' && lng !== '') {
             mergedAddress.coordinates = {
               lat: Number(lat),
               lng: Number(lng)
@@ -269,17 +363,17 @@ const updateLead = async (leadId, userId, role, updateData) => {
     // Update lead
     const updatedLead = await Lead.findOneAndUpdate(
       filter,
-      { 
+      {
         ...updateData,
         updatedAt: Date.now()
       },
-      { 
+      {
         new: true,
         runValidators: true,
       }
     )
-    .populate('address.state')
-    .populate('campaign_id');
+      .populate('address.state')
+      .populate('campaign_id');
 
     if (!updatedLead) {
       throw new ErrorHandler(404, 'Lead not found or access denied');
@@ -303,7 +397,7 @@ const processCSVUpload = async (filePath, userId, columnMapping) => {
     const requiredFields = [
       'first_name', 'last_name', 'phone_number', 'address.street', 'address.city', 'address.state', 'address.zip', 'campaign_id'
     ];
-    
+
     const mappedDbColumns = Object.values(columnMapping);
     const missingRequired = requiredFields.filter(field => !mappedDbColumns.includes(field));
 
@@ -311,7 +405,7 @@ const processCSVUpload = async (filePath, userId, columnMapping) => {
       throw new ErrorHandler(400, `Missing required column mappings: ${missingRequired.join(', ')}`);
     }
 
-    
+
     // Add job to processing queue
     const jobInfo = await addCSVProcessingJob(filePath, null, userId, columnMapping);
     console.log('CSV processing job added:', jobInfo);
@@ -333,12 +427,12 @@ const validateCSVFormat = async (filePath, sampleRows = 5) => {
   try {
     const fs = require('fs');
     const csv = require('csv-parser');
-    
+
     return new Promise((resolve, reject) => {
       const results = [];
       let headers = [];
       let rowCount = 0;
-      
+
       fs.createReadStream(filePath)
         .pipe(csv({
           mapHeaders: ({ header }) => header.trim(),
@@ -374,7 +468,7 @@ const validateCSVFormat = async (filePath, sampleRows = 5) => {
         })
         .on('end', () => {
           // Check if campaign_id exists in the CSV
-          const hasCampaignId = headers.some(header => 
+          const hasCampaignId = headers.some(header =>
             header.toLowerCase().includes('campaign') && header.toLowerCase().includes('id')
           );
 
@@ -384,10 +478,10 @@ const validateCSVFormat = async (filePath, sampleRows = 5) => {
             totalSampleRows: rowCount,
             hasCampaignId,
             suggestions: {
-              campaignIdColumn: headers.find(header => 
+              campaignIdColumn: headers.find(header =>
                 header.toLowerCase().includes('campaign') && header.toLowerCase().includes('id')
               ),
-              stateColumn: headers.find(header => 
+              stateColumn: headers.find(header =>
                 header.toLowerCase().includes('state')
               )
             }
@@ -406,7 +500,7 @@ const validateCSVFormat = async (filePath, sampleRows = 5) => {
 const getProcessingStatus = async (jobId, userId) => {
   try {
     const jobStatus = await getJobStatus(jobId);
-    
+
     // Check if user has access to this job
     if (jobStatus.userId.toString() !== userId.toString()) {
       throw new ErrorHandler(403, 'Access denied to this job');
@@ -422,9 +516,9 @@ const getProcessingStatus = async (jobId, userId) => {
 const getUserProcessingJobs = async (userId, page = 1, limit = 10) => {
   try {
     const skip = (page - 1) * limit;
-    
+
     const JobStatus = require('../../models/jobStatus.model');
-    
+
     const [jobs, total] = await Promise.all([
       JobStatus.find({ userId })
         .sort({ createdAt: -1 })
@@ -529,127 +623,127 @@ const validatePrepaidCampaignBalance = async (campaign_id) => {
       if (totalAvailable < leadCost) {
 
 
-     // 🔹 Call NEW LOW BALANCE API
-      try {
-        const lowBalanceResp = await sendLowBalanceAlert({
-          campaign_name: campaign.name,
-          filter_set_id: campaign.boberdoo_filter_set_id,
-          partner_id: campaignUser.integrations?.boberdoo?.external_id || "",
-          email: campaignUser.email
-        });
-
-
-        // define once at top of function
-
-
-        if (lowBalanceResp.success) {
-          leadLogger.info('Low Balance webhook sent successfully', {
-       
-            webhook_status: "success",
-            response: lowBalanceResp
+        // 🔹 Call NEW LOW BALANCE API
+        try {
+          const lowBalanceResp = await sendLowBalanceAlert({
+            campaign_name: campaign.name,
+            filter_set_id: campaign.boberdoo_filter_set_id,
+            partner_id: campaignUser.integrations?.boberdoo?.external_id || "",
+            email: campaignUser.email
           });
-        } else {
-          leadLogger.warn('Low Balance webhook failed', {
-       
-            webhook_status: "failed",
-            error: lowBalanceResp.error || "Unknown error",
-            response: lowBalanceResp
-          });
-        }
 
-  
-      } catch (err) {
-        leadLogger.error('Fatal error while sending low balance webhook', err, {
-     
-          error: err.message
-        });
-      }
-      // 🔹 Send detailed insufficient balance email
-      try {
-        const emailResp = await MAIL_HANDLER.sendInsufficientBalanceEmail({
-          to: campaignUser.email,
-          userName: campaignUser.name || campaignUser.fullName || campaignUser.email,
-          requiredAmount: leadCost,
-          currentBalance: totalAvailable,
-          campaignName: campaign.name || `Campaign #${campaign._id}`,
-          campaignId: campaign._id
-        });
 
-        if (emailResp?.data?.id) {
-          leadLogger.info('Low Balance email sent successfully', {
-       
-            email_to: campaignUser.email,
-            response_id: emailResp.data.id
-          });
-        } else {
-          leadLogger.warn('Low Balance email sending failed', {
-       
-            email_to: campaignUser.email,
-            error: emailResp?.error || "Unknown error",
-            response: emailResp
+          // define once at top of function
+
+
+          if (lowBalanceResp.success) {
+            leadLogger.info('Low Balance webhook sent successfully', {
+
+              webhook_status: "success",
+              response: lowBalanceResp
+            });
+          } else {
+            leadLogger.warn('Low Balance webhook failed', {
+
+              webhook_status: "failed",
+              error: lowBalanceResp.error || "Unknown error",
+              response: lowBalanceResp
+            });
+          }
+
+
+        } catch (err) {
+          leadLogger.error('Fatal error while sending low balance webhook', err, {
+
+            error: err.message
           });
         }
+        // 🔹 Send detailed insufficient balance email
+        try {
+          const emailResp = await MAIL_HANDLER.sendInsufficientBalanceEmail({
+            to: campaignUser.email,
+            userName: campaignUser.name || campaignUser.fullName || campaignUser.email,
+            requiredAmount: leadCost,
+            currentBalance: totalAvailable,
+            campaignName: campaign.name || `Campaign #${campaign._id}`,
+            campaignId: campaign._id
+          });
 
-      const EXCLUDED = new Set([
-        'admin@gmail.com',
-        'admin123@gmail.com',
-        'admin1234@gmail.com',
-      ]);
+          if (emailResp?.data?.id) {
+            leadLogger.info('Low Balance email sent successfully', {
 
-      const adminUsers = await User.find({
-        role: { $in: ['ADMIN', 'SUPER_ADMIN'] },
-        isActive: { $ne: false },
-      }).select('email');
+              email_to: campaignUser.email,
+              response_id: emailResp.data.id
+            });
+          } else {
+            leadLogger.warn('Low Balance email sending failed', {
 
-      
+              email_to: campaignUser.email,
+              error: emailResp?.error || "Unknown error",
+              response: emailResp
+            });
+          }
 
-      let adminEmails = (adminUsers || [])
-        .map(a => a.email)
-        .filter(Boolean)
-        .map(e => e.trim().toLowerCase())
-        .filter(e => !EXCLUDED.has(e));
+          const EXCLUDED = new Set([
+            'admin@gmail.com',
+            'admin123@gmail.com',
+            'admin1234@gmail.com',
+          ]);
+
+          const adminUsers = await User.find({
+            role: { $in: ['ADMIN', 'SUPER_ADMIN'] },
+            isActive: { $ne: false },
+          }).select('email');
 
 
-                  // ✅ NEW: override with env emails if present (still an array)
-        console.log("ENV CHECK → ADMIN_NOTIFICATION_EMAILS =", process.env.ADMIN_NOTIFICATION_EMAILS);
 
-        console.log("Admin before override =", adminEmails);
-
-        if (process.env.ADMIN_NOTIFICATION_EMAILS) {
-          adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS
-            .split(',')
+          let adminEmails = (adminUsers || [])
+            .map(a => a.email)
+            .filter(Boolean)
             .map(e => e.trim().toLowerCase())
-            .filter(Boolean);
+            .filter(e => !EXCLUDED.has(e));
+
+
+          // ✅ NEW: override with env emails if present (still an array)
+          console.log("ENV CHECK → ADMIN_NOTIFICATION_EMAILS =", process.env.ADMIN_NOTIFICATION_EMAILS);
+
+          console.log("Admin before override =", adminEmails);
+
+          if (process.env.ADMIN_NOTIFICATION_EMAILS) {
+            adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS
+              .split(',')
+              .map(e => e.trim().toLowerCase())
+              .filter(Boolean);
+          }
+
+          console.log("Admin AFTER override =", adminEmails);
+          const emailString = adminEmails.join(',');
+          // ---------------------------------------
+          // 🔹 SEND LOW BALANCE ADMIN EMAIL
+          // ---------------------------------------
+          const adminEmailResp = await MAIL_HANDLER.sendLowBalanceAdminEmail({
+            to: emailString,  // <-- NOW SENDING TO MULTIPLE OR SINGLE (same key)
+            userEmail: campaignUser.email,
+            userName: campaignUser.name || campaignUser.fullName || "",
+            campaignName: campaign.name,
+            campaignId: campaign._id,
+            requiredAmount: leadCost,
+            currentBalance: totalAvailable
+          });
+
+          if (adminEmailResp?.data?.id) {
+            leadLogger.info('Low Balance ADMIN email sent successfully', {
+              email_to: adminEmails,
+              response_id: adminEmailResp.data.id
+            });
+          }
+
+        } catch (err) {
+          leadLogger.error('Fatal error while sending low balance email', err, {
+
+            error: err.message
+          });
         }
-
-        console.log("Admin AFTER override =", adminEmails);
-        const emailString = adminEmails.join(',');
-      // ---------------------------------------
-      // 🔹 SEND LOW BALANCE ADMIN EMAIL
-      // ---------------------------------------
-      const adminEmailResp = await MAIL_HANDLER.sendLowBalanceAdminEmail({
-        to: emailString,  // <-- NOW SENDING TO MULTIPLE OR SINGLE (same key)
-        userEmail: campaignUser.email,
-        userName: campaignUser.name || campaignUser.fullName || "",
-        campaignName: campaign.name,
-        campaignId: campaign._id,
-        requiredAmount: leadCost,
-        currentBalance: totalAvailable
-      });
-
-      if (adminEmailResp?.data?.id) {
-        leadLogger.info('Low Balance ADMIN email sent successfully', {
-          email_to: adminEmails,
-          response_id: adminEmailResp.data.id
-        });
-      }
-
-      } catch (err) {
-        leadLogger.error('Fatal error while sending low balance email', err, {
-     
-          error: err.message
-        });
-      }
 
 
         throw new ErrorHandler(400, 'Insufficient funds to create lead');
@@ -713,7 +807,7 @@ const returnLead = async (leadId, returnStatus, returnReason, returnComments) =>
 
     // ✅ Update with reason and comments
     lead.return_status = returnStatus;
-    lead.return_attempts = attempts + 1; 
+    lead.return_attempts = attempts + 1;
     lead.return_reason = returnReason;
     lead.return_comments = returnComments;
     // NEW FIELD
@@ -722,7 +816,7 @@ const returnLead = async (leadId, returnStatus, returnReason, returnComments) =>
     await lead.save();
 
     return lead.toObject();
-    
+
   } catch (error) {
     throw new ErrorHandler(
       error.statusCode || 500,
@@ -780,11 +874,11 @@ const rejectReturnLead = async (leadId, returnStatus) => {
       throw new ErrorHandler(400, 'Lead return is not pending and cannot be rejected');
     }
 
-    lead.return_status = returnStatus;       
+    lead.return_status = returnStatus;
 
     await lead.save();
 
-    return lead.toObject(); 
+    return lead.toObject();
   } catch (error) {
     throw new ErrorHandler(
       error.statusCode || 500,
@@ -792,9 +886,9 @@ const rejectReturnLead = async (leadId, returnStatus) => {
     );
   }
 };
-const approveReturnLead = async(leadId, returnStatus, isDirectReturn = false) => {
+const approveReturnLead = async (leadId, returnStatus, isDirectReturn = false) => {
   const Transaction = require('../../models/transaction.model');
-  
+
   try {
     const lead = await Lead.findById(leadId);
 
@@ -840,7 +934,7 @@ const approveReturnLead = async(leadId, returnStatus, isDirectReturn = false) =>
       transactionId = lead.transaction_id;
       fetchMethod = 'stored_in_lead';
       console.log('✅ Using stored original_cost from lead:', originalLeadCost);
-    } 
+    }
     else if (lead.transaction_id) {
       const transaction = await Transaction.findById(lead.transaction_id);
       if (transaction) {
@@ -850,11 +944,11 @@ const approveReturnLead = async(leadId, returnStatus, isDirectReturn = false) =>
         console.log('✅ Fetched from transaction by stored ID:', originalLeadCost);
       }
     }
-    
+
     if (originalLeadCost <= 0) {
       const transaction = await Transaction.findOne({
         userId: user_id,
-        createdAt: { 
+        createdAt: {
           $gte: new Date(lead.createdAt.getTime() - 10000),
           $lte: new Date(lead.createdAt.getTime() + 10000)
         }
@@ -936,11 +1030,11 @@ const deleteLead = async (leadId, userId, role) => {
     if (role !== CONSTANT_ENUM.USER_ROLE.ADMIN) {
       // Get lead's campaign to check ownership
       const lead = await Lead.findById(leadId).populate('campaign_id');
-      
+
       if (!lead) {
         throw new ErrorHandler(404, 'Lead not found');
       }
-      
+
       if (lead.campaign_id.user_id.toString() !== userId.toString()) {
         throw new ErrorHandler(403, 'Access denied: You can only delete your own leads');
       }
@@ -954,7 +1048,7 @@ const deleteLead = async (leadId, userId, role) => {
     }
 
     console.log(`✅ Lead ${leadId} permanently deleted by user ${userId}`);
-    
+
     return {
       deleted: true,
       lead_id: leadId,
