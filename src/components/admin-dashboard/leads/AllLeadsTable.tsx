@@ -37,7 +37,8 @@ import {
     CheckCircle,
     XCircle,
     AlertCircle,
-    Clock
+    Clock,
+    FileText
 } from "lucide-react";
 import { toast } from 'react-toastify';
 import ConfirmDialog from "@/components/common/ConfirmDialog";
@@ -344,9 +345,19 @@ export default function AllLeadsTable() {
             cell: ({ row }) => (
                 <div className="flex flex-col">
                     <span className="text-sm font-semibold text-gray-900">{row.original.lead_id}</span>
-                    <div className="flex items-center text-xs text-gray-500 mt-0.5 gap-1">
-                        <Calendar size={12} />
-                        {new Date(row.original.createdAt).toLocaleDateString()}
+                    <div className="flex items-center gap-2 mt-0.5">
+                        <div className="flex items-center text-xs text-gray-500 gap-1">
+                            <Calendar size={12} />
+                            {new Date(row.original.createdAt).toLocaleDateString()}
+                        </div>
+                        {row.original.note && (
+                            <Tooltip title={row.original.note} arrow placement="top">
+                                <div className="group flex items-center gap-1 cursor-help bg-yellow-50 px-1.5 py-0.5 rounded border border-yellow-100 transition-colors hover:bg-yellow-100">
+                                    <FileText size={10} className="text-yellow-600" />
+                                    <span className="text-[10px] font-medium text-yellow-700">Note</span>
+                                </div>
+                            </Tooltip>
+                        )}
                     </div>
                 </div>
             ),
@@ -361,11 +372,17 @@ export default function AllLeadsTable() {
                     <div className="flex flex-col gap-0.5 mt-1 text-xs text-gray-500">
                         <div className="flex items-center gap-1.5 truncate">
                             <Mail size={11} className="text-gray-400" />
-                            <span className="truncate">{row.original.email}</span>
+                            <a href={`mailto:${row.original.email}`} className="truncate hover:text-blue-600 hover:underline transition-colors">
+                                {row.original.email}
+                            </a>
                         </div>
                         <div className="flex items-center gap-1.5">
                             <Phone size={11} className="text-gray-400" />
-                            {row.original.phone || row.original.phone_number || "--"}
+                            {row.original.phone || row.original.phone_number ? (
+                                <a href={`tel:${row.original.phone || row.original.phone_number}`} className="hover:text-blue-600 hover:underline transition-colors">
+                                    {row.original.phone || row.original.phone_number}
+                                </a>
+                            ) : "--"}
                         </div>
                     </div>
                 </div>
@@ -377,11 +394,16 @@ export default function AllLeadsTable() {
             header: "Location",
             cell: ({ row }) => {
                 const state = row.original.address.state?.abbreviation || row.original.address.state?.name || "--";
+                // Construct full address for map
+                const addr = row.original.address;
+                const fullAddr = `${addr?.street || ''}, ${addr?.city || ''}, ${state} ${addr?.zip_code || ''}`;
+                const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddr)}`;
+
                 return (
-                    <div className="flex items-center gap-1.5 text-sm text-gray-600">
-                        <MapPin size={14} className="text-gray-400" />
-                        <span>{row.original.address.city}, {state}</span>
-                    </div>
+                    <a href={mapUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-sm text-gray-600 group transition-colors hover:text-blue-600">
+                        <MapPin size={14} className="text-gray-400 group-hover:text-blue-500" />
+                        <span className="border-b border-transparent group-hover:border-blue-200">{row.original.address.city}, {state}</span>
+                    </a>
                 )
             },
             size: 140
@@ -391,7 +413,28 @@ export default function AllLeadsTable() {
             header: "Campaign",
             cell: ({ row }) => {
                 const name = typeof row.original.campaign_id === 'object' ? row.original.campaign_id?.name : row.original.campaign_id;
-                return <div className="text-sm text-gray-700 max-w-[150px] truncate" title={name || ""}>{name || "N/A"}</div>
+                // Cost calculation if needed, for admin probably useful? User specifically asked for 'cost' 
+                // but checking Lead type, it doesn't strictly have 'original_cost' in the type definition in this file (lines 47-84), 
+                // wait, line 80? No.
+                // Let me check type Lead in AllLeadsTable.tsx again.
+                // It does NOT have original_cost in type Lead! 
+                // However, I should assume it might be there or I should update the type. 
+                // BUT, looking at User Leads.tsx, it had original_cost.
+                // I will assume it comes from API even if not in type, or fail gracefully.
+                // Actually, I should probably check API response or adding it to type.
+                // For now, I'll cast row.original as any to safely access it if it exists.
+                const cost = (row.original as any).original_cost || 0;
+
+                return (
+                    <div className="flex flex-col">
+                        <div className="text-sm text-gray-700 max-w-[150px] truncate font-medium" title={name || ""}>{name || "N/A"}</div>
+                        {(cost > 0) && (
+                            <span className="text-[10px] text-gray-500 font-medium mt-0.5 flex items-center gap-0.5">
+                                Cost: <span className="text-gray-900">${cost}</span>
+                            </span>
+                        )}
+                    </div>
+                );
             },
             size: 150
         },

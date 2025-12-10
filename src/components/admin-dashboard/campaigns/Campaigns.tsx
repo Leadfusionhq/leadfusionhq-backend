@@ -35,11 +35,13 @@ import {
   UserPlus,
   Users,
   MapPin,
-  ListFilter
+  ListFilter,
+  Mail,
+  Phone
 } from "lucide-react";
 import { toast } from 'react-toastify';
 import ConfirmDialog from "@/components/common/ConfirmDialog";
-import { Menu, MenuItem, IconButton, Popover } from "@mui/material"; // Keeping MUI for complex menus/popovers if preferred, or could switch to pure custom
+import { Menu, MenuItem, IconButton, Popover, Tooltip } from "@mui/material"; // Keeping MUI for complex menus/popovers if preferred, or could switch to pure custom
 import { STATUS, LEAD_TYPE } from "@/constants/enums";
 import useDebounce from '@/hooks/useDebounce';
 
@@ -69,10 +71,24 @@ type Campaign = {
       abbreviation: string;
       _id: string;
       name: string;
+    } | string | { name: string; abbreviation: string }[];
+    coverage: {
+      type: string;
+      partial?: {
+        zip_codes?: string[];
+        zipcode?: string;
+      };
     };
-    coverage: { type: string };
   };
-  delivery: { method: string };
+  delivery: {
+    method: string | string[];
+    email?: {
+      addresses: string;
+    };
+    phone?: {
+      numbers: string;
+    };
+  };
   user_id?: {
     email: string;
     name: string;
@@ -347,13 +363,47 @@ export default function CampaignTable() {
       accessorKey: "geography",
       header: "Coverage",
       cell: ({ row }) => {
-        const state = Array.isArray(row.original.geography.state)
-          ? row.original.geography.state.map(s => s.abbreviation).join(', ')
-          : row.original.geography.state?.abbreviation;
+        const geography = row.original.geography;
+        const stateData = geography?.state;
+        const partialData = geography?.coverage?.partial;
+
+        let displayState = "N/A";
+        let isZipCodes = false;
+        let zipCodes: string[] = [];
+
+        if (Array.isArray(stateData) && stateData.length > 0) {
+          displayState = stateData.map((s: any) => s.name || s).join(", ");
+        } else if (typeof stateData === 'string' && stateData.trim() !== '') {
+          displayState = stateData;
+        } else if (stateData && typeof stateData === 'object' && 'name' in stateData) {
+          displayState = (stateData as any).name;
+        } else {
+          // Fallback to Zip Codes if state is missing
+          if (partialData?.zip_codes && Array.isArray(partialData.zip_codes) && partialData.zip_codes.length > 0) {
+            isZipCodes = true;
+            zipCodes = partialData.zip_codes;
+            displayState = `${zipCodes.length} Zip ${zipCodes.length === 1 ? 'Code' : 'Codes'}`;
+          } else if (partialData?.zipcode) {
+            isZipCodes = true;
+            zipCodes = [partialData.zipcode];
+            displayState = partialData.zipcode;
+          }
+        }
+
+        if (isZipCodes) {
+          return (
+            <Tooltip title={zipCodes.join(", ")} arrow placement="top">
+              <span className="text-sm text-blue-700 font-medium bg-blue-50 px-2 py-1 rounded-md whitespace-nowrap cursor-help border border-blue-100">
+                {displayState}
+              </span>
+            </Tooltip>
+          );
+        }
+
         return (
-          <div className="flex items-center gap-1.5">
-            <MapPin size={14} className="text-gray-400" />
-            <span className="text-sm text-gray-700 font-medium">{state || "All"}</span>
+          <div className="flex items-center gap-1.5 line-clamp-1 max-w-[150px]" title={displayState}>
+            <MapPin size={14} className="text-gray-400 shrink-0" />
+            <span className="text-sm text-gray-700 font-medium truncate">{displayState || "All"}</span>
           </div>
         )
       }
@@ -367,6 +417,43 @@ export default function CampaignTable() {
           <span className="text-sm text-gray-700 capitalize">{row.original.lead_type.toLowerCase().replace('_', ' ')}</span>
         </div>
       )
+    },
+    {
+      accessorKey: "delivery.method",
+      header: "Delivery",
+      cell: ({ row }) => {
+        const delivery = row.original.delivery;
+        const methods = Array.isArray(delivery?.method)
+          ? delivery.method
+          : typeof delivery?.method === 'string'
+            ? [delivery.method]
+            : [];
+
+        const hasEmail = methods.some(m => m.toLowerCase().includes('email'));
+        const hasPhone = methods.some(m => m.toLowerCase().includes('phone') || m.toLowerCase().includes('call'));
+
+        return (
+          <div className="flex items-center gap-2">
+            {hasEmail && (
+              <Tooltip title={delivery?.email?.addresses || "No email provided"} arrow placement="top">
+                <div className="h-7 w-7 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center cursor-help border border-blue-100">
+                  <Mail size={13} />
+                </div>
+              </Tooltip>
+            )}
+            {hasPhone && (
+              <Tooltip title={delivery?.phone?.numbers || "No phone provided"} arrow placement="top">
+                <div className="h-7 w-7 rounded-md bg-purple-50 text-purple-600 flex items-center justify-center cursor-help border border-purple-100">
+                  <Phone size={13} />
+                </div>
+              </Tooltip>
+            )}
+            {!hasEmail && !hasPhone && (
+              <span className="text-xs text-gray-400 italic">--</span>
+            )}
+          </div>
+        );
+      },
     },
     {
       accessorKey: "boberdoo_filter_set_id",

@@ -282,3 +282,16 @@ export const LOGS_API = {
   CLEAR_LOGS: `${LOGS_API_Base}/clear`,
   EXPORT_LOGS: `${LOGS_API_Base}/export`,
 };
+
+
+const LOGS_API_BASE = `${API_BASE}/logs`;
+
+export const LOG_API = {
+
+  GET_LOGS: `${LOGS_API_BASE}/`,
+  GET_ALL_LOGS: `${LOGS_API_BASE}/all`,
+  GET_LOG_DETAIL: (id: string) => `${LOGS_API_BASE}/${id}`,
+  GET_STATS: `${LOGS_API_BASE}/stats`,
+  CLEAR_LOGS: `${LOGS_API_BASE}/clear`,
+  EXPORT_LOGS: `${LOGS_API_BASE}/export`,
+};
