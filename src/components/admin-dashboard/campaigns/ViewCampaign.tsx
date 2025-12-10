@@ -9,12 +9,12 @@ import { RootState } from "@/redux/store";
 import { FormatListBulleted } from "@mui/icons-material";
 import { LEADS_API } from "@/utils/apiUrl";
 
-import { 
-  Skeleton, 
-  Typography, 
-  Box, 
-  Paper, 
-  Divider, 
+import {
+  Skeleton,
+  Typography,
+  Box,
+  Paper,
+  Divider,
   Chip,
   Card,
   CardContent,
@@ -23,7 +23,7 @@ import {
   Stack,
   Badge
 } from "@mui/material";
-import { 
+import {
   Campaign as CampaignIcon,
   Person,
   LocationOn,
@@ -63,38 +63,38 @@ type Campaign = {
     };
     coverage: {
       type: string;
-      partial:{
-        counties:[{
+      partial: {
+        counties: [{
           name: string;
           code: string;
           fips_code: string;
           state: string;
         }];
         zip_codes: string[];
-        zip_code:string;
+        zip_code: string;
       }
-      
+
     };
   };
   delivery: {
     method: string;
     email: {
-        addresses: string;
-        subject: string;
+      addresses: string;
+      subject: string;
     };
     phone: {
-        numbers: string;
+      numbers: string;
     };
     crm: {
-        instructions: string;
+      instructions: string;
     };
     schedule: {
       days: {
-        day: string;            
-        active: boolean;        
-        start_time: string | null; 
-        end_time: string | null;  
-        cap: number | null;    
+        day: string;
+        active: boolean;
+        start_time: string | null;
+        end_time: string | null;
+        cap: number | null;
       }[];
     };
   };
@@ -190,7 +190,7 @@ export default function CampaignDetailPage() {
   useEffect(() => {
     const id = Array.isArray(campaignId) ? campaignId[0] : campaignId;
     if (!id || !token) return;
-  
+
     const fetchLeadCount = async () => {
       try {
         setLeadCountLoading(true);
@@ -200,14 +200,14 @@ export default function CampaignDetailPage() {
           limit: "1",
           campaign_id: id, // IMPORTANT: use Mongo _id, not campaign_id string
         });
-  
+
         const res = await axiosWrapper(
           "get",
           `${LEADS_API.GET_ALL_LEADS}?${params.toString()}`,
           {},
           token ?? undefined
         ) as { meta?: { total?: number } };
-  
+
         setLeadCount(res?.meta?.total ?? 0);
       } catch (e) {
         console.error("Failed to fetch lead count", e);
@@ -216,21 +216,21 @@ export default function CampaignDetailPage() {
         setLeadCountLoading(false);
       }
     };
-  
+
     fetchLeadCount();
   }, [campaignId, token]);
 
-  const handleEdit = (id:any) => {
+  const handleEdit = (id: any) => {
     router.push(`/admin/campaigns/${id}/edit`);
   };
-  const handleAddLead = (id:any) => {
+  const handleAddLead = (id: any) => {
     router.push(`/admin/campaigns/${id}/leads/add`);
   };
   // + add (near handleEdit / handleAddLead)
-const handleViewLeads = (id: string) => {
-  // pass the Mongo _id of the campaign
-  router.push(`/admin/leads?campaign_id=${id}`);
-};
+  const handleViewLeads = (id: string) => {
+    // pass the Mongo _id of the campaign
+    router.push(`/admin/leads?campaign_id=${id}`);
+  };
 
   if (loading) {
     return (
@@ -278,7 +278,7 @@ const handleViewLeads = (id: string) => {
               <Typography variant="h4" fontWeight={700} sx={{ fontSize: { xs: '1.75rem', sm: '2.125rem' } }}>
                 {campaign.name}
               </Typography>
-              <Chip 
+              <Chip
                 label={campaign.status}
                 color={getStatusColor(campaign.status) as any}
                 sx={{ fontWeight: 600, textTransform: 'capitalize' }}
@@ -321,17 +321,17 @@ const handleViewLeads = (id: string) => {
                 />
               )} */}
               {campaign.bid_price !== undefined && campaign.bid_price !== null && (
-                <DetailRow 
-                  label="Bid Price" 
-                  value={`$ ${campaign.bid_price.toFixed(2)}`} 
+                <DetailRow
+                  label="Bid Price"
+                  value={`$ ${campaign.bid_price.toFixed(2)}`}
                 />
               )}
 
               {campaign.language && <DetailRow label="Language" value={campaign.language} />}
               {campaign.updatedAt && (
-                <DetailRow 
-                  label="Last Updated" 
-                  value={formatDate(campaign.updatedAt)} 
+                <DetailRow
+                  label="Last Updated"
+                  value={formatDate(campaign.updatedAt)}
                 />
               )}
             </Stack>
@@ -357,21 +357,21 @@ const handleViewLeads = (id: string) => {
             <InfoCard title="Geographic Targeting" icon={<LocationOn fontSize="small" />}>
               <Stack spacing={1}>
                 {campaign.geography.state?.name && (
-                  <DetailRow 
-                    label="State" 
-                    value={`${campaign.geography.state.name} (${campaign.geography.state.abbreviation})`} 
+                  <DetailRow
+                    label="State"
+                    value={`${campaign.geography.state.name} (${campaign.geography.state.abbreviation})`}
                   />
                 )}
                 {campaign.geography.coverage?.type && (
                   <DetailRow label="Coverage Type" value={campaign.geography.coverage.type} />
                 )}
-               {campaign.geography.coverage?.type === 'PARTIAL' && 
-                campaign.geography.coverage.partial?.counties?.length > 0 && (
-                  <DetailRow
-                    label="Counties"
-                    value={campaign.geography.coverage.partial.counties.map(county => county.name).join(', ')}
-                  />
-                )}
+                {campaign.geography.coverage?.type === 'PARTIAL' &&
+                  campaign.geography.coverage.partial?.counties?.length > 0 && (
+                    <DetailRow
+                      label="Counties"
+                      value={campaign.geography.coverage.partial.counties.map(county => county.name).join(', ')}
+                    />
+                  )}
                 {campaign.geography.coverage?.partial?.zip_codes?.length > 0 && (
 
                   <DetailRow
@@ -405,11 +405,11 @@ const handleViewLeads = (id: string) => {
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                       CRM Instructions:
                     </Typography>
-                    <Typography 
-                      variant="body2" 
-                      sx={{ 
-                        backgroundColor: '#f5f5f5', 
-                        p: { xs: 1.5, sm: 2 }, 
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        backgroundColor: '#f5f5f5',
+                        p: { xs: 1.5, sm: 2 },
                         borderRadius: 1,
                         fontFamily: 'monospace',
                         fontSize: '0.875rem',
@@ -438,11 +438,11 @@ const handleViewLeads = (id: string) => {
                     Campaign Notes
                   </Typography>
                 </Stack>
-                <Typography 
-                  variant="body1" 
-                  sx={{ 
-                    backgroundColor: '#f8f9fa', 
-                    p: { xs: 2, sm: 3 }, 
+                <Typography
+                  variant="body1"
+                  sx={{
+                    backgroundColor: '#f8f9fa',
+                    p: { xs: 2, sm: 3 },
                     borderRadius: 2,
                     border: '1px solid #e9ecef',
                     lineHeight: 1.6,
