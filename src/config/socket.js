@@ -1,37 +1,49 @@
+
 const socketIo = require('socket.io');
+const jwt = require('jsonwebtoken');
+const config = require('./config');
 
 let io;
 
 const initSocket = (server) => {
-  // Initialize socket.io with the HTTP server
   io = socketIo(server, {
     cors: {
-      origin: "*", // Configure as needed for your client
+      origin: "*",
       methods: ["GET", "POST"]
     }
   });
 
-  // Set up the connection event for users
+  io.use((socket, next) => {
+    try {
+      const token =
+        socket.handshake.auth?.token ||
+        socket.handshake.query?.token ||
+        socket.handshake.headers?.authorization?.split(' ')[1];
+
+      if (!token) {
+        return next(new Error('Authentication error: Token required'));
+      }
+
+      jwt.verify(token, config.server.jwtSecretKey, (err, decoded) => {
+        if (err) {
+          return next(new Error('Authentication error: Invalid token'));
+        }
+        socket.user = decoded;
+        next();
+      });
+    } catch (err) {
+      next(new Error('Authentication error'));
+    }
+  });
+
   io.on('connection', (socket) => {
-    console.log('A user connected:', socket.id);
+    const userId = socket.user.id;
+    console.log(`User connected: ${userId} (Socket ID: ${socket.id})`);
+    socket.join(userId.toString());
+    console.log(`User ${userId} joined room: ${userId}`);
 
-    // Emit a test message to the user
-    socket.emit('message', 'Welcome to the notification service!');
-
-    // Handle when the user disconnects
     socket.on('disconnect', () => {
-      console.log('User disconnected:', socket.id);
-    });
-
-    // Allow users to join rooms based on their user ID
-    socket.on('join-room', (userId) => {
-      socket.join(userId.toString());
-      console.log(`User ${socket.id} joined room: ${userId}`);
-    });
-
-    // Handle other custom events here
-    socket.on('send-notification', (notification) => {
-      io.emit('notification', notification);
+      console.log(`User disconnected: ${userId}`);
     });
   });
 
@@ -39,7 +51,6 @@ const initSocket = (server) => {
   return io;
 };
 
-// Function to get the io instance safely
 const getIO = () => {
   if (!io) {
     throw new Error('Socket.IO not initialized. Call initSocket first.');
