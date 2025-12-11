@@ -9,12 +9,12 @@ const initSocket = (server) => {
   io = socketIo(server, {
     transports: ["websocket"],
     cors: {
-      // origin: "*",
-      origin: [
-        "http://localhost:3000",
-        `${process.env.BACKEND_LINK}`,
-        `${process.env.UI_LINK}`
-      ],
+      origin: "*",
+      // origin: [
+      //   "http://localhost:3000",
+      //   `${process.env.BACKEND_LINK}`,
+      //   `${process.env.UI_LINK}`
+      // ],
       methods: ["GET", "POST"]
     }
   });
