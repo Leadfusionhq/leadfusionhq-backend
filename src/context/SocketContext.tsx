@@ -30,8 +30,9 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     if (!token) return;
 
     const socketInstance = io(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}`, {
-      transports: ['polling', 'websocket'],
-      upgrade: true,
+      // transports: ['polling', 'websocket'],
+      transports: ['websocket'],
+      upgrade: false,
       auth: {
         token: token,
       },
