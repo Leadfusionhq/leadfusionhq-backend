@@ -47,7 +47,15 @@ app.get('/', (req, res) => {
 });
 
 app.get('/my-type', (req, res) => {
-  res.json({ message: 'Enviourment ' + process.env.nodeEnv });
+  res.json({
+    message: 'Environment ' + config.server.nodeEnv,
+    debug: {
+      db: config.server.db,
+      port: config.server.port,
+      backendLink: config.server.backendLink,
+      route: config.server.route
+    }
+  });
 
 });
 
