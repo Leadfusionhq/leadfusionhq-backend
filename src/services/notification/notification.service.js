@@ -19,13 +19,13 @@ const createNotification = async (senderId, recipientId, type, message, priority
     try {
       const io = getIO();
       console.log(`Emitting notification to user with ID ${recipientId}`);
-      
+
+      // Emit to specific user room only
+      io.to(recipientId.toString()).emit('notification', notification);
+
+      // Legacy support (optional, can be removed if frontend is updated)
       io.to(recipientId.toString()).emit(`new-notification-${recipientId}`, notification);
-      io.emit('notification', {
-        recipientId: recipientId.toString(),
-        ...notification.toObject()
-      });
-      
+
       console.log('Notification emitted successfully');
     } catch (socketError) {
       console.error('Socket.IO error:', socketError.message);
@@ -40,12 +40,12 @@ const createNotification = async (senderId, recipientId, type, message, priority
 
 const getNotifications = async (userId, page = 1, limit = 50, unreadOnly = false) => {
   const skip = (page - 1) * limit;
-  
-  const query = { 
-    recipientId: userId, 
-    isArchived: false 
+
+  const query = {
+    recipientId: userId,
+    isArchived: false
   };
-  
+
   if (unreadOnly) {
     query.read = false;
   }
@@ -57,10 +57,10 @@ const getNotifications = async (userId, page = 1, limit = 50, unreadOnly = false
     .sort({ priority: -1, createdAt: -1 });
 
   const totalCount = await Notification.countDocuments(query);
-  const unreadCount = await Notification.countDocuments({ 
-    recipientId: userId, 
-    read: false, 
-    isArchived: false 
+  const unreadCount = await Notification.countDocuments({
+    recipientId: userId,
+    read: false,
+    isArchived: false
   });
 
   return {
@@ -76,8 +76,8 @@ const getNotifications = async (userId, page = 1, limit = 50, unreadOnly = false
 const markAsRead = async (notificationId, userId) => {
   const notification = await Notification.findOneAndUpdate(
     { _id: notificationId, recipientId: userId },
-    { 
-      read: true, 
+    {
+      read: true,
       seenAt: new Date(),
       updatedAt: new Date()
     },
@@ -94,8 +94,8 @@ const markAsRead = async (notificationId, userId) => {
 const markAllAsRead = async (userId) => {
   const result = await Notification.updateMany(
     { recipientId: userId, read: false },
-    { 
-      read: true, 
+    {
+      read: true,
       seenAt: new Date(),
       updatedAt: new Date()
     }
@@ -124,7 +124,7 @@ const getUnreadCount = async (userId) => {
     read: false,
     isArchived: false
   });
-  
+
   return count;
 };
 
