@@ -15,7 +15,22 @@ const csvProcessingQueue = new Queue('csv-processing', {
     host: process.env.REDIS_HOST || 'localhost',
     port: process.env.REDIS_PORT || 6379,
     password: process.env.REDIS_PASSWORD || undefined,
+    // Add these to prevent crash on connection failure
+    retryStrategy: function (times) {
+      // Retry connection every 10 seconds, max 20 seconds
+      return Math.min(times * 50, 2000);
+    },
+    maxRetriesPerRequest: null,
   },
+});
+
+// CRITICAL: Prevent unhandled error events from crashing the process
+csvProcessingQueue.on('error', (err) => {
+  console.error('🔴 CSV Queue Error (Redis might be down):', err.message);
+});
+
+csvProcessingQueue.on('failed', (job, err) => {
+  console.error(`🔴 CSV Queue Job ${job.id} failed:`, err.message);
 });
 
 const addCSVProcessingJob = async (filePath, campaignId, userId, columnMapping) => {
@@ -28,6 +43,10 @@ const addCSVProcessingJob = async (filePath, campaignId, userId, columnMapping) 
       metadata: { filePath, columnMapping },
     });
 
+    // Check if queue client is ready/connected (simplified check)
+    // Bull doesn't expose a simple 'isReady', but handling the error below is key.
+
+    // Add job with timeout to prevent hanging if Redis is dead
     const job = await csvProcessingQueue.add({
       filePath,
       jobId: jobStatus._id,
@@ -36,6 +55,8 @@ const addCSVProcessingJob = async (filePath, campaignId, userId, columnMapping) 
     }, {
       attempts: parseInt(process.env.MAX_RETRY_ATTEMPTS) || 3,
       backoff: { type: 'exponential', delay: 5000 },
+      timeout: 10000, // Fail if not processed (or added) quickly
+      removeOnComplete: true
     });
 
     return {
@@ -75,14 +96,14 @@ csvProcessingQueue.process(async (job) => {
       }));
 
     for await (const row of stream) {
-    results.totalRows++;
-    try {
+      results.totalRows++;
+      try {
         const campaignIdColumn = Object.keys(columnMapping).find(
-        (key) => columnMapping[key] === 'campaign_id'
+          (key) => columnMapping[key] === 'campaign_id'
         );
 
         if (!campaignIdColumn || !row[campaignIdColumn]) {
-        // if (campaignIdColumn && row[campaignIdColumn]) {
+          // if (campaignIdColumn && row[campaignIdColumn]) {
           throw new Error('Missing campaign_id in row');
         }
         // else {
@@ -90,54 +111,54 @@ csvProcessingQueue.process(async (job) => {
         // }
 
         const campaign = await Campaign.findOne({
-        $or: [
+          $or: [
             { campaign_id: row[campaignIdColumn] },
             // { campaign_id: campaignIdValue },
-        ],
+          ],
         });
 
         if (!campaign) {
-        throw new Error(`Invalid campaign_id: ${row[campaignIdColumn]}`);
+          throw new Error(`Invalid campaign_id: ${row[campaignIdColumn]}`);
         }
 
         const leadData = {
-        user_id: userId,
-        campaign_id: campaign._id,
-        lead_id: row[Object.keys(columnMapping).find((key) => columnMapping[key] === 'lead_id')] || await generateUniqueLeadId(),
+          user_id: userId,
+          campaign_id: campaign._id,
+          lead_id: row[Object.keys(columnMapping).find((key) => columnMapping[key] === 'lead_id')] || await generateUniqueLeadId(),
         };
 
         for (const csvHeader of Object.keys(columnMapping)) {
-        const dbField = columnMapping[csvHeader];
-        const value = row[csvHeader] || '';
+          const dbField = columnMapping[csvHeader];
+          const value = row[csvHeader] || '';
 
-        // Handle address.state
-        if (dbField === 'address.state') {
+          // Handle address.state
+          if (dbField === 'address.state') {
             leadData['address'] = leadData['address'] || {};
             leadData['address']['state'] = await resolveStateAbbreviation(value);
-        }
-        // Handle other address fields
-        else if (dbField.startsWith('address.')) {
+          }
+          // Handle other address fields
+          else if (dbField.startsWith('address.')) {
             const addressField = dbField.split('.')[1];
             leadData['address'] = leadData['address'] || {};
             leadData['address'][addressField] = value;
-        }
-        // Other normal fields
-        else if (dbField !== 'campaign_id' && dbField !== 'lead_id') {
+          }
+          // Other normal fields
+          else if (dbField !== 'campaign_id' && dbField !== 'lead_id') {
             leadData[dbField] = value;
-        }
+          }
         }
 
         await Lead.create(leadData);
         results.processed++;
 
         await JobStatus.findByIdAndUpdate(jobId, {
-        progress: Math.round((results.processed / results.totalRows) * 100),
+          progress: Math.round((results.processed / results.totalRows) * 100),
         });
 
-    } catch (error) {
+      } catch (error) {
         results.errors++;
         results.errorDetails.push(`Row ${results.totalRows}: ${error.message}`);
-    }
+      }
     }
 
 

@@ -23,6 +23,7 @@ const API = {
 userRouter.use(
     checkAuth,
     // authorizedRoles([CONSTANT_ENUM.USER_ROLE.ADMIN],[CONSTANT_ENUM.USER_ROLE.ADMIN])
+    authorizedRoles([CONSTANT_ENUM.USER_ROLE.ADMIN]),
 );
 
 // GET all admins
