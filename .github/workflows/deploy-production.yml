@@ -25,4 +25,4 @@ jobs:
             git fetch --all
             git reset --hard origin/development
             npm ci
-            pm2 reload leadfusion-api-test --update-env
+            pm2 reload leadfusion-api-production --update-env

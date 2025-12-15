@@ -1,12 +1,12 @@
-const  Campaign  = require('../../models/campaign.model');
-const  State  = require('../../models/state.model');
-const  County  = require('../../models/county.model');
+const Campaign = require('../../models/campaign.model');
+const State = require('../../models/state.model');
+const County = require('../../models/county.model');
 const { ErrorHandler } = require('../../utils/error-handler');
 const CONSTANT_ENUM = require('../../helper/constant-enums.js');
-const {getLeadCountByCampaignId} = require('../../services/lead/lead.service.js');
-const Lead = require('../../models/lead.model.js'); 
+const { getLeadCountByCampaignId } = require('../../services/lead/lead.service.js');
+const Lead = require('../../models/lead.model.js');
 const { sendToN8nWebhook } = require('../../services/n8n/webhookService.js');
-const { createCampaignInBoberdoo ,updateCampaignInBoberdoo ,deleteCampaignFromBoberdoo} = require('../boberdoo/boberdoo.service');
+const { createCampaignInBoberdoo, updateCampaignInBoberdoo, deleteCampaignFromBoberdoo } = require('../boberdoo/boberdoo.service');
 const { User } = require('../../models/user.model');
 const { campaignLogger } = require('../../utils/logger');
 const MAIL_HANDLER = require('../../mail/mails');
@@ -103,7 +103,7 @@ const createCampaign = async (data) => {
       campaignLogger.error('Failed to send N8N webhook', n8nError, { campaign_id: newCampaign.campaign_id });
     }
 
-   
+
     // --- Helper function to delay ---
     const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -112,8 +112,8 @@ const createCampaign = async (data) => {
       await MAIL_HANDLER.sendCampaignCreatedEmailtoN8N(populatedCampaign);
       campaignLogger.info('N8N email sent', { campaign_id: newCampaign.campaign_id });
     } catch (err) {
-      campaignLogger.error('Failed to send N8N email', err, { 
-        campaign_id: newCampaign.campaign_id 
+      campaignLogger.error('Failed to send N8N email', err, {
+        campaign_id: newCampaign.campaign_id
       });
     }
 
@@ -123,8 +123,8 @@ const createCampaign = async (data) => {
       await MAIL_HANDLER.sendCampaignCreatedEmailToAdmin(populatedCampaign);
       campaignLogger.info('Admin email sent', { campaign_id: newCampaign.campaign_id });
     } catch (err) {
-      campaignLogger.error('Failed to send admin email', err, { 
-        campaign_id: newCampaign.campaign_id 
+      campaignLogger.error('Failed to send admin email', err, {
+        campaign_id: newCampaign.campaign_id
       });
     }
 
@@ -134,8 +134,8 @@ const createCampaign = async (data) => {
       await MAIL_HANDLER.sendCampaignCreatedEmailToUser(populatedCampaign);
       campaignLogger.info('User email sent', { campaign_id: newCampaign.campaign_id });
     } catch (err) {
-      campaignLogger.error('Failed to send user email', err, { 
-        campaign_id: newCampaign.campaign_id 
+      campaignLogger.error('Failed to send user email', err, {
+        campaign_id: newCampaign.campaign_id
       });
     }
 
@@ -304,23 +304,27 @@ const updateCampaign = async (campaignId, userId, role, updateData) => {
 // };
 // Admin usage: filters is an object
 
-
-const getCampaignsByUserId = async (page = 1, limit = 10, user_id) => {
+const getCampaignsByUserId = async (page = 1, limit = 10, user_id, search = "") => {
   try {
     const skip = (page - 1) * limit;
 
     const filter = { user_id };
 
+    if (search) {
+      const regex = new RegExp(search, "i");
+      filter.$or = [{ name: regex }];
+    }
+
     const [campaigns, total] = await Promise.all([
       Campaign.find(filter)
+        .populate("geography.state", "name abbreviation")
+        .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .sort({ createdAt: -1 })
-        .lean(), // Use lean for better performance
+        .lean(),
       Campaign.countDocuments(filter),
     ]);
 
-    // 👇 Add lead counts for each campaign
     const enrichedCampaigns = await Promise.all(
       campaigns.map(async (campaign) => {
         const leadCount = await Lead.countDocuments({ campaign_id: campaign._id });
@@ -341,12 +345,118 @@ const getCampaignsByUserId = async (page = 1, limit = 10, user_id) => {
       },
     };
   } catch (error) {
-    throw new ErrorHandler(500, error.message || 'Failed to fetch campaigns');
+    throw new ErrorHandler(500, error.message || "Failed to fetch campaigns");
   }
 };
 
+
+// const getCampaignsByUserId = async (page = 1, limit = 10, user_id) => {
+//   try {
+//     const skip = (page - 1) * limit;
+
+//     const filter = { user_id };
+
+//     const [campaigns, total] = await Promise.all([
+//       Campaign.find(filter)
+//         .skip(skip)
+//         .limit(limit)
+//         .sort({ createdAt: -1 })
+//         .lean(), 
+//       Campaign.countDocuments(filter),
+//     ]);
+
+//     const enrichedCampaigns = await Promise.all(
+//       campaigns.map(async (campaign) => {
+//         const leadCount = await Lead.countDocuments({ campaign_id: campaign._id });
+//         return {
+//           ...campaign,
+//           leadCount,
+//         };
+//       })
+//     );
+
+//     return {
+//       data: enrichedCampaigns,
+//       meta: {
+//         total,
+//         page,
+//         limit,
+//         totalPages: Math.ceil(total / limit),
+//       },
+//     };
+//   } catch (error) {
+//     throw new ErrorHandler(500, error.message || 'Failed to fetch campaigns');
+//   }
+// };
+
 const stateCache = {};
-const getCampaigns = async (page = 1, limit = 10, filters = {}) => {
+// const getCampaigns = async (page = 1, limit = 10, filters = {}) => {
+//   try {
+//     const skip = (page - 1) * limit;
+
+//     const query = {
+//       ...(filters.user_id && { user_id: filters.user_id }),
+//       ...(filters.status && { status: filters.status }),
+//       ...(filters.lead_type && { lead_type: filters.lead_type }),
+//     };
+
+//     if (filters.state) {
+//       const stateAbbr = filters.state.toUpperCase();
+
+//       if (!stateCache[stateAbbr]) {
+//         const stateDoc = await State.findOne({ abbreviation: stateAbbr })
+//           .select('_id')
+//           .lean();
+
+//         if (stateDoc) {
+//           stateCache[stateAbbr] = stateDoc._id.toString();
+//         } else {
+//           return {
+//             data: [],
+//             meta: {
+//               total: 0,
+//               page,
+//               limit,
+//               totalPages: 0,
+//             },
+//           };
+//         }
+//       }
+
+//       query['geography.state'] = { $in: [stateCache[stateAbbr]] };
+//     }
+
+//     const projection = 'campaign_id name status boberdoo_filter_set_id lead_type exclusivity language geography delivery user_id note createdAt updatedAt';
+
+//     const [campaigns, total] = await Promise.all([
+//       Campaign.find(query)
+//         .select(projection)
+//         .populate('geography.state', 'name abbreviation')
+//         .populate('user_id', 'name email')
+//         .sort({ createdAt: -1 })
+//         .skip(skip)
+//         .limit(limit)
+//         .lean(),
+//       Campaign.countDocuments(query),
+//     ]);
+
+//     return {
+//       data: campaigns,
+//       meta: {
+//         total,
+//         page,
+//         limit,
+//         totalPages: Math.ceil(total / limit),
+//       },
+//     };
+//   } catch (error) {
+//     console.error('Error in getCampaigns:', error);
+//     throw new ErrorHandler(500, error.message || 'Failed to fetch campaigns');
+//   }
+// };
+
+
+const getCampaigns = async (page = 1, limit = 10, filters = {}, search = "") => {
   try {
     const skip = (page - 1) * limit;
 
@@ -356,12 +466,22 @@ const getCampaigns = async (page = 1, limit = 10, filters = {}) => {
       ...(filters.lead_type && { lead_type: filters.lead_type }),
     };
 
+    if (search) {
+      const regex = new RegExp(search, "i");
+
+      query.$or = [
+        { name: regex },
+        { "user_id.name": regex },
+        { "user_id.email": regex },
+      ];
+    }
+
     if (filters.state) {
       const stateAbbr = filters.state.toUpperCase();
 
       if (!stateCache[stateAbbr]) {
         const stateDoc = await State.findOne({ abbreviation: stateAbbr })
-          .select('_id')
+          .select("_id")
           .lean();
 
         if (stateDoc) {
@@ -379,16 +499,17 @@ const getCampaigns = async (page = 1, limit = 10, filters = {}) => {
         }
       }
 
-      query['geography.state'] = { $in: [stateCache[stateAbbr]] };
+      query["geography.state"] = { $in: [stateCache[stateAbbr]] };
     }
 
-    const projection = 'campaign_id name status boberdoo_filter_set_id lead_type exclusivity language geography delivery user_id note createdAt updatedAt';
+    const projection =
+      "campaign_id name status boberdoo_filter_set_id lead_type exclusivity language geography delivery user_id note createdAt updatedAt";
 
     const [campaigns, total] = await Promise.all([
       Campaign.find(query)
         .select(projection)
-        .populate('geography.state', 'name abbreviation')
-        .populate('user_id', 'name email')
+        .populate("geography.state", "name abbreviation")
+        .populate("user_id", "name email")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -406,10 +527,11 @@ const getCampaigns = async (page = 1, limit = 10, filters = {}) => {
       },
     };
   } catch (error) {
-    console.error('Error in getCampaigns:', error);
-    throw new ErrorHandler(500, error.message || 'Failed to fetch campaigns');
+    console.error("Error in getCampaigns:", error);
+    throw new ErrorHandler(500, error.message || "Failed to fetch campaigns");
   }
 };
+
 const getCampaignById = async (campaignId, userId) => {
   const campaign = await Campaign.findOne({ _id: campaignId, user_id: userId })
     .populate('user_id', 'name email')
@@ -459,7 +581,7 @@ const getCampaignByIdForAdmin = async (campaignId) => {
     .populate('user_id', 'name email')
     // .populate('geography.coverage.partial.counties', 'name code fips_code state')
     .lean();
-  console.log('campaign data : ',campaign);
+  console.log('campaign data : ', campaign);
   if (!campaign) {
     throw new ErrorHandler(404, 'Campaign not found');
   }
@@ -691,7 +813,7 @@ module.exports = {
   updateCampaign,
   getCampaignsByUserId,
   getCampaignByIdForAdmin,
-  searchCampaigns,      
-  quickSearchCampaigns,    
+  searchCampaigns,
+  quickSearchCampaigns,
   deleteCampaign,
 };
