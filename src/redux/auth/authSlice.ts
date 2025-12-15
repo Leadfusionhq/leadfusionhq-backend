@@ -3,22 +3,22 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { loginUser, registerUser } from './authActions';
 
-interface User {
+export interface User {
   _id: string;
   email: string;
   role: string;
   name?: string;
   avatar?: string;
-  phoneNumber?:string;
-  address?:string; 
+  phoneNumber?: string;
+  address?: string;
   dob?: string | null;
-  balance?:null;
-    // 👇 Add these fields from backend
-    companyName?: string;
-    zipCode?: string;
-    isActive?: boolean;
-    isSuperAdmin?: boolean;
-    isEmailVerified?: boolean;
+  balance?: null;
+  // 👇 Add these fields from backend
+  companyName?: string;
+  zipCode?: string;
+  isActive?: boolean;
+  isSuperAdmin?: boolean;
+  isEmailVerified?: boolean;
 }
 
 interface AuthState {
@@ -71,13 +71,13 @@ const authSlice = createSlice({
       state.user = action.payload; // now includes avatar
       state.isLoggedIn = true;
     },
-    
+
     updateAvatar(state, action: PayloadAction<{ avatar: string }>) {
       if (state.user) {
         state.user.avatar = action.payload.avatar;
       }
     },
-    
+
   },
   extraReducers: (builder) => {
     builder
@@ -108,7 +108,7 @@ const authSlice = createSlice({
         state.loading = false;
         state.success = true;
         state.message = action.payload.message;
-        state.isLoggedIn = false; 
+        state.isLoggedIn = false;
       })
       .addCase(registerUser.rejected, (state, action) => {
         state.loading = false;
@@ -118,5 +118,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { logout, clearError, clearSuccess ,setUser,updateAvatar} = authSlice.actions;
+export const { logout, clearError, clearSuccess, setUser, updateAvatar } = authSlice.actions;
 export default authSlice.reducer;
