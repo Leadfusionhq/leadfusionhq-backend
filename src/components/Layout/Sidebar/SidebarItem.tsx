@@ -3,53 +3,74 @@ import { FC } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { AppDispatch, RootState } from '@/redux/store';
-import {useSelector} from 'react-redux'
+import { useSelector } from 'react-redux'
 interface SidebarItemProps {
   item: {
     id: string;
     name: string;
     icon: React.ElementType | string;
     link: string;
+    category?: string;
   };
 }
 
 const SidebarItem: FC<SidebarItemProps> = ({ item }) => {
   const pathname = usePathname();
-  const { collapsed}=useSelector((state:RootState)=>state.theme);
-  // console.log("inside collapsed",collapsed);
+  const { collapsed } = useSelector((state: RootState) => state.theme);
+
   const isActive =
     pathname === item.link ||
     (item.link !== '/dashboard' && pathname?.startsWith(item.link + '/'));
 
-  return (
-    <Link href={item.link}>
-    <div
-  className={`flex items-center ${collapsed?"justify-left":""} gap-3 overflow-hidden  ${collapsed?"px-[18px] lg:px-[6px]":"px-[20px]"} py-[18px] lg:py-[8px]  my-[8px] rounded-full cursor-pointer transition-all duration-300 
-    ${isActive ? 'bg-[#204D9D] text-white' : 'hover:bg-gray-700'}
-  `}
->
-        {typeof item.icon === 'string' ? (
-          <Image
-          priority
-          unoptimized 
-            src={item.icon}
-            alt={item.name}
-            width={23}
-            height={24}
-            className={`object-contain ${collapsed?"lg:mx-auto":""} `}
-          />
-        ) : (
-          <item.icon size={25} />
-        )}
-        
-              <div className="lg:hidden whitespace-nowrap overflow-hidden text-ellipsis">
-      {item.name}
-    </div>
-        {!collapsed &&    <div className="whitespace-nowrap overflow-hidden text-ellipsis ">
+  const Icon = item.icon;
 
-          {item.name}</div>}
-       
-    
+  return (
+    <Link href={item.link} className="block group">
+      <div
+        className={`relative flex items-center gap-3 overflow-hidden 
+        ${collapsed ? "justify-center px-2" : "px-4"} 
+        py-3 my-1.5 rounded-xl cursor-pointer transition-all duration-200 ease-[cubic-bezier(0.25,0.1,0.25,1)]
+        ${isActive
+            ? 'bg-gradient-to-r from-[#204969] to-[#306A64] text-white shadow-md shadow-[#204969]/20'
+            : 'text-gray-400 hover:text-white hover:bg-white/5'}
+        `}
+      >
+        {/* Premium Active Glow (Left Strip) */}
+        {!collapsed && isActive && (
+          <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-[#4facfe] to-[#00f2fe] shadow-[0_0_15px_#00f2fe] rounded-r-full animate-pulse" />
+        )}
+
+        <div className={`relative z-10 flex items-center justify-center transition-transform duration-300 ${!isActive && 'group-hover:scale-110'}`}>
+          {typeof Icon === 'string' ? (
+            <Image
+              priority
+              unoptimized
+              src={Icon}
+              alt={item.name}
+              width={20}
+              height={20}
+              className="object-contain"
+            />
+          ) : (
+            <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+          )}
+        </div>
+
+        {!collapsed && (
+          <div className="whitespace-nowrap overflow-hidden text-ellipsis text-sm font-medium tracking-wide relative z-10 transition-transform duration-300 group-hover:translate-x-1">
+            {item.name}
+          </div>
+        )}
+
+        {/* Tooltip for Collapsed State */}
+        {collapsed && (
+          <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-3 py-1.5 bg-gray-900 text-white text-xs font-semibold rounded-md shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 whitespace-nowrap border border-gray-700">
+            {item.name}
+            {/* Arrow */}
+            <div className="absolute top-1/2 -translate-y-1/2 -left-1 w-2 h-2 bg-gray-900 border-l border-b border-gray-700 rotate-45"></div>
+          </div>
+        )}
+
       </div>
     </Link>
   );

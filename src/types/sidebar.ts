@@ -6,5 +6,6 @@ export type SidebarItem = {
   icon: string | IconType;
   link: string;
   pathCombinations?: string[];
-  child?: SidebarItem[]; 
+  child?: SidebarItem[];
+  category?: string;
 };
