@@ -411,7 +411,7 @@ const processCSVUpload = async (filePath, userId, columnMapping) => {
     console.log('CSV processing job added:', jobInfo);
     return {
       success: true,
-      message: 'CSV upload queued for processing',
+      message: jobInfo.message || 'CSV upload queued for processing',
       jobId: jobInfo.jobId,
       queueJobId: jobInfo.queueJobId
     };

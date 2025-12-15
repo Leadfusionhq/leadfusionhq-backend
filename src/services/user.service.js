@@ -4,16 +4,27 @@ const OTP = require('../models/otp.model');
 const CONSTANT_ENUM = require('../helper/constant-enums');
 const { generateVerificationToken, getTokenExpiration } = require('../utils/token.utils');
 const { updatePartnerInBoberdoo } = require('../services/boberdoo/boberdoo.service');
+const redisClient = require('../config/redis');
+
+// Helper to invalidate user cache safely
+const invalidateUserCache = async (userId) => {
+  try {
+    if (redisClient.isOpen) {
+      await redisClient.del(`auth:user:${userId}`);
+      console.log(`Redis Cache Invalidated for User: ${userId}`);
+    }
+  } catch (err) {
+    console.error('Redis Invalidation Error:', err);
+  }
+};
 const getUserByEmail = async (email, includePassword = false) => {
   const projection = includePassword ? {} : { password: 0 };
   return User.findOne({ email }, projection).exec();
 };
 
 const getUserByID = async (userId, includePassword = false) => {
-  // console.log('userId',userId)
   const projection = includePassword ? {} : { password: 0 };
   const user = await User.findById(userId, projection).exec();
-  // console.log(user);
   if (!user) throw new ErrorHandler(404, 'User not found');
   return user;
 };
@@ -21,12 +32,14 @@ const getUserByID = async (userId, includePassword = false) => {
 const updateUser = async (userId, updateData) => {
   const user = await User.findByIdAndUpdate(userId, updateData, { new: true }).exec();
 
+  await invalidateUserCache(userId);
+
   if (user?.integrations?.boberdoo?.external_id) {
-    console.log("🔁 Admin updated user – syncing with Boberdoo...");
+    console.log("Admin updated user – syncing with Boberdoo...");
     const result = await updatePartnerInBoberdoo(user);
     console.log("Boberdoo sync result:", result);
   } else {
-    console.log("⚠️ User has no Boberdoo Partner ID – skipping sync.");
+    console.log("User has no Boberdoo Partner ID – skipping sync.");
   }
 
   return user;
@@ -39,6 +52,8 @@ const updateUserProfile = async (userId, updateData) => {
     { $set: updateData },
     { new: true, runValidators: true }
   ).select('-password -verificationToken -resetPasswordToken');
+
+  if (user) await invalidateUserCache(userId);
 
   if (!user) throw new ErrorHandler(404, 'User not found');
 
@@ -78,15 +93,18 @@ const changeUserPassword = async (userId, currentPassword, newPassword) => {
   // Update password
   user.password = newPassword;
   await user.save();
+  await invalidateUserCache(userId);
 
   return user;
 };
 
 const softDeleteUser = async (userId) => {
+  await invalidateUserCache(userId);
   return User.findByIdAndUpdate(userId, { isDeleted: true }, { new: true }).exec();
 };
 
 const hardDeleteUser = async (userId) => {
+  await invalidateUserCache(userId);
   return User.findByIdAndDelete(userId).exec();
 };
 
