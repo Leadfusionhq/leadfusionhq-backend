@@ -5,12 +5,22 @@ const { logger } = require('../utils/logger');
 const redisUrl = `redis://${config.server.redisPassword ? `:${config.server.redisPassword}@` : ''}${config.server.redisHost}:${config.server.redisPort}`;
 
 const client = createClient({
-    url: redisUrl
+    url: redisUrl,
+    disableOfflineQueue: true,
+    socket: {
+        reconnectStrategy: (retries) => {
+            return Math.min(retries * 50, 5000);
+        }
+    }
 });
 
+let lastErrorLog = 0;
 client.on('error', (err) => {
-    console.error('Redis Client Error', err);
-    // logger.error('Redis Client Error', err);
+    const now = Date.now();
+    if (now - lastErrorLog > 10000) {
+        console.error('Redis Client Error (throttled):', err.message);
+        lastErrorLog = now;
+    }
 });
 
 client.on('connect', () => {
@@ -26,7 +36,6 @@ const connectRedis = async () => {
     } catch (err) {
         console.warn('Redis Connection Failed: Caching will be disabled. App will continue running.');
         console.warn('Error:', err.message);
-        // We do NOT exit here, so the app can still run without Redis
     }
 };
 

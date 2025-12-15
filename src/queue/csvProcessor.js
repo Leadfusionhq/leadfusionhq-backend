@@ -18,7 +18,8 @@ const csvProcessingQueue = new Queue('csv-processing', {
     // Add these to prevent crash on connection failure
     retryStrategy: function (times) {
       // Retry connection every 10 seconds, max 20 seconds
-      return Math.min(times * 50, 2000);
+      // Increasing delay to reduce log spam
+      return Math.min(times * 1000, 10000);
     },
     maxRetriesPerRequest: null,
   },
@@ -26,6 +27,8 @@ const csvProcessingQueue = new Queue('csv-processing', {
 
 // CRITICAL: Prevent unhandled error events from crashing the process
 csvProcessingQueue.on('error', (err) => {
+  // Only log if it's NOT a connection refused, OR log it less frequently?
+  // For now, keep logging but maybe distinct
   console.error('🔴 CSV Queue Error (Redis might be down):', err.message);
 });
 
@@ -34,8 +37,9 @@ csvProcessingQueue.on('failed', (job, err) => {
 });
 
 const addCSVProcessingJob = async (filePath, campaignId, userId, columnMapping) => {
+  let jobStatus;
   try {
-    const jobStatus = await JobStatus.create({
+    jobStatus = await JobStatus.create({
       userId,
       jobType: 'csv_processing',
       status: 'queued',
@@ -46,25 +50,41 @@ const addCSVProcessingJob = async (filePath, campaignId, userId, columnMapping) 
     // Check if queue client is ready/connected (simplified check)
     // Bull doesn't expose a simple 'isReady', but handling the error below is key.
 
-    // Add job with timeout to prevent hanging if Redis is dead
-    const job = await csvProcessingQueue.add({
-      filePath,
-      jobId: jobStatus._id,
-      userId,
-      columnMapping,
-    }, {
-      attempts: parseInt(process.env.MAX_RETRY_ATTEMPTS) || 3,
-      backoff: { type: 'exponential', delay: 5000 },
-      timeout: 10000, // Fail if not processed (or added) quickly
-      removeOnComplete: true
-    });
+    let queueJobId = null;
+    let warning = null;
+
+    try {
+      // Add job with timeout to prevent hanging if Redis is dead
+      const job = await csvProcessingQueue.add({
+        filePath,
+        jobId: jobStatus._id,
+        userId,
+        columnMapping,
+      }, {
+        attempts: parseInt(process.env.MAX_RETRY_ATTEMPTS) || 3,
+        backoff: { type: 'exponential', delay: 5000 },
+        timeout: 5000, // Fail fast (5s) if Redis is down
+        removeOnComplete: true
+      });
+      queueJobId = job.id;
+    } catch (queueError) {
+      console.error("⚠️ Failed to add job to Redis queue:", queueError.message);
+      // Update status to indicate it's waiting for queue availability
+      await JobStatus.findByIdAndUpdate(jobStatus._id, {
+        message: 'Queued (System Busy - Processing Delayed)',
+        status: 'queued_delayed' // Distinct status
+      });
+      warning = 'Processing delayed due to high system load (Queue unavailable). Job saved.';
+    }
 
     return {
       jobId: jobStatus._id,
-      queueJobId: job.id,
+      queueJobId: queueJobId,
+      message: warning
     };
   } catch (error) {
-    throw new ErrorHandler(500, error.message || 'Failed to add CSV processing job');
+    // If accessing Mongo fails, that's a real 500
+    throw new ErrorHandler(500, error.message || 'Failed to create CSV processing job');
   }
 };
 
