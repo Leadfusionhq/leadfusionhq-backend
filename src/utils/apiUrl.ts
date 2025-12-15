@@ -257,6 +257,11 @@ export const BILLING_API = {
   TEST_AUTO_TOPUP: `${BILLING_API_BASE}/test-auto-topup`,
   GET_BALANCE: `${BILLING_API_BASE}/balance`,
   REVENUE_FROM_NMI: `${BILLING_API_BASE}/revenue-from-nmi`,
+
+
+
+  CHARGE_SINGLE_LEAD: `${BILLING_API_BASE}/charge-single-lead/:leadId`,
+
 };
 
 // constants/api-urls.js

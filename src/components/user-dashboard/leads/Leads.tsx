@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { LEADS_API } from "@/utils/apiUrl";
+import { LEADS_API, BILLING_API } from "@/utils/apiUrl";
 import axiosWrapper from "@/utils/api";
 import { useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
@@ -36,7 +36,8 @@ import {
   RefreshCcw,
   FileText,
   Mail,
-  Phone
+  Phone,
+  CreditCard
 } from "lucide-react";
 import Link from 'next/link';
 import { useRouter } from "next/navigation";
@@ -86,6 +87,7 @@ type Lead = {
   max_return_attempts: number;
   return_reason?: string;
   return_comments?: string;
+  payment_status?: "paid" | "payment_pending" | "failed" | "refunded";
 };
 
 type ApiResponse = {
@@ -261,6 +263,30 @@ export default function LeadTable() {
     } catch (err: any) {
       console.error("Failed to return lead:", err);
       const message = err?.response?.data?.message || err?.message || "Failed to submit return request.";
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePayLead = async (leadId: string) => {
+    try {
+      setLoading(true);
+      const url = BILLING_API.CHARGE_SINGLE_LEAD.replace(':leadId', leadId);
+
+      await axiosWrapper(
+        "post",
+        url,
+        {},
+        token ?? undefined
+      );
+
+      // Refresh
+      fetchLeads(pagination.pageIndex + 1, pagination.pageSize, debouncedGlobalFilter);
+      toast.success("Lead payment processed successfully!");
+    } catch (err: any) {
+      console.error("Failed to pay for lead:", err);
+      const message = err?.response?.data?.message || err?.message || "Failed to process payment.";
       toast.error(message);
     } finally {
       setLoading(false);
@@ -452,7 +478,7 @@ export default function LeadTable() {
       cell: ({ row }) => {
         const leadSt = row.original.status || "New";
         const retLabel = row.original.return_status === 'Not Returned' ? 'Active' : row.original.return_status;
-        const payLabel = "Paid"; // User usually sees paid leads, assuming defaulting to Paid for now if field missing
+        const payLabel = row.original.payment_status || "Paid";
 
         // Helper for colors (inline to avoid massive refactor of helper functions outside)
         const getStatusColor = (s: string, type: 'lead' | 'return' | 'payment') => {
@@ -473,7 +499,10 @@ export default function LeadTable() {
             return "text-gray-500";
           }
           if (type === 'payment') {
-            return "text-emerald-700"; // Always paid for user view generally
+            if (str === 'paid') return "text-emerald-700";
+            if (str?.includes('pending')) return "text-amber-700";
+            if (str === 'failed') return "text-red-700";
+            return "text-gray-500";
           }
           return "text-gray-500";
         };
@@ -501,7 +530,7 @@ export default function LeadTable() {
             <span className="mx-2 text-gray-300 text-[10px]">|</span>
 
             <Tooltip title="Payment Status">
-              <span className={`text-[11px] font-medium cursor-help ${getStatusColor('Paid', 'payment')} uppercase tracking-wide`}>
+              <span className={`text-[11px] font-medium cursor-help ${getStatusColor(payLabel, 'payment')} uppercase tracking-wide`}>
                 {payLabel}
               </span>
             </Tooltip>
@@ -518,9 +547,11 @@ export default function LeadTable() {
           row={row.original}
           onView={() => router.push(`/dashboard/leads/${row.original._id}`)}
           onReturn={() => handleReturnClick(row.original)}
+          onPay={() => handlePayLead(row.original._id)}
           canReturn={isLeadReturnable(row.original.createdAt) &&
             (row.original.return_status === "Not Returned" || row.original.return_status === "Rejected") &&
-            row.original.return_attempts < row.original.max_return_attempts}
+            row.original.return_attempts < (row.original.max_return_attempts || 2)}
+          canPay={Boolean(row.original.payment_status && row.original.payment_status.toLowerCase().includes('pending'))}
         />
       ),
       size: 60,
@@ -726,7 +757,7 @@ export default function LeadTable() {
 }
 
 // --- Action Menu Component ---
-const ActionMenu = ({ row, onView, onReturn, canReturn }: { row: Lead, onView: () => void, onReturn: () => void, canReturn: boolean }) => {
+const ActionMenu = ({ row, onView, onReturn, onPay, canReturn, canPay }: { row: Lead, onView: () => void, onReturn: () => void, onPay: () => void, canReturn: boolean, canPay: boolean }) => {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => setAnchorEl(e.currentTarget);
@@ -758,6 +789,12 @@ const ActionMenu = ({ row, onView, onReturn, canReturn }: { row: Lead, onView: (
         <MenuItem onClick={() => { onView(); handleClose(); }} disableRipple className="text-sm font-medium text-gray-700 gap-2 hover:bg-gray-50 py-2">
           <Eye size={16} className="text-gray-400" /> View Details
         </MenuItem>
+
+        {canPay && (
+          <MenuItem onClick={() => { onPay(); handleClose(); }} disableRipple className="text-sm font-medium text-emerald-600 gap-2 hover:bg-emerald-50 py-2">
+            <CreditCard size={16} className="text-emerald-500" /> Pay Now
+          </MenuItem>
+        )}
 
         {canReturn && (
           <MenuItem onClick={() => { onReturn(); handleClose(); }} disableRipple className="text-sm font-medium text-rose-600 gap-2 hover:bg-rose-50 py-2">
