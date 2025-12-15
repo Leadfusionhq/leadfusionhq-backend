@@ -4,16 +4,16 @@ import { useNotifications } from '@/context/NotificationContext';
 import { useSocket } from '@/context/SocketContext';
 
 const NotificationCard = () => {
-  const { 
-    notifications, 
-    unreadCount, 
+  const {
+    notifications,
+    unreadCount,
     loading,
-    removeNotification, 
+    removeNotification,
     markAsRead,
     markAllAsRead,
     fetchNotifications
   } = useNotifications();
-  
+
   const { connected } = useSocket();
   const [activeTab, setActiveTab] = useState<'all' | 'unread'>('all');
 
@@ -33,32 +33,30 @@ const NotificationCard = () => {
     fetchNotifications(tab === 'unread');
   };
 
-  const filteredNotifications = activeTab === 'unread' 
+  const filteredNotifications = activeTab === 'unread'
     ? notifications.filter(n => !n.read)
     : notifications;
 
   return (
-    <div className="absolute right-10 top-[88px] w-[420px] bg-white shadow-2xl rounded-lg border border-gray-200 z-50 transition-all duration-300">
+    <div className="w-[420px] bg-white shadow-2xl rounded-lg border border-gray-200 z-50 transition-all duration-300">
       {/* Header */}
       <div className="border-b border-gray-200 bg-gray-50 rounded-t-lg">
         <div className="flex">
           <button
             onClick={() => handleTabChange('all')}
-            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-              activeTab === 'all'
+            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${activeTab === 'all'
                 ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
                 : 'text-gray-600 hover:text-gray-800'
-            }`}
+              }`}
           >
             All ({notifications.length})
           </button>
           <button
             onClick={() => handleTabChange('unread')}
-            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-              activeTab === 'unread'
+            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${activeTab === 'unread'
                 ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
                 : 'text-gray-600 hover:text-gray-800'
-            }`}
+              }`}
           >
             Unread ({unreadCount})
           </button>
@@ -95,9 +93,8 @@ const NotificationCard = () => {
             <div
               key={notification._id || notification.id}
               onClick={() => handleNotificationClick(notification)}
-              className={`flex items-start gap-3 px-4 py-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer group transition-colors ${
-                !notification.read ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''
-              }`}
+              className={`flex items-start gap-3 px-4 py-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer group transition-colors ${!notification.read ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''
+                }`}
             >
               {/* Icon */}
               <div className="flex-shrink-0 mt-1">
@@ -110,27 +107,25 @@ const NotificationCard = () => {
               {/* Content */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between">
-                  <h4 className={`text-sm font-medium ${
-                    !notification.read ? 'text-gray-900' : 'text-gray-700'
-                  }`}>
+                  <h4 className={`text-sm font-medium ${!notification.read ? 'text-gray-900' : 'text-gray-700'
+                    }`}>
                     {notification.title}
                   </h4>
                   {!notification.read && (
                     <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-1"></div>
                   )}
                 </div>
-                
-                <p className={`text-sm mt-1 break-words ${
-                  !notification.read ? 'text-gray-800' : 'text-gray-600'
-                }`}>
+
+                <p className={`text-sm mt-1 break-words ${!notification.read ? 'text-gray-800' : 'text-gray-600'
+                  }`}>
                   {notification.message}
                 </p>
-                
+
                 <div className="flex items-center justify-between mt-2">
                   <span className="text-xs text-gray-500">
                     {notification.time}
                   </span>
-                  
+
                   {notification.senderId && (
                     <span className="text-xs text-gray-500">
                       from {notification.senderId.name}
@@ -161,7 +156,7 @@ const NotificationCard = () => {
             <div className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`}></div>
             <span>{connected ? 'Connected' : 'Disconnected'}</span>
           </div>
-          
+
           <button
             onClick={() => fetchNotifications(activeTab === 'unread')}
             className="text-blue-600 hover:text-blue-800"
