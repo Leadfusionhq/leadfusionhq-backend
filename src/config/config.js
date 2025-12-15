@@ -11,7 +11,7 @@ const env = cleanEnv(process.env, {
 
     // Server
     PORT: port({ default: 4000, desc: 'API Server Port' }),
-    NODE_ENV: str({ choices: ['development', 'test', 'production', 'dev', 'prod'], default: 'dev', desc: 'Node.js Environment' }),
+    NODE_ENV: str({ choices: ['staging', 'development', 'test', 'production', 'dev', 'prod'], default: 'staging', desc: 'Node.js Environment' }),
     ROUTE: str({ default: 'api', desc: 'API Route Prefix' }),
 
     // Security
