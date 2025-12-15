@@ -1,234 +1,218 @@
 "use client";
 import React, { useState } from 'react';
-import { Edit } from 'lucide-react';
+import { Edit2, Settings, Check, X, Shield } from 'lucide-react';
 
 
 const AccountSetting = () => {
-    const [isEditing, setIsEditing] = useState(false);
-    const [accountData, setAccountData] = useState({
-      status: 'Active',
-      monthlyBudget: 'No',
-      cooldown: '-',
-      wtCooldown: '-',
-      homeProposal: '(N/A)',
-      authorizedUser: 'Participant'
-    });
-  
-    const handleEdit = () => {
-      setIsEditing(!isEditing);
-    };
-  
-    const handleInputChange = (field, value) => {
-      setAccountData(prev => ({
-        ...prev,
-        [field]: value
-      }));
-    };
-  
-    const handleSave = () => {
-      setIsEditing(false);
-    };
-  
-    return (
-      <div className="bg-white rounded-lg border border-gray-200 mb-8">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-medium text-gray-900">Account Setting</h2>
-          <button 
-            onClick={handleEdit}
-            className="px-3 py-1.5 text-sm text-white bg-gray-900 rounded hover:bg-gray-800 flex items-center space-x-1"
-          >
-            <Edit className="w-3 h-3" />
-            <span>Edit</span>
-          </button>
+  const [isEditing, setIsEditing] = useState(false);
+  const [accountData, setAccountData] = useState({
+    status: 'Active',
+    monthlyBudget: 'No',
+    cooldown: '-',
+    wtCooldown: '-',
+    homeProposal: '(N/A)',
+    authorizedUser: 'Participant'
+  });
+
+  const handleEdit = () => {
+    setIsEditing(!isEditing);
+  };
+
+  const handleInputChange = (field: string, value: string) => {
+    setAccountData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleSave = () => {
+    setIsEditing(false);
+  };
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-6 py-5 md:px-8 border-b border-gray-100 bg-gray-50/50">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <Settings className="w-5 h-5 text-[#306A64]" />
+            Account Settings
+          </h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Manage your account configuration and preferences.
+          </p>
         </div>
-        
-        <div className="px-6 py-6">
-          <div className="grid grid-cols-3 gap-x-8 gap-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-600 mb-2">Status</label>
-              {isEditing ? (
+
+        <button
+          onClick={handleEdit}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${isEditing
+            ? "bg-gray-200 text-gray-700 hover:bg-gray-300"
+            : "bg-gray-900 text-white hover:bg-gray-800 shadow-sm"
+            }`}
+        >
+          {isEditing ? (
+            <>
+              <X className="w-4 h-4" /> Cancel
+            </>
+          ) : (
+            <>
+              <Edit2 className="w-4 h-4" /> Edit
+            </>
+          )}
+        </button>
+      </div>
+
+      <div className="p-6 md:p-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+
+          {/* Status */}
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-gray-700">Status</label>
+            {isEditing ? (
+              <div className="relative">
                 <select
                   value={accountData.status}
                   onChange={(e) => handleInputChange('status', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:border-[#306A64] focus:ring-2 focus:ring-[#306A64]/20 appearance-none"
                 >
                   <option value="Active">Active</option>
                   <option value="Inactive">Inactive</option>
                   <option value="Suspended">Suspended</option>
                 </select>
-              ) : (
-                <p className="text-gray-900 font-medium">{accountData.status}</p>
-              )}
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-600 mb-2">Set a Monthly Budget?</label>
-              {isEditing ? (
-                <div className="flex items-center space-x-6 mt-2">
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      name="monthlyBudgetEdit"
-                      value="Yes"
-                      checked={accountData.monthlyBudget === 'Yes'}
-                      onChange={(e) => handleInputChange('monthlyBudget', e.target.value)}
-                      className="mr-2 text-blue-600"
-                    />
-                    <span className="text-sm text-gray-700">Yes</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      name="monthlyBudgetEdit"
-                      value="No"
-                      checked={accountData.monthlyBudget === 'No'}
-                      onChange={(e) => handleInputChange('monthlyBudget', e.target.value)}
-                      className="mr-2 text-blue-600"
-                    />
-                    <span className="text-sm text-gray-700">No</span>
-                  </label>
+                <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-gray-400">
+                  <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
                 </div>
-              ) : (
-                <div className="flex items-center space-x-6 mt-2">
-                  <label className="flex items-center">
-                    <span className="text-sm text-gray-700">Yes</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      name="monthlyBudget"
-                      checked={accountData.monthlyBudget === 'No'}
-                      readOnly
-                      className="mr-2"
-                    />
-                    <span className="text-sm text-gray-700">No</span>
-                  </label>
-                </div>
-              )}
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-600 mb-2">Cooldown (mins)</label>
-              {isEditing ? (
-                <input
-                  type="text"
-                  value={accountData.cooldown}
-                  onChange={(e) => handleInputChange('cooldown', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                />
-              ) : (
-                <p className="text-gray-900 font-medium">{accountData.cooldown}</p>
-              )}
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-600 mb-2">WT Cooldown (mins)</label>
-              {isEditing ? (
-                <input
-                  type="text"
-                  value={accountData.wtCooldown}
-                  onChange={(e) => handleInputChange('wtCooldown', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                />
-              ) : (
-                <p className="text-gray-900 font-medium">{accountData.wtCooldown}</p>
-              )}
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-600 mb-2">Home 2nd Proposal request (days)</label>
-              {isEditing ? (
-                <input
-                  type="text"
-                  value={accountData.homeProposal}
-                  onChange={(e) => handleInputChange('homeProposal', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                />
-              ) : (
-                <p className="text-gray-900 font-medium">{accountData.homeProposal}</p>
-              )}
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-600 mb-2">Add New Authorized User</label>
-              {isEditing ? (
-                <div className="flex items-center space-x-4 mt-2">
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      name="authorizedUserEdit"
-                      value="Admin"
-                      checked={accountData.authorizedUser === 'Admin'}
-                      onChange={(e) => handleInputChange('authorizedUser', e.target.value)}
-                      className="mr-1 text-blue-600"
-                    />
-                    <span className="text-sm text-gray-700">Admin</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      name="authorizedUserEdit"
-                      value="Viewer"
-                      checked={accountData.authorizedUser === 'Viewer'}
-                      onChange={(e) => handleInputChange('authorizedUser', e.target.value)}
-                      className="mr-1 text-blue-600"
-                    />
-                    <span className="text-sm text-gray-700">Viewer</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      name="authorizedUserEdit"
-                      value="Participant"
-                      checked={accountData.authorizedUser === 'Participant'}
-                      onChange={(e) => handleInputChange('authorizedUser', e.target.value)}
-                      className="mr-1 text-blue-600"
-                    />
-                    <span className="text-sm text-gray-700">Participant</span>
-                  </label>
-                </div>
-              ) : (
-                <div className="flex items-center space-x-4 mt-2">
-                  <label className="flex items-center">
-                    <span className="text-sm text-gray-700">Admin</span>
-                  </label>
-                  <label className="flex items-center">
-                    <span className="text-sm text-gray-700">Viewer</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      name="authorizedUser"
-                      checked={accountData.authorizedUser === 'Participant'}
-                      readOnly
-                      className="mr-1"
-                    />
-                    <span className="text-sm text-gray-700">Participant</span>
-                  </label>
-                </div>
-              )}
+              </div>
+            ) : (
+              <div className="px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-700 font-medium">
+                <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${accountData.status === 'Active' ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                  }`}>
+                  <div className={`w-1.5 h-1.5 rounded-full ${accountData.status === 'Active' ? "bg-green-500" : "bg-red-500"}`} />
+                  {accountData.status}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Monthly Budget */}
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-gray-700">Set a Monthly Budget?</label>
+            <div className={`w-full px-4 py-2.5 rounded-lg border flex items-center gap-6 ${isEditing ? "bg-white border-gray-300" : "bg-gray-50 border-gray-200"}`}>
+              {['Yes', 'No'].map((option) => (
+                <label key={option} className={`flex items-center gap-2 cursor-pointer ${!isEditing && "pointer-events-none opacity-80"}`}>
+                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${accountData.monthlyBudget === option
+                      ? "border-[#306A64]"
+                      : "border-gray-300"
+                    }`}>
+                    {accountData.monthlyBudget === option && (
+                      <div className="w-2 h-2 rounded-full bg-[#306A64]" />
+                    )}
+                  </div>
+                  <input
+                    type="radio"
+                    name="monthlyBudget"
+                    value={option}
+                    checked={accountData.monthlyBudget === option}
+                    onChange={(e) => handleInputChange('monthlyBudget', e.target.value)}
+                    disabled={!isEditing}
+                    className="hidden"
+                  />
+                  <span className="text-sm font-medium text-gray-700">{option}</span>
+                </label>
+              ))}
             </div>
           </div>
-          
-          {isEditing && (
-            <div className="mt-6 flex space-x-3">
-              <button
-                onClick={handleSave}
-                className="px-4 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 text-sm font-medium"
-              >
-                Save
-              </button>
-              <button
-                onClick={() => setIsEditing(false)}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 text-sm"
-              >
-                Cancel
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
 
-  export default  AccountSetting;
+          {/* Cooldown */}
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-gray-700">Cooldown (mins)</label>
+            <input
+              type="text"
+              value={accountData.cooldown}
+              disabled={!isEditing}
+              onChange={(e) => handleInputChange('cooldown', e.target.value)}
+              className={`w-full px-4 py-2.5 rounded-lg border transition-all duration-200 ${!isEditing
+                ? "bg-gray-50 border-gray-200 text-gray-500 cursor-not-allowed"
+                : "bg-white border-gray-300 focus:border-[#306A64] focus:ring-2 focus:ring-[#306A64]/20"
+                }`}
+            />
+          </div>
+
+          {/* WT Cooldown */}
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-gray-700">WT Cooldown (mins)</label>
+            <input
+              type="text"
+              value={accountData.wtCooldown}
+              disabled={!isEditing}
+              onChange={(e) => handleInputChange('wtCooldown', e.target.value)}
+              className={`w-full px-4 py-2.5 rounded-lg border transition-all duration-200 ${!isEditing
+                ? "bg-gray-50 border-gray-200 text-gray-500 cursor-not-allowed"
+                : "bg-white border-gray-300 focus:border-[#306A64] focus:ring-2 focus:ring-[#306A64]/20"
+                }`}
+            />
+          </div>
+
+          {/* Home Proposal */}
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-gray-700">Home 2nd Proposal (days)</label>
+            <input
+              type="text"
+              value={accountData.homeProposal}
+              disabled={!isEditing}
+              onChange={(e) => handleInputChange('homeProposal', e.target.value)}
+              className={`w-full px-4 py-2.5 rounded-lg border transition-all duration-200 ${!isEditing
+                ? "bg-gray-50 border-gray-200 text-gray-500 cursor-not-allowed"
+                : "bg-white border-gray-300 focus:border-[#306A64] focus:ring-2 focus:ring-[#306A64]/20"
+                }`}
+            />
+          </div>
+
+          {/* Authorized User */}
+          <div className="space-y-2 md:col-span-2 lg:col-span-3">
+            <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <Shield className="w-4 h-4 text-gray-400" /> Authorized User Role
+            </label>
+            <div className={`w-full px-4 py-2.5 rounded-lg border flex flex-wrap items-center gap-6 ${isEditing ? "bg-white border-gray-300" : "bg-gray-50 border-gray-200"}`}>
+              {['Admin', 'Viewer', 'Participant'].map((role) => (
+                <label key={role} className={`flex items-center gap-2 cursor-pointer ${!isEditing && "pointer-events-none opacity-80"}`}>
+                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${accountData.authorizedUser === role
+                      ? "border-[#306A64]"
+                      : "border-gray-300"
+                    }`}>
+                    {accountData.authorizedUser === role && (
+                      <div className="w-2 h-2 rounded-full bg-[#306A64]" />
+                    )}
+                  </div>
+                  <input
+                    type="radio"
+                    name="authorizedUser"
+                    value={role}
+                    checked={accountData.authorizedUser === role}
+                    onChange={(e) => handleInputChange('authorizedUser', e.target.value)}
+                    disabled={!isEditing}
+                    className="hidden"
+                  />
+                  <span className="text-sm font-medium text-gray-700">{role}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {isEditing && (
+          <div className="mt-8 pt-6 border-t border-gray-100 flex items-center justify-end animate-in slide-in-from-top-2 duration-300">
+            <button
+              onClick={handleSave}
+              className="px-8 py-2.5 bg-gradient-to-r from-[#306A64] to-[#204D9D] text-white rounded-lg hover:shadow-lg text-sm font-semibold transition-all flex items-center gap-2"
+            >
+              <Check className="w-4 h-4" /> Save Configuration
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default AccountSetting;
