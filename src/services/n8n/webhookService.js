@@ -1,9 +1,9 @@
 const axios = require('axios');
 const State = require('../../models/state.model');
-const { User,RegularUser } = require('../../models/user.model');
+const { User, RegularUser } = require('../../models/user.model');
 
 const CONSTANT_ENUM = require('../../helper/constant-enums.js');
-const { createCustomerVault, chargeCustomerVault ,deleteCustomerVault} = require('../nmi/nmi.service');
+const { createCustomerVault, chargeCustomerVault, deleteCustomerVault } = require('../nmi/nmi.service');
 const mongoose = require('mongoose');
 const BoberDoService = require('../../services/boberdoo/boberdoo.service');
 const Lead = require('../../models/lead.model');
@@ -60,7 +60,7 @@ const sendToN8nWebhook = async (campaignData) => {
           `${u.firstName || ''} ${u.lastName || ''}`.trim() ||
           u.email ||
           '';
-        
+
         // ✅ FIX
         partnerId = u?.integrations?.boberdoo?.external_id || '';
       } else {
@@ -74,7 +74,7 @@ const sendToN8nWebhook = async (campaignData) => {
               `${userDoc.firstName || ''} ${userDoc.lastName || ''}`.trim() ||
               userDoc.email ||
               '';
-                  // ⬇️ Extract Partner ID
+            // ⬇️ Extract Partner ID
             partnerId = userDoc.integrations?.boberdoo?.external_id || '';
           }
         } catch (e) {
@@ -90,7 +90,7 @@ const sendToN8nWebhook = async (campaignData) => {
 
     // ✅ Get lead_type and mapped boberdoo number
     const leadTypeKey = campaignData.lead_type;
-    const boberdooTypeId =  CONSTANT_ENUM.BOBERDOO_LEAD_TYPE_MAP[leadTypeKey] || null;
+    const boberdooTypeId = CONSTANT_ENUM.BOBERDOO_LEAD_TYPE_MAP[leadTypeKey] || null;
 
     // ✅ Payload
     const payload = {
@@ -99,7 +99,7 @@ const sendToN8nWebhook = async (campaignData) => {
       states: stateAbbrs,
       zip_codes: zipCodes,
       client_name: userName,
-      partner_id: partnerId,       
+      partner_id: partnerId,
       boberdoo_filter_set_id: campaignData.boberdoo_filter_set_id || null,
       timezone: campaignData.delivery?.schedule?.timezone || 'America/New_York',
       submitted_at: new Date().toISOString(),
@@ -137,9 +137,9 @@ const sendToN8nWebhook = async (campaignData) => {
   }
 };
 
-const sendLowBalanceAlert = async ({ campaign_name, filter_set_id, partner_id, email,user_id,campaign_id}) => {
+const sendLowBalanceAlert = async ({ campaign_name, filter_set_id, partner_id, email, user_id, campaign_id }) => {
   try {
- const LOW_BALANCE_API = "https://n8n.srv997679.hstgr.cloud/webhook/low_balance";
+    const LOW_BALANCE_API = "https://n8n.srv997679.hstgr.cloud/webhook/low_balance";
 
 
     const payload = {
@@ -160,12 +160,12 @@ const sendLowBalanceAlert = async ({ campaign_name, filter_set_id, partner_id, e
       timeout: 10000,
     });
     console.log("✅ Low Balance API Response:", resp.status);
-// ✅ STORE THE STOPPED CAMPAIGN INFO ON USER - DIRECT SAVE METHOD
+    // ✅ STORE THE STOPPED CAMPAIGN INFO ON USER - DIRECT SAVE METHOD
     if (user_id && filter_set_id) {
       try {
         // Fetch user directly
         const userToUpdate = await User.findById(user_id);
-        
+
         if (!userToUpdate) {
           console.error("❌ User not found for stopped_campaigns update:", user_id);
           return { success: true }; // Webhook was successful, just DB update failed
@@ -206,7 +206,7 @@ const sendLowBalanceAlert = async ({ campaign_name, filter_set_id, partner_id, e
       }
     }
 
-   
+
     return { success: true };
   } catch (error) {
     console.error("❌ Error sending low balance alert:", error.response?.data || error.message);
@@ -218,7 +218,7 @@ const sendLowBalanceAlert = async ({ campaign_name, filter_set_id, partner_id, e
 const sendBalanceTopUpAlert = async ({ partner_id, email, amount, user_id }) => {
   try {
     let pendingLeadsResult = { processed: 0, failed: 0, total: 0 };
-    
+
     // ✅ FIRST: Process all pending leads for this user
     if (user_id) {
       pendingLeadsResult = await processPendingLeadsForUser(user_id);
@@ -228,17 +228,17 @@ const sendBalanceTopUpAlert = async ({ partner_id, email, amount, user_id }) => 
     // ✅ FETCH USER TO GET STOPPED CAMPAIGNS
     let stoppedCampaigns = [];
     let userDoc = null;
-    
+
     if (user_id) {
       userDoc = await User.findById(user_id);
-      
+
       console.log("🔍 DEBUG - User found:", userDoc ? "Yes" : "No");
       console.log("🔍 DEBUG - stopped_campaigns raw:", userDoc?.stopped_campaigns);
       console.log("🔍 DEBUG - stopped_campaigns length:", userDoc?.stopped_campaigns?.length);
-      
+
       stoppedCampaigns = userDoc?.stopped_campaigns || [];
       console.log(`📋 Found ${stoppedCampaigns.length} stopped campaigns for user`);
-      
+
       if (stoppedCampaigns.length > 0) {
         console.log("📋 Stopped campaigns details:", JSON.stringify(stoppedCampaigns, null, 2));
       }
@@ -248,9 +248,9 @@ const sendBalanceTopUpAlert = async ({ partner_id, email, amount, user_id }) => 
     if (pendingLeadsResult.failed > 0 && pendingLeadsResult.processed === 0) {
       console.log("⚠️ WARNING: Pending leads payment failed, NOT sending resume webhook");
       console.log("⚠️ User needs to add funds or fix payment method first");
-      
-      return { 
-        success: false, 
+
+      return {
+        success: false,
         error: 'PAYMENT_STILL_FAILING',
         message: 'Cannot resume campaigns - payment is still failing',
         pending_leads: pendingLeadsResult
@@ -276,7 +276,7 @@ const sendBalanceTopUpAlert = async ({ partner_id, email, amount, user_id }) => 
     };
 
     console.log("📤 Sending BALANCE TOP-UP alert:", JSON.stringify(payload, null, 2));
-    billingLogger.info('Sending BALANCE TOP-UP alert payload:',  JSON.stringify(payload, null, 2));
+    billingLogger.info('Sending BALANCE TOP-UP alert payload:', JSON.stringify(payload, null, 2));
 
     const resp = await axios.post(BALANCE_TOP_UP_API, payload, {
       headers: {
@@ -410,9 +410,9 @@ const processPendingLeadsForUser = async (userId) => {
           }).save({ session });
 
           // ✅ UPDATED: Added paymentMethod
-          paymentResult = { 
-            success: true, 
-            transactionId: txn._id, 
+          paymentResult = {
+            success: true,
+            transactionId: txn._id,
             newBalance: user.balance,
             paymentMethod: 'BALANCE',
             cardLast4: null
@@ -455,9 +455,9 @@ const processPendingLeadsForUser = async (userId) => {
           }).save({ session });
 
           // ✅ UPDATED: Added paymentMethod
-          paymentResult = { 
-            success: true, 
-            transactionId: txn._id, 
+          paymentResult = {
+            success: true,
+            transactionId: txn._id,
             newBalance: user.balance,
             paymentMethod: 'BALANCE',
             cardLast4: null
@@ -656,7 +656,7 @@ const processPendingLeadsForUser = async (userId) => {
           .map(a => a.email?.trim().toLowerCase())
           .filter(e => e && !EXCLUDED.has(e));
 
-                    // ✅ NEW: override with env emails if present (still an array)
+        // ✅ NEW: override with env emails if present (still an array)
         console.log("ENV CHECK → ADMIN_NOTIFICATION_EMAILS =", process.env.ADMIN_NOTIFICATION_EMAILS);
 
         console.log("Admin before override =", adminEmails);
@@ -718,4 +718,255 @@ const processPendingLeadsForUser = async (userId) => {
 };
 
 
-module.exports = { sendToN8nWebhook,sendLowBalanceAlert,sendBalanceTopUpAlert,processPendingLeadsForUser};
+const processSingleLeadPayment = async (userId, leadId) => {
+  const logMeta = {
+    user_id: userId,
+    lead_id: leadId,
+    action: 'Process Single Lead Payment'
+  };
+
+  billingLogger.info("Starting single lead payment", logMeta);
+
+  // FIXED: Lookup by _id (ObjectId)
+  const lead = await Lead.findOne({
+    user_id: userId,
+    _id: leadId
+  }).populate('campaign_id');
+
+  // If still not found, try fallback to lead_id (string)
+  if (!lead) {
+    const leadFallback = await Lead.findOne({
+      user_id: userId,
+      lead_id: leadId
+    }).populate('campaign_id');
+
+    if (!leadFallback) {
+      billingLogger.warn("Lead not found for user", logMeta);
+      return {
+        success: false,
+        error: "Lead not found",
+        message: "The requested lead could not be found"
+      };
+    }
+
+    // Use fallback lead
+    lead = leadFallback;
+  }
+
+  if (lead.payment_status === "paid") {
+    billingLogger.info("Lead is already paid", logMeta);
+    return {
+      success: true,
+      message: "This lead has already been paid",
+      alreadyPaid: true
+    };
+  }
+
+  const campaign = lead.campaign_id;
+  if (!campaign) {
+    billingLogger.error("Campaign not found", logMeta);
+    return {
+      success: false,
+      error: "Campaign missing",
+      message: "Campaign configuration is missing for this lead"
+    };
+  }
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const user = await User.findById(userId).session(session);
+    if (!user) {
+      await session.abortTransaction();
+      billingLogger.error("User not found during payment", logMeta);
+      return {
+        success: false,
+        error: "User not found",
+        message: "User account could not be found"
+      };
+    }
+
+    const leadCost = lead.lead_cost;
+    let paymentResult = { success: false };
+
+    // PREPAID LOGIC
+    if (campaign.payment_type === "prepaid") {
+      if (user.balance >= leadCost) {
+        user.balance -= leadCost;
+        await user.save({ session });
+
+        const txn = await new Transaction({
+          userId,
+          type: "LEAD_ASSIGNMENT",
+          amount: -leadCost,
+          status: "COMPLETED",
+          paymentMethod: "BALANCE",
+          description: `Lead charged: ${lead._id}`,
+          leadId: lead._id,
+          balanceAfter: user.balance
+        }).save({ session });
+
+        paymentResult = {
+          success: true,
+          paymentMethod: "BALANCE",
+          transactionId: txn._id,
+          newBalance: user.balance
+        };
+
+      } else {
+        await session.abortTransaction();
+        billingLogger.warn("Insufficient prepaid balance", {
+          ...logMeta,
+          required: leadCost,
+          available: user.balance
+        });
+        return {
+          success: false,
+          error: "Insufficient prepaid balance",
+          message: `Insufficient balance. Required: $${leadCost.toFixed(2)}, Available: $${user.balance.toFixed(2)}`,
+          required: leadCost,
+          available: user.balance
+        };
+      }
+    }
+
+    // POSTPAID LOGIC
+    else {
+      if (user.balance >= leadCost) {
+        user.balance -= leadCost;
+        await user.save({ session });
+
+        const txn = await new Transaction({
+          userId,
+          type: "LEAD_ASSIGNMENT",
+          amount: -leadCost,
+          status: "COMPLETED",
+          paymentMethod: "BALANCE",
+          description: `Lead charged: ${lead._id}`,
+          leadId: lead._id,
+          balanceAfter: user.balance
+        }).save({ session });
+
+        paymentResult = {
+          success: true,
+          paymentMethod: "BALANCE",
+          transactionId: txn._id,
+          newBalance: user.balance
+        };
+      } else {
+        const defaultCard = user.paymentMethods?.find(pm => pm.isDefault);
+
+        if (!defaultCard?.customerVaultId) {
+          await session.abortTransaction();
+          billingLogger.warn("No default payment method", logMeta);
+          return {
+            success: false,
+            error: "No default card available",
+            message: "No default payment method found. Please add a payment method to continue."
+          };
+        }
+
+        const chargeResult = await chargeCustomerVault(
+          defaultCard.customerVaultId,
+          leadCost,
+          `Lead charge: ${lead._id}`
+        );
+
+        if (!chargeResult.success) {
+          await session.abortTransaction();
+          billingLogger.error("Card charge failed", {
+            ...logMeta,
+            cardLast4: defaultCard.cardLastFour,
+            chargeError: chargeResult.message
+          });
+          return {
+            success: false,
+            error: chargeResult.message || "Card charge failed",
+            message: `Payment failed: ${chargeResult.message || "Unable to charge your card. Please check your payment method."}`,
+            cardLast4: defaultCard.cardLastFour
+          };
+        }
+
+        const txn = await new Transaction({
+          userId,
+          type: "LEAD_ASSIGNMENT",
+          amount: -leadCost,
+          status: "COMPLETED",
+          paymentMethod: "CARD",
+          transactionId: chargeResult.transactionId,
+          description: `Lead charged (Card): ${lead._id}`,
+          leadId: lead._id,
+          balanceAfter: user.balance
+        }).save({ session });
+
+        paymentResult = {
+          success: true,
+          paymentMethod: "CARD",
+          cardLast4: defaultCard.cardLastFour || null,
+          transactionId: txn._id,
+          newBalance: user.balance
+        };
+      }
+    }
+
+    if (!paymentResult.success) {
+      await session.abortTransaction();
+      billingLogger.error("Payment processing failed", logMeta);
+      return {
+        success: false,
+        error: "Payment failed",
+        message: "Payment could not be processed. Please try again."
+      };
+    }
+
+    // UPDATE LEAD
+    lead.payment_status = "paid";
+    lead.status = "active";
+    lead.transaction_id = paymentResult.transactionId;
+    lead.payment_error_message = null;
+    await lead.save({ session });
+
+    // UPDATE USER PENDING PAYMENTS
+    user.pending_payment.amount -= leadCost;
+    user.pending_payment.count -= 1;
+    await user.save({ session });
+
+    await session.commitTransaction();
+
+    billingLogger.info("Single lead payment completed successfully", {
+      ...logMeta,
+      transaction_id: paymentResult.transactionId,
+      payment_method: paymentResult.paymentMethod,
+      amount: leadCost
+    });
+
+    return {
+      success: true,
+      message: "Lead payment completed successfully",
+      lead_id: lead._id,
+      paymentMethod: paymentResult.paymentMethod,
+      cardLast4: paymentResult.cardLast4 || null,
+      transactionId: paymentResult.transactionId,
+      newBalance: paymentResult.newBalance,
+      amountCharged: leadCost
+    };
+
+  } catch (err) {
+    await session.abortTransaction();
+    billingLogger.error("Error processing single lead payment", {
+      ...logMeta,
+      error: err.message,
+      stack: err.stack
+    });
+    return {
+      success: false,
+      error: err.message,
+      message: "An error occurred while processing payment. Please try again later."
+    };
+  } finally {
+    session.endSession();
+  }
+};
+
+module.exports = { processSingleLeadPayment, sendToN8nWebhook, sendLowBalanceAlert, sendBalanceTopUpAlert, processPendingLeadsForUser };
