@@ -46,7 +46,7 @@ class DashboardService {
                                 {
                                     $and: [
                                         { $eq: ["$status", "active"] },
-                                        { $eq: ["$return_status", "Not Returned"] } // Only count as qualified if NOT returned
+                                        { $eq: ["$return_status", "Not Returned"] }
                                     ]
                                 },
                                 1,
@@ -75,12 +75,23 @@ class DashboardService {
 
         const chartDataRaw = await Lead.aggregate(aggregationPipeline);
 
-        // 4. Detailed User Stats
         const activeUsers = await User.countDocuments({ isActive: true });
         const inactiveUsers = await User.countDocuments({ isActive: false });
 
-        // 5. Detailed Lead Stats (Global)
-        // Fix: Active leads should exclude those that are "Returned" to avoid double counting
+
+        const activeAdmins = await User.countDocuments({
+            isActive: true,
+            role: { $in: [STATUS.ADMIN, 'ADMIN', 'SUPER_ADMIN', /^admin$/i, /^super_admin$/i] }
+        });
+        const activeRegularUsers = await User.countDocuments({
+            isActive: true,
+            isEmailVerified: true,
+            role: { $in: ['USER', /^user$/i] }
+        });
+        const unverifiedUsers = await User.countDocuments({
+            isEmailVerified: { $ne: false }
+        });
+
         const activeLeads = await Lead.countDocuments({
             status: 'active',
             return_status: { $in: ['Not Returned', null] }
@@ -90,7 +101,6 @@ class DashboardService {
             return_status: { $in: ['Pending', 'Approved', 'Rejected'] }
         });
 
-        // 6. Campaign Stats
         const totalCampaigns = await Campaign.countDocuments({});
         const activeCampaigns = await Campaign.countDocuments({ status: STATUS.ACTIVE });
         const pendingCampaigns = await Campaign.countDocuments({ status: STATUS.PENDING });
@@ -101,6 +111,10 @@ class DashboardService {
             totalUsers,
             activeUsers,
             inactiveUsers,
+
+            activeAdmins,
+            activeRegularUsers,
+            unverifiedUsers,
 
             totalLeads,
             activeLeads,
