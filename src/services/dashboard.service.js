@@ -89,7 +89,7 @@ class DashboardService {
             role: { $in: ['USER', /^user$/i] }
         });
         const unverifiedUsers = await User.countDocuments({
-            isEmailVerified: { $ne: false }
+            isEmailVerified: false,
         });
 
         const activeLeads = await Lead.countDocuments({
