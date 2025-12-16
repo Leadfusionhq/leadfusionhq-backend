@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Users, DollarSign, FileText, CheckCircle, XCircle, Calendar, TrendingUp } from 'lucide-react';
+import { Users, DollarSign, FileText, CheckCircle, XCircle, Calendar, TrendingUp, Shield, UserCheck, AlertTriangle } from 'lucide-react';
 import { Skeleton } from '@mui/material';
 import Link from 'next/link';
 import axiosWrapper from "@/utils/api";
@@ -14,6 +14,9 @@ interface DashboardStats {
   totalUsers: number;
   activeUsers: number;
   inactiveUsers: number;
+  activeAdmins: number;
+  activeRegularUsers: number;
+  unverifiedUsers: number;
   totalLeads: number;
   activeLeads: number;
   returnedLeads: number;
@@ -54,6 +57,9 @@ export default function AdminDashboard() {
     totalUsers: 0,
     activeUsers: 0,
     inactiveUsers: 0,
+    activeAdmins: 0,
+    activeRegularUsers: 0,
+    unverifiedUsers: 0,
     totalRevenue: 0,
     totalLeads: 0,
     activeLeads: 0,
@@ -168,6 +174,9 @@ export default function AdminDashboard() {
           totalUsers: dashboardData.totalUsers || 0,
           activeUsers: dashboardData.activeUsers || 0,
           inactiveUsers: dashboardData.inactiveUsers || 0,
+          activeAdmins: dashboardData.activeAdmins || 0,
+          activeRegularUsers: dashboardData.activeRegularUsers || 0,
+          unverifiedUsers: dashboardData.unverifiedUsers || 0,
           totalLeads: dashboardData.totalLeads || 0,
           activeLeads: dashboardData.activeLeads || 0,
           returnedLeads: dashboardData.returnedLeads || 0,
@@ -206,6 +215,9 @@ export default function AdminDashboard() {
         totalUsers: 0,
         activeUsers: 0,
         inactiveUsers: 0,
+        activeAdmins: 0,
+        activeRegularUsers: 0,
+        unverifiedUsers: 0,
         totalRevenue: 0,
         totalLeads: 0,
         activeLeads: 0,
@@ -319,18 +331,52 @@ export default function AdminDashboard() {
               <div className="bg-blue-50 p-3 rounded-lg">
                 <Users className="w-6 h-6 text-blue-600" />
               </div>
+              <div className="flex flex-col items-end">
+                <span className="text-3xl font-bold text-gray-900">{stats.totalUsers.toLocaleString()}</span>
+                <span className="text-xs text-gray-500">Total Users</span>
+              </div>
             </div>
-            <p className="text-gray-600 text-sm mb-1">Total Number of Users</p>
-            <p className="text-3xl font-bold text-gray-900">{stats.totalUsers.toLocaleString()}</p>
-            <div className="flex items-center gap-4 mt-2">
-              <p className="text-xs text-green-600 flex items-center">
-                <CheckCircle className="w-3 h-3 mr-1" />
-                {stats.activeUsers} Active
-              </p>
-              <p className="text-xs text-red-500 flex items-center">
-                <XCircle className="w-3 h-3 mr-1" />
-                {stats.inactiveUsers} Inactive
-              </p>
+
+            <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-gray-50">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-indigo-50 rounded text-indigo-600">
+                  <Shield className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Admins</p>
+                  <p className="text-sm font-semibold text-gray-900">{stats.activeAdmins}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-green-50 rounded text-green-600">
+                  <UserCheck className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Active</p>
+                  <p className="text-sm font-semibold text-gray-900">{stats.activeRegularUsers}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-yellow-50 rounded text-yellow-600">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Unverified</p>
+                  <p className="text-sm font-semibold text-gray-900">{stats.unverifiedUsers}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-red-50 rounded text-red-600">
+                  <XCircle className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Inactive</p>
+                  <p className="text-sm font-semibold text-gray-900">{stats.inactiveUsers}</p>
+                </div>
+              </div>
             </div>
           </div>
         )}
