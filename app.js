@@ -105,6 +105,10 @@ app.use(`/${config.server.route}/sms`, smsRoutes);
 app.use(`/${config.server.route}/boberdo`, boberDoRoutes); // Public API for Boberdo
 app.use(`/${config.server.route}/admin/boberdo`, boberdoAdminRoutes); // Admin management
 
+// Dashboard Routes
+const dashboardRoutes = require('./src/routes/dashboard.routes');
+app.use(`/${config.server.route}/dashboard`, dashboardRoutes);
+
 
 app.use(errors());
 
