@@ -300,3 +300,10 @@ export const LOG_API = {
   CLEAR_LOGS: `${LOGS_API_BASE}/clear`,
   EXPORT_LOGS: `${LOGS_API_BASE}/export`,
 };
+
+
+const DASHBOARD_API_BASE = `${API_BASE}/dashboard`;
+
+export const DASHBOARD_API = {
+  GET_DASHBOARD_DATA: `${DASHBOARD_API_BASE}/stats`,
+};
