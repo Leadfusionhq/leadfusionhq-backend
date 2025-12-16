@@ -1,10 +1,8 @@
-'use client';
+import { LogOut, X } from "lucide-react";
 import { useSelector, useDispatch } from 'react-redux';
 import { logout } from '@/redux/auth/authSlice';
-import { RxCross2 } from "react-icons/rx";
 import { removeToken } from '@/utils/auth';
-import { toggleSidebar ,collapseSidebar} from '@/redux/theme/theme_slice';
-// import { usePathname, useRouter } from 'next/navigation';
+import { toggleSidebar, collapseSidebar } from '@/redux/theme/theme_slice';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import SidebarItem from './SidebarItem';
@@ -15,19 +13,15 @@ import { useLoader } from '@/context/LoaderContext';
 const Sidebar = () => {
   const dispatch = useDispatch<AppDispatch>();
   const router = useRouter();
-  const { collapsed}=useSelector((state:RootState)=>state.theme);
-  //  console.log("inside collapsed sidebar",collapsed)
-  // const pathname = usePathname();
-
+  const { collapsed } = useSelector((state: RootState) => state.theme);
   const { user } = useSelector((state: RootState) => state.auth);
-   const { showLoader, hideLoader } = useLoader(); 
+  const { showLoader, hideLoader } = useLoader();
   const role = user?.role;
 
   const sidebarItems = role === 'ADMIN' ? adminSidebarItems : userSidebarItems;
 
- const handleLogout = async () => {
+  const handleLogout = async () => {
     showLoader("Logging out...");
-    
     try {
       await fetch("/api/auth/logout", { method: "POST" });
       await new Promise(resolve => setTimeout(resolve, 800));
@@ -35,12 +29,9 @@ const Sidebar = () => {
       console.error("Logout failed", error);
       await new Promise(resolve => setTimeout(resolve, 800));
     } finally {
-      // Always clean up and navigate
       removeToken();
       dispatch(logout());
-      hideLoader(); // Explicitly hide loader
-      
-      // Use setTimeout to ensure state updates complete before navigation
+      hideLoader();
       setTimeout(() => {
         router.replace("/login");
       }, 50);
@@ -48,49 +39,69 @@ const Sidebar = () => {
   };
 
   return (
-<aside
-  className={`bg-black  fixed z-10 lg:z-10 top-0 left-0   text-white flex flex-col justify-between min-h-screen
-    lg:translate-x-0
-    transition-all duration-300   ${collapsed ? 'lg:w-[6%] translate-x-0 w-[85%]  ' : "lg:w-[17%]  hidden lg:flex -translate-x-full "} 
-  `}
->   
-           <button
-             className="absolute z-10 right-2 top-2 lg:hidden cursor-pointer"
-                onClick={() => dispatch(collapseSidebar(false))} >
-         {/* <Image src="/images/icons/close.png" width={20} height={20} alt="cross-icon" 
-         className="absolute z-10 right-1 top-6 lg:hidden cursor-pointer"
-        
-         /> */}
-         <RxCross2 />
-         </button>
-
-   <div className="logo-container border-b border-[#FFFFFF17]">
-        <Image
-          src="/images/logo.svg"
-          alt="Logo"
-          width={80}
-          height={80}
-          className="mx-auto h-[140px] lg:h-[72px]   transition-all duration-300"
-        />
-      </div>
-      <nav className="sidebar-nav flex-1 px-[18px] py-4 space-y-[30px]">
-        {sidebarItems.map((item) => (
-          <SidebarItem key={item.id} item={item} />
-        ))}
-      </nav>
-      <div className={`logout-container ${collapsed?"px-[6px]":"px-[9px]"} py-4`}>
+    <aside
+      className={`bg-black fixed z-[110] top-0 left-0 text-white flex flex-col justify-between h-screen
+      lg:translate-x-0 transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)]
+      ${collapsed ? 'lg:w-[110px] w-[280px] translate-x-0' : "lg:w-[260px] hidden lg:flex -translate-x-full"} 
+      shadow-2xl border-r border-[#FFFFFF10]
+      `}
+    >
+      {/* Mobile Close Button - Enhanced */}
+      <div className="lg:hidden absolute right-4 top-5 z-20">
         <button
-          className={`w-full flex items-center justify-center whitespace-nowrap overflow-hidden text-ellipsis cursor-pointer transition-all duration-300  bg-transparent text-[#204D9D] font-semibold delay-[1ms] rounded-full py-2 ${collapsed?"px-4":"px-4 border border-[#204D9D]"} `}
-
-          onClick={handleLogout}
+          className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all backdrop-blur-sm"
+          onClick={() => dispatch(collapseSidebar(false))}
         >
-         {collapsed ?
-         <Image src="/images/logout.png" alt="logout-logo" width={100} height={100} className="hidden lg:block transition-all duration-300 whitespace-nowrap overflow-hidden text-ellipsis mx-auto w-auto h-[16px] my-[5px]"/>
-         :  
-         <div className="transition-all duration-300  whitespace-nowrap overflow-hidden text-ellipsis ">Log Out</div>
-} 
-         <div className="block lg:hidden px-4 border cursor-pointer  py-2 border-[#204D9D] transition-all duration-300  whitespace-nowrap overflow-hidden text-ellipsis rounded-full ">Log Out</div>
+          <X size={20} />
+        </button>
+      </div>
 
+      {/* Logo Section - Adjusted sizing */}
+      <div className={`logo-container h-[88px] flex items-center justify-center border-b border-[#FFFFFF10] transition-all duration-300 ${collapsed ? "px-0 lg:px-2" : "px-6"}`}>
+        <div className="relative w-full h-full flex items-center justify-center">
+          <Image
+            src="/images/logo.svg"
+            alt="Logo"
+            width={collapsed ? 90 : 130}
+            height={collapsed ? 90 : 50}
+            className={`transition-all duration-300 object-contain ${collapsed ? "w-32 lg:w-[90px]" : "w-32"}`}
+          />
+        </div>
+      </div>
+
+      {/* Navigation Items */}
+      {/* Navigation Items - Grouped & Animated */}
+      <nav className="sidebar-nav flex-1 py-6 space-y-2 overflow-y-auto px-3 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+        <div className="space-y-1 animate-in fade-in slide-in-from-left-4 duration-500">
+          {sidebarItems.map((item) => (
+            <SidebarItem key={item.id} item={item} />
+          ))}
+        </div>
+      </nav>
+
+      {/* Footer / Logout */}
+      <div className="p-4 border-t border-[#FFFFFF10]">
+        <button
+          onClick={handleLogout}
+          className={`group w-full flex items-center gap-3 relative overflow-hidden rounded-xl transition-all duration-200 
+            ${collapsed ? "justify-center p-3" : "px-4 py-3"}
+            text-red-400 hover:bg-red-500/10 hover:text-red-300
+          `}
+        >
+          <LogOut size={20} className="transition-transform duration-200 group-hover:-translate-x-0.5" />
+
+          {!collapsed && (
+            <span className="font-medium tracking-wide text-sm">Log Out</span>
+          )}
+
+          {/* Tooltip for Collapsed State */}
+          {collapsed && (
+            <div className="absolute left-full top-1/2 -translate-y-1/2 ml-4 px-3 py-1.5 bg-gray-900 text-white text-xs font-semibold rounded-md shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 whitespace-nowrap border border-gray-700">
+              Log Out
+              {/* Arrow */}
+              <div className="absolute top-1/2 -translate-y-1/2 -left-1 w-2 h-2 bg-gray-900 border-l border-b border-gray-700 rotate-45"></div>
+            </div>
+          )}
         </button>
       </div>
     </aside>

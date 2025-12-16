@@ -44,6 +44,7 @@ import {
 import { toast } from 'react-toastify';
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 import { Menu, MenuItem, IconButton } from "@mui/material";
+import useDebounce from '@/hooks/useDebounce';
 
 // --- Types ---
 type PaymentMethod = {
@@ -181,6 +182,7 @@ export default function UserTable() {
 
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
+  const debouncedGlobalFilter = useDebounce(globalFilter, 300);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
 
   const [filterAnchorEl, setFilterAnchorEl] = useState<null | HTMLElement>(null);
@@ -240,13 +242,13 @@ export default function UserTable() {
 
   useEffect(() => {
     setPagination(prev => ({ ...prev, pageIndex: 0 }));
-  }, [globalFilter]);
+  }, [debouncedGlobalFilter]);
 
   useEffect(() => {
     if (token) {
-      fetchUsers(pagination.pageIndex + 1, pagination.pageSize, globalFilter, statusFilter);
+      fetchUsers(pagination.pageIndex + 1, pagination.pageSize, debouncedGlobalFilter, statusFilter);
     }
-  }, [token, pagination.pageIndex, pagination.pageSize, globalFilter, statusFilter, fetchUsers]);
+  }, [token, pagination.pageIndex, pagination.pageSize, debouncedGlobalFilter, statusFilter, fetchUsers]);
 
 
   const handleToggleUser = async (row: User) => {
@@ -311,12 +313,12 @@ export default function UserTable() {
 
       if (response?.result?.externalId || response?.externalId) {
         toast.update(toastId, { render: response?.message || '✓ User synced to Boberdoo successfully!', type: 'success', isLoading: false, autoClose: 3000 });
-        fetchUsers(pagination.pageIndex + 1, pagination.pageSize, globalFilter, statusFilter);
+        fetchUsers(pagination.pageIndex + 1, pagination.pageSize, debouncedGlobalFilter, statusFilter);
         return;
       }
 
       toast.update(toastId, { render: response?.message || 'Sync completed with unknown status', type: 'warning', isLoading: false, autoClose: 3000 });
-      fetchUsers(pagination.pageIndex + 1, pagination.pageSize, globalFilter, statusFilter);
+      fetchUsers(pagination.pageIndex + 1, pagination.pageSize, debouncedGlobalFilter, statusFilter);
 
     } catch (err: any) {
       let errorMessage = 'Failed to sync user to Boberdoo';

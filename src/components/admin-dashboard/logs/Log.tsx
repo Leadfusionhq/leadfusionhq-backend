@@ -3,7 +3,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { LOGS_API } from "@/utils/apiUrl";
+import { LOG_API } from "@/utils/apiUrl";
 import axiosWrapper from "@/utils/api";
 import { useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
@@ -48,7 +48,7 @@ type LogEntry = {
   timestamp: string;
   level: "info" | "warn" | "error" | "debug";
   message: string;
-  
+
   meta?: Record<string, any>;
 };
 
@@ -76,7 +76,7 @@ type StatsResponse = {
       error?: number;
       debug?: number;
     };
-   
+
   };
 };
 
@@ -120,16 +120,16 @@ export default function LogsTable() {
     try {
       const response = (await axiosWrapper(
         "get",
-        LOGS_API.GET_STATS,
+        LOG_API.GET_STATS,
         {},
         token ?? undefined
       )) as StatsResponse;
 
       if (response.success) {
         setStats(response.data);
-  
-       
-      
+
+
+
       }
     } catch (err) {
       console.error("Failed to fetch stats:", err);
@@ -142,7 +142,7 @@ export default function LogsTable() {
       pageNumber: number,
       pageSize: number,
       level: string,
-   
+
       message: string,
       start: string,
       end: string
@@ -155,7 +155,7 @@ export default function LogsTable() {
           page: pageNumber.toString(),
           limit: pageSize.toString(),
           ...(level && { level }),
-       
+
           ...(message && { message }),
           ...(start && { startDate: start }),
           ...(end && { endDate: end }),
@@ -165,7 +165,7 @@ export default function LogsTable() {
 
         const response = (await axiosWrapper(
           "get",
-          `${LOGS_API.GET_ALL_LOGS}?${params.toString()}`,
+          `${LOG_API.GET_ALL_LOGS}?${params.toString()}`,
           {},
           token ?? undefined
         )) as ApiResponse;
@@ -206,7 +206,7 @@ export default function LogsTable() {
     pagination.page,
     pagination.limit,
     selectedLevel,
- 
+
     searchMessage,
     startDate,
     endDate,
@@ -216,7 +216,7 @@ export default function LogsTable() {
   useEffect(() => {
     if (anchorEl) {
       setTempSelectedLevel(selectedLevel);
- 
+
       setTempSearchMessage(searchMessage);
       setTempStartDate(startDate);
       setTempEndDate(endDate);
@@ -297,7 +297,7 @@ export default function LogsTable() {
       sortable: true,
       minWidth: "100px",
     },
-  
+
     {
       name: "Message",
       selector: (row) => row.message,
@@ -359,7 +359,7 @@ export default function LogsTable() {
 
   const handleClearFilters = () => {
     setSelectedLevel("");
- 
+
     setSearchMessage("");
     setStartDate("");
     setEndDate("");
@@ -376,7 +376,7 @@ export default function LogsTable() {
       case "level":
         setSelectedLevel("");
         break;
-    
+
       case "message":
         setSearchMessage("");
         break;
@@ -392,7 +392,7 @@ export default function LogsTable() {
     switch (type) {
       case "level":
         return `Level: ${value.toUpperCase()}`;
- 
+
       case "message":
         return `Search: "${value}"`;
       case "dateRange":
@@ -403,7 +403,7 @@ export default function LogsTable() {
   };
 
   const hasFilters =
-    selectedLevel  || searchMessage || startDate || endDate;
+    selectedLevel || searchMessage || startDate || endDate;
 
   const handlePageChange = (page: number) => {
     setPagination((prev) => ({ ...prev, page }));
@@ -432,13 +432,13 @@ export default function LogsTable() {
       const params = new URLSearchParams({
         format,
         ...(selectedLevel && { level: selectedLevel }),
-  
+
         ...(startDate && { startDate }),
         ...(endDate && { endDate }),
       });
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}${LOGS_API.EXPORT_LOGS}?${params.toString()}`,
+        `${process.env.NEXT_PUBLIC_API_URL}${LOG_API.EXPORT_LOGS}?${params.toString()}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -469,13 +469,13 @@ export default function LogsTable() {
     try {
       const params = new URLSearchParams({
         ...(selectedLevel && { level: selectedLevel }),
-    
+
         ...(startDate && { beforeDate: endDate || new Date().toISOString() }),
       });
 
       const response = (await axiosWrapper(
         "delete",
-        `${LOGS_API.CLEAR_LOGS}?${params.toString()}`,
+        `${LOG_API.CLEAR_LOGS}?${params.toString()}`,
         {},
         token ?? undefined
       )) as { success: boolean; deletedCount: number; message: string };
@@ -516,8 +516,8 @@ export default function LogsTable() {
             >
               <RefreshIcon />
             </IconButton>
-          
-         
+
+
             <Button
               variant="outlined"
               size="small"
@@ -528,8 +528,8 @@ export default function LogsTable() {
             >
               Clear
             </Button>
-            <IconButton 
-              aria-label="filter" 
+            <IconButton
+              aria-label="filter"
               onClick={handleFilterClick}
               size="small"
             >
@@ -544,9 +544,9 @@ export default function LogsTable() {
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <Card sx={{ height: '100%' }}>
                 <CardContent>
-                  <Typography 
-                    color="textSecondary" 
-                    gutterBottom 
+                  <Typography
+                    color="textSecondary"
+                    gutterBottom
                     variant="body2"
                     sx={{ fontSize: '0.75rem', fontWeight: 500 }}
                   >
@@ -562,9 +562,9 @@ export default function LogsTable() {
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <Card sx={{ height: '100%' }}>
                 <CardContent>
-                  <Typography 
-                    color="textSecondary" 
-                    gutterBottom 
+                  <Typography
+                    color="textSecondary"
+                    gutterBottom
                     variant="body2"
                     sx={{ fontSize: '0.75rem', fontWeight: 500 }}
                   >
@@ -580,9 +580,9 @@ export default function LogsTable() {
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <Card sx={{ height: '100%' }}>
                 <CardContent>
-                  <Typography 
-                    color="textSecondary" 
-                    gutterBottom 
+                  <Typography
+                    color="textSecondary"
+                    gutterBottom
                     variant="body2"
                     sx={{ fontSize: '0.75rem', fontWeight: 500 }}
                   >
@@ -598,9 +598,9 @@ export default function LogsTable() {
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <Card sx={{ height: '100%' }}>
                 <CardContent>
-                  <Typography 
-                    color="textSecondary" 
-                    gutterBottom 
+                  <Typography
+                    color="textSecondary"
+                    gutterBottom
                     variant="body2"
                     sx={{ fontSize: '0.75rem', fontWeight: 500, mb: 1 }}
                   >
@@ -640,7 +640,7 @@ export default function LogsTable() {
                 size="small"
               />
             )}
-           
+
             {searchMessage && (
               <Chip
                 label={getFilterLabel("message", searchMessage)}
@@ -715,7 +715,7 @@ export default function LogsTable() {
               </Select>
             </FormControl>
 
-    
+
 
             <TextField
               fullWidth
@@ -822,7 +822,7 @@ export default function LogsTable() {
 
               <Divider />
 
-         
+
 
               <Divider />
 
@@ -889,14 +889,13 @@ export default function LogsTable() {
       <ConfirmDialog
         open={clearDialog}
         title="Clear Logs"
-        message={`Are you sure you want to clear logs with the current filters? This action cannot be undone.${
-          !hasFilters
+        message={`Are you sure you want to clear logs with the current filters? This action cannot be undone.${!hasFilters
             ? " Please apply at least one filter to avoid clearing all logs."
             : ""
-        }`}
+          }`}
         onConfirm={handleClearLogs}
         onCancel={() => setClearDialog(false)}
-       
+
       />
     </>
   );

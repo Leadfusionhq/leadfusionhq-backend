@@ -1,30 +1,26 @@
 "use client";
 import { useState } from "react";
-import { Formik, Form, Field ,ErrorMessage} from "formik";
-import { Edit } from "lucide-react";
+import { Formik, Form, Field, ErrorMessage } from "formik";
+import {
+  User as UserIcon,
+  Mail,
+  Phone,
+  Calendar,
+  Edit2,
+  X,
+  Check
+} from "lucide-react";
 import { toast } from "react-toastify";
 import axiosWrapper from "@/utils/api";
 import { API_URL } from "@/utils/apiUrl";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/redux/store";
-import { getErrorMessage } from '@/utils/getErrorMessage';
-import { useDispatch } from "react-redux";
-import { setUser } from "@/redux/auth/authSlice";
+import { setUser, User } from "@/redux/auth/authSlice";
 import * as Yup from "yup";
-interface User {
-  _id: string;
-  name: string;
-  email: string;
-  phoneNumber?: string; 
-  address?: string;
-  role: string;
-  dob?: string;
-}
 
-const PersonalInformation = ({ user }) => {
+const PersonalInformation = ({ user }: { user: User }) => {
   const [isEditing, setIsEditing] = useState(false);
   const token = useSelector((state: RootState) => state.auth.token);
-
   const dispatch = useDispatch();
 
   const initialValues = {
@@ -34,11 +30,8 @@ const PersonalInformation = ({ user }) => {
       : "",
     email: user?.email || "",
     phone: user?.phoneNumber || "",
-    address: user?.address || "",
-    userRole: user?.role || "USER",
   };
 
-  // ✅ Validation schema
   const validationSchema = Yup.object({
     name: Yup.string().required("Name is required"),
     email: Yup.string()
@@ -50,9 +43,6 @@ const PersonalInformation = ({ user }) => {
     phone: Yup.string()
       .matches(/^\+?[0-9\- ]+$/, "Only numbers are allowed")
       .required("Phone number is required"),
-    address: Yup.string()
-      .required("address is required"),
-    
   });
 
   const handleSubmit = async (values: typeof initialValues, { resetForm }: any) => {
@@ -61,7 +51,6 @@ const PersonalInformation = ({ user }) => {
         name: values.name,
         email: values.email,
         phoneNumber: values.phone,
-        address: values.address,
         dob: values.dateOfBirth ? new Date(values.dateOfBirth).toISOString() : null,
       };
 
@@ -76,249 +65,189 @@ const PersonalInformation = ({ user }) => {
       dispatch(
         setUser({
           ...user,
-          id: user._id,
+          _id: user._id,
           name: values.name,
           email: values.email,
           phoneNumber: values.phone,
-          address: values.address,
           dob: values.dateOfBirth || null,
         })
       );
 
       toast.success(res?.message || "Profile updated successfully!");
       setIsEditing(false);
-      resetForm({ values }); // ✅ keep updated values in form after save
+      resetForm({ values });
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Failed to update profile");
     }
   };
 
   return (
-   
-      <div className="bg-white rounded-lg border border-gray-200 mb-6">
-        <Formik
-          initialValues={initialValues}
-          onSubmit={handleSubmit}
-          validationSchema={validationSchema}
-          enableReinitialize
-        >
-          {({ values, errors, touched, resetForm }) => (
-            <>
-              {/* Header */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-medium text-gray-900">
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden transition-all hover:shadow-md">
+      <Formik
+        initialValues={initialValues}
+        onSubmit={handleSubmit}
+        validationSchema={validationSchema}
+        enableReinitialize
+      >
+        {({ values, errors, touched, resetForm, isSubmitting }) => (
+          <>
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-5 md:px-8 border-b border-gray-100 bg-gray-50/50">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <UserIcon className="w-5 h-5 text-[#306A64]" />
                   Personal Information
                 </h2>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (isEditing) {
-                      resetForm(); // ✅ now works correctly
-                      setIsEditing(false);
-                    } else {
-                      setIsEditing(true);
-                    }
-                  }}
-                  className="px-3 py-1.5 text-sm text-white bg-gray-900 rounded hover:bg-gray-800 flex items-center space-x-1"
-                >
-                  <Edit className="w-3 h-3" />
-                  <span>{isEditing ? "Close" : "Edit"}</span>
-                </button>
+                <p className="text-sm text-gray-500 mt-1">
+                  Manage your personal details and contact info.
+                </p>
               </div>
-    
-              {/* Form */}
-              <div className="px-6 py-6">
-                <Form>
-                  <div className="grid grid-cols-3 gap-x-8 gap-y-6">
-                    {/* Name */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-600 mb-2">
-                        Name
-                      </label>
-                      {isEditing ? (
-                        <>
-                          <Field
-                            type="text"
-                            name="name"
-                            className={`w-full px-3 py-2 border rounded-md focus:ring-1 focus:ring-blue-500 ${
-                              errors.name && touched.name
-                                ? "border-red-500"
-                                : "border-gray-300"
-                            }`}
-                          />
-                          <ErrorMessage
-                            name="name"
-                            component="div"
-                            className="text-red-500 text-sm mt-1"
-                          />
-                        </>
-                      ) : (
-                        <p className="text-gray-900 font-medium">{values.name}</p>
-                      )}
-                    </div>
-    
-                    {/* Date of Birth */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-600 mb-2">
-                        Date of Birth
-                      </label>
-                      {isEditing ? (
-                        <>
-                          <Field
-                            type="date"
-                            name="dateOfBirth"
-                            max={new Date().toISOString().split("T")[0]} // ✅ prevent future selection
-                            className={`w-full px-3 py-2 border rounded-md focus:ring-1 focus:ring-blue-500 ${
-                              errors.dateOfBirth && touched.dateOfBirth
-                                ? "border-red-500"
-                                : "border-gray-300"
-                            }`}
-                          />
-                          <ErrorMessage
-                            name="dateOfBirth"
-                            component="div"
-                            className="text-red-500 text-sm mt-1"
-                          />
-                        </>
-                      ) : (
-                        <p className="text-gray-900 font-medium">
-                          {values.dateOfBirth
-                            ? new Date(values.dateOfBirth).toLocaleDateString(
-                                "en-GB"
-                              )
-                            : "—"}
-                        </p>
-                      )}
-                    </div>
-    
-                    {/* Email */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-600 mb-2">
-                        Email Address
-                      </label>
-                      {isEditing ? (
-                        <>
-                          <Field
-                            type="email"
-                            name="email"
-                            className={`w-full px-3 py-2 border rounded-md focus:ring-1 focus:ring-blue-500 ${
-                              errors.email && touched.email
-                                ? "border-red-500"
-                                : "border-gray-300"
-                            }`}
-                          />
-                          <ErrorMessage
-                            name="email"
-                            component="div"
-                            className="text-red-500 text-sm mt-1"
-                          />
-                        </>
-                      ) : (
-                        <p className="text-gray-900 font-medium">{values.email}</p>
-                      )}
-                    </div>
-    
-                    {/* Phone */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-600 mb-2">
-                        Phone Number
-                      </label>
-                      {isEditing ? (
-                        <>
-                          <Field
-                            type="text"
-                            name="phone"
-                            className={`w-full px-3 py-2 border rounded-md focus:ring-1 focus:ring-blue-500 ${
-                              errors.phone && touched.phone
-                                ? "border-red-500"
-                                : "border-gray-300"
-                            }`}
-                          />
-                          <ErrorMessage
-                            name="phone"
-                            component="div"
-                            className="text-red-500 text-sm mt-1"
-                          />
-                        </>
-                      ) : (
-                        <p className="text-gray-900 font-medium">{values.phone}</p>
-                      )}
-                    </div>
-    
-                   
-                    {/* Address */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-600 mb-2">
-                        Address
-                      </label>
-                      {isEditing ? (
-                        <>
-                          <Field
-                            type="text"
-                            name="address"
-                            className={`w-full px-3 py-2 border rounded-md focus:ring-1 focus:ring-blue-500 ${
-                              errors.address && touched.address
-                                ? "border-red-500"
-                                : "border-gray-300"
-                            }`}
-                          />
-                          <ErrorMessage
-                            name="address"
-                            component="div"
-                            className="text-red-500 text-sm mt-1"
-                          />
-                        </>
-                      ) : (
-                        <p className="text-gray-900 font-medium">{values.address}</p>
-                      )}
-                    </div>
 
-    
-                    {/* User Role */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-600 mb-2">
-                        User Role
-                      </label>
-                      {isEditing ? (
-                        <Field
-                          type="text"
-                          name="userRole"
-                          readOnly
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed"
-                        />
-                      ) : (
-                        <p className="text-gray-900 font-medium">{values.userRole}</p>
-                      )}
-                    </div>
-                  </div>
-    
-                  {/* Buttons */}
-                  {isEditing && (
-                    <div className="mt-6 flex space-x-3">
-                      <button
-                        type="submit"
-                        className="px-4 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 text-sm font-medium"
-                      >
-                        Save
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          resetForm(); // ✅ works fine
-                          setIsEditing(false);
-                        }}
-                        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 text-sm"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  )}
-                </Form>
+              <button
+                type="button"
+                onClick={() => {
+                  if (isEditing) {
+                    resetForm();
+                    setIsEditing(false);
+                  } else {
+                    setIsEditing(true);
+                  }
+                }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${isEditing
+                  ? "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  : "bg-gradient-to-r from-[#306A64] to-[#204D9D] text-white hover:shadow-lg"
+                  }`}
+              >
+                {isEditing ? (
+                  <>
+                    <X className="w-4 h-4" /> Cancel
+                  </>
+                ) : (
+                  <>
+                    <Edit2 className="w-4 h-4" /> Edit
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Form Fields */}
+            <Form className="p-6 md:p-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+
+                {/* Name */}
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <UserIcon className="w-4 h-4 text-gray-400" /> Name
+                  </label>
+                  <Field
+                    type="text"
+                    name="name"
+                    disabled={!isEditing}
+                    className={`w-full px-4 py-2.5 rounded-lg border transition-all duration-200 ${!isEditing
+                      ? "bg-gray-50 border-gray-200 text-gray-500 cursor-not-allowed"
+                      : errors.name && touched.name
+                        ? "bg-white border-red-500 focus:ring-2 focus:ring-red-200"
+                        : "bg-white border-gray-300 focus:border-[#306A64] focus:ring-2 focus:ring-[#306A64]/20"
+                      }`}
+                  />
+                  <ErrorMessage name="name" component="div" className="text-red-500 text-xs mt-1 font-medium" />
+                </div>
+
+                {/* Date of Birth */}
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-gray-400" /> Date of Birth
+                  </label>
+                  <Field
+                    type="date"
+                    name="dateOfBirth"
+                    disabled={!isEditing}
+                    max={new Date().toISOString().split("T")[0]}
+                    className={`w-full px-4 py-2.5 rounded-lg border transition-all duration-200 ${!isEditing
+                      ? "bg-gray-50 border-gray-200 text-gray-500 cursor-not-allowed"
+                      : errors.dateOfBirth && touched.dateOfBirth
+                        ? "bg-white border-red-500 focus:ring-2 focus:ring-red-200"
+                        : "bg-white border-gray-300 focus:border-[#306A64] focus:ring-2 focus:ring-[#306A64]/20"
+                      }`}
+                  />
+                  <ErrorMessage name="dateOfBirth" component="div" className="text-red-500 text-xs mt-1 font-medium" />
+                </div>
+
+                {/* Phone */}
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <Phone className="w-4 h-4 text-gray-400" /> Phone Number
+                  </label>
+                  <Field
+                    type="text"
+                    name="phone"
+                    disabled={!isEditing}
+                    className={`w-full px-4 py-2.5 rounded-lg border transition-all duration-200 ${!isEditing
+                      ? "bg-gray-50 border-gray-200 text-gray-500 cursor-not-allowed"
+                      : errors.phone && touched.phone
+                        ? "bg-white border-red-500 focus:ring-2 focus:ring-red-200"
+                        : "bg-white border-gray-300 focus:border-[#306A64] focus:ring-2 focus:ring-[#306A64]/20"
+                      }`}
+                  />
+                  <ErrorMessage name="phone" component="div" className="text-red-500 text-xs mt-1 font-medium" />
+                </div>
+
+                {/* Email */}
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-gray-400" /> Email Address
+                  </label>
+                  <Field
+                    type="email"
+                    name="email"
+                    disabled={!isEditing}
+                    className={`w-full px-4 py-2.5 rounded-lg border transition-all duration-200 ${!isEditing
+                      ? "bg-gray-50 border-gray-200 text-gray-500 cursor-not-allowed"
+                      : errors.email && touched.email
+                        ? "bg-white border-red-500 focus:ring-2 focus:ring-red-200"
+                        : "bg-white border-gray-300 focus:border-[#306A64] focus:border-[#306A64] focus:ring-2 focus:ring-[#306A64]/20"
+                      }`}
+                  />
+                  <ErrorMessage name="email" component="div" className="text-red-500 text-xs mt-1 font-medium" />
+                </div>
               </div>
-            </>
-          )}
-        </Formik>
-      </div>
+
+              {/* Action Buttons */}
+              {isEditing && (
+                <div className="mt-8 pt-6 border-t border-gray-100 flex items-center justify-end gap-3 animate-in slide-in-from-top-2 duration-300">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      resetForm();
+                      setIsEditing(false);
+                    }}
+                    className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="px-8 py-2.5 bg-gradient-to-r from-[#306A64] to-[#204D9D] text-white rounded-lg hover:shadow-lg text-sm font-semibold transition-all disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4" /> Save Changes
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </Form>
+          </>
+        )}
+      </Formik>
+    </div>
   );
 };
 

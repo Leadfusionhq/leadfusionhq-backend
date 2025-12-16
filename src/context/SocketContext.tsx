@@ -8,7 +8,6 @@ import { useNotifications } from './NotificationContext';
 interface SocketContextType {
   socket: Socket | null;
   connected: boolean;
-  joinRoom: (userId: string) => void;
   userId: string | null;
   setUserId: (userId: string) => void;
 }
@@ -23,16 +22,20 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [connected, setConnected] = useState<boolean>(false);
   const [userId, setUserId] = useState<string | null>(null);
-  
-  // Get user from Redux state
-  const { user } = useSelector((state: RootState) => state.auth);
+
+  const { user, token } = useSelector((state: RootState) => state.auth);
   const { addNotification } = useNotifications();
 
   useEffect(() => {
-    // Connect to your backend server
+    if (!token) return;
+
     const socketInstance = io(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}`, {
-      transports: ['polling', 'websocket'],
-      upgrade: true,
+      // transports: ['polling', 'websocket'],
+      transports: ['websocket'],
+      upgrade: false,
+      auth: {
+        token: token,
+      },
       timeout: 10000,
     });
 
@@ -40,14 +43,11 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
     socketInstance.on('connect', () => {
       setConnected(true);
-      console.log('✅ Socket connected with ID:', socketInstance.id);
-      
-      // Auto-join room if userId is available
-      if (userId || user?._id) {
-        const roomId = userId || user?._id;
-        socketInstance.emit('join-room', roomId);
-        console.log(`🏠 Auto-joined room: ${roomId}`);
-      }
+      console.log('✅ Socket connected securely with ID:', socketInstance.id);
+    });
+
+    socketInstance.on('connect_error', (err) => {
+      console.error('❌ Socket connection error:', err.message);
     });
 
     socketInstance.on('disconnect', (reason) => {
@@ -55,76 +55,43 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       console.log('🔌 Socket disconnected:', reason);
     });
 
-    socketInstance.on('connect_error', (error) => {
-      console.error('❌ Socket connection error:', error);
-    });
-
-    // Listen for welcome messages
-    socketInstance.on('message', (msg) => {
-      console.log('💬 Message from server:', msg);
-    });
-
-    // Listen for general notifications
     socketInstance.on('notification', (notificationData: any) => {
-      console.log('📢 Received general notification:', notificationData);
+      console.log('🔔 Received notification:', notificationData);
+
+      addNotification({
+        id: notificationData._id || Date.now(),
+        title: 'New Notification',
+        message: notificationData.message,
+        time: new Date().toLocaleTimeString(),
+        type: notificationData.type || 'info',
+      });
     });
 
-    // Cleanup on unmount
+    if (user?._id) {
+      socketInstance.on(`new-notification-${user._id}`, (data) => {
+        console.log('🔔 Received legacy notification:', data);
+      });
+    }
+
     return () => {
       console.log('🛑 Cleaning up socket connection');
       socketInstance.disconnect();
     };
-  }, [userId, user, addNotification]);
+  }, [token, user?._id, addNotification]);
 
-  // Set userId from Redux user when available
+
   useEffect(() => {
     if (user?._id && !userId) {
       setUserId(user._id);
     }
   }, [user, userId]);
 
-  // Handle user-specific notifications
-  useEffect(() => {
-    if (socket && connected && (userId || user?._id)) {
-      const currentUserId = userId || user?._id;
-      const eventName = `new-notification-${currentUserId}`;
-      
-      const handleUserNotification = (notificationData: any) => {
-        console.log(`🔔 Received notification for user ${currentUserId}:`, notificationData);
-        
-        addNotification({
-          id: notificationData._id || Date.now(),
-          title: 'New Lead Assignment',
-          message: notificationData.message,
-          time: new Date().toLocaleTimeString(),
-          type: notificationData.type || 'info',
-        });
-      };
-
-      socket.on(eventName, handleUserNotification);
-
-      // Cleanup listener when userId changes or component unmounts
-      return () => {
-        socket.off(eventName, handleUserNotification);
-      };
-    }
-  }, [socket, connected, userId, user, addNotification]);
-
-  const joinRoom = (newUserId: string) => {
-    if (socket && connected) {
-      socket.emit('join-room', newUserId);
-      console.log(`🏠 Manually joined room: ${newUserId}`);
-    }
-    setUserId(newUserId);
-  };
-
   return (
-    <SocketContext.Provider value={{ 
-      socket, 
-      connected, 
-      joinRoom, 
-      userId: userId || user?._id || null, 
-      setUserId 
+    <SocketContext.Provider value={{
+      socket,
+      connected,
+      userId: userId || user?._id || null,
+      setUserId
     }}>
       {children}
     </SocketContext.Provider>

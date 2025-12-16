@@ -257,6 +257,11 @@ export const BILLING_API = {
   TEST_AUTO_TOPUP: `${BILLING_API_BASE}/test-auto-topup`,
   GET_BALANCE: `${BILLING_API_BASE}/balance`,
   REVENUE_FROM_NMI: `${BILLING_API_BASE}/revenue-from-nmi`,
+
+
+
+  CHARGE_SINGLE_LEAD: `${BILLING_API_BASE}/charge-single-lead/:leadId`,
+
 };
 
 // constants/api-urls.js
@@ -281,4 +286,24 @@ export const LOGS_API = {
   GET_STATS: `${LOGS_API_Base}/stats`,
   CLEAR_LOGS: `${LOGS_API_Base}/clear`,
   EXPORT_LOGS: `${LOGS_API_Base}/export`,
+};
+
+
+const LOGS_API_BASE = `${API_BASE}/logs`;
+
+export const LOG_API = {
+
+  GET_LOGS: `${LOGS_API_BASE}/`,
+  GET_ALL_LOGS: `${LOGS_API_BASE}/all`,
+  GET_LOG_DETAIL: (id: string) => `${LOGS_API_BASE}/${id}`,
+  GET_STATS: `${LOGS_API_BASE}/stats`,
+  CLEAR_LOGS: `${LOGS_API_BASE}/clear`,
+  EXPORT_LOGS: `${LOGS_API_BASE}/export`,
+};
+
+
+const DASHBOARD_API_BASE = `${API_BASE}/dashboard`;
+
+export const DASHBOARD_API = {
+  GET_DASHBOARD_DATA: `${DASHBOARD_API_BASE}/stats`,
 };

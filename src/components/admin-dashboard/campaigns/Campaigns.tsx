@@ -1,36 +1,63 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { CAMPAIGNS_API, API_URL,LOCATION_API } from "@/utils/apiUrl";
+import { useCallback, useEffect, useState, useMemo } from "react";
+import { CAMPAIGNS_API, API_URL, LOCATION_API } from "@/utils/apiUrl";
 import axiosWrapper from "@/utils/api";
 import { useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
-import DataTable, { TableColumn } from "react-data-table-component";
-import { Skeleton, Box, Button, Typography, FormControl, InputLabel, Select, MenuItem, Popover, IconButton, Chip, Stack,Menu } from "@mui/material";
-import FilterListIcon from '@mui/icons-material/FilterList';
-import ClearIcon from '@mui/icons-material/Clear';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import customStyles from '@/components/common/dataTableStyles';
-import { STATUS, LEAD_TYPE, EXCLUSIVITY, LANGUAGE } from "@/constants/enums";
-import MoreVertIcon from '@mui/icons-material/MoreVert';
+import Link from 'next/link';
+import {
+  useReactTable,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  ColumnDef,
+  flexRender,
+  SortingState,
+  ColumnFiltersState,
+} from "@tanstack/react-table";
+import {
+  Search,
+  Filter,
+  ChevronLeft,
+  ChevronRight,
+  MoreHorizontal,
+  Trash2,
+  Edit2,
+  Eye,
+  Plus,
+  Megaphone,
+  PlayCircle,
+  PauseCircle,
+  AlertCircle,
+  UserPlus,
+  Users,
+  MapPin,
+  ListFilter,
+  Mail,
+  Phone
+} from "lucide-react";
 import { toast } from 'react-toastify';
-import ConfirmDialog from '@/components/common/ConfirmDialog';
+import ConfirmDialog from "@/components/common/ConfirmDialog";
+import { Menu, MenuItem, IconButton, Popover, Tooltip } from "@mui/material"; // Keeping MUI for complex menus/popovers if preferred, or could switch to pure custom
+import { STATUS, LEAD_TYPE } from "@/constants/enums";
+import useDebounce from '@/hooks/useDebounce';
 
-// Define User type
+// --- Types ---
+
 type User = {
   _id: string;
   name: string;
   email: string;
 };
 
-// Define State type for filter
 type StateOption = {
   abbreviation: string;
   name: string;
 };
 
-// Define Campaign type
 type Campaign = {
   _id: string;
   campaign_id: string;
@@ -44,10 +71,24 @@ type Campaign = {
       abbreviation: string;
       _id: string;
       name: string;
+    } | string | { name: string; abbreviation: string }[];
+    coverage: {
+      type: string;
+      partial?: {
+        zip_codes?: string[];
+        zipcode?: string;
+      };
     };
-    coverage: { type: string };
   };
-  delivery: { method: string };
+  delivery: {
+    method: string | string[];
+    email?: {
+      addresses: string;
+    };
+    phone?: {
+      numbers: string;
+    };
+  };
   user_id?: {
     email: string;
     name: string;
@@ -75,732 +116,698 @@ type UsersApiResponse = {
   message?: string;
 };
 
+// --- Components ---
+
+const StatusBadge = ({ status }: { status: string }) => {
+  const statusColors: { [key: string]: string } = {
+    'ACTIVE': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    'PAUSED': 'bg-amber-50 text-amber-700 border-amber-200',
+    'DRAFT': 'bg-gray-50 text-gray-700 border-gray-200',
+    'ARCHIVED': 'bg-red-50 text-red-700 border-red-200',
+    'COMPLETED': 'bg-blue-50 text-blue-700 border-blue-200',
+  };
+
+  const colorClass = statusColors[status] || 'bg-gray-50 text-gray-700 border-gray-200';
+  const dotColor = status === 'ACTIVE' ? 'bg-emerald-600' :
+    status === 'PAUSED' ? 'bg-amber-600' :
+      status === 'ARCHIVED' ? 'bg-red-600' :
+        status === 'COMPLETED' ? 'bg-blue-600' : 'bg-gray-500';
+
+  const formatStatus = (s: string) => s.replace(/_/g, ' ').toLowerCase().replace(/^\w/, c => c.toUpperCase());
+
+  return (
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${colorClass}`}>
+      <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${dotColor}`}></span>
+      {formatStatus(status)}
+    </span>
+  );
+};
+
+const StatCard = ({ title, value, icon: Icon, color, subtext }: { title: string, value: string | number, icon: any, color: string, subtext?: string }) => {
+  const isBlack = color.includes('bg-black');
+
+  return (
+    <div className={`p-6 rounded-2xl shadow-sm border flex items-center gap-4 transition-all duration-200 hover:scale-[1.01] hover:shadow-md ${isBlack ? "bg-black border-black text-white" : "bg-white border-gray-100"}`}>
+      <div className={`p-3 rounded-xl ${isBlack ? "bg-gray-800 text-white" : color}`}>
+        <Icon className={`w-6 h-6`} />
+      </div>
+      <div>
+        <p className={`text-sm font-medium ${isBlack ? "text-gray-400" : "text-gray-500"}`}>{title}</p>
+        <h3 className={`text-2xl font-bold mt-0.5 ${isBlack ? "text-white" : "text-gray-900"}`}>{value}</h3>
+        {subtext && <p className={`text-xs mt-1 ${isBlack ? "text-gray-500" : "text-gray-400"}`}>{subtext}</p>}
+      </div>
+    </div>
+  );
+};
+
 export default function CampaignTable() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [pagination, setPagination] = useState({ page: 1, limit: 10 });
+
+  // Pagination
+  const [pagination, setPagination] = useState({
+    pageIndex: 0,
+    pageSize: 10,
+  });
   const [totalRows, setTotalRows] = useState<number>(0);
+
+  // Filters state
   const [users, setUsers] = useState<User[]>([]);
+  const [states, setStates] = useState<StateOption[]>([]);
+
+  // Active Filters
   const [selectedUser, setSelectedUser] = useState<string>("");
   const [selectedState, setSelectedState] = useState<string>("");
   const [selectedStatus, setSelectedStatus] = useState<string>("");
   const [selectedLeadType, setSelectedLeadType] = useState<string>("");
-  const [tempSelectedUser, setTempSelectedUser] = useState<string>("");
-  const [tempSelectedState, setTempSelectedState] = useState<string>("");
-  const [tempSelectedStatus, setTempSelectedStatus] = useState<string>("");
-  const [tempSelectedLeadType, setTempSelectedLeadType] = useState<string>("");
-  const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null);
-  const router = useRouter();
+
+  // TanStack Table State
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [globalFilter, setGlobalFilter] = useState("");
+  const debouncedGlobalFilter = useDebounce(globalFilter, 300);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+
+  // Filter Popover State
+  const [filterAnchorEl, setFilterAnchorEl] = useState<HTMLButtonElement | null>(null);
+  const [tempFilters, setTempFilters] = useState({
+    user: "",
+    state: "",
+    status: "",
+    leadType: ""
+  });
+
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [campaignToDelete, setCampaignToDelete] = useState<Campaign | null>(null);
+
   const token = useSelector((state: RootState) => state.auth.token);
-  const [states, setStates] = useState<StateOption[]>([]);
-  const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
-const [menuRow, setMenuRow] = useState<Campaign | null>(null);
-const isMenuOpen = Boolean(menuAnchorEl);
-
-const handleMenuClick = (event: React.MouseEvent<HTMLButtonElement>, row: Campaign) => {
-  setMenuAnchorEl(event.currentTarget);
-  setMenuRow(row);
-};
-const handleMenuClose = () => {
-  setMenuAnchorEl(null);
-  setMenuRow(null);
-};
-
-// optional: navigate to Leads filtered by campaign
-const handleViewLeads = (row: Campaign) => {
-  router.push(`/admin/leads?campaign_id=${row._id}`);
-};
+  const router = useRouter();
 
 
-const [deleteDialog, setDeleteDialog] = useState({
-  open: false,
-  campaign: null as Campaign | null,
-});
-
-const handleDelete = (row: Campaign) => {
-  setDeleteDialog({ open: true, campaign: row });
-  handleMenuClose();
-};
-
-const confirmDelete = async () => {
-  if (!deleteDialog.campaign) return;
-
-  try {
-    const response = await axiosWrapper(
-      "delete",
-      CAMPAIGNS_API.DELETE_CAMPAIGN.replace(':campaignId', deleteDialog.campaign._id),
-      {},
-      token ?? undefined
-    ) as { 
-      result: { 
-        deleted: boolean;
-        campaign_id: string;
-        leads_deleted: number;
-        message: string;
-      };
-      message: string;
-    };
-    
-    // ✅ Check if deletion was successful
-    if (response.result?.deleted) {
-      toast.success(response.message || response.result.message || 'Campaign deleted successfully');
-      
-      // Close dialog
-      setDeleteDialog({ open: false, campaign: null });
-      
-      // Refresh the table
-      fetchCampaigns(
-        pagination.page,
-        pagination.limit,
-        selectedUser,
-        selectedState,
-        selectedStatus,
-        selectedLeadType
-      );
-    } else {
-      toast.error('Failed to delete campaign');
-    }
-  } catch (err: any) {
-    console.error('Failed to delete campaign:', err);
-    toast.error(err?.response?.data?.message || err?.message || 'Failed to delete campaign');
-  }
-};
-
-
-
-const statuses = Object.values(STATUS);
-const leadTypes = Object.values(LEAD_TYPE);
-
-  // Fetch users
+  // --- Helper Data Fetching ---
   const fetchUsers = useCallback(async () => {
     try {
-      const response = (await axiosWrapper(
-        "get",
-        API_URL.GET_ALL_USERS,
-        {},
-        token ?? undefined
-      )) as UsersApiResponse;
+      const response = (await axiosWrapper("get", API_URL.GET_ALL_USERS, {}, token ?? undefined)) as UsersApiResponse;
       setUsers(response.data || []);
-    } catch (err) {
-      console.error("Failed to fetch users:", err);
-      setError("Failed to fetch users");
-    }
+    } catch (err) { console.error(err); }
   }, [token]);
+
   const fetchStates = useCallback(async () => {
     try {
-      const response = await axiosWrapper(
-        "get",
-        LOCATION_API.GET_STATES,
-        {},
-        token ?? undefined
-      )as {
-        data: StateOption[];
-        message?: string;
-      };
-
-
+      const response = await axiosWrapper("get", LOCATION_API.GET_STATES, {}, token ?? undefined) as { data: StateOption[] };
       setStates(response.data || []);
-    } catch (err) {
-      console.error("Failed to fetch states:", err);
-      setError("Failed to fetch states");
-    }
+    } catch (err) { console.error(err); }
   }, [token]);
 
-  // Fetch campaigns with filters
-  const fetchCampaigns = useCallback(
-    async (
-      pageNumber: number,
-      pageSize: number,
-      userId: string,
-      state: string,
-      status: string,
-      leadType: string
-    ) => {
-      try {
-        setLoading(true);
-        setError(null);
+  // --- Campaign Fetching ---
+  const fetchCampaigns = useCallback(async (pageIndex: number, pageSize: number, search?: string) => {
+    try {
+      setLoading(true);
+      setError(null);
 
-        const params = new URLSearchParams({
-          page: pageNumber.toString(),
-          limit: pageSize.toString(),
-          ...(userId && { user_id: userId }),
-          ...(state && { state: state }),
-          ...(status && { status: status }),
-          ...(leadType && { lead_type: leadType }),
-        });
-        console.log(`${CAMPAIGNS_API.GET_ALL_CAMPAIGNS}?${params.toString()}`);
-        const response = (await axiosWrapper(
-          "get",
-          `${CAMPAIGNS_API.GET_ALL_CAMPAIGNS}?${params.toString()}`,
-          {},
-          token ?? undefined
-        )) as ApiResponse;
+      const params = new URLSearchParams({
+        page: (pageIndex + 1).toString(),
+        limit: pageSize.toString(),
+        ...(selectedUser && { user_id: selectedUser }),
+        ...(selectedState && { state: selectedState }),
+        ...(selectedStatus && { status: selectedStatus }),
+        ...(selectedLeadType && { lead_type: selectedLeadType }),
+      });
 
-        console.log("Campaign Response:", response);
-        setCampaigns(response.data || []);
-        setTotalRows(response.meta?.total || 0);
-      } catch (err) {
-        console.error("Failed to fetch campaigns:", err);
-        setError("Failed to fetch campaigns");
-      } finally {
-        setLoading(false);
-      }
-    },
-    [token]
-  );
+      if (search) params.append('search', search);
 
-  // Fetch users and campaigns on mount or changes
+      const response = (await axiosWrapper(
+        "get",
+        `${CAMPAIGNS_API.GET_ALL_CAMPAIGNS}?${params.toString()}`,
+        {},
+        token ?? undefined
+      )) as ApiResponse;
+
+      setCampaigns(response.data || []);
+      setTotalRows(response.meta?.total || 0);
+    } catch (err) {
+      console.error("Failed to fetch campaigns:", err);
+      setError("Failed to fetch campaigns");
+    } finally {
+      setLoading(false);
+    }
+  }, [token, selectedUser, selectedState, selectedStatus, selectedLeadType]);
+
+  // Initial Data Load
   useEffect(() => {
     if (token) {
       fetchUsers();
       fetchStates();
-      fetchCampaigns(
-        pagination.page,
-        pagination.limit,
-        selectedUser,
-        selectedState,
-        selectedStatus,
-        selectedLeadType
-      );
     }
-  }, [token, pagination.page, pagination.limit, fetchCampaigns,fetchStates, fetchUsers, selectedUser, selectedState, selectedStatus, selectedLeadType]);
+  }, [token, fetchUsers, fetchStates]);
 
-  // Set temp filters when popover opens
+  // Fetch data on changes
   useEffect(() => {
-    if (anchorEl) {
-      setTempSelectedUser(selectedUser);
-      setTempSelectedState(selectedState);
-      setTempSelectedStatus(selectedStatus);
-      setTempSelectedLeadType(selectedLeadType);
+    if (token) {
+      fetchCampaigns(pagination.pageIndex, pagination.pageSize, debouncedGlobalFilter);
     }
-  }, [anchorEl, selectedUser, selectedState, selectedStatus, selectedLeadType]);
+  }, [token, pagination.pageIndex, pagination.pageSize, debouncedGlobalFilter, selectedUser, selectedState, selectedStatus, selectedLeadType, fetchCampaigns]);
 
-  const skeletonRows: Campaign[] = Array.from({ length: pagination.limit }).map((_, i) => ({
-    _id: `skeleton-${i}`,
-    campaign_id: "",
-    name: "",
-    status: "",
-    lead_type: "",
-    exclusivity: "",
-    language: "",
-    geography: {
-      state: {
-        abbreviation: "",
-        name: "",
-        _id: ""
-      },
-      coverage: { type: "" }
-    },
-    user_id: {
-      email: '',
-      name: '',
-      _id: ''
-    },
-    delivery: { method: "" },
-    createdAt: "",
-    updatedAt: ""
-  }));
+  // Reset pagination when filters change
+  useEffect(() => {
+    setPagination(prev => ({ ...prev, pageIndex: 0 }));
+  }, [debouncedGlobalFilter, selectedUser, selectedState, selectedStatus, selectedLeadType]);
 
-  const formatStatus = (status: string) => {
-    return status.replace(/_/g, ' ').toLowerCase().replace(/^\w/, c => c.toUpperCase());
+  // --- Actions ---
+  const handleDelete = (row: Campaign) => {
+    setCampaignToDelete(row);
+    setConfirmOpen(true);
   };
 
-  const formatLeadType = (leadType: string) => {
-    return leadType.replace(/_/g, ' ').toLowerCase().replace(/^\w/, c => c.toUpperCase());
-  };
+  const confirmDelete = async () => {
+    if (!campaignToDelete) return;
+    try {
+      const response = await axiosWrapper(
+        "delete",
+        CAMPAIGNS_API.DELETE_CAMPAIGN.replace(':campaignId', campaignToDelete._id),
+        {},
+        token ?? undefined
+      ) as { result?: { deleted: boolean; message: string; }; message: string };
 
-  const formatExclusivity = (exclusivity: string) => {
-    return exclusivity.charAt(0) + exclusivity.slice(1).toLowerCase();
-  };
-
-  const getStatusBadge = (status: string) => {
-    const statusColors: { [key: string]: string } = {
-      'ACTIVE': 'bg-green-100 text-green-800',
-      'INACTIVE': 'bg-red-100 text-red-800',
-      'PAUSED': 'bg-yellow-100 text-yellow-800',
-      'DRAFT': 'bg-gray-100 text-gray-800'
-    };
-    
-    const colorClass = statusColors[status] || 'bg-gray-100 text-gray-800';
-    
-    return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${colorClass}`}>
-        {formatStatus(status)}
-      </span>
-    );
-  };
-
-  const handleEdit = (row: Campaign) => {
-    router.push(`/admin/campaigns/${row._id}/edit`);
-  };
-
-  const handleView = (row: Campaign) => {
-    router.push(`/admin/campaigns/${row._id}`);
-  };
-  const handleAddLead = (row:Campaign) => {
-    router.push(`/admin/campaigns/${row._id}/leads/add`);
-  };
-  const columns: TableColumn<Campaign>[] = [
-    {
-      name: "Campaign ID",
-      selector: (row) => row.campaign_id,
-      cell: (row) =>
-        row._id.startsWith("skeleton") ? (
-          <Skeleton variant="text" width={120} animation="wave" />
-        ) : (
-          <div className="font-medium text-gray-900">{row.campaign_id}</div>
-        ),
-      sortable: true,
-      minWidth: "150px",
-    },
-    {
-      name: "Campaign Name",
-      selector: (row) => row.name,
-      cell: (row) =>
-        row._id.startsWith("skeleton") ? (
-          <Skeleton variant="text" width={120} animation="wave" />
-        ) : (
-          <div className="font-medium text-gray-900">{row.name}</div>
-        ),
-      sortable: true,
-      minWidth: "150px",
-    },
-    {
-      name: "Client",
-      selector: (row) => row.user_id?._id || "",
-      cell: (row) =>
-        row._id.startsWith("skeleton") ? (
-          <Skeleton variant="text" width={120} animation="wave" />
-        ) : (
-          <div className="font-medium text-gray-900">{row?.user_id?.name}</div>
-        ),
-      sortable: true,
-      minWidth: "150px",
-    },
-    {
-      name: "Lead Type",
-      selector: (row) => row.lead_type,
-      cell: (row) =>
-        row._id.startsWith("skeleton") ? (
-          <Skeleton variant="text" width={100} animation="wave" />
-        ) : (
-          <div className="text-sm text-gray-600">{formatLeadType(row.lead_type)}</div>
-        ),
-      sortable: true,
-      minWidth: "130px",
-    },
-    {
-      name: "Filter Set ID",
-      selector: (row) => row.boberdoo_filter_set_id || "",
-      cell: (row) =>
-        row._id.startsWith("skeleton") ? (
-          <Skeleton variant="text" width={120} animation="wave" />
-        ) : (
-          <div className="text-sm text-gray-600">{row.boberdoo_filter_set_id || "-"}</div>
-        ),
-      sortable: true,
-      minWidth: "150px",
-    },    
-    {
-      name: "State",
-      selector: (row) => 
-        Array.isArray(row.geography.state)
-          ? row.geography.state.map((s) => s.abbreviation).join(", ")
-          : row.geography.state?.abbreviation || "",
-      cell: (row) =>
-        row._id.startsWith("skeleton") ? (
-          <Skeleton variant="text" width={100} animation="wave" />
-        ) : (
-          <div className="text-sm text-gray-600 uppercase">
-            {Array.isArray(row.geography.state)
-              ? row.geography.state.map((s) => s.abbreviation).join(", ")
-              : row.geography.state?.abbreviation || "-"}
-          </div>
-        ),
-      sortable: true,
-      minWidth: "130px",
-    },
-    
-    {
-      name: "Status",
-      selector: (row) => row.status,
-      cell: (row) =>
-        row._id.startsWith("skeleton") ? (
-          <Skeleton variant="text" width={80} animation="wave" />
-        ) : (
-          getStatusBadge(row.status)
-        ),
-      sortable: true,
-      minWidth: "80px",
-    },
-    {
-      name: "Action",
-      button: true,
-      cell: (row) =>
-        row._id.startsWith("skeleton") ? (
-          <Skeleton variant="rectangular" width={80} height={30} />
-        ) : (
-          <IconButton size="small" onClick={(e) => handleMenuClick(e, row)}>
-            <MoreVertIcon />
-          </IconButton>
-        ),
-      minWidth: "80px",
-      maxWidth: "100px",
-      ignoreRowClick: true,
-      allowOverflow: true,
+      if (response.result?.deleted || response.message?.includes('success')) {
+        toast.success(response.message || 'Campaign deleted successfully');
+        setConfirmOpen(false);
+        setCampaignToDelete(null);
+        fetchCampaigns(pagination.pageIndex, pagination.pageSize, debouncedGlobalFilter);
+        setTotalRows(prev => prev - 1);
+      } else {
+        toast.error('Failed to delete campaign');
+      }
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to delete campaign');
     }
-    
-  ];
+  };
 
-  // Popover handlers
+
+  // --- Filter Logic ---
   const handleFilterClick = (event: React.MouseEvent<HTMLButtonElement>) => {
-    setAnchorEl(event.currentTarget);
+    setTempFilters({
+      user: selectedUser,
+      state: selectedState,
+      status: selectedStatus,
+      leadType: selectedLeadType
+    });
+    setFilterAnchorEl(event.currentTarget);
   };
 
   const handleFilterClose = () => {
-    setAnchorEl(null);
+    setFilterAnchorEl(null);
   };
 
-  const open = Boolean(anchorEl);
-  const id = open ? 'filter-popover' : undefined;
-
-  // Apply filters and close popover
   const handleApplyFilters = () => {
-    setSelectedUser(tempSelectedUser);
-    setSelectedState(tempSelectedState);
-    setSelectedStatus(tempSelectedStatus);
-    setSelectedLeadType(tempSelectedLeadType);
-    setPagination((prev) => ({ ...prev, page: 1 }));
-    fetchCampaigns(
-      1,
-      pagination.limit,
-      tempSelectedUser,
-      tempSelectedState,
-      tempSelectedStatus,
-      tempSelectedLeadType
-    );
+    setSelectedUser(tempFilters.user);
+    setSelectedState(tempFilters.state);
+    setSelectedStatus(tempFilters.status);
+    setSelectedLeadType(tempFilters.leadType);
     handleFilterClose();
   };
 
-  // Clear all filters
   const handleClearFilters = () => {
     setSelectedUser("");
     setSelectedState("");
     setSelectedStatus("");
     setSelectedLeadType("");
-    setPagination((prev) => ({ ...prev, page: 1 }));
-    fetchCampaigns(1, pagination.limit, "", "", "", "");
   };
 
-  // Remove individual filter
-  const handleRemoveFilter = (filterType: string) => {
-    let newUser = selectedUser;
-    let newState = selectedState;
-    let newStatus = selectedStatus;
-    let newLeadType = selectedLeadType;
 
-    switch (filterType) {
-      case 'user':
-        newUser = "";
-        setSelectedUser("");
-        break;
-      case 'state':
-        newState = "";
-        setSelectedState("");
-        break;
-      case 'status':
-        newStatus = "";
-        setSelectedStatus("");
-        break;
-      case 'leadType':
-        newLeadType = "";
-        setSelectedLeadType("");
-        break;
+  // --- Table Columns ---
+  const columns: ColumnDef<Campaign>[] = useMemo(() => [
+    {
+      accessorKey: "name",
+      header: "Campaign Info",
+      cell: ({ row }) => (
+        <div className="flex flex-col">
+          <span className="text-sm font-semibold text-gray-900">{row.original.name}</span>
+          <span className="text-xs text-gray-500 font-mono mt-0.5">ID: {row.original.campaign_id}</span>
+        </div>
+      )
+    },
+    {
+      accessorKey: "user_id",
+      header: "Client",
+      cell: ({ row }) => row.original.user_id ? (
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs font-medium text-gray-600">
+            {row.original.user_id.name.charAt(0).toUpperCase()}
+          </div>
+          <span className="text-sm text-gray-700">{row.original.user_id.name}</span>
+        </div>
+      ) : <span className="text-gray-400 italic text-sm">--</span>
+    },
+    {
+      accessorKey: "geography",
+      header: "Coverage",
+      cell: ({ row }) => {
+        const geography = row.original.geography;
+        const stateData = geography?.state;
+        const partialData = geography?.coverage?.partial;
+
+        let displayState = "N/A";
+        let isZipCodes = false;
+        let zipCodes: string[] = [];
+
+        if (Array.isArray(stateData) && stateData.length > 0) {
+          displayState = stateData.map((s: any) => s.name || s).join(", ");
+        } else if (typeof stateData === 'string' && stateData.trim() !== '') {
+          displayState = stateData;
+        } else if (stateData && typeof stateData === 'object' && 'name' in stateData) {
+          displayState = (stateData as any).name;
+        } else {
+          // Fallback to Zip Codes if state is missing
+          if (partialData?.zip_codes && Array.isArray(partialData.zip_codes) && partialData.zip_codes.length > 0) {
+            isZipCodes = true;
+            zipCodes = partialData.zip_codes;
+            displayState = `${zipCodes.length} Zip ${zipCodes.length === 1 ? 'Code' : 'Codes'}`;
+          } else if (partialData?.zipcode) {
+            isZipCodes = true;
+            zipCodes = [partialData.zipcode];
+            displayState = partialData.zipcode;
+          }
+        }
+
+        if (isZipCodes) {
+          return (
+            <Tooltip title={zipCodes.join(", ")} arrow placement="top">
+              <span className="text-sm text-blue-700 font-medium bg-blue-50 px-2 py-1 rounded-md whitespace-nowrap cursor-help border border-blue-100">
+                {displayState}
+              </span>
+            </Tooltip>
+          );
+        }
+
+        return (
+          <div className="flex items-center gap-1.5 line-clamp-1 max-w-[150px]" title={displayState}>
+            <MapPin size={14} className="text-gray-400 shrink-0" />
+            <span className="text-sm text-gray-700 font-medium truncate">{displayState || "All"}</span>
+          </div>
+        )
+      }
+    },
+    {
+      accessorKey: "lead_type",
+      header: "Lead Type",
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1.5">
+          <Users size={14} className="text-gray-400" />
+          <span className="text-sm text-gray-700 capitalize">{row.original.lead_type.toLowerCase().replace('_', ' ')}</span>
+        </div>
+      )
+    },
+    {
+      accessorKey: "delivery.method",
+      header: "Delivery",
+      cell: ({ row }) => {
+        const delivery = row.original.delivery;
+        const methods = Array.isArray(delivery?.method)
+          ? delivery.method
+          : typeof delivery?.method === 'string'
+            ? [delivery.method]
+            : [];
+
+        const hasEmail = methods.some(m => m.toLowerCase().includes('email'));
+        const hasPhone = methods.some(m => m.toLowerCase().includes('phone') || m.toLowerCase().includes('call'));
+
+        return (
+          <div className="flex items-center gap-2">
+            {hasEmail && (
+              <Tooltip title={delivery?.email?.addresses || "No email provided"} arrow placement="top">
+                <div className="h-7 w-7 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center cursor-help border border-blue-100">
+                  <Mail size={13} />
+                </div>
+              </Tooltip>
+            )}
+            {hasPhone && (
+              <Tooltip title={delivery?.phone?.numbers || "No phone provided"} arrow placement="top">
+                <div className="h-7 w-7 rounded-md bg-purple-50 text-purple-600 flex items-center justify-center cursor-help border border-purple-100">
+                  <Phone size={13} />
+                </div>
+              </Tooltip>
+            )}
+            {!hasEmail && !hasPhone && (
+              <span className="text-xs text-gray-400 italic">--</span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "boberdoo_filter_set_id",
+      header: "Filter Set ID",
+      cell: ({ row }) => (
+        <span className="text-sm text-gray-600 font-mono">{row.original.boberdoo_filter_set_id || "-"}</span>
+      )
+    },
+    {
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) => <StatusBadge status={row.original.status} />
+    },
+    {
+      id: "actions",
+      header: "",
+      cell: ({ row }) => {
+        const campaign = row.original;
+        return (
+          <ActionMenu
+            campaign={campaign}
+            onDelete={() => handleDelete(campaign)}
+          />
+        )
+      }
     }
-    setPagination((prev) => ({ ...prev, page: 1 }));
-    fetchCampaigns(1, pagination.limit, newUser, newState, newStatus, newLeadType);
+  ], []);
+
+  const table = useReactTable({
+    data: campaigns,
+    columns,
+    pageCount: Math.ceil(totalRows / pagination.pageSize),
+    state: {
+      pagination,
+      sorting,
+      columnFilters,
+      globalFilter,
+    },
+    onPaginationChange: setPagination,
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    onGlobalFilterChange: setGlobalFilter,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    manualPagination: true,
+    manualFiltering: true,
+    manualSorting: true,
+  });
+
+  // Calculate stats for cards
+  const activeCount = campaigns.filter(c => c.status === 'ACTIVE').length; // Note: This is page-level only if we rely on fetched data. Ideal is server stats.
+  // For "10/10" feel we should probably display total active from metadata if available, OR just use totalRows for now. 
+  // Let's use `totalRows` for total, and just visually show Active/Paused based on current view or generic placeholder if no server API for stats.
+  // Assuming totalRows is total campaigns.
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500">
+
+      {/* --- Stats Section --- */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <StatCard
+          title="Total Campaigns"
+          value={totalRows}
+          icon={Megaphone}
+          color="text-white bg-black"
+        />
+        <StatCard
+          title="Active Now"
+          value={activeCount > 0 ? activeCount : "--"}
+          subtext="On current page"
+          icon={PlayCircle}
+          color="text-emerald-600 bg-emerald-100"
+        />
+        <StatCard
+          title="Campaign types"
+          value={new Set(campaigns.map(c => c.lead_type)).size}
+          subtext="Variety"
+          icon={ListFilter}
+          color="text-blue-600 bg-blue-100"
+        />
+      </div>
+
+      {/* --- Header & Filters --- */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Campaigns</h1>
+          <p className="text-sm text-gray-500 mt-1">Manage marketing campaigns, track performance & status.</p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+          {/* Search */}
+          <div className="relative group">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-hover:text-black transition-colors" />
+            <input
+              type="text"
+              placeholder="Search campaigns..."
+              value={globalFilter ?? ""}
+              onChange={(e) => setGlobalFilter(e.target.value)}
+              className="w-full sm:w-64 pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black/20 transition-all"
+            />
+          </div>
+
+          {/* Filter Button */}
+          <button
+            onClick={handleFilterClick}
+            className={`flex items-center gap-2 px-3 py-2 border rounded-lg transition-all ${Boolean(filterAnchorEl) || (selectedUser || selectedState || selectedStatus || selectedLeadType)
+              ? "bg-black text-white border-black shadow-md"
+              : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+              }`}
+          >
+            <Filter size={16} />
+            <span className="text-sm font-medium hidden sm:inline">Filters</span>
+            {(selectedUser || selectedState || selectedStatus || selectedLeadType) && (
+              <span className="flex h-2 w-2 rounded-full bg-red-500"></span>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* --- Table --- */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50/50">
+                {table.getHeaderGroups().map(headerGroup => (
+                  headerGroup.headers.map(header => (
+                    <th key={header.id} className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                    </th>
+                  ))
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {loading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i} className="animate-pulse">
+                    <td className="px-6 py-4"><div className="h-6 w-32 bg-gray-100 rounded" /></td>
+                    <td className="px-6 py-4"><div className="h-6 w-24 bg-gray-100 rounded" /></td>
+                    <td className="px-6 py-4"><div className="h-6 w-20 bg-gray-100 rounded" /></td>
+                    <td className="px-6 py-4"><div className="h-6 w-20 bg-gray-100 rounded" /></td>
+                    <td className="px-6 py-4"><div className="h-6 w-16 bg-gray-100 rounded-full" /></td>
+                    <td className="px-6 py-4"><div className="h-8 w-8 bg-gray-100 rounded ml-auto" /></td>
+                  </tr>
+                ))
+              ) : table.getRowModel().rows.length ? (
+                table.getRowModel().rows.map(row => (
+                  <tr key={row.id} className="group hover:bg-gray-50/80 transition-colors">
+                    {row.getVisibleCells().map(cell => (
+                      <td key={cell.id} className="px-6 py-4 whitespace-nowrap">
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={columns.length} className="px-6 py-24 text-center text-gray-500">
+                    <div className="flex flex-col items-center justify-center">
+                      <Megaphone className="h-12 w-12 text-gray-200 mb-4" />
+                      <p className="text-lg font-medium text-gray-900">No campaigns found</p>
+                      <p className="text-sm">Try creating one or adjusting filters.</p>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-white">
+          <div className="text-sm text-gray-500">
+            Showing <span className="font-medium text-gray-900">{(pagination.pageIndex * pagination.pageSize) + 1}</span> to <span className="font-medium text-gray-900">{Math.min((pagination.pageIndex + 1) * pagination.pageSize, totalRows)}</span> of <span className="font-medium text-gray-900">{totalRows}</span> results
+          </div>
+          <div className="flex items-center gap-2">
+            <select
+              value={pagination.pageSize}
+              onChange={e => table.setPageSize(Number(e.target.value))}
+              className="block w-full pl-3 pr-8 py-1.5 text-sm border-gray-300 focus:outline-none focus:ring-black focus:border-black rounded-lg border"
+            >
+              {[10, 20, 30, 50].map(pageSize => (
+                <option key={pageSize} value={pageSize}>Show {pageSize}</option>
+              ))}
+            </select>
+            <div className="flex rounded-md shadow-sm">
+              <button
+                onClick={() => table.previousPage()}
+                disabled={!table.getCanPreviousPage()}
+                className="relative inline-flex items-center px-3 py-1.5 rounded-l-lg border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button
+                onClick={() => table.nextPage()}
+                disabled={!table.getCanNextPage()}
+                className="relative inline-flex items-center px-3 py-1.5 rounded-r-lg border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Filter Popover */}
+      <Popover
+        open={Boolean(filterAnchorEl)}
+        anchorEl={filterAnchorEl}
+        onClose={handleFilterClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+        PaperProps={{
+          sx: { p: 0, width: 320, borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }
+        }}
+      >
+        <div className="p-4 border-b border-gray-100">
+          <h3 className="font-semibold text-gray-900">Filter Campaigns</h3>
+        </div>
+        <div className="p-4 space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1.5 uppercase tracking-wide">Client</label>
+            <select
+              value={tempFilters.user}
+              onChange={(e) => setTempFilters(prev => ({ ...prev, user: e.target.value }))}
+              className="w-full rounded-lg border-gray-200 text-sm focus:border-black focus:ring-black"
+            >
+              <option value="">All Clients</option>
+              {users.map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1.5 uppercase tracking-wide">State</label>
+            <select
+              value={tempFilters.state}
+              onChange={(e) => setTempFilters(prev => ({ ...prev, state: e.target.value }))}
+              className="w-full rounded-lg border-gray-200 text-sm focus:border-black focus:ring-black"
+            >
+              <option value="">All States</option>
+              {states.map(s => <option key={s.abbreviation} value={s.abbreviation}>{s.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1.5 uppercase tracking-wide">Status</label>
+            <div className="flex flex-wrap gap-2">
+              {['ACTIVE', 'PAUSED', 'DRAFT', 'ARCHIVED'].map(status => (
+                <button
+                  key={status}
+                  onClick={() => setTempFilters(prev => ({ ...prev, status: prev.status === status ? "" : status }))}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-all ${tempFilters.status === status
+                    ? "bg-black text-white border-black"
+                    : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+                    }`}
+                >
+                  {status.charAt(0) + status.slice(1).toLowerCase()}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1.5 uppercase tracking-wide">Lead Type</label>
+            <select
+              value={tempFilters.leadType}
+              onChange={(e) => setTempFilters(prev => ({ ...prev, leadType: e.target.value }))}
+              className="w-full rounded-lg border-gray-200 text-sm focus:border-black focus:ring-black"
+            >
+              <option value="">All Types</option>
+              {Object.values(LEAD_TYPE).map(t => <option key={t} value={t}>{t.replace('_', ' ')}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="p-4 bg-gray-50 border-t border-gray-100 flex gap-2">
+          <button
+            onClick={handleClearFilters}
+            className="flex-1 px-4 py-2 bg-white border border-gray-200 text-gray-700 text-sm font-medium rounded-xl hover:bg-gray-50"
+          >
+            Clear
+          </button>
+          <button
+            onClick={handleApplyFilters}
+            className="flex-1 px-4 py-2 bg-black text-white text-sm font-medium rounded-xl hover:bg-gray-800 shadow-lg shadow-black/10"
+          >
+            Apply Filters
+          </button>
+        </div>
+      </Popover>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Delete Campaign"
+        message={`Are you sure you want to delete campaign "${campaignToDelete?.name}"?`}
+        onConfirm={confirmDelete}
+        onCancel={() => setConfirmOpen(false)}
+      />
+    </div>
+  );
+}
+
+// Sub-component for Menu
+const ActionMenu = ({ campaign, onDelete }: { campaign: Campaign, onDelete: () => void }) => {
+  const router = useRouter();
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const open = Boolean(anchorEl);
+
+  const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setAnchorEl(event.currentTarget);
   };
-
-  // Get display value for chips
-  const getFilterLabel = (type: string, value: string) => {
-    switch (type) {
-      case 'user':
-        const user = users.find(u => u._id === value);
-        return user ? `Client: ${user.name}` : '';
-      case 'state':
-        const state = states.find(s => s.abbreviation === value);
-        return state ? `State: ${state.name}` : '';
-      case 'status':
-        return `Status: ${formatStatus(value)}`;
-      case 'leadType':
-        return `Lead Type: ${formatLeadType(value)}`;
-      default:
-        return '';
-    }
-  };
-
-  // Check if any filters are active
-  const hasFilters = selectedUser || selectedState || selectedStatus || selectedLeadType;
-
-  const handlePageChange = (page: number) => {
-    setPagination((prev) => ({ ...prev, page }));
-  };
-
-  const handlePerRowsChange = (newLimit: number, page: number) => {
-    setPagination({ page, limit: newLimit });
+  const handleClose = () => {
+    setAnchorEl(null);
   };
 
   return (
     <>
-
-  <Box sx={{ padding: 2 }}>
-      <div className="flex justify-between items-center pb-[30px]">
-        <h3 className="text-[24px] text-[#1C1C1C] text-[Inter] font-semibold">List of Campaigns</h3>
-        <IconButton aria-label="filter" onClick={handleFilterClick}>
-          <FilterListIcon />
+      <div className="text-right">
+        <IconButton onClick={handleClick} size="small" className="text-gray-400 hover:text-gray-600 hover:bg-gray-50">
+          <MoreHorizontal className="h-5 w-5" />
         </IconButton>
       </div>
-
-      {hasFilters && (
-        <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: 'wrap', gap: 1 }}>
-          {selectedUser && (
-            <Chip
-              label={getFilterLabel('user', selectedUser)}
-              onDelete={() => handleRemoveFilter('user')}
-              deleteIcon={<ClearIcon />}
-              color="primary"
-              variant="outlined"
-            />
-          )}
-          {selectedState && (
-            <Chip
-              label={getFilterLabel('state', selectedState)}
-              onDelete={() => handleRemoveFilter('state')}
-              deleteIcon={<ClearIcon />}
-              color="primary"
-              variant="outlined"
-            />
-          )}
-          {selectedStatus && (
-            <Chip
-              label={getFilterLabel('status', selectedStatus)}
-              onDelete={() => handleRemoveFilter('status')}
-              deleteIcon={<ClearIcon />}
-              color="primary"
-              variant="outlined"
-            />
-          )}
-          {selectedLeadType && (
-            <Chip
-              label={getFilterLabel('leadType', selectedLeadType)}
-              onDelete={() => handleRemoveFilter('leadType')}
-              deleteIcon={<ClearIcon />}
-              color="primary"
-              variant="outlined"
-            />
-          )}
-          <Chip
-            label="Clear All"
-            onClick={handleClearFilters}
-            color="default"
-            variant="outlined"
-          />
-        </Stack>
-      )}
-
-      <Popover
-        id={id}
-        open={open}
-        anchorEl={anchorEl}
-        onClose={handleFilterClose}
-        anchorOrigin={{
-          vertical: 'bottom',
-          horizontal: 'right',
-        }}
-        transformOrigin={{
-          vertical: 'top',
-          horizontal: 'right',
-        }}
-        PaperProps={{
-          sx: { p: 2, width: 400 },
-        }}
-      >
-        <Typography variant="h6" sx={{ mb: 2 }}>Filters</Typography>
-        <Stack spacing={2}>
-          <FormControl fullWidth>
-            <InputLabel id="user-filter-label">Client</InputLabel>
-            <Select
-              labelId="user-filter-label"
-              value={tempSelectedUser}
-              label="Client"
-              onChange={(e) => setTempSelectedUser(e.target.value as string)}
-            >
-              <MenuItem value="">
-                <em>All Clients</em>
-              </MenuItem>
-              {users.map((user) => (
-                <MenuItem key={user._id} value={user._id}>
-                  {user.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl fullWidth>
-            <InputLabel id="state-filter-label">State</InputLabel>
-            <Select
-              labelId="state-filter-label"
-              value={tempSelectedState}
-              label="State"
-              onChange={(e) => setTempSelectedState(e.target.value as string)}
-            >
-              <MenuItem value="">
-                <em>All States</em>
-              </MenuItem>
-              {states.map((state) => (
-                <MenuItem key={state.abbreviation} value={state.abbreviation}>
-                  {state.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl fullWidth>
-            <InputLabel id="status-filter-label">Status</InputLabel>
-            <Select
-              labelId="status-filter-label"
-              value={tempSelectedStatus}
-              label="Status"
-              onChange={(e) => setTempSelectedStatus(e.target.value as string)}
-            >
-              <MenuItem value="">
-                <em>All Statuses</em>
-              </MenuItem>
-              {statuses.map((status) => (
-                <MenuItem key={status} value={status}>
-                  {formatStatus(status)}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl fullWidth>
-            <InputLabel id="lead-type-filter-label">Lead Type</InputLabel>
-            <Select
-              labelId="lead-type-filter-label"
-              value={tempSelectedLeadType}
-              label="Lead Type"
-              onChange={(e) => setTempSelectedLeadType(e.target.value as string)}
-            >
-              <MenuItem value="">
-                <em>All Lead Types</em>
-              </MenuItem>
-              {leadTypes.map((type) => (
-                <MenuItem key={type} value={type}>
-                  {formatLeadType(type)}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <Stack direction="row" spacing={2} justifyContent="flex-end">
-            <Button variant="outlined" onClick={handleFilterClose}>
-              Cancel
-            </Button>
-            <Button variant="contained" onClick={handleApplyFilters}>
-              Apply
-            </Button>
-          </Stack>
-        </Stack>
-      </Popover>
-
-      <DataTable
-        columns={columns}
-        data={loading ? skeletonRows : campaigns}
-        customStyles={customStyles}
-        pagination
-        paginationServer
-        paginationTotalRows={totalRows}
-        paginationDefaultPage={pagination.page}
-        paginationPerPage={pagination.limit}
-        paginationRowsPerPageOptions={[10, 25, 50, 100]}
-        onChangePage={handlePageChange}
-        onChangeRowsPerPage={handlePerRowsChange}
-        highlightOnHover
-        striped
-        dense
-        persistTableHead
-        progressPending={false}
-        noDataComponent={
-          error ? (
-            <Typography color="error" sx={{ py: 4, textAlign: 'center' }}>
-              ⚠️ {error}
-            </Typography>
-          ) : !loading && campaigns.length === 0 ? (
-            <Typography sx={{ py: 4, textAlign: 'center', color: 'gray' }}>
-              📝 No campaigns found. Try adjusting your filters!
-            </Typography>
-          ) : null
-        }
-      />
       <Menu
-      anchorEl={menuAnchorEl}
-      open={isMenuOpen}
-      onClose={handleMenuClose}
-      anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-      transformOrigin={{ vertical: "top", horizontal: "right" }}
-    >
-      <MenuItem
-        onClick={() => {
-          if (menuRow) handleView(menuRow);
-          handleMenuClose();
+        anchorEl={anchorEl}
+        open={open}
+        onClose={handleClose}
+        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+        PaperProps={{
+          elevation: 0,
+          sx: {
+            overflow: 'visible',
+            filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.08))',
+            mt: 1.5,
+            '& .MuiAvatar-root': { width: 32, height: 32, ml: -0.5, mr: 1 },
+            borderRadius: '12px',
+            border: '1px solid #f3f4f6'
+          },
         }}
       >
-        View
-      </MenuItem>
-      <MenuItem
-        onClick={() => {
-          if (menuRow) handleEdit(menuRow);
-          handleMenuClose();
-        }}
-      >
-        Edit
-      </MenuItem>
-      <MenuItem
-        onClick={() => {
-          if (menuRow) handleAddLead(menuRow);
-          handleMenuClose();
-        }}
-      >
-        Add Lead
-      </MenuItem>
-      {/* Optional: View Leads list filtered by this campaign */}
-      <MenuItem
-        onClick={() => {
-          if (menuRow) handleViewLeads(menuRow);
-          handleMenuClose();
-        }}
-      >
-        View Leads
-      </MenuItem>
-      {/* ✅ ADD THIS */}
-      <MenuItem
-        onClick={() => {
-          if (menuRow) handleDelete(menuRow);
-          handleMenuClose();
-        }}
-        sx={{ color: 'error.main' }}
-      >
-        Delete
-      </MenuItem>
-    </Menu>
-  </Box>
- 
-  <ConfirmDialog
-    open={deleteDialog.open}
-    title="Delete Campaign"
-    message={`Are you sure you want to delete campaign "${deleteDialog.campaign?.name}" and all its associated leads? This action cannot be undone.`}
-    onConfirm={confirmDelete}
-    onCancel={() => setDeleteDialog({ open: false, campaign: null })}
-  />    
-  </>
-
-  );
+        <MenuItem onClick={() => { router.push(`/admin/campaigns/${campaign._id}`); handleClose(); }} disableRipple className="text-sm font-medium text-gray-700 gap-2">
+          <Eye size={16} /> View Details
+        </MenuItem>
+        <MenuItem onClick={() => { router.push(`/admin/campaigns/${campaign._id}/edit`); handleClose(); }} disableRipple className="text-sm font-medium text-gray-700 gap-2">
+          <Edit2 size={16} /> Edit Campaign
+        </MenuItem>
+        <MenuItem onClick={() => { router.push(`/admin/campaigns/${campaign._id}/leads/add`); handleClose(); }} disableRipple className="text-sm font-medium text-gray-700 gap-2">
+          <UserPlus size={16} /> Add Lead
+        </MenuItem>
+        <MenuItem onClick={() => { router.push(`/admin/leads?campaign_id=${campaign._id}`); handleClose(); }} disableRipple className="text-sm font-medium text-gray-700 gap-2">
+          <ListFilter size={16} /> View Leads
+        </MenuItem>
+        <MenuItem onClick={() => { onDelete(); handleClose(); }} disableRipple className="text-sm font-medium text-red-600 gap-2">
+          <Trash2 size={16} /> Delete
+        </MenuItem>
+      </Menu>
+    </>
+  )
 }

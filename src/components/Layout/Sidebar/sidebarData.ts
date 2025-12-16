@@ -1,136 +1,132 @@
+
 import { SidebarItem } from '@/types/sidebar';
-import { FiMapPin } from 'react-icons/fi';
+import {
+  LayoutDashboard,
+  Users,
+  Megaphone,
+  Target,
+  Settings,
+  MessageCircleQuestion,
+  MessageSquare,
+  Upload,
+  FileText,
+  Search,
+  Rocket,
+  CreditCard
+} from 'lucide-react';
 
 export const adminSidebarItems: SidebarItem[] = [
-  { 
-    id: 'dashboard', 
-    name: 'Dashboard', 
-    icon: '/images/icons/dashboard.svg', 
-    link: '/admin/dashboard' 
+  {
+    id: 'dashboard',
+    name: 'Dashboard',
+    icon: LayoutDashboard,
+    link: '/admin/dashboard',
+    category: 'Main'
   },
   {
     id: 'user-management',
     name: 'User Management',
-    icon: '/images/icons/user-management.svg',
+    icon: Users,
     link: '/admin/user-management',
     pathCombinations: [
       '/admin/user-management',
       '/admin/user-management/new',
-    ]
+    ],
+    category: 'Management'
   },
-  // {
-  //   id: 'locations',
-  //   name: 'Locations',
-  //   icon: '/images/icons/location.svg',
-  //   link: '/admin/locations',
-  //   pathCombinations: [
-  //     '/admin/locations/edit',
-  //     '/admin/locations/add',
-  //   ]
-  // },
   {
     id: 'campaigns',
     name: 'Campaigns',
-    icon: '/images/icons/campaigns.svg',
+    icon: Megaphone,
     link: '/admin/campaigns',
     pathCombinations: [
       '/admin/campaigns/edit',
       '/admin/campaigns/add',
-    ]
+    ],
+    category: 'Management'
   },
   {
     id: 'leads',
     name: 'Leads',
-    icon: '/images/icons/lead-management.svg',
+    icon: Target,
     link: '/admin/leads',
     pathCombinations: [
       '/admin/leads/edit',
       '/admin/leads/add',
-    ]
+    ],
+    category: 'Management'
   },
+
   {
-    id: 'setting-support',
-    name: 'Setting & Supports',
-    icon: '/images/icons/setting.svg',
-    link: '/admin/setting-support',
-    // pathCombinations: [
-    //   '/admin/leads/edit',
-    //   '/admin/leads/add',
-    // ]
+    id: 'chats',
+    name: 'Chats',
+    icon: MessageSquare,
+    link: '/admin/chats',
+    category: 'Communication'
   },
   {
     id: 'faq',
     name: 'FAQs',
-    icon: '/images/icons/chats.svg',
+    icon: MessageCircleQuestion,
     link: '/admin/faq',
+    category: 'Communication'
   },
   {
-
-    id: 'chats',
-    name: 'Chats',
-    icon: '/images/icons/chats.svg',
-    link: '/admin/chats',
+    id: 'setting-support',
+    name: 'Setting & Supports',
+    icon: Settings,
+    link: '/admin/setting-support',
+    category: 'System'
   },
-  // {
-  //   id: 'feedback',
-  //   name: 'Feedback',
-  //   icon: '/images/icons/feedback.svg',
-  //   link: '/admin/feedback',
-
-  // },
   {
     id: 'upload-csv',
     name: 'Upload CSV',
-    icon: '/images/icons/upload-csv.svg',
+    icon: Upload,
     link: '/import-csv',
-
+    category: 'Tools'
   },
   {
     id: 'csv-logs',
     name: 'CSV Logs',
-    icon: '/images/icons/logs.svg',
+    icon: FileText,
     link: '/admin/logs/csv',
+    category: 'Tools'
   },
-  //  {
-  //   id: 'billing-control',
-  //   name: 'Billing Control',
-  //   icon: '/images/icons/billing-control.svg',
-  //   link: '/admin/billing-control',
-
-  // },
 
   {
     id: 'search',
     name: 'Search',
-    icon: '/images/icons/search.svg',
+    icon: Search,
     link: '/search',
+    category: 'System'
   },
   {
     id: 'supacampaign',
     name: 'SupaCampaign',
-    icon: '/images/icons/campaigns.svg',
+    icon: Rocket,
     link: '/supacampaign',
+    category: 'Tools'
   },
-
 ];
 
 export const userSidebarItems: SidebarItem[] = [
-  { 
-    id: 'dashboard', 
-    name: 'Dashboard', 
-    icon: '/images/icons/dashboard.svg', 
-    link: '/dashboard' 
+  {
+    id: 'dashboard',
+    name: 'Dashboard',
+    icon: LayoutDashboard,
+    link: '/dashboard',
+    category: 'Main'
   },
-  { 
-    id: 'campaigns', 
-    name: 'Campaigns', 
-    icon: '/images/icons/campaigns.svg', 
-    link: '/dashboard/campaigns' 
+  {
+    id: 'campaigns',
+    name: 'Campaigns',
+    icon: Megaphone,
+    link: '/dashboard/campaigns'
   },
   {
     id: 'leads',
     name: 'Leads',
-    icon: '/images/icons/lead-management.svg',
+    icon: Target,
     link: '/dashboard/leads',
     pathCombinations: [
       '/dashboard/leads/edit',
@@ -138,43 +134,27 @@ export const userSidebarItems: SidebarItem[] = [
     ]
   },
   {
-
     id: 'chats',
     name: 'Chats',
-    icon: '/images/icons/chats.svg',
+    icon: MessageSquare,
     link: '/dashboard/chats',
   },
   {
     id: 'setting-support',
     name: 'Setting & Supports',
-    icon: '/images/icons/setting.svg',
+    icon: Settings,
     link: '/dashboard/setting-support',
-    // pathCombinations: [
-    //   '/admin/leads/edit',
-    //   '/admin/leads/add',
-    // ]
   },
   {
-
     id: 'faq',
     name: 'FAQs',
-    icon: '/images/icons/chats.svg',
+    icon: MessageCircleQuestion,
     link: '/dashboard/faq',
   },
-   {
+  {
     id: 'billing-control',
     name: 'Billing Control',
-    icon: '/images/icons/billing-control.svg',
+    icon: CreditCard,
     link: '/dashboard/billing-control',
-
   },
-
-  // {
-  //   id: 'feedback',
-  //   name: 'Feedback',
-  //   icon: '/images/icons/feedback.svg',
-  //   link: '/dashboard/feedback',
-  // },
-
-
 ];

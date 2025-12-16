@@ -3,25 +3,35 @@
 import { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Users, DollarSign, FileText, CheckCircle, XCircle, Calendar, TrendingUp } from 'lucide-react';
+import { Users, DollarSign, FileText, CheckCircle, XCircle, Calendar, TrendingUp, Shield, UserCheck, AlertTriangle } from 'lucide-react';
 import { Skeleton } from '@mui/material';
 import Link from 'next/link';
 import axiosWrapper from "@/utils/api";
-import { API_URL, BILLING_API, LEADS_API } from "@/utils/apiUrl";
+import { API_URL, BILLING_API, LEADS_API, DASHBOARD_API } from "@/utils/apiUrl";
 import { RootState } from '@/redux/store';
 import { Activity, AlertCircle } from 'lucide-react'
 interface DashboardStats {
   totalUsers: number;
-  totalRevenue: number;
+  activeUsers: number;
+  inactiveUsers: number;
+  activeAdmins: number;
+  activeRegularUsers: number;
+  unverifiedUsers: number;
   totalLeads: number;
-  qualifiedLeads: number;
-  disqualifiedLeads: number;
-}
-
-interface LeadData {
-  name: string;
-  qualified: number;
-  disqualified: number;
+  activeLeads: number;
+  returnedLeads: number;
+  totalCampaigns: number;
+  activeCampaigns: number;
+  pendingCampaigns: number;
+  leadChartData: Array<{
+    name: string;
+    qualified: number;
+    disqualified: number;
+    date: string;
+  }>;
+  totalRevenue: number;
+  qualifiedLeads: number; // Keeping for backward compatibility if needed, but will map from activeLeads
+  disqualifiedLeads: number; // Keeping for backward compatibility if needed, but will map from returnedLeads
 }
 
 interface RevenueResponse {
@@ -45,13 +55,24 @@ export default function AdminDashboard() {
 
   const [stats, setStats] = useState<DashboardStats>({
     totalUsers: 0,
+    activeUsers: 0,
+    inactiveUsers: 0,
+    activeAdmins: 0,
+    activeRegularUsers: 0,
+    unverifiedUsers: 0,
     totalRevenue: 0,
     totalLeads: 0,
+    activeLeads: 0,
+    returnedLeads: 0,
+    totalCampaigns: 0,
+    activeCampaigns: 0,
+    pendingCampaigns: 0,
+    leadChartData: [],
     qualifiedLeads: 0,
     disqualifiedLeads: 0,
   });
 
-  const [leadChartData, setLeadChartData] = useState<LeadData[]>([]);
+  // const [leadChartData, setLeadChartData] = useState<LeadData[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [revenueLoading, setRevenueLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -134,134 +155,44 @@ export default function AdminDashboard() {
 
       console.log('Fetching dashboard data...');
 
-      let usersData: any = null;
-      let leadsData: any = null;
-
-      // Fetch users
       try {
-        const usersResponse = await axiosWrapper(
+        const dashboardResponse = await axiosWrapper(
           'get',
-          API_URL.GET_ALL_USERS,
+          DASHBOARD_API.GET_DASHBOARD_DATA,
           {},
           token ?? undefined
         );
-        usersData = usersResponse;
+
+        const data = dashboardResponse as any; // Typed as any to match standard response shape if needed or direct data
+
+        // If your axiosWrapper returns the response directly or inside .data, verify structure.
+        // Assuming data comes directly or inside data property based on typical behavior.
+        const dashboardData = data.data || data;
+
+        setStats(prev => ({
+          ...prev,
+          totalUsers: dashboardData.totalUsers || 0,
+          activeUsers: dashboardData.activeUsers || 0,
+          inactiveUsers: dashboardData.inactiveUsers || 0,
+          activeAdmins: dashboardData.activeAdmins || 0,
+          activeRegularUsers: dashboardData.activeRegularUsers || 0,
+          unverifiedUsers: dashboardData.unverifiedUsers || 0,
+          totalLeads: dashboardData.totalLeads || 0,
+          activeLeads: dashboardData.activeLeads || 0,
+          returnedLeads: dashboardData.returnedLeads || 0,
+          totalCampaigns: dashboardData.totalCampaigns || 0,
+          activeCampaigns: dashboardData.activeCampaigns || 0,
+          pendingCampaigns: dashboardData.pendingCampaigns || 0,
+          leadChartData: dashboardData.leadChartData || [],
+          // Map for compatibility if needed or use directly in JSX
+          qualifiedLeads: dashboardData.activeLeads || 0,
+          disqualifiedLeads: dashboardData.returnedLeads || 0
+        }));
+
       } catch (err) {
-        console.error('Error fetching users:', err);
+        console.error('Error fetching dashboard stats:', err);
+        throw err; // Re-throw to be caught by outer catch
       }
-
-      // Fetch leads
-      try {
-        const leadsResponse = await axiosWrapper(
-          'get',
-          LEADS_API.GET_ALL_LEADS,
-          {},
-          token ?? undefined
-        );
-        leadsData = leadsResponse;
-      } catch (err) {
-        console.error('Error fetching leads:', err);
-      }
-
-      // Process users data
-      let totalUsers = 0;
-      if (usersData) {
-        if (Array.isArray(usersData)) {
-          totalUsers = usersData.length;
-        } else if (usersData.data && Array.isArray(usersData.data)) {
-          totalUsers = usersData.data.length;
-        } else if (usersData.users && Array.isArray(usersData.users)) {
-          totalUsers = usersData.users.length;
-        } else if (typeof usersData.count === 'number') {
-          totalUsers = usersData.count;
-        } else if (typeof usersData.total === 'number') {
-          totalUsers = usersData.total;
-        } else if (typeof usersData.totalCount === 'number') {
-          totalUsers = usersData.totalCount;
-        }
-      }
-
-      // Process leads data with date range filter
-      let leadsList: any[] = [];
-      let totalLeads = 0;
-      let qualifiedLeads = 0;
-      let disqualifiedLeads = 0;
-
-      if (leadsData) {
-        if (Array.isArray(leadsData)) {
-          leadsList = leadsData;
-        } else if (leadsData.data && Array.isArray(leadsData.data)) {
-          leadsList = leadsData.data;
-        } else if (leadsData.leads && Array.isArray(leadsData.leads)) {
-          leadsList = leadsData.leads;
-        }
-
-        totalLeads = leadsList.length || leadsData.count || leadsData.total || leadsData.totalCount || 0;
-
-        qualifiedLeads = leadsList.filter((lead: any) =>
-          lead?.status === 'active'
-        ).length;
-
-        disqualifiedLeads = leadsList.filter((lead: any) =>
-          lead?.return_status && lead.return_status !== 'Not Returned'
-        ).length;
-
-        // Generate chart data based on selected range
-        let daysToShow = 7;
-        if (leadDateRange === '30d') daysToShow = 30;
-        if (leadDateRange === 'mtd') {
-          const today = new Date();
-          daysToShow = today.getDate();
-        }
-
-        const chartDays = Array.from({ length: Math.min(daysToShow, 30) }, (_, i) => {
-          const date = new Date();
-          date.setDate(date.getDate() - (daysToShow - 1 - i));
-          return date;
-        });
-
-        const chartData = chartDays.map((date) => {
-          const dayName = daysToShow <= 7
-            ? date.toLocaleDateString('en-US', { weekday: 'short' })
-            : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-
-          const dayStart = new Date(date);
-          dayStart.setHours(0, 0, 0, 0);
-          const dayEnd = new Date(date);
-          dayEnd.setHours(23, 59, 59, 999);
-
-          const qualifiedCount = leadsList.filter((lead: any) => {
-            const leadDate = new Date(lead.createdAt);
-            return lead.status === 'active' &&
-              leadDate >= dayStart &&
-              leadDate <= dayEnd;
-          }).length;
-
-          const disqualifiedCount = leadsList.filter((lead: any) => {
-            const leadDate = new Date(lead.createdAt);
-            return lead.return_status &&
-              lead.return_status !== 'Not Returned' &&
-              leadDate >= dayStart &&
-              leadDate <= dayEnd;
-          }).length;
-
-          return {
-            name: dayName,
-            qualified: qualifiedCount,
-            disqualified: disqualifiedCount
-          };
-        });
-
-        setLeadChartData(chartData);
-      }
-
-      setStats(prev => ({
-        ...prev,
-        totalUsers,
-        totalLeads,
-        qualifiedLeads,
-        disqualifiedLeads,
-      }));
 
       // Fetch revenue independently
       await fetchRevenue();
@@ -282,12 +213,23 @@ export default function AdminDashboard() {
 
       setStats({
         totalUsers: 0,
+        activeUsers: 0,
+        inactiveUsers: 0,
+        activeAdmins: 0,
+        activeRegularUsers: 0,
+        unverifiedUsers: 0,
         totalRevenue: 0,
         totalLeads: 0,
+        activeLeads: 0,
+        returnedLeads: 0,
+        totalCampaigns: 0,
+        activeCampaigns: 0,
+        pendingCampaigns: 0,
+        leadChartData: [],
         qualifiedLeads: 0,
         disqualifiedLeads: 0,
       });
-      setLeadChartData([]);
+      // setLeadChartData([]);
     } finally {
       setLoading(false);
     }
@@ -379,7 +321,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         {/* Total Users */}
         {loading ? (
           <SkeletonCard />
@@ -389,13 +331,53 @@ export default function AdminDashboard() {
               <div className="bg-blue-50 p-3 rounded-lg">
                 <Users className="w-6 h-6 text-blue-600" />
               </div>
+              <div className="flex flex-col items-end">
+                <span className="text-3xl font-bold text-gray-900">{stats.totalUsers.toLocaleString()}</span>
+                <span className="text-xs text-gray-500">Total Users</span>
+              </div>
             </div>
-            <p className="text-gray-600 text-sm mb-1">Total Number of Users</p>
-            <p className="text-3xl font-bold text-gray-900">{stats.totalUsers.toLocaleString()}</p>
-            <p className="text-xs text-green-600 mt-2 flex items-center">
-              <TrendingUp className="w-3 h-3 mr-1" />
-              Active users in system
-            </p>
+
+            <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-gray-50">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-indigo-50 rounded text-indigo-600">
+                  <Shield className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Admins</p>
+                  <p className="text-sm font-semibold text-gray-900">{stats.activeAdmins}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-green-50 rounded text-green-600">
+                  <UserCheck className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Active</p>
+                  <p className="text-sm font-semibold text-gray-900">{stats.activeRegularUsers}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-yellow-50 rounded text-yellow-600">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Unverified</p>
+                  <p className="text-sm font-semibold text-gray-900">{stats.unverifiedUsers}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-red-50 rounded text-red-600">
+                  <XCircle className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Inactive</p>
+                  <p className="text-sm font-semibold text-gray-900">{stats.inactiveUsers}</p>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
@@ -419,21 +401,21 @@ export default function AdminDashboard() {
                 onChange={(e) => setRevenueRange(e.target.value as any)}
                 disabled={revenueLoading}
               >
-              <option value="today">Today</option>
-              <option value="yesterday">Yesterday</option>
+                <option value="today">Today</option>
+                <option value="yesterday">Yesterday</option>
 
-              <option value="7d">Last 7 Days</option>
-              <option value="30d">Last 30 Days</option>
+                <option value="7d">Last 7 Days</option>
+                <option value="30d">Last 30 Days</option>
 
-              <option value="mtd">Month to Date (MTD)</option>
-              <option value="q1">Q1 (Jan–Mar)</option>
-              <option value="q2">Q2 (Apr–Jun)</option>
-              <option value="q3">Q3 (Jul–Sep)</option>
-              <option value="q4">Q4 (Oct–Dec)</option>
+                <option value="mtd">Month to Date (MTD)</option>
+                <option value="q1">Q1 (Jan–Mar)</option>
+                <option value="q2">Q2 (Apr–Jun)</option>
+                <option value="q3">Q3 (Jul–Sep)</option>
+                <option value="q4">Q4 (Oct–Dec)</option>
 
-              <option value="this_year">This Year</option>
-              <option value="last_year">Last Year</option>
-       
+                <option value="this_year">This Year</option>
+                <option value="last_year">Last Year</option>
+
               </select>
             </div>
             <p className="text-gray-600 text-sm mb-1">Total Revenue</p>
@@ -463,10 +445,33 @@ export default function AdminDashboard() {
             <p className="text-3xl font-bold text-gray-900">{stats.totalLeads.toLocaleString()}</p>
             <div className="flex items-center gap-4 mt-2">
               <span className="text-xs text-green-600">
-                {stats.qualifiedLeads} Active
+                {stats.activeLeads} Active
               </span>
               <span className="text-xs text-red-600">
-                {stats.disqualifiedLeads} Returned
+                {stats.returnedLeads} Returned
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Total Campaigns - NEW */}
+        {loading ? (
+          <SkeletonCard />
+        ) : (
+          <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between mb-4">
+              <div className="bg-orange-50 p-3 rounded-lg">
+                <Activity className="w-6 h-6 text-orange-600" />
+              </div>
+            </div>
+            <p className="text-gray-600 text-sm mb-1">Total Campaigns</p>
+            <p className="text-3xl font-bold text-gray-900">{stats.totalCampaigns.toLocaleString()}</p>
+            <div className="flex items-center gap-4 mt-2">
+              <span className="text-xs text-green-600">
+                {stats.activeCampaigns} Active
+              </span>
+              <span className="text-xs text-yellow-600">
+                {stats.pendingCampaigns} Pending
               </span>
             </div>
           </div>
@@ -491,13 +496,13 @@ export default function AdminDashboard() {
               </div>
             </div>
             <ResponsiveContainer width="100%" height={150}>
-              <LineChart data={leadChartData}>
+              <LineChart data={stats.leadChartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis
                   dataKey="name"
                   tick={{ fontSize: 11 }}
                   stroke="#94a3b8"
-                  interval={leadDateRange === '30d' ? 4 : 0}
+                  interval={4}
                 />
                 <YAxis tick={{ fontSize: 12 }} stroke="#94a3b8" />
                 <Tooltip
@@ -538,13 +543,13 @@ export default function AdminDashboard() {
               </div>
             </div>
             <ResponsiveContainer width="100%" height={150}>
-              <LineChart data={leadChartData}>
+              <LineChart data={stats.leadChartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis
                   dataKey="name"
                   tick={{ fontSize: 11 }}
                   stroke="#94a3b8"
-                  interval={leadDateRange === '30d' ? 4 : 0}
+                  interval={4}
                 />
                 <YAxis tick={{ fontSize: 12 }} stroke="#94a3b8" />
                 <Tooltip
