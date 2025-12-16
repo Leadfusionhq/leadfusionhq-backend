@@ -1,0 +1,58 @@
+
+Roles Distribution:
+[
+  {
+    "_id": "USER",
+    "count": 32
+  },
+  {
+    "_id": "ADMIN",
+    "count": 10
+  },
+  {
+    "_id": "Admin",
+    "count": 1
+  },
+  {
+    "_id": "User",
+    "count": 9
+  }
+]
+
+Active Users by Role:
+[
+  {
+    "_id": "Admin",
+    "count": 1
+  },
+  {
+    "_id": "User",
+    "count": 9
+  },
+  {
+    "_id": "USER",
+    "count": 31
+  },
+  {
+    "_id": "ADMIN",
+    "count": 10
+  }
+]
+
+Verification Distribution:
+[
+  {
+    "_id": true,
+    "count": 18
+  },
+  {
+    "_id": null,
+    "count": 13
+  },
+  {
+    "_id": false,
+    "count": 21
+  }
+]
+
+Active & Unverified: 21

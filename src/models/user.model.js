@@ -2,8 +2,6 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const CONSTANT_ENUM = require('../helper/constant-enums');
 
-// ✅ Import Chat and Message models
-
 
 
 const SALT_ROUNDS = 10;
@@ -40,6 +38,7 @@ const baseUserSchema = new mongoose.Schema({
     enum: Object.values(CONSTANT_ENUM.USER_ROLE),
     required: true,
     default: CONSTANT_ENUM.USER_ROLE.USER,
+    index: true,
   },
   password: {
     type: String,
@@ -73,6 +72,7 @@ const baseUserSchema = new mongoose.Schema({
   verificationToken: {
     type: String,
     default: '',
+    index: true,
   },
   verificationTokenExpires: {
     type: Date,
@@ -81,6 +81,7 @@ const baseUserSchema = new mongoose.Schema({
   resetPasswordToken: {
     type: Date,
     default: null,
+    index: true,
   },
   resetPasswordExpires: {
     type: Date,
@@ -134,7 +135,9 @@ const baseUserSchema = new mongoose.Schema({
   }
 }, options);
 
-// Password hashing middleware
+baseUserSchema.index({ role: 1, createdAt: -1 });
+baseUserSchema.index({ isActive: 1 });
+baseUserSchema.index({ 'integrations.boberdoo.sync_status': 1 });
 baseUserSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
 
@@ -171,13 +174,10 @@ baseUserSchema.pre('findByIdAndUpdate', async function (next) {
   next();
 });
 
-// ✅ Compare password method
 baseUserSchema.methods.comparePassword = async function (candidatePassword) {
   return bcrypt.compare(candidatePassword, this.password);
 };
 
-// 🧹 Cascade delete user's chats & messages
-// ✅ Cascade delete user's chats & messages
 baseUserSchema.pre('findOneAndDelete', async function (next) {
   try {
     const user = await this.model.findOne(this.getFilter());
@@ -185,20 +185,15 @@ baseUserSchema.pre('findOneAndDelete', async function (next) {
 
     console.log(`🧹 Deleting all chats and messages for user: ${user._id}`);
 
-    // ✅ ONLY load models here (inside the middleware)
     const Chat = mongoose.model('Chat');
     const Message = mongoose.model('Message');
 
-    // 1️⃣ Find all chats where the user is a participant
     const chats = await Chat.find({ participants: user._id });
     const chatIds = chats.map(chat => chat._id);
 
-    // 2️⃣ Delete all related messages
     if (chatIds.length > 0) {
       await Message.deleteMany({ chatId: { $in: chatIds } });
     }
-
-    // 3️⃣ Delete all chats the user participated in
     await Chat.deleteMany({ participants: user._id });
 
     console.log(`✅ Successfully deleted ${chats.length} chats and related messages for user ${user._id}`);

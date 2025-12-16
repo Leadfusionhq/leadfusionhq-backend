@@ -47,7 +47,15 @@ app.get('/', (req, res) => {
 });
 
 app.get('/my-type', (req, res) => {
-  res.json({ message: 'Enviourment ' + process.env.nodeEnv });
+  res.json({
+    message: 'Environment ' + config.server.nodeEnv,
+    debug: {
+      db: config.server.db,
+      port: config.server.port,
+      backendLink: config.server.backendLink,
+      route: config.server.route
+    }
+  });
 
 });
 
@@ -96,6 +104,10 @@ app.use(`/${config.server.route}/sms`, smsRoutes);
 // Add these routes
 app.use(`/${config.server.route}/boberdo`, boberDoRoutes); // Public API for Boberdo
 app.use(`/${config.server.route}/admin/boberdo`, boberdoAdminRoutes); // Admin management
+
+// Dashboard Routes
+const dashboardRoutes = require('./src/routes/dashboard.routes');
+app.use(`/${config.server.route}/dashboard`, dashboardRoutes);
 
 
 app.use(errors());

@@ -16,7 +16,7 @@ const Transaction = require('../../models/transaction.model');
 
 
 const API = {
-  BILLING_INFO:'/',
+  BILLING_INFO: '/',
   SAVE_CARD: '/save-card',
   ADD_FUNDS: '/add-funds',
   ACCEPT_CONTRACT: '/contract/accept',
@@ -29,10 +29,11 @@ const API = {
   CONTRACT_STATUS: '/contract/status',
   GET_CARDS: '/cards', // NEW
   SET_DEFAULT_CARD: '/cards/default', // NEW
-  DELETE_CARD: '/cards/:vaultId' ,
+  DELETE_CARD: '/cards/:vaultId',
   TEST_AUTO_TOPUP: '/test-auto-topup',
   REVENUE_FROM_NMI: '/revenue-from-nmi',
   RECEIPT: '/receipts/:txnId', // 
+  CHARGE_SINGLE_LEAD: '/charge-single-lead/:leadId',
 };
 
 // Info endpoint for Billing API
@@ -76,10 +77,10 @@ billingRouter.get(API.BILLING_INFO, (req, res) => {
 
 
 billingRouter.use(
-    checkAuth,
-    authorizedRoles([
-      CONSTANT_ENUM.USER_ROLE.ADMIN,
-      CONSTANT_ENUM.USER_ROLE.USER
+  checkAuth,
+  authorizedRoles([
+    CONSTANT_ENUM.USER_ROLE.ADMIN,
+    CONSTANT_ENUM.USER_ROLE.USER
   ])
 );
 
@@ -100,25 +101,25 @@ billingRouter.use(
 // );
 
 billingRouter.post(
-    API.TEST_AUTO_TOPUP,
-    celebrate({
-      [Segments.BODY]: Joi.object().keys({
-        deductAmount: Joi.number().min(0.01).required()
-      })
-    }),
-    billingController.testAutoTopUp
+  API.TEST_AUTO_TOPUP,
+  celebrate({
+    [Segments.BODY]: Joi.object().keys({
+      deductAmount: Joi.number().min(0.01).required()
+    })
+  }),
+  billingController.testAutoTopUp
 );
 
 billingRouter.post(
-    API.SAVE_CARD, 
-    celebrate(BillingSchema.saveCard),
-    billingController.saveCard
+  API.SAVE_CARD,
+  celebrate(BillingSchema.saveCard),
+  billingController.saveCard
 );
 
 billingRouter.post(
-    API.ADD_FUNDS, 
-    celebrate(BillingSchema.addFunds),
-    billingController.addFunds
+  API.ADD_FUNDS,
+  celebrate(BillingSchema.addFunds),
+  billingController.addFunds
 );
 
 // billingRouter.post(
@@ -135,19 +136,19 @@ billingRouter.post(
 // );
 
 billingRouter.get(
-    API.BALANCE,
-    billingController.getBalance
+  API.BALANCE,
+  billingController.getBalance
 );
 
 billingRouter.get(
-    API.TRANSACTIONS,
-    billingController.getTransactions
+  API.TRANSACTIONS,
+  billingController.getTransactions
 );
 
 billingRouter.post(
-    API.AUTO_TOP_UP,
-    celebrate(BillingSchema.toggleAutoTopUp),
-    billingController.toggleAutoTopUp
+  API.AUTO_TOP_UP,
+  celebrate(BillingSchema.toggleAutoTopUp),
+  billingController.toggleAutoTopUp
 );
 billingRouter.get(
   API.REVENUE_FROM_NMI,
@@ -180,5 +181,10 @@ billingRouter.get(
 );
 
 
+billingRouter.post(
+  API.CHARGE_SINGLE_LEAD,
+  // celebrate(BillingSchema.chargeSingleLead),
+  billingController.chargeSingleLead
+);
 
 module.exports = billingRouter;

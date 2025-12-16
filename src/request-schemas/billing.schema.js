@@ -1,7 +1,6 @@
 const { Joi, Segments } = require('celebrate');
 
-// 🔐 1. Save Card Schema
-// 🔐 1. Save Card Schema
+// 1. Save Card Schema
 const saveCard = {
   [Segments.BODY]: Joi.object().keys({
     card_number: Joi.string()
@@ -25,7 +24,7 @@ const saveCard = {
 };
 
 
-// 💰 2. Add Funds Schema
+// 2. Add Funds Schema
 const addFunds = {
   [Segments.BODY]: Joi.object().keys({
     amount: Joi.number().min(1).required(),
@@ -33,7 +32,7 @@ const addFunds = {
   }),
 };
 
-// 📄 3. Accept Contract Schema
+// 3. Accept Contract Schema
 const acceptContract = {
   [Segments.BODY]: Joi.object().keys({
     version: Joi.string().optional(),
@@ -41,7 +40,7 @@ const acceptContract = {
   }),
 };
 
-// 📦 4. Assign Lead Schema
+// 4. Assign Lead Schema
 const assignLead = {
   [Segments.BODY]: Joi.object().keys({
     userId: Joi.string().required(), // user receiving the lead
@@ -50,7 +49,7 @@ const assignLead = {
   }),
 };
 
-// 💳 5. Manual Charge Schema
+// 5. Manual Charge Schema
 const chargeUser = {
   [Segments.BODY]: Joi.object().keys({
     userId: Joi.string().required(),
@@ -61,12 +60,13 @@ const chargeUser = {
 
 const toggleAutoTopUp = {
   [Segments.BODY]: Joi.object().keys({
-    enabled: Joi.boolean().required(), // ✅ Make required again
+    enabled: Joi.boolean().required(),
     threshold: Joi.number().min(0).optional(),
     topUpAmount: Joi.number().min(1).optional(),
     paymentMode: Joi.string().valid('prepaid', 'payAsYouGo').required()
   }),
 };
+
 
 module.exports = {
   saveCard,

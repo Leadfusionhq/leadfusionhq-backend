@@ -1,8 +1,9 @@
 const { User } = require('../../models/user.model');
-const  Transaction  = require('../../models/transaction.model');
+const Lead = require('../../models/lead.model');
+const Transaction = require('../../models/transaction.model');
 const mongoose = require('mongoose');
 // const { ContractAcceptance } = require('../../models/ContractAcceptance');
-const { createCustomerVault, chargeCustomerVault ,deleteCustomerVault} = require('../nmi/nmi.service');
+const { createCustomerVault, chargeCustomerVault, deleteCustomerVault } = require('../nmi/nmi.service');
 const { ErrorHandler } = require('../../utils/error-handler');
 const { RegularUser } = require('../../models/user.model');
 const { billingLogger } = require('../../utils/logger');
@@ -10,10 +11,10 @@ const NMI_QUERY_URL = process.env.NMI_QUERY_URL;
 const SECURITY_KEY = process.env.NMI_SECURITY_KEY;
 const dayjs = require('dayjs');
 const fetchWrapper = require('../../utils/fetchWrapper');
-const {sendBalanceTopUpAlert} = require('../../services/n8n/webhookService.js');
+const { sendBalanceTopUpAlert, processSingleLeadPayment } = require('../../services/n8n/webhookService.js');
 const MAIL_HANDLER = require('../../mail/mails');
 const formatForNmi = (d) => dayjs(d).format('MM/DD/YYYY');
-const { sendToN8nWebhook, sendLowBalanceAlert} = require('../../services/n8n/webhookService.js');
+const { sendToN8nWebhook, sendLowBalanceAlert } = require('../../services/n8n/webhookService.js');
 
 // Contract management
 const getCurrentContract = async () => {
@@ -75,12 +76,12 @@ const getUserContractStatus = async (userId) => {
 
 // Card management
 const saveCard = async (cardData) => {
-  const { user_id, card_number, expiry_month, expiry_year, cvv, billing_address, zip, full_name , email } = cardData;
+  const { user_id, card_number, expiry_month, expiry_year, cvv, billing_address, zip, full_name, email } = cardData;
 
-  billingLogger.info('Starting card save process', { 
-    userId: user_id, 
+  billingLogger.info('Starting card save process', {
+    userId: user_id,
     cardLast4: card_number.slice(-4),
-    fullName: full_name 
+    fullName: full_name
   });
 
   const [first_name, ...last_nameParts] = full_name.split(" ");
@@ -95,17 +96,17 @@ const saveCard = async (cardData) => {
     billing_first_name: first_name,
     billing_last_name: last_name,
     billing_address1: billing_address || '123 Default St',
-    billing_address2:'',
-    billing_city:'CityName',
-    billing_state:'StateCode',
+    billing_address2: '',
+    billing_city: 'CityName',
+    billing_state: 'StateCode',
     billing_zip: zip || '00000',
-    billing_country:'US',
+    billing_country: 'US',
     ccnumber: card_number,
     ccexp: `${expiry_month}${expYear}`,
     cvv: cvv
   };
 
-  billingLogger.info('Sending card data to NMI vault', { 
+  billingLogger.info('Sending card data to NMI vault', {
     userId: user_id,
     cardLast4: card_number.slice(-4)
   });
@@ -114,7 +115,7 @@ const saveCard = async (cardData) => {
   try {
     vaultResponse = await createCustomerVault(payload);
   } catch (err) {
-    billingLogger.error('NMI vault creation failed', err, { 
+    billingLogger.error('NMI vault creation failed', err, {
       userId: user_id,
       cardLast4: card_number.slice(-4)
     });
@@ -139,14 +140,14 @@ const saveCard = async (cardData) => {
 
   const vaultId = params.customer_vault_id;
   if (!vaultId) {
-    billingLogger.error('Failed to retrieve vault ID from NMI response', null, { 
+    billingLogger.error('Failed to retrieve vault ID from NMI response', null, {
       userId: user_id,
       responseParams: params
     });
     throw new ErrorHandler(500, 'Failed to retrieve customer vault ID from gateway');
   }
 
-  billingLogger.info('NMI vault created successfully', { 
+  billingLogger.info('NMI vault created successfully', {
     userId: user_id,
     vaultId,
     cardLast4: card_number.slice(-4)
@@ -166,12 +167,12 @@ const saveCard = async (cardData) => {
     expiryMonth: expiry_month,
     expiryYear: expiry_year,
     isDefault: user.paymentMethods.length === 0, // Set as default if first card
-    cvv:cvv,
+    cvv: cvv,
   };
 
   // Add to payment methods array
   user.paymentMethods.push(newPaymentMethod);
-  
+
   // If this is the first card, set it as default
   if (user.paymentMethods.length === 1) {
     user.defaultPaymentMethod = vaultId;
@@ -180,7 +181,7 @@ const saveCard = async (cardData) => {
   user.hasStoredCard = true;
   await user.save();
 
-  billingLogger.info('Card saved to database successfully', { 
+  billingLogger.info('Card saved to database successfully', {
     userId: user_id,
     vaultId,
     cardBrand,
@@ -211,10 +212,10 @@ const detectCardBrand = (cardNumber) => {
 
 // Billing operations
 const addFunds = async (userId, amount, vaultId = null) => {
-  billingLogger.info('Starting add funds process', { 
-    userId, 
+  billingLogger.info('Starting add funds process', {
+    userId,
     amount,
-    vaultId 
+    vaultId
   });
 
   const user = await User.findById(userId);
@@ -228,7 +229,7 @@ const addFunds = async (userId, amount, vaultId = null) => {
   if (vaultId) {
     // Use the provided vaultId
     customerVaultIdToUse = vaultId;
-    
+
     // Find the payment method details
     const selectedPaymentMethod = user.paymentMethods.find(pm => pm.customerVaultId === vaultId);
     if (selectedPaymentMethod) {
@@ -255,10 +256,10 @@ const addFunds = async (userId, amount, vaultId = null) => {
       brand: 'Card'
     };
   }
-  
+
   // FINALLY: If still no vault ID, throw error
   if (!customerVaultIdToUse) {
-    billingLogger.error('No payment method found for user', null, { 
+    billingLogger.error('No payment method found for user', null, {
       userId,
       amount,
       hasPaymentMethods: user.paymentMethods?.length > 0,
@@ -267,7 +268,7 @@ const addFunds = async (userId, amount, vaultId = null) => {
     throw new ErrorHandler(400, 'No payment method found. Please add a card first.');
   }
 
-  billingLogger.info('Charging payment method for funds', { 
+  billingLogger.info('Charging payment method for funds', {
     userId,
     amount,
     vaultId: customerVaultIdToUse,
@@ -277,15 +278,15 @@ const addFunds = async (userId, amount, vaultId = null) => {
 
   // ✅ Charge using the found vault ID
   const chargeResult = await chargeCustomerVault(
-    customerVaultIdToUse, 
-    amount, 
+    customerVaultIdToUse,
+    amount,
     `Add funds to account - ${user.email}`
   );
 
   console.log('Charge result:', chargeResult);
 
   if (!chargeResult.success) {
-    billingLogger.error('Payment charge failed', null, { 
+    billingLogger.error('Payment charge failed', null, {
       userId,
       amount,
       vaultId: customerVaultIdToUse,
@@ -301,26 +302,26 @@ const addFunds = async (userId, amount, vaultId = null) => {
     } else if (chargeResult.responseCode === '3') {
       throw new ErrorHandler(400, 'Payment error. Please contact your bank or use a different card.');
     }
-    
+
     throw new ErrorHandler(400, 'Payment failed: ' + chargeResult.message);
   }
 
   const oldBalance = user.balance || 0;
   const newBalance = oldBalance + parseFloat(amount);
-  
+
   // ✅ Add to user's balance
   user.balance = newBalance;
   await user.save();
 
-try {
+  try {
     // ---------------------------------------
     // 🔹 Send Balance Top-Up Webhook
     // ---------------------------------------
     await sendBalanceTopUpAlert({
-        partner_id: user.integrations?.boberdoo?.external_id || "",
-        email: user.email,
-        amount: amount,
-        user_id: user._id
+      partner_id: user.integrations?.boberdoo?.external_id || "",
+      email: user.email,
+      amount: amount,
+      user_id: user._id
     });
 
     billingLogger.info('Balance top-up webhook sent', { userId, amount });
@@ -331,49 +332,49 @@ try {
     // 🔹 Prepare Admin Emails (Exclude Specific Admins)
     // ---------------------------------------
     const EXCLUDED = new Set([
-        'admin@gmail.com',
-        'admin123@gmail.com',
-        'admin1234@gmail.com',
+      'admin@gmail.com',
+      'admin123@gmail.com',
+      'admin1234@gmail.com',
     ]);
 
     const adminUsers = await User.find({
-        role: { $in: ['ADMIN', 'SUPER_ADMIN'] },
-        isActive: { $ne: false },
+      role: { $in: ['ADMIN', 'SUPER_ADMIN'] },
+      isActive: { $ne: false },
     }).select('email name');
 
     const adminEmails = (adminUsers || [])
-        .map(a => a.email?.trim().toLowerCase())
-        .filter(e => e && !EXCLUDED.has(e));
-        
+      .map(a => a.email?.trim().toLowerCase())
+      .filter(e => e && !EXCLUDED.has(e));
+
 
     // ---------------------------------------
     // 🔹 Send USER Email (Lead Service Resumed)
     // ---------------------------------------
     await MAIL_HANDLER.sendCampaignResumedEmail({
-        to: user.email,
-        userName: user.name,
-        email: user.email,
-        partnerId: user.integrations?.boberdoo?.external_id || ""
+      to: user.email,
+      userName: user.name,
+      email: user.email,
+      partnerId: user.integrations?.boberdoo?.external_id || ""
     });
 
     // ---------------------------------------
     // 🔹 Send ADMIN Email (Lead Service Resumed)
     // ---------------------------------------
     await MAIL_HANDLER.sendCampaignResumedAdminEmail({
-        to: adminEmails,
-        userName: user.name,
-        userEmail: user.email,
-        partnerId: user.integrations?.boberdoo?.external_id || ""
+      to: adminEmails,
+      userName: user.name,
+      userEmail: user.email,
+      partnerId: user.integrations?.boberdoo?.external_id || ""
     });
 
 
-} catch (webhookErr) {
+  } catch (webhookErr) {
     billingLogger.error('Failed to send balance top-up webhook or emails', webhookErr);
-}
+  }
 
 
 
-  billingLogger.info('Funds added successfully', { 
+  billingLogger.info('Funds added successfully', {
     userId,
     amount,
     oldBalance,
@@ -418,11 +419,11 @@ try {
 
   } catch (transactionError) {
     billingLogger.error('Transaction creation error', transactionError, { userId, amount });
-    
+
     // Even if transaction recording fails, the payment was successful
     // Generate a fallback transaction ID
     const fallbackTxnId = `TXN-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
-    
+
     return {
       success: true,
       transactionId: fallbackTxnId,
@@ -446,7 +447,7 @@ const assignLead = async (userId, leadId, leadCost, assignedBy) => {
   if (!user) throw new ErrorHandler(404, 'User not found');
 
   const currentBalance = user.balance || 0;
-  
+
   // Check if user has sufficient balance
   if (currentBalance >= leadCost) {
     // Deduct from balance
@@ -481,7 +482,7 @@ const assignLead = async (userId, leadId, leadCost, assignedBy) => {
 
     // Charge the user's card for the lead cost
     const chargeResult = await chargeCustomerVault(user.customerVaultId, leadCost, `Lead assignment: ${leadId}`);
-    
+
     if (!chargeResult.success) {
       throw new ErrorHandler(400, 'Payment failed: ' + chargeResult.message);
     }
@@ -599,7 +600,7 @@ const assignLeadPrepaid = async (userId, leadId, leadCost, assignedBy, session) 
   await transaction.save({ session });
 
   return {
-    success: true, 
+    success: true,
     paymentMethod: "BALANCE",
     newBalance: user.balance,
     leadId,
@@ -816,20 +817,20 @@ const handlePaymentFailure = async ({
         .map(a => a.email?.trim().toLowerCase())
         .filter(e => e && !EXCLUDED.has(e));
 
-                  // ✅ NEW: override with env emails if present (still an array)
-        console.log("ENV CHECK → ADMIN_NOTIFICATION_EMAILS =", process.env.ADMIN_NOTIFICATION_EMAILS);
+      // ✅ NEW: override with env emails if present (still an array)
+      console.log("ENV CHECK → ADMIN_NOTIFICATION_EMAILS =", process.env.ADMIN_NOTIFICATION_EMAILS);
 
-        console.log("Admin before override =", adminEmails);
+      console.log("Admin before override =", adminEmails);
 
-        if (process.env.ADMIN_NOTIFICATION_EMAILS) {
-          adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS
-            .split(',')
-            .map(e => e.trim().toLowerCase())
-            .filter(Boolean);
-        }
+      if (process.env.ADMIN_NOTIFICATION_EMAILS) {
+        adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS
+          .split(',')
+          .map(e => e.trim().toLowerCase())
+          .filter(Boolean);
+      }
 
-        console.log("Admin AFTER override =", adminEmails);
- const emailString = adminEmails.join(',');
+      console.log("Admin AFTER override =", adminEmails);
+      const emailString = adminEmails.join(',');
       await MAIL_HANDLER.sendFailedLeadPaymentAdminEmail({
         to: emailString,
         userEmail: owner.email,
@@ -868,7 +869,7 @@ const manualCharge = async (userId, amount, note, chargedBy) => {
 
   // Charge the user's card
   const chargeResult = await chargeCustomerVault(user.customerVaultId, amount, note || 'Manual charge');
-  
+
   if (!chargeResult.success) {
     throw new ErrorHandler(400, 'Payment failed: ' + chargeResult.message);
   }
@@ -924,7 +925,7 @@ const getUserTransactions = async (userId, page = 1, limit = 20, filters = {}) =
   // Apply filters
   if (filters.type) query.type = filters.type;
   if (filters.status) query.status = filters.status;
-  
+
   // Date range filter
   if (filters.dateFrom || filters.dateTo) {
     query.createdAt = {};
@@ -987,7 +988,7 @@ const updatePaymentMode = async (userId, paymentModeData) => {
     paymentMode: paymentMode,
     updatedAt: new Date()
   };
-  
+
   await user.save();
 
   return {
@@ -1016,7 +1017,7 @@ const checkAndPerformAutoTopUp = async (userId, currentBalance) => {
   // Get default payment method
   let customerVaultIdToUse;
   let defaultPaymentMethod;
-  
+
   if (user.paymentMethods && user.paymentMethods.length > 0) {
     defaultPaymentMethod = user.paymentMethods.find(pm => pm.isDefault);
     if (defaultPaymentMethod?.customerVaultId) {
@@ -1030,17 +1031,17 @@ const checkAndPerformAutoTopUp = async (userId, currentBalance) => {
 
   try {
     const topUpAmount = user.autoTopUp.topUpAmount || 50;
-    
+
     // Charge using the found vault ID
     const chargeResult = await chargeCustomerVault(
-      customerVaultIdToUse, 
-      topUpAmount, 
+      customerVaultIdToUse,
+      topUpAmount,
       'Auto top-up'
     );
 
     if (!chargeResult.success) {
-      return { 
-        performed: false, 
+      return {
+        performed: false,
         reason: `Payment failed: ${chargeResult.message}`,
         error: chargeResult
       };
@@ -1078,36 +1079,36 @@ const checkAndPerformAutoTopUp = async (userId, currentBalance) => {
 
   } catch (error) {
     console.error('Auto top-up error:', error);
-    return { 
-      performed: false, 
+    return {
+      performed: false,
       reason: 'Auto top-up processing failed',
-      error: error.message 
+      error: error.message
     };
   }
 };
 
 const testLeadDeduction = async (userId, deductAmount) => {
-  billingLogger.info('Starting test lead deduction', { 
-    userId, 
-    deductAmount 
+  billingLogger.info('Starting test lead deduction', {
+    userId,
+    deductAmount
   });
 
   const user = await User.findById(userId);
   if (!user) throw new ErrorHandler(404, 'User not found');
 
   const originalBalance = user.balance || 0;
-  billingLogger.info('User balance and deduction details', { 
+  billingLogger.info('User balance and deduction details', {
     userId,
     originalBalance,
     deductAmount,
     balanceSufficient: originalBalance >= deductAmount
   });
-  
+
   // Check payment mode
   const paymentMode = user.autoTopUp?.paymentMode || 'prepaid';
   const autoPayEnabled = user.autoTopUp?.enabled || false;
-  
-  billingLogger.info('User payment configuration', { 
+
+  billingLogger.info('User payment configuration', {
     userId,
     paymentMode,
     autoPayEnabled,
@@ -1151,7 +1152,7 @@ const testLeadDeduction = async (userId, deductAmount) => {
     return await handleDirectCardCharge(user, deductAmount, originalBalance);
   } else {
     // Prepaid mode or auto-pay disabled - require manual top-up
-    throw new ErrorHandler(400, 
+    throw new ErrorHandler(400,
       `Insufficient wallet balance ($${originalBalance.toFixed(2)}). ` +
       `You need $${deductAmount.toFixed(2)} to complete this transaction. ` +
       `Please add funds to your wallet to continue.`
@@ -1160,12 +1161,12 @@ const testLeadDeduction = async (userId, deductAmount) => {
 };
 
 const handleDirectCardCharge = async (user, deductAmount, originalBalance) => {
-  billingLogger.info('Attempting direct card charge', { 
+  billingLogger.info('Attempting direct card charge', {
     userId: user._id,
     deductAmount,
     originalBalance
   });
-  
+
   // Get default payment method
   let defaultPaymentMethod;
   if (user.paymentMethods && user.paymentMethods.length > 0) {
@@ -1173,11 +1174,11 @@ const handleDirectCardCharge = async (user, deductAmount, originalBalance) => {
   }
 
   if (!defaultPaymentMethod?.customerVaultId) {
-    billingLogger.error('No default payment method for direct charge', null, { 
+    billingLogger.error('No default payment method for direct charge', null, {
       userId: user._id,
       hasPaymentMethods: user.paymentMethods?.length > 0
     });
-    throw new ErrorHandler(400, 
+    throw new ErrorHandler(400,
       'No default payment method available for direct charging. ' +
       'Please add a payment method or add funds to your wallet.'
     );
@@ -1186,13 +1187,13 @@ const handleDirectCardCharge = async (user, deductAmount, originalBalance) => {
   try {
     // Charge the card directly for the lead amount
     const chargeResult = await chargeCustomerVault(
-      defaultPaymentMethod.customerVaultId, 
-      deductAmount, 
+      defaultPaymentMethod.customerVaultId,
+      deductAmount,
       'Direct lead payment'
     );
 
     if (!chargeResult.success) {
-      throw new ErrorHandler(400, 
+      throw new ErrorHandler(400,
         `Payment failed: ${chargeResult.message}. ` +
         'Please use a different payment method or add funds to your wallet.'
       );
@@ -1230,7 +1231,7 @@ const handleDirectCardCharge = async (user, deductAmount, originalBalance) => {
 
   } catch (error) {
     console.error('Direct card charge error:', error);
-    throw new ErrorHandler(400, 
+    throw new ErrorHandler(400,
       `Direct card payment failed: ${error.message}. ` +
       'Please add funds to your wallet or update your payment method.'
     );
@@ -1330,27 +1331,42 @@ const addBalanceByAdmin = async (userId, amount, adminId) => {
 
 const getRevenueFromNmi = async ({ start, end }) => {
   const payload = {
-  security_key: SECURITY_KEY,
-  report_type: 'transaction',
-  start_date: formatForNmi(start),
-  end_date: formatForNmi(end),
-  action_type: 'sale',
-  response: '1',
-  output: 'json',
+    security_key: SECURITY_KEY,
+    report_type: 'transaction',
+    start_date: formatForNmi(start),
+    end_date: formatForNmi(end),
+    action_type: 'sale',
+    response: '1',
+    output: 'json',
   };
-  
+
   const resp = await fetchWrapper('POST', NMI_QUERY_URL, payload, null, false, true);
   const data = typeof resp === 'string' ? JSON.parse(resp) : resp;
-  
+
   const records = data?.records?.record || data?.record || [];
   const totalAmount = records.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0);
-  
+
   return { totalAmount, count: records.length, raw: data };
-  };
-  
-  
+};
+
+
+const chargeSingleLead = async (userId, leadId) => {
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new ErrorHandler(404, 'User not found');
+  }
+  const lead = await Lead.findById(leadId);
+  if (!lead) {
+    throw new ErrorHandler(404, 'Lead not found');
+  }
+  const result = await processSingleLeadPayment(userId, leadId);
+
+  return result;
+};
+
 
 module.exports = {
+  chargeSingleLead,
   getCurrentContract,
   getUserContractStatus,
   // acceptContract,
@@ -1363,11 +1379,11 @@ module.exports = {
   updatePaymentMode,
   deleteUserCard,
   testLeadDeduction,
-  checkAndPerformAutoTopUp, 
+  checkAndPerformAutoTopUp,
   assignLeadNew,
   addBalanceByAdmin,
   getRevenueFromNmi,
-handlePaymentFailure,
+  handlePaymentFailure,
 
   assignLeadPrepaid,
   assignLeadPayAsYouGo,
