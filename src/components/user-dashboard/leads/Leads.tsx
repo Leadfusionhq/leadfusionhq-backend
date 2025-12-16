@@ -624,7 +624,7 @@ export default function LeadTable() {
           <div className="bg-gradient-to-br from-blue-500 to-indigo-600 p-6 rounded-2xl shadow-lg text-white flex flex-col justify-between relative overflow-hidden">
             <div className="z-10">
               <p className="text-blue-100 text-sm font-medium">Return Policy</p>
-              <h3 className="text-xl font-bold mt-1">5-Day Guarantee</h3>
+              <h3 className="text-xl font-bold mt-1">5-Day For Returns</h3>
               <p className="text-xs text-blue-100 mt-2 opacity-80">You can return bad leads within 5 days of purchase.</p>
             </div>
             <CheckCircle className="absolute right-[-10px] bottom-[-10px] w-24 h-24 text-white opacity-10" />
