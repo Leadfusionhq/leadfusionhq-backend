@@ -9,12 +9,6 @@ class DashboardService {
     async getDashboardStats(query = {}) {
         const { range = '30d' } = query;
 
-        const totalUsers = await User.countDocuments({});
-
-        const totalLeads = await Lead.countDocuments({});
-
-
-
         let daysToSubtract = 30;
         if (range === '7d') daysToSubtract = 7;
 
@@ -22,107 +16,146 @@ class DashboardService {
         startDate.setDate(startDate.getDate() - daysToSubtract);
         startDate.setHours(0, 0, 0, 0);
 
-        const matchStage = {
-            createdAt: { $gte: startDate }
-        };
+        // Helper to extract count from facet result safely
+        const getCount = (arr) => (arr && arr.length > 0 && arr[0].count) ? arr[0].count : 0;
 
-        const aggregationPipeline = [
-            { $match: matchStage },
-            {
-                $project: {
-                    formattedDate: {
-                        $dateToString: { format: "%Y-%m-%d", date: "$createdAt" }
-                    },
-                    status: 1,
-                    return_status: 1
-                }
-            },
-            {
-                $group: {
-                    _id: "$formattedDate",
-                    qualified: {
-                        $sum: {
-                            $cond: [
-                                {
-                                    $and: [
-                                        { $eq: ["$status", "active"] },
-                                        { $eq: ["$return_status", "Not Returned"] }
-                                    ]
-                                },
-                                1,
-                                0
-                            ]
-                        }
-                    },
-                    disqualified: {
-                        $sum: {
-                            $cond: [
-                                {
-                                    $and: [
-                                        { $ifNull: ["$return_status", false] },
-                                        { $ne: ["$return_status", "Not Returned"] }
-                                    ]
-                                },
-                                1,
-                                0
-                            ]
-                        }
+        const [userResults, leadResults, campaignResults] = await Promise.all([
+            User.aggregate([
+                {
+                    $facet: {
+                        totalUsers: [{ $count: "count" }],
+                        activeUsers: [{ $match: { isActive: true } }, { $count: "count" }],
+                        inactiveUsers: [{ $match: { isActive: false } }, { $count: "count" }],
+                        activeAdmins: [
+                            {
+                                $match: {
+                                    isActive: true,
+                                    role: { $in: [STATUS.ADMIN, 'ADMIN', 'SUPER_ADMIN', /^admin$/i, /^super_admin$/i] }
+                                }
+                            },
+                            { $count: "count" }
+                        ],
+                        activeRegularUsers: [
+                            {
+                                $match: {
+                                    isActive: true,
+                                    isEmailVerified: true,
+                                    role: { $in: ['USER', /^user$/i] }
+                                }
+                            },
+                            { $count: "count" }
+                        ],
+                        unverifiedUsers: [
+                            { $match: { isEmailVerified: false } },
+                            { $count: "count" }
+                        ]
                     }
                 }
-            },
-            { $sort: { _id: 1 } }
-        ];
+            ]),
+            Lead.aggregate([
+                {
+                    $facet: {
+                        totalLeads: [{ $count: "count" }],
+                        activeLeads: [
+                            {
+                                $match: {
+                                    status: 'active',
+                                    return_status: { $in: ['Not Returned', null] }
+                                }
+                            },
+                            { $count: "count" }
+                        ],
+                        returnedLeads: [
+                            {
+                                $match: {
+                                    return_status: { $in: ['Pending', 'Approved', 'Rejected'] }
+                                }
+                            },
+                            { $count: "count" }
+                        ],
+                        chartData: [
+                            { $match: { createdAt: { $gte: startDate } } },
+                            {
+                                $project: {
+                                    formattedDate: {
+                                        $dateToString: { format: "%Y-%m-%d", date: "$createdAt" }
+                                    },
+                                    status: 1,
+                                    return_status: 1
+                                }
+                            },
+                            {
+                                $group: {
+                                    _id: "$formattedDate",
+                                    qualified: {
+                                        $sum: {
+                                            $cond: [
+                                                {
+                                                    $and: [
+                                                        { $eq: ["$status", "active"] },
+                                                        { $eq: ["$return_status", "Not Returned"] }
+                                                    ]
+                                                },
+                                                1,
+                                                0
+                                            ]
+                                        }
+                                    },
+                                    disqualified: {
+                                        $sum: {
+                                            $cond: [
+                                                {
+                                                    $and: [
+                                                        { $ifNull: ["$return_status", false] },
+                                                        { $ne: ["$return_status", "Not Returned"] }
 
-        const chartDataRaw = await Lead.aggregate(aggregationPipeline);
+                                                    ]
+                                                },
+                                                1,
+                                                0
+                                            ]
+                                        }
+                                    }
+                                }
+                            },
+                            { $sort: { _id: 1 } }
+                        ]
+                    }
+                }
+            ]),
+            Campaign.aggregate([
+                {
+                    $facet: {
+                        totalCampaigns: [{ $count: "count" }],
+                        activeCampaigns: [{ $match: { status: STATUS.ACTIVE } }, { $count: "count" }],
+                        pendingCampaigns: [{ $match: { status: STATUS.PENDING } }, { $count: "count" }]
+                    }
+                }
+            ])
+        ]);
 
-        const activeUsers = await User.countDocuments({ isActive: true });
-        const inactiveUsers = await User.countDocuments({ isActive: false });
+        const u = userResults[0];
+        const l = leadResults[0];
+        const c = campaignResults[0];
 
-
-        const activeAdmins = await User.countDocuments({
-            isActive: true,
-            role: { $in: [STATUS.ADMIN, 'ADMIN', 'SUPER_ADMIN', /^admin$/i, /^super_admin$/i] }
-        });
-        const activeRegularUsers = await User.countDocuments({
-            isActive: true,
-            isEmailVerified: true,
-            role: { $in: ['USER', /^user$/i] }
-        });
-        const unverifiedUsers = await User.countDocuments({
-            isEmailVerified: false,
-        });
-
-        const activeLeads = await Lead.countDocuments({
-            status: 'active',
-            return_status: { $in: ['Not Returned', null] }
-        });
-
-        const returnedLeads = await Lead.countDocuments({
-            return_status: { $in: ['Pending', 'Approved', 'Rejected'] }
-        });
-
-        const totalCampaigns = await Campaign.countDocuments({});
-        const activeCampaigns = await Campaign.countDocuments({ status: STATUS.ACTIVE });
-        const pendingCampaigns = await Campaign.countDocuments({ status: STATUS.PENDING });
-
-        const leadChartData = this.fillMissingDates(chartDataRaw, daysToSubtract);
+        const leadChartData = this.fillMissingDates(l.chartData, daysToSubtract);
 
         return {
-            totalUsers,
-            activeUsers,
-            inactiveUsers,
+            totalUsers: getCount(u.totalUsers),
+            activeUsers: getCount(u.activeUsers),
+            inactiveUsers: getCount(u.inactiveUsers),
 
-            activeAdmins,
-            activeRegularUsers,
-            unverifiedUsers,
+            activeAdmins: getCount(u.activeAdmins),
+            activeRegularUsers: getCount(u.activeRegularUsers),
+            unverifiedUsers: getCount(u.unverifiedUsers),
 
-            totalLeads,
-            activeLeads,
-            returnedLeads,
+            totalLeads: getCount(l.totalLeads),
+            activeLeads: getCount(l.activeLeads),
+            returnedLeads: getCount(l.returnedLeads),
 
-            totalCampaigns,
-            activeCampaigns,
-            pendingCampaigns,
+            totalCampaigns: getCount(c.totalCampaigns),
+            activeCampaigns: getCount(c.activeCampaigns),
+            pendingCampaigns: getCount(c.pendingCampaigns),
 
             leadChartData
         };

@@ -137,6 +137,7 @@ const baseUserSchema = new mongoose.Schema({
 
 baseUserSchema.index({ role: 1, createdAt: -1 });
 baseUserSchema.index({ isActive: 1 });
+baseUserSchema.index({ isActive: 1, isEmailVerified: 1, role: 1 });
 baseUserSchema.index({ 'integrations.boberdoo.sync_status': 1 });
 baseUserSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
