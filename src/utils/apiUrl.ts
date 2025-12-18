@@ -306,4 +306,5 @@ const DASHBOARD_API_BASE = `${API_BASE}/dashboard`;
 
 export const DASHBOARD_API = {
   GET_DASHBOARD_DATA: `${DASHBOARD_API_BASE}/stats`,
+  USER_DASHBOARD_DATA: `${DASHBOARD_API_BASE}/user-stats`,
 };
