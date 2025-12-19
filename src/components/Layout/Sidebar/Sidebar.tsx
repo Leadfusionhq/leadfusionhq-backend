@@ -84,15 +84,13 @@ const Sidebar = () => {
         <button
           onClick={handleLogout}
           className={`group w-full flex items-center gap-3 relative overflow-hidden rounded-xl transition-all duration-200 
-            ${collapsed ? "justify-center p-3" : "px-4 py-3"}
+            ${collapsed ? "justify-start px-4 py-3 lg:justify-center lg:p-3" : "px-4 py-3"}
             text-red-400 hover:bg-red-500/10 hover:text-red-300
           `}
         >
           <LogOut size={20} className="transition-transform duration-200 group-hover:-translate-x-0.5" />
 
-          {!collapsed && (
-            <span className="font-medium tracking-wide text-sm">Log Out</span>
-          )}
+          <span className={`font-medium tracking-wide text-sm ${collapsed ? 'lg:hidden' : ''}`}>Log Out</span>
 
           {/* Tooltip for Collapsed State */}
           {collapsed && (

@@ -28,7 +28,7 @@ const SidebarItem: FC<SidebarItemProps> = ({ item }) => {
     <Link href={item.link} className="block group">
       <div
         className={`relative flex items-center gap-3 overflow-hidden 
-        ${collapsed ? "justify-center px-2" : "px-4"} 
+        ${collapsed ? "justify-start px-4 lg:justify-center lg:px-2" : "px-4"} 
         py-3 my-1.5 rounded-xl cursor-pointer transition-all duration-200 ease-[cubic-bezier(0.25,0.1,0.25,1)]
         ${isActive
             ? 'bg-gradient-to-r from-[#204969] to-[#306A64] text-white shadow-md shadow-[#204969]/20'
@@ -56,11 +56,9 @@ const SidebarItem: FC<SidebarItemProps> = ({ item }) => {
           )}
         </div>
 
-        {!collapsed && (
-          <div className="whitespace-nowrap overflow-hidden text-ellipsis text-sm font-medium tracking-wide relative z-10 transition-transform duration-300 group-hover:translate-x-1">
-            {item.name}
-          </div>
-        )}
+        <div className={`whitespace-nowrap overflow-hidden text-ellipsis text-sm font-medium tracking-wide relative z-10 transition-transform duration-300 group-hover:translate-x-1 ${collapsed ? 'lg:hidden' : ''}`}>
+          {item.name}
+        </div>
 
         {/* Tooltip for Collapsed State */}
         {collapsed && (
