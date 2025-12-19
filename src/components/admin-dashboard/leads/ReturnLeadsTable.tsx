@@ -135,7 +135,7 @@ const StatCard = ({ title, value, icon: Icon, color, subtext, onClick, active }:
   );
 };
 
-export default function ReturnLeadsTable() {
+export default function ReturnLeadsTable({ defaultStatus = "", isAllLeads = false }: { defaultStatus?: string; isAllLeads?: boolean }) {
   const [returnLeads, setReturnLeads] = useState<ReturnLead[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -145,7 +145,7 @@ export default function ReturnLeadsTable() {
 
   // Filter State
   const [filterAnchorEl, setFilterAnchorEl] = useState<HTMLButtonElement | null>(null);
-  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>(defaultStatus);
 
   // Dialogs
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
@@ -165,12 +165,14 @@ export default function ReturnLeadsTable() {
         const params = new URLSearchParams({
           page: (pageNumber + 1).toString(),
           limit: pageSize.toString(),
-          ...(statusFilter && { status: statusFilter }),
+          ...(statusFilter && { return_status: statusFilter }),
         });
+
+        const url = isAllLeads ? LEADS_API.GET_ALL_LEADS : LEADS_API.GET_RETURN_LEADS;
 
         const response = (await axiosWrapper(
           "get",
-          `${LEADS_API.GET_RETURN_LEADS}?${params.toString()}`,
+          `${url}?${params.toString()}`,
           {},
           token ?? undefined
         )) as ApiResponse;
