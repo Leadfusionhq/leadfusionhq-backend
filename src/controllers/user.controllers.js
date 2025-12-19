@@ -319,6 +319,58 @@ const sendBalanceTopUpWebhook = wrapAsync(async (req, res) => {
   sendResponse(res, { result }, 'Balance top-up webhook sent', 200);
 });
 
+const verifyUserEmail = wrapAsync(async (req, res) => {
+  const { userId } = req.params;
+
+  console.log('🔹 [Admin] Verify Email Request for User:', userId);
+
+  const user = await UserServices.getUserByID(userId);
+  if (!user) {
+    throw new ErrorHandler(404, 'User not found');
+  }
+
+  if (user.isEmailVerified) {
+    return sendResponse(res, { user }, 'User email is already verified.', 200);
+  }
+
+  // 1. Trigger Boberdoo Sync FIRST (Atomic Verification)
+  console.log('🚀 [Admin] Starting Boberdoo sync check before verification:', user._id);
+  logger.info('[Admin] Starting Boberdoo sync check', { userId: user._id });
+
+  let syncResult;
+  try {
+    syncResult = await syncUserToBoberdooById(user._id);
+    console.log('✅ [Admin] Boberdoo sync result:', syncResult);
+    logger.info('[Admin] Boberdoo sync (verify) completed', { userId: user._id, result: syncResult });
+  } catch (err) {
+    console.error('❌ [Admin] Boberdoo sync exception:', err.message);
+    logger.error('[Admin] Boberdoo sync exception', err, { userId: user._id });
+    // Abort if the sync throws an exception
+    throw new ErrorHandler(400, `Verification Failed: Boberdoo sync error - ${err.message}`);
+  }
+
+  // 2. Check for Sync Success
+  if (!syncResult.success) {
+    // ABORT: Do not verify the user if Boberdoo rejected the data
+    const errorMessage = syncResult.error || 'Unknown Boberdoo error';
+    console.warn(`⚠️ [Admin] Verification aborted. Boberdoo rejected user: ${errorMessage}`);
+
+    // Return 400 Bad Request with the specific error so Admin knows what to fix
+    return sendResponse(res, { boberdoo: syncResult }, `Verification Aborted: ${errorMessage}`, 400);
+  }
+
+  // 3. Sync Success -> Mark Verified
+  user.isEmailVerified = true;
+  user.verificationToken = null;
+  user.verificationTokenExpires = null;
+  await user.save();
+
+  console.log('✅ User email marked as verified by Admin:', user.email);
+  logger.info('User email verified by Admin', { userId: user._id, adminId: req.user._id });
+
+  sendResponse(res, { user, boberdoo: syncResult }, 'User email verified successfully and synced to Boberdoo.', 200);
+});
+
 const deleteUser = wrapAsync(async (req, res) => {
   const { userId } = req.params;
 
@@ -355,5 +407,6 @@ module.exports = {
   updateMyProfile,
   changeMyPassword,
   sendBalanceTopUpWebhook,
+  verifyUserEmail,
   deleteUser,
 };
