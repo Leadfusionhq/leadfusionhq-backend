@@ -34,7 +34,7 @@ const AddNewUser = () => {
             name: state.name,
             abbreviation: state.abbreviation,
           }));
-          
+
           setStateOptions(options);
         }
       } catch (err) {
@@ -65,7 +65,7 @@ const AddNewUser = () => {
       coordinates: { lat: 0, lng: 0 },
       place_id: ''
     },
-   
+
   };
 
   type ApiError = {
@@ -112,7 +112,7 @@ const AddNewUser = () => {
   ) => {
     try {
       setSubmitting(true);
-      
+
       // Combine firstName and lastName into name
       const fullName = `${values.firstName.trim()} ${values.lastName.trim()}`;
 
@@ -132,7 +132,7 @@ const AddNewUser = () => {
           coordinates: values.address.coordinates,
           place_id: values.address.place_id
         },
-      
+
       };
 
       console.log("📤 Submit data:", submitData);
@@ -193,7 +193,7 @@ const AddNewUser = () => {
       >
         {({ isSubmitting, values, touched, errors, setFieldValue }) => (
           <Form className="space-y-6 bg-white p-8 rounded-lg border border-gray-300 shadow-lg max-w-4xl w-full">
-            
+
             {/* First Name and Last Name Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormikInput
@@ -255,32 +255,21 @@ const AddNewUser = () => {
                 name="phoneNumber"
                 value={values.phoneNumber}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                  let clean = e.target.value.replace(/\D/g, '');
-                  
-                  // ✅ Block 11th digit entry with non-spammy toast
-                  if (clean.length > 10) {
-                    clean = clean.slice(0, 10);
-                    toast.error('Phone number cannot exceed 10 digits', {
-                      toastId: 'phone-limit', // Prevents duplicate toasts
-                      autoClose: 2000
-                    });
-                  }
-                  
+                  const clean = e.target.value.replace(/\D/g, '').slice(0, 10);
                   setFieldValue("phoneNumber", clean);
                 }}
                 placeholder="1234567890"
-                maxLength={10} // ✅ HTML-level protection
-                className={`h-[48px] border ${
-                  touched.phoneNumber && errors.phoneNumber 
-                    ? 'border-red-500' 
+                maxLength={10}
+                className={`h-[48px] border ${touched.phoneNumber && errors.phoneNumber
+                    ? 'border-red-500'
                     : 'border-[#E0E0E0]'
-                } rounded-[8px] px-5 text-[16px] font-inter bg-[#FFFFFF] text-[#333333] focus:border-[#000] outline-none transition w-full`}
+                  } rounded-[8px] px-5 text-[16px] font-inter bg-[#FFFFFF] text-[#333333] focus:border-[#000] outline-none transition w-full`}
               />
               <div className="min-h-[20px] flex items-center justify-between">
-                <ErrorMessage 
-                  name="phoneNumber" 
-                  component="div" 
-                  className="text-red-500 text-xs transition-opacity duration-300" 
+                <ErrorMessage
+                  name="phoneNumber"
+                  component="div"
+                  className="text-red-500 text-xs transition-opacity duration-300"
                 />
                 {/* ✅ Visual feedback */}
                 {/* <span className={`text-xs ${
@@ -317,17 +306,17 @@ const AddNewUser = () => {
                   if (addressData) {
                     const selectedState = stateOptions.find(
                       state => state.abbreviation === addressData.addressComponents.state ||
-                               state.name.toLowerCase() === addressData.addressComponents.state?.toLowerCase()
+                        state.name.toLowerCase() === addressData.addressComponents.state?.toLowerCase()
                     );
-                    
+
                     if (selectedState) {
                       setFieldValue('address.state', selectedState);
                     }
-                    
+
                     if (addressData.coordinates) {
                       setFieldValue('address.coordinates', addressData.coordinates);
                     }
-                    
+
                     if (addressData.placeId) {
                       setFieldValue('address.place_id', addressData.placeId);
                     }

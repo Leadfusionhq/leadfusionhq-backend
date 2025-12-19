@@ -33,6 +33,8 @@ export const API_URL = {
 
   ACCEPT_CONTRACT: `${USER_API_BASE}/:userId/contract/accept`,
   CHECK_CONTRACT: `${USER_API_BASE}/:userId/contract/status`,
+  VERIFY_EMAIL_BY_ADMIN: `${USER_API_BASE}/:userId/verify-email`,
+
 
   GET_ALL_ADMINS: `${ADMIN_API_BASE}/`,
   // add admin accounts :::::::
@@ -65,6 +67,8 @@ export const API_URL = {
 
   // Add this new endpoint
   RESEND_VERIFICATION_EMAIL: `${TEST_API_BASE}/resend-verification-email`,
+
+
 };
 
 /** ::::::::::::::::::FAQ ROUTES :::::::::::::::::: */

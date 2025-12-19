@@ -3,7 +3,9 @@ import { FC } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { AppDispatch, RootState } from '@/redux/store';
-import { useSelector } from 'react-redux'
+import { useSelector, useDispatch } from 'react-redux';
+import { collapseSidebar } from '@/redux/theme/theme_slice';
+
 interface SidebarItemProps {
   item: {
     id: string;
@@ -16,6 +18,7 @@ interface SidebarItemProps {
 
 const SidebarItem: FC<SidebarItemProps> = ({ item }) => {
   const pathname = usePathname();
+  const dispatch = useDispatch();
   const { collapsed } = useSelector((state: RootState) => state.theme);
 
   const isActive =
@@ -24,8 +27,14 @@ const SidebarItem: FC<SidebarItemProps> = ({ item }) => {
 
   const Icon = item.icon;
 
+  const handleClick = () => {
+    if (window.innerWidth < 1024) {
+      dispatch(collapseSidebar(false));
+    }
+  };
+
   return (
-    <Link href={item.link} className="block group">
+    <Link href={item.link} className="block group" onClick={handleClick}>
       <div
         className={`relative flex items-center gap-3 overflow-hidden 
         ${collapsed ? "justify-start px-4 lg:justify-center lg:px-2" : "px-4"} 
