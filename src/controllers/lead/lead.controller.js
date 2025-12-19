@@ -781,11 +781,11 @@ const getLeads = wrapAsync(async (req, res) => {
   let data;
   // after
   if (isAdmin) {
-    const allowedFilterKeys = ['campaign_id', 'status', 'state'];
+    const allowedFilterKeys = ['campaign_id', 'status', 'state', 'return_status', 'payment_status'];
     const filters = extractFilters(req.query, allowedFilterKeys);
     data = await LeadServices.getLeads(page, limit, filters, search);
   } else {
-    const allowedFilterKeys = ['campaign_id', 'status', 'state'];
+    const allowedFilterKeys = ['campaign_id', 'status', 'state', 'return_status', 'payment_status'];
     const filters = extractFilters(req.query, allowedFilterKeys);
     data = await LeadServices.getLeadByUserId(page, limit, user._id, filters, search);
   }

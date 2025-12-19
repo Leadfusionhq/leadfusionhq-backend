@@ -27,6 +27,7 @@ const API = {
     CHECK_CONTRACT: '/:userId/contract/check',
     SYNC_BOMBERDO: '/:userId/boberdoo/resync',
     SEND_BALANCE_TOPUP_WEBHOOK: '/:userId/balance/topup-webhook',
+    VERIFY_EMAIL: '/:userId/verify-email',
 
 };
 
@@ -126,6 +127,12 @@ userRouter.post(
         CONSTANT_ENUM.USER_ROLE.USER
     ]),
     UserController.sendBalanceTopUpWebhook
+);
+
+// Admin verify user email route
+userRouter.post(API.VERIFY_EMAIL,
+    authorizedRoles([CONSTANT_ENUM.USER_ROLE.ADMIN]),
+    UserController.verifyUserEmail
 );
 
 userRouter.delete(API.DELETE_USER_BY_ID,

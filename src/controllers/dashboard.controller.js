@@ -11,6 +11,18 @@ class DashboardController {
             next(error);
         }
     }
+
+    async getUserStats(req, res, next) {
+        try {
+            const userId = req.user._id;
+            const { range } = req.query;
+            const stats = await DashboardService.getUserDashboardStats(userId, range);
+
+            res.json(stats);
+        } catch (error) {
+            next(error);
+        }
+    }
 }
 
 module.exports = new DashboardController();
