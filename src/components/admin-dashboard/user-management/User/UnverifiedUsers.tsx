@@ -28,7 +28,8 @@ import {
     Trash2,
     RefreshCcw,
     CheckCircle2,
-    ShieldAlert
+    ShieldAlert,
+    Check
 } from "lucide-react";
 import { toast } from 'react-toastify';
 import ConfirmDialog from "@/components/common/ConfirmDialog";
@@ -170,7 +171,7 @@ export default function UnverifiedUsersTable() {
             setLoading(true);
             const url = API_URL.DELETE_USER_BY_ID.replace(':userId', selectedUser._id);
             await axiosWrapper('delete', url, {}, token ?? undefined);
-            toast.success(`${selectedUser.name} deleted successfully`);
+            toast.success(`${selectedUser.name} rejected successfully`);
             setUsers((prev) => prev.filter((u) => u._id !== selectedUser._id));
             setTotalRows(prev => Math.max(0, prev - 1));
         } catch (err) {
@@ -179,6 +180,20 @@ export default function UnverifiedUsersTable() {
             setLoading(false);
             setConfirmOpen(false);
             setSelectedUser(null);
+        }
+    };
+
+    const handleApproveUser = async (user: User) => {
+        const toastId = toast.loading(`Approving ${user.name}...`);
+        try {
+            const url = API_URL.VERIFY_EMAIL_BY_ADMIN.replace(':userId', user._id);
+            const response = await axiosWrapper('post', url, {}, token ?? undefined) as { message: string };
+            toast.update(toastId, { render: response?.message || "User approved successfully", type: "success", isLoading: false, autoClose: 3000 });
+            // Remove from list since it's no longer unverified
+            setUsers((prev) => prev.filter((u) => u._id !== user._id));
+            setTotalRows(prev => Math.max(0, prev - 1));
+        } catch (err: any) {
+            toast.update(toastId, { render: getErrorMessage(err), type: "error", isLoading: false, autoClose: 3000 });
         }
     };
 
@@ -233,6 +248,7 @@ export default function UnverifiedUsersTable() {
                 return (
                     <ActionMenu
                         onResend={() => handleResendVerification(user)}
+                        onApprove={() => handleApproveUser(user)}
                         // Reuse edit route from main user/admin? Assuming yes.
                         onEdit={() => router.push(`/admin/user-management/user/${user._id}/edit`)}
                         onDelete={() => { setSelectedUser(user); setConfirmOpen(true); }}
@@ -398,8 +414,8 @@ export default function UnverifiedUsersTable() {
 
             <ConfirmDialog
                 open={confirmOpen}
-                title="Delete User"
-                message={`Are you sure you want to delete ${selectedUser?.name}?`}
+                title="Reject User"
+                message={`Are you sure you want to reject ${selectedUser?.name}? This action cannot be undone.`}
                 onConfirm={confirmDeleteUser}
                 onCancel={() => setConfirmOpen(false)}
             />
@@ -408,7 +424,7 @@ export default function UnverifiedUsersTable() {
 }
 
 
-const ActionMenu = ({ onResend, onEdit, onDelete }: { onResend: () => void, onEdit: () => void, onDelete: () => void }) => {
+const ActionMenu = ({ onResend, onEdit, onDelete, onApprove }: { onResend: () => void, onEdit: () => void, onDelete: () => void, onApprove: () => void }) => {
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const open = Boolean(anchorEl);
     const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => setAnchorEl(e.currentTarget);
@@ -436,6 +452,9 @@ const ActionMenu = ({ onResend, onEdit, onDelete }: { onResend: () => void, onEd
                 transformOrigin={{ horizontal: 'right', vertical: 'top' }}
                 anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
             >
+                <MenuItem onClick={() => { onApprove(); handleClose(); }} disableRipple className="text-sm font-medium text-emerald-600 gap-2">
+                    <Check size={16} /> Approve User
+                </MenuItem>
                 <MenuItem onClick={() => { onResend(); handleClose(); }} disableRipple className="text-sm font-medium text-gray-700 gap-2">
                     <Mail size={16} /> Resend Verification
                 </MenuItem>
@@ -443,7 +462,7 @@ const ActionMenu = ({ onResend, onEdit, onDelete }: { onResend: () => void, onEd
                     <RefreshCcw size={16} /> Edit User
                 </MenuItem>
                 <MenuItem onClick={() => { onDelete(); handleClose(); }} disableRipple className="text-sm font-medium text-red-600 gap-2">
-                    <Trash2 size={16} /> Delete User
+                    <Trash2 size={16} /> Reject User
                 </MenuItem>
             </Menu>
         </>
