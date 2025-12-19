@@ -197,7 +197,13 @@ const StatCard = ({ title, value, icon: Icon, color, subtext, onClick, active }:
     );
 };
 
-export default function AllLeadsTable() {
+// --- Props ---
+type AllLeadsTableProps = {
+    defaultPaymentStatus?: string;
+    defaultReturnStatus?: string;
+};
+
+export default function AllLeadsTable({ defaultPaymentStatus, defaultReturnStatus }: AllLeadsTableProps) {
     const [leads, setLeads] = useState<Lead[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
@@ -268,6 +274,8 @@ export default function AllLeadsTable() {
                 ...(selectedCampaign && { campaign_id: selectedCampaign }),
                 ...(selectedStatus && { status: selectedStatus }),
                 ...(normStateId && { state: normStateId }),
+                ...(defaultPaymentStatus && { payment_status: defaultPaymentStatus }),
+                ...(defaultReturnStatus && { return_status: defaultReturnStatus }),
             });
 
             const endpoint = LEADS_API.GET_ALL_LEADS;
@@ -287,7 +295,7 @@ export default function AllLeadsTable() {
         } finally {
             setLoading(false);
         }
-    }, [token, selectedCampaign, selectedStatus, selectedState]);
+    }, [token, selectedCampaign, selectedStatus, selectedState, defaultPaymentStatus, defaultReturnStatus]);
 
     // Effects
     useEffect(() => {

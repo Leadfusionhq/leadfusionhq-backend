@@ -168,12 +168,14 @@ export default function LeadTable() {
   const [returnModalOpen, setReturnModalOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
 
+  const [activeTab, setActiveTab] = useState<'all' | 'payment_pending' | 'return_approved'>('all');
+
   const router = useRouter();
   const token = useSelector((state: RootState) => state.auth.token);
 
   // --- Fetch Leads ---
   const fetchLeads = useCallback(
-    async (pageNumber: number, pageSize: number, search?: string) => {
+    async (pageNumber: number, pageSize: number, search?: string, currentTab?: string) => {
       try {
         setLoading(true);
 
@@ -184,6 +186,14 @@ export default function LeadTable() {
 
         if (search) {
           params.append('search', search);
+        }
+
+        const tab = currentTab || activeTab;
+
+        if (tab === 'payment_pending') {
+          params.append('payment_status', 'pending');
+        } else if (tab === 'return_approved') {
+          params.append('return_status', 'Approved');
         }
 
         const response = (await axiosWrapper(
@@ -202,12 +212,12 @@ export default function LeadTable() {
         setLoading(false);
       }
     },
-    [token]
+    [token, activeTab]
   );
 
   useEffect(() => {
     setPagination(prev => ({ ...prev, pageIndex: 0 }));
-  }, [debouncedGlobalFilter]);
+  }, [debouncedGlobalFilter, activeTab]);
 
   useEffect(() => {
     if (token) {
@@ -636,20 +646,51 @@ export default function LeadTable() {
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
 
         {/* Controls */}
-        <div className="p-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/50 backdrop-blur-sm">
-          <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            All Leads
-            <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 text-xs font-medium">{totalRows}</span>
-          </h2>
-          <div className="relative group w-full sm:w-72">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-hover:text-black transition-colors" />
-            <input
-              type="text"
-              placeholder="Search leads..."
-              value={globalFilter}
-              onChange={(e) => setGlobalFilter(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black/20 transition-all shadow-sm group-hover:bg-white"
-            />
+        <div className="p-5 border-b border-gray-100 flex flex-col gap-4 bg-white/50 backdrop-blur-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+
+            {/* Tabs */}
+            <div className="flex flex-wrap items-center gap-2">
+              {[
+                { id: 'all', label: 'All Leads' },
+                { id: 'payment_pending', label: 'Payment Pending', icon: Clock },
+                { id: 'return_approved', label: 'Return Approved', icon: CheckCircle }
+              ].map((tab) => {
+                const isActive = activeTab === tab.id;
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id as any)}
+                    className={`
+                      flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all
+                      ${isActive
+                        ? 'bg-black text-white shadow-md transform scale-105'
+                        : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+                      }
+                    `}
+                  >
+                    {Icon && <Icon size={14} className={isActive ? 'text-white' : 'text-gray-500'} />}
+                    {tab.label}
+                  </button>
+                );
+              })}
+              <span className="ml-2 px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-600 text-xs font-semibold border border-gray-200">
+                {totalRows}
+              </span>
+            </div>
+
+            {/* Search */}
+            <div className="relative group w-full sm:w-72">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-hover:text-black transition-colors" />
+              <input
+                type="text"
+                placeholder="Search leads..."
+                value={globalFilter}
+                onChange={(e) => setGlobalFilter(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black/20 transition-all shadow-sm group-hover:bg-white"
+              />
+            </div>
           </div>
         </div>
 

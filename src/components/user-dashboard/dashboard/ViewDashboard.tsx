@@ -1,225 +1,124 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import axiosWrapper from "@/utils/api";
-import { CAMPAIGNS_API, LEADS_API, BILLING_API } from "@/utils/apiUrl";
-import { useSelector } from "react-redux";
-import { RootState } from "@/redux/store";
-import { 
-  Box, 
-  Card, 
-  CardContent, 
-  Typography, 
-  Button,
-  Skeleton,
-  Chip,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  IconButton,
-  Stack,
-  Alert
-} from "@mui/material";
-import { 
-  Campaign as CampaignIcon,
-  People as PeopleIcon,
-  AccountBalanceWallet as WalletIcon,
+import { useState, useEffect } from 'react';
+import { useSelector } from 'react-redux';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import {
+  Users,
+  DollarSign,
+  FileText,
+  CheckCircle,
+  XCircle,
   TrendingUp,
-  Add,
-  Visibility,
-  Edit,
-  Warning
-} from "@mui/icons-material";
-import { toast } from "react-toastify";
-import { getErrorMessage } from "@/utils/getErrorMessage";
+  Activity,
+  AlertCircle,
+  Plus,
+  Eye,
+  Wallet,
+  Download
+} from 'lucide-react';
+import { Skeleton, Chip, IconButton } from '@mui/material';
+import Link from 'next/link';
+import axiosWrapper from "@/utils/api";
+import { DASHBOARD_API } from "@/utils/apiUrl";
+import { RootState } from '@/redux/store';
 import { useRouter } from 'next/navigation';
+import { toast } from 'react-toastify';
+import { getErrorMessage } from "@/utils/getErrorMessage";
 
-interface DashboardStats {
-  totalCampaigns: number;
-  activeCampaigns: number;
-  completedCampaigns: number;
-  totalLeads: number;
-  activeLeads: number;     // NEW
-  pendingLeads: number;    // NEW
-  returnedLeads: number;   // NEW
-  rejectedLeads: number; 
-  balance: number;
-  lastPaymentDate?: string;
+// --- Interfaces ---
+
+interface ChartDataPoint {
+  date: string;
+  count: number;
 }
 
 interface RecentLead {
   id: string;
   name: string;
+  campaign_name: string;
   status: string;
-  campaign: string;
-  lastActivity: string;
+  payment_status: string;
+  created_at: string;
 }
 
 interface CampaignPerformance {
   id: string;
   name: string;
-  totalLeads: number;
-  conversionRate: number;
+  total_leads: number;
   status: string;
 }
 
-interface StatCardProps {
-  title: string;
-  mainValue: string | number;
-  subtext: string;
-  icon: React.ReactNode;
-  color: string;
-  buttonText?: string;
-  buttonAction?: () => void;
+interface RecentActivity {
+  id: string;
+  type: string;
+  message: string;
+  timestamp: string;
+}
+
+interface DashboardData {
+  summary: {
+    total_campaigns: number;
+    active_campaigns: number;
+    completed_campaigns: number;
+    total_leads: number;
+  };
+  lead_metrics: {
+    active: number;
+    pending_return: number;
+    returned: number;
+    rejected_return: number;
+    payment_pending: number;
+  };
+  billing: {
+    current_balance: number;
+    spent_this_period: number;
+    added_this_period: number;
+    currency: string;
+    is_low_balance: boolean;
+    last_payment?: {
+      amount: number;
+      date: string;
+    };
+  };
+  charts: {
+    leads_trend: ChartDataPoint[]; // Renamed to leads_trend to match new API
+    returned_leads_trend?: ChartDataPoint[]; // Optional, fallback to leads_trend if missing
+  };
+  recent_leads: RecentLead[];
+  campaign_performance: CampaignPerformance[];
+  recent_activity: RecentActivity[];
 }
 
 export default function ClientDashboard() {
   const token = useSelector((state: RootState) => state.auth.token);
+  const user = useSelector((state: RootState) => state.auth.user);
   const router = useRouter();
-  
-  const [stats, setStats] = useState<DashboardStats>({
-    totalCampaigns: 0,
-    activeCampaigns: 0,
-    completedCampaigns: 0,
-    totalLeads: 0,
-     activeLeads: 0,
-      pendingLeads: 0,
-      returnedLeads: 0,
-      rejectedLeads: 0,
 
-    balance: 0
-  });
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [dateRange, setDateRange] = useState<string>('30d');
 
-  
-  const [recentLeads, setRecentLeads] = useState<RecentLead[]>([]);
-  const [campaignPerformance, setCampaignPerformance] = useState<CampaignPerformance[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [lowBalanceAlert, setLowBalanceAlert] = useState(false);
-
-  // Lead Status Mapping
-  const LEAD_STATUS_MAP: Record<string, { label: string }> = {
-    'Not Returned': { label: 'Active' },
-    'Pending': { label: 'Pending Return' },
-    'Approved': { label: 'Returned' },
-    'Rejected': { label: 'Return Rejected' }
+  const handlePrint = () => {
+    window.print();
   };
-
-  const getLeadStatus = (return_status: string) => {
-    return LEAD_STATUS_MAP[return_status] || LEAD_STATUS_MAP['Not Returned'];
-  };
-
-  useEffect(() => {
-    if (token) {
-      fetchDashboardData();
-    }
-  }, [token]);
 
   const fetchDashboardData = async () => {
+    if (!token) return;
+
     try {
       setLoading(true);
-      
-      // Fetch campaigns
-      const campaignsRes = await axiosWrapper(
+      // Pass the date range filter to the API
+      const res = await axiosWrapper(
         "get",
-        CAMPAIGNS_API.GET_ALL_CAMPAIGNS,
-        {},
-        token ?? undefined
-      ) as any;
-      
-      // Fetch leads
-      const leadsRes = await axiosWrapper(
-        "get",
-        LEADS_API.GET_ALL_LEADS,
-        {},
-        token ?? undefined
-      ) as any;
-      
-      // Fetch billing info
-      const billingRes = await axiosWrapper(
-        "get",
-        BILLING_API.GET_BALANCE,
-        {},
+        DASHBOARD_API.USER_DASHBOARD_DATA,
+        { range: dateRange }, // Send range param
         token ?? undefined
       ) as any;
 
-      // Process campaigns data
-      const campaigns = Array.isArray(campaignsRes?.data) ? campaignsRes.data : [];
-      const activeCampaigns = campaigns.filter((c: any) => c.status?.toLowerCase() === 'active').length;
-      const completedCampaigns = campaigns.filter((c: any) => c.status?.toLowerCase() === 'completed').length;
-
-      // Process leads data
-      const leads = Array.isArray(leadsRes?.data) ? leadsRes.data : [];
-
-      // Backend-real logic
-      const activeLeads = leads.filter(l => l.return_status === "Not Returned").length;
-      const pendingLeads = leads.filter(l => l.return_status === "Pending").length;
-      const returnedLeads = leads.filter(l => l.return_status === "Approved").length;
-      const rejectedLeads = leads.filter(l => l.return_status === "Rejected").length;
-
-
-      // Process billing data
-      const balance = billingRes?.balance?.balance || 0;
-      const lastPaymentDate = billingRes?.balance?.lastPaymentDate;
-
-      setStats({
-        totalCampaigns: campaigns.length,
-        activeCampaigns,
-        completedCampaigns,
-        totalLeads: leads.length,
-          activeLeads,
-          pendingLeads,
-          returnedLeads,
-          rejectedLeads,
-
-
-        balance,
-        lastPaymentDate
-      });
-
-
-      // Set low balance alert if balance is less than $100
-      setLowBalanceAlert(balance < 100);
-
-      // Process recent leads (last 5)
-      const recent = leads.slice(0, 5).map((lead: any) => ({
-        id: lead._id || '',
-        name: `${lead.first_name || ''} ${lead.last_name || ''}`.trim(),
-        status: lead.status || 'New',
-        campaign: lead.campaign_id.campaign_id || 'N/A',
-        lastActivity: lead.updatedAt ? new Date(lead.updatedAt).toLocaleDateString() : 'N/A'
-      }));
-      setRecentLeads(recent);
-
-      // Process campaign performance
-      const performance = campaigns.slice(0, 5).map((camp: any) => {
-        const totalLeads = camp.leadCount || 0;
-
-        const leadsForCamp = leads.filter(
-          l => l.campaign_id?._id === camp._id
-        );
-
-        const acceptedLeads = leadsForCamp.filter(
-          l => l.return_status === "Not Returned"
-        ).length;
-
-        const conversionRate =
-          totalLeads === 0 ? 0 : Number(((acceptedLeads / totalLeads) * 100).toFixed(2));
-
-        return {
-          id: camp._id,
-          name: camp.name || "Unnamed Campaign",
-          totalLeads,
-          conversionRate,
-          status: camp.status || "Active",
-        };
-      });
-
-      setCampaignPerformance(performance);
-
-
+      if (res?.data) {
+        setData(res.data);
+      }
     } catch (err) {
       console.error("Error fetching dashboard data:", err);
       toast.error(getErrorMessage(err));
@@ -228,309 +127,490 @@ export default function ClientDashboard() {
     }
   };
 
-  const StatCard = ({ 
-    title, 
-    mainValue, 
-    subtext, 
-    icon, 
-    color, 
-    buttonText, 
-    buttonAction 
-  }: StatCardProps) => (
-    <Card 
-      elevation={3} 
-      sx={{ 
-        height: '100%',
-        background: `linear-gradient(135deg, ${color}15 0%, ${color}05 100%)`,
-        borderLeft: `4px solid ${color}`,
-        transition: 'transform 0.2s, box-shadow 0.2s',
-        '&:hover': {
-          transform: 'translateY(-4px)',
-          boxShadow: 6
-        }
-      }}
-    >
-      <CardContent>
-        <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-          <Box>
-            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-              {title}
-            </Typography>
-            <Typography variant="h3" fontWeight="bold" color={color} gutterBottom>
-              {mainValue}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {subtext}
-            </Typography>
-          </Box>
-          <Box 
-            sx={{ 
-              backgroundColor: `${color}20`,
-              borderRadius: '12px',
-              p: 1.5,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            {icon}
-          </Box>
-        </Stack>
-        {buttonText && buttonAction && (
-          <Button 
-            variant="outlined" 
-            size="small" 
-            fullWidth 
-            sx={{ mt: 2, borderColor: color, color: color }}
-            onClick={buttonAction}
-          >
-            {buttonText}
-          </Button>
-        )}
-      </CardContent>
-    </Card>
+  useEffect(() => {
+    fetchDashboardData();
+  }, [token, dateRange]); // Refetch when dateRange changes
+
+  // Skeleton loading card component
+  const SkeletonCard = () => (
+    <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100">
+      <div className="flex items-center justify-between mb-4">
+        <Skeleton variant="circular" width={48} height={48} />
+      </div>
+      <Skeleton variant="text" width="60%" height={20} />
+      <Skeleton variant="text" width="40%" height={36} sx={{ mt: 1 }} />
+    </div>
   );
 
-  const getStatusColor = (status: string): "success" | "info" | "primary" | "warning" | "default" => {
-    switch (status?.toLowerCase()) {
-      case 'active': 
-      case 'new': 
-        return 'success';
-      case 'contacted': 
-        return 'info';
-      case 'converted': 
-      case 'completed': 
-        return 'primary';
-      case 'paused': 
-        return 'warning';
-      default: 
-        return 'default';
-    }
+  // Skeleton chart component
+  const SkeletonChart = () => (
+    <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <Skeleton variant="circular" width={20} height={20} />
+            <Skeleton variant="text" width={120} height={20} />
+          </div>
+          <Skeleton variant="text" width={80} height={36} />
+        </div>
+      </div>
+      <Skeleton variant="rectangular" width="100%" height={150} sx={{ borderRadius: 1 }} />
+    </div>
+  );
+
+  const getStatusColor = (status: string): "success" | "info" | "primary" | "warning" | "error" | "default" => {
+    const s = status?.toLowerCase() || "";
+    if (s === "active" || s === "paid" || s === "approved" || s === "new") return "success";
+    if (s === "contacted" || s === "returned") return "info";
+    if (s === "completed" || s === "converted") return "primary";
+    if (s === "pending" || s === "paused") return "warning";
+    if (s === "rejected" || s === "unpaid") return "error";
+    return "default";
   };
 
-  if (loading) {
+  if (!token) {
     return (
-      <Box sx={{ p: 3 }}>
-        <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
-          {[1, 2, 3].map((i) => (
-            <div key={i} style={{ flex: '1 1 300px', minWidth: '300px' }}>
-              <Skeleton variant="rectangular" height={180} sx={{ borderRadius: 2 }} />
-            </div>
-          ))}
-        </div>
-      </Box>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <p className="text-gray-600">Please log in to view the dashboard.</p>
+      </div>
     );
   }
 
   return (
-    <Box sx={{ p: 3, bgcolor: '#f5f7fa', minHeight: '100vh' }}>
+    <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
       {/* Header */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" fontWeight="bold" gutterBottom>
-          Dashboard Overview
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Welcome back! Here&apos;s what&apos;s happening with your campaigns.
-        </Typography>
-      </Box>
+      <div className="mb-8 overflow-hidden">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              User Dashboard
+            </h1>
+            <p className="text-gray-600">
+              Welcome back, {user?.name || 'User'}! Here&apos;s what&apos;s happening.
+            </p>
+          </div>
 
-      {/* Low Balance Alert */}
-      {lowBalanceAlert && (
-        <Alert 
-          severity="warning" 
-          icon={<Warning />}
-          sx={{ mb: 3 }}
-          action={
-            <Button 
-              color="inherit" 
-              size="small"
-              onClick={() => router.push('/dashboard/billing-control')}
+          <div className="flex items-center gap-3 print:hidden">
+            <button
+              onClick={handlePrint}
+              className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors shadow-sm font-medium"
             >
-              Add Funds
-            </Button>
-          }
-        >
-          Your account balance is low. Please add funds to continue your campaigns.
-        </Alert>
-      )}
-
-      {/* Stats Cards */}
-      <div style={{ 
-        display: 'flex', 
-        gap: '24px', 
-        marginBottom: '32px',
-        flexWrap: 'wrap'
-      }}>
-        <div style={{ flex: '1 1 300px', minWidth: '300px' }}>
-          <StatCard
-            title="Total Campaigns"
-            mainValue={stats.totalCampaigns}
-            subtext={`Active: ${stats.activeCampaigns} | Completed: ${stats.completedCampaigns}`}
-            icon={<CampaignIcon sx={{ fontSize: 40, color: '#1976d2' }} />}
-            color="#1976d2"
-            buttonText="View All Campaigns"
-            buttonAction={() => router.push('/dashboard/campaigns')}
-          />
-        </div>
-
-        <div style={{ flex: '1 1 300px', minWidth: '300px' }}>
-          <StatCard
-            title="Total Leads"
-            mainValue={stats.totalLeads}
-           subtext={`Active: ${stats.activeLeads} | Pending: ${stats.pendingLeads} | Returned: ${stats.returnedLeads} | Rejected: ${stats.rejectedLeads}`}
-            icon={<PeopleIcon sx={{ fontSize: 40, color: '#2e7d32' }} />}
-            color="#2e7d32"
-            buttonText="View Leads"
-            buttonAction={() => router.push('/dashboard/leads')}
-          />
-        </div>
-
-        <div style={{ flex: '1 1 300px', minWidth: '300px' }}>
-          <StatCard
-            title="Account Balance"
-            mainValue={`$${stats.balance.toFixed(2)}`}
-            subtext={stats.lastPaymentDate ? `Last Payment: ${new Date(stats.lastPaymentDate).toLocaleDateString()}` : 'No recent payments'}
-            icon={<WalletIcon sx={{ fontSize: 40, color: '#ed6c02' }} />}
-            color="#ed6c02"
-            buttonText="Add Funds"
-            buttonAction={() => router.push('/dashboard/billing-control')}
-          />
+              <Download className="w-4 h-4" />
+              <span className="hidden sm:inline">Export</span>
+            </button>
+            <div className="relative">
+              <select
+                value={dateRange}
+                onChange={(e) => setDateRange(e.target.value)}
+                className="appearance-none bg-white border border-gray-200 text-gray-700 py-2.5 pl-4 pr-10 rounded-lg shadow-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent cursor-pointer hover:border-gray-300 transition-colors"
+              >
+                <option value="today">Today</option>
+                <option value="yesterday">Yesterday</option>
+                <option value="7d">Last 7 Days</option>
+                <option value="30d">Last 30 Days</option>
+                <option value="this_month">This Month</option>
+                <option value="last_month">Last Month</option>
+                <option value="all_time">All Time</option>
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Recent Leads Table */}
-      <Card elevation={3} sx={{ mb: 4 }}>
-        <CardContent>
-          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-            <Typography variant="h6" fontWeight="bold">
-              Recent Leads
-            </Typography>
-            
-          </Stack>
-          <TableContainer>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell><strong>Lead Name</strong></TableCell>
-                  <TableCell><strong>Status</strong></TableCell>
-                  <TableCell><strong>Campaign</strong></TableCell>
-                  <TableCell><strong>Last Activity</strong></TableCell>
-                  <TableCell align="center"><strong>Actions</strong></TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {recentLeads.length > 0 ? (
-                  recentLeads.map((lead) => (
-                    <TableRow key={lead.id} hover>
-                      <TableCell>{lead.name}</TableCell>
-                      <TableCell>
-                        <Chip 
-                          label={lead.status} 
-                          color={getStatusColor(lead.status)}
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>{lead.campaign}</TableCell>
-                      <TableCell>{lead.lastActivity}</TableCell>
-                      <TableCell align="center">
-                        <IconButton 
-                          size="small" 
-                          color="primary"
-                          onClick={() => router.push(`/dashboard/leads/${lead.id}`)}
-                        >
-                          <Visibility />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={5} align="center">
-                      <Typography color="text.secondary">No recent leads</Typography>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </CardContent>
-      </Card>
+      {/* Alerts */}
+      {
+        data?.billing?.is_low_balance && (
+          <div className="mb-8 bg-orange-50 rounded-xl border border-orange-100 p-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="bg-orange-100 p-2 rounded-lg">
+                  <AlertCircle className="w-5 h-5 text-orange-600" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-900">Low Account Balance</h4>
+                  <p className="text-sm text-gray-600 mt-0.5">
+                    Current balance: <span className="font-medium text-orange-700">${data.billing.current_balance.toFixed(2)}</span>. Minimum recommended: $100.00
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => router.push("/dashboard/billing-control")}
+                className="px-4 py-2 bg-white text-orange-700 border border-orange-200 rounded-lg hover:bg-orange-50 transition-colors text-sm font-semibold shadow-sm"
+              >
+                Add Funds
+              </button>
+            </div>
+          </div>
+        )
+      }
 
-      {/* Campaign Performance Table */}
-      <Card elevation={3}>
-        <CardContent>
-          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-            <Typography variant="h6" fontWeight="bold">
-              Campaign Performance
-            </Typography>
-            <Button 
-              startIcon={<Add />} 
-              variant="outlined"
-              onClick={() => router.push('/dashboard/campaigns/new')}
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {loading ? (
+          <>
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </>
+        ) : data && (
+          <>
+            {/* Total Leads */}
+            <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow">
+              <div className="flex items-center justify-between mb-4">
+                <div className="bg-blue-50 p-3 rounded-lg">
+                  <FileText className="w-6 h-6 text-blue-600" />
+                </div>
+                <div className="flex flex-col items-end">
+                  <span className="text-3xl font-bold text-gray-900">{data.summary.total_leads.toLocaleString()}</span>
+                  <span className="text-xs text-gray-500">Total Leads</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-4 mt-2">
+                <span className="text-xs text-green-600 font-semibold">
+                  {data.lead_metrics.active} Active
+                </span>
+                <span className="text-xs text-red-600 font-semibold">
+                  {data.lead_metrics.returned} Returned
+                </span>
+              </div>
+            </div>
+
+            {/* Current Balance */}
+            <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow">
+              <div className="flex items-center justify-between mb-4">
+                <div className="bg-green-50 p-3 rounded-lg">
+                  <DollarSign className="w-6 h-6 text-green-600" />
+                </div>
+                <div className="flex flex-col items-end">
+                  <span className="text-3xl font-bold text-gray-900">${data.billing.current_balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                  <span className="text-xs text-gray-500">Account Balance</span>
+                </div>
+              </div>
+              <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-50 text-xs">
+                <div className="flex flex-col">
+                  <span className="text-gray-500">Spent Today</span>
+                  <span className="font-semibold text-gray-900">${data.billing.spent_this_period?.toFixed(2) ?? '0.00'}</span>
+                </div>
+                <div className="flex flex-col items-end">
+                  <span className="text-gray-500">Added</span>
+                  <span className="font-semibold text-green-600">+${data.billing.added_this_period?.toFixed(2) ?? '0.00'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Total Campaigns */}
+            <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow">
+              <div className="flex items-center justify-between mb-4">
+                <div className="bg-purple-50 p-3 rounded-lg">
+                  <Activity className="w-6 h-6 text-purple-600" />
+                </div>
+                <div className="flex flex-col items-end">
+                  <span className="text-3xl font-bold text-gray-900">{data.summary.total_campaigns.toLocaleString()}</span>
+                  <span className="text-xs text-gray-500">Total Campaigns</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-4 mt-2">
+                <span className="text-xs text-green-600 font-semibold">
+                  {data.summary.active_campaigns} Active
+                </span>
+                <span className="text-xs text-orange-600 font-semibold">
+                  {data.summary.total_campaigns - data.summary.active_campaigns} Pending
+                </span>
+              </div>
+            </div>
+
+            {/* Pending Payments */}
+            <div
+              onClick={() => router.push("/dashboard/leads?status=payment_pending")}
+              className="bg-white rounded-lg shadow-sm p-6 border border-gray-100 hover:shadow-md transition-all cursor-pointer group"
             >
-              New Campaign
-            </Button>
-          </Stack>
-          <TableContainer>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell><strong>Campaign Name</strong></TableCell>
-                  <TableCell align="center"><strong>Total Leads</strong></TableCell>
-                  <TableCell align="center"><strong>Conversion Rate</strong></TableCell>
-                  <TableCell><strong>Status</strong></TableCell>
-                  <TableCell align="center"><strong>Actions</strong></TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {campaignPerformance.length > 0 ? (
-                  campaignPerformance.map((campaign) => (
-                    <TableRow key={campaign.id} hover>
-                      <TableCell>{campaign.name}</TableCell>
-                      <TableCell align="center">{campaign.totalLeads}</TableCell>
-                      <TableCell align="center">
-                        <Stack direction="row" alignItems="center" justifyContent="center" spacing={0.5}>
-                          <TrendingUp fontSize="small" color="success" />
-                          <Typography>{campaign.conversionRate}%</Typography>
-                        </Stack>
-                      </TableCell>
-                      <TableCell>
-                        <Chip 
-                          label={campaign.status} 
-                          color={getStatusColor(campaign.status)}
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell align="center">
-                        <IconButton 
-                          size="small" 
-                          color="primary"
-                          onClick={() => router.push(`/dashboard/campaigns/${campaign.id}`)}
-                        >
-                          <Visibility />
-                        </IconButton>
-                        <IconButton 
-                          size="small" 
-                          color="secondary"
-                          onClick={() => router.push(`/dashboard/campaigns/${campaign.id}/edit`)}
-                        >
-                          <Edit />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={5} align="center">
-                      <Typography color="text.secondary">No campaigns found</Typography>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </CardContent>
-      </Card>
-    </Box>
+              <div className="flex items-center justify-between mb-4">
+                <div className="bg-red-50 p-3 rounded-lg group-hover:bg-red-100 transition-colors">
+                  <Wallet className="w-6 h-6 text-red-600" />
+                </div>
+                <div className="flex flex-col items-end">
+                  <span className="text-3xl font-bold text-gray-900">{data.lead_metrics.payment_pending.toLocaleString()}</span>
+                  <span className="text-xs text-gray-500">Pending Payments</span>
+                </div>
+              </div>
+              <p className="text-xs text-red-600 font-bold mt-2 flex items-center gap-1">
+                <AlertCircle className="w-3 h-3" />
+                Needs Action
+              </p>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Content Grid: Charts + Side Panel (Activity) */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
+        {/* Charts Column */}
+        <div className="xl:col-span-2 space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {loading ? (
+              <>
+                <SkeletonChart />
+                <SkeletonChart />
+              </>
+            ) : data && (
+              <>
+                {/* Active Leads Chart */}
+                <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100">
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                        <p className="text-gray-600 text-sm font-medium">Active Leads</p>
+                      </div>
+                      <p className="text-3xl font-bold text-gray-900">{data.lead_metrics.active.toLocaleString()}</p>
+                      <p className="text-xs text-gray-500 mt-1">Status: Active</p>
+                    </div>
+                  </div>
+                  <ResponsiveContainer width="100%" height={150}>
+                    <LineChart data={data.charts.leads_trend}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis
+                        dataKey="date"
+                        tick={{ fontSize: 11 }}
+                        stroke="#94a3b8"
+                        interval={Math.floor((data.charts.leads_trend?.length || 0) / 5)}
+                      />
+                      <YAxis tick={{ fontSize: 12 }} stroke="#94a3b8" width={30} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#fff',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontSize: '12px'
+                        }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="count"
+                        stroke="#10b981"
+                        strokeWidth={3}
+                        dot={{ fill: '#10b981', r: 4 }}
+                        activeDot={{ r: 6 }}
+                        name="Leads"
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Returned Leads Chart */}
+                <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100">
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <XCircle className="w-5 h-5 text-red-600" />
+                        <p className="text-gray-600 text-sm font-medium">Returned Leads</p>
+                      </div>
+                      <p className="text-3xl font-bold text-gray-900">{data.lead_metrics.returned.toLocaleString()}</p>
+                      <p className="text-xs text-gray-500 mt-1">Status: Pending/Approved/Rejected</p>
+                    </div>
+                  </div>
+                  <ResponsiveContainer width="100%" height={150}>
+                    <LineChart data={data.charts.returned_leads_trend || data.charts.leads_trend}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis
+                        dataKey="date"
+                        tick={{ fontSize: 11 }}
+                        stroke="#94a3b8"
+                        interval={Math.floor((data.charts.leads_trend?.length || 0) / 5)}
+                      />
+                      <YAxis tick={{ fontSize: 12 }} stroke="#94a3b8" width={30} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#fff',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontSize: '12px'
+                        }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="count"
+                        stroke="#ef4444"
+                        strokeWidth={3}
+                        dot={{ fill: '#ef4444', r: 4 }}
+                        activeDot={{ r: 6 }}
+                        name="Returned"
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Recent Activity Feed */}
+        <div className="xl:col-span-1">
+          {loading ? (
+            <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100 h-full">
+              <Skeleton variant="text" width="50%" height={32} />
+              <div className="mt-4 space-y-4">
+                {[1, 2, 3, 4].map(i => <Skeleton key={i} variant="rectangular" height={50} className="rounded-md" />)}
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100 h-full flex flex-col">
+              <h3 className="text-lg font-bold text-gray-900 mb-4">Recent Activity</h3>
+
+              {data && data.recent_activity && data.recent_activity.length > 0 ? (
+                <div className="space-y-4">
+                  {data.recent_activity.map((activity) => (
+                    <div key={activity.id} className="flex gap-3 pb-3 border-b border-gray-50 last:border-0">
+                      <div className={`mt-1 min-w-[32px] h-8 rounded-full flex items-center justify-center ${activity.type === 'payment' ? 'bg-green-100 text-green-600' :
+                        activity.type === 'campaign' ? 'bg-purple-100 text-purple-600' :
+                          'bg-blue-100 text-blue-600'
+                        }`}>
+                        {activity.type === 'payment' ? <DollarSign size={14} /> :
+                          activity.type === 'campaign' ? <Activity size={14} /> :
+                            <FileText size={14} />}
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-700 font-medium leading-tight">{activity.message}</p>
+                        <p className="text-xs text-gray-500 mt-1">{new Date(activity.timestamp).toLocaleDateString()} • {new Date(activity.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center py-6 text-gray-400">
+                  <Activity size={32} className="mb-2 opacity-20" />
+                  <p className="text-sm">No recent activity</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Lead Conversion Funnel */}
+      {
+        !loading && data && data.summary.total_leads > 0 && (
+          <div className="mb-8 bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-6">Lead Conversion Funnel</h3>
+
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4 relative">
+              {/* Step 1: Total */}
+              <div className="flex-1 w-full bg-gray-50 rounded-xl p-4 border border-gray-100 relative z-10 text-center">
+                <p className="text-sm font-semibold text-gray-500 mb-1">Total Leads</p>
+                <p className="text-2xl font-bold text-gray-900">{data.summary.total_leads}</p>
+                <div className="mt-2 text-xs text-blue-600 bg-blue-50 inline-block px-2 py-0.5 rounded-full font-medium">100%</div>
+              </div>
+
+              {/* Connector */}
+              <div className="hidden md:block text-gray-300">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+              </div>
+
+              {/* Step 2: Active */}
+              <div className="flex-1 w-full bg-gray-50 rounded-xl p-4 border border-gray-100 relative z-10 text-center">
+                <p className="text-sm font-semibold text-gray-500 mb-1">Active</p>
+                <p className="text-2xl font-bold text-gray-900">{data.lead_metrics.active}</p>
+                <div className="mt-2 text-xs text-green-600 bg-green-50 inline-block px-2 py-0.5 rounded-full font-medium">
+                  {((data.lead_metrics.active / data.summary.total_leads) * 100).toFixed(1)}% Conversion
+                </div>
+              </div>
+
+              {/* Connector */}
+              <div className="hidden md:block text-gray-300">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+              </div>
+
+              {/* Step 3: Pending Payment */}
+              <div className="flex-1 w-full bg-gray-50 rounded-xl p-4 border border-gray-100 relative z-10 text-center">
+                <p className="text-sm font-semibold text-gray-500 mb-1">Payment Pending</p>
+                <p className="text-2xl font-bold text-gray-900">{data.lead_metrics.payment_pending}</p>
+                <div className="mt-2 text-xs text-orange-600 bg-orange-50 inline-block px-2 py-0.5 rounded-full font-medium">
+                  {((data.lead_metrics.payment_pending / data.summary.total_leads) * 100).toFixed(1)}% Potential
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      }
+
+      {/* Top Campaigns Table */}
+      {
+        !loading && data && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+            <div className="p-6 border-b border-gray-50 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-gray-900">Top Campaign Performance</h3>
+              <Link
+                href="/dashboard/campaigns"
+                className="text-sm font-semibold text-blue-600 hover:text-blue-700"
+              >
+                View All
+              </Link>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-100">
+                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Campaign Name</th>
+                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Total Leads</th>
+                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Status</th>
+                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {data.campaign_performance.length > 0 ? (
+                    data.campaign_performance.map((camp) => (
+                      <tr key={camp.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4">
+                          <span className="text-sm font-semibold text-gray-900">{camp.name}</span>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <span className="text-sm text-gray-600">{camp.total_leads.toLocaleString()}</span>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize
+                          ${camp.status.toLowerCase() === 'active' ? 'bg-green-50 text-green-700 border border-green-100' :
+                              camp.status.toLowerCase() === 'completed' ? 'bg-gray-100 text-gray-700 border border-gray-200' :
+                                'bg-orange-50 text-orange-700 border border-orange-100'}`}>
+                            {camp.status.toLowerCase()}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <IconButton
+                            size="small"
+                            onClick={() => router.push(`/dashboard/campaigns/${camp.id}`)}
+                            className="hover:bg-blue-50 text-blue-600"
+                          >
+                            <Eye size={18} />
+                          </IconButton>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={4} className="px-6 py-10 text-center text-gray-500 text-sm">
+                        No active campaigns found.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )
+      }
+
+      {/* Footer */}
+      <div className="mt-12 mb-4 text-center">
+        <p className="text-sm text-gray-500">
+          © {new Date().getFullYear()} Lead Fusion, All Rights Reserved.
+        </p>
+      </div>
+    </div >
   );
 }

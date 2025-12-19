@@ -28,7 +28,8 @@ import {
   Edit2,
   Eye,
   Trash2,
-  Calendar
+  Calendar,
+  Clock
 } from "lucide-react";
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -89,10 +90,11 @@ const StatusBadge = ({ status }: { status: string }) => {
     'ACTIVE': { bg: 'bg-emerald-50 border-emerald-100', text: 'text-emerald-700', icon: PlayCircle },
     'INACTIVE': { bg: 'bg-rose-50 border-rose-100', text: 'text-rose-700', icon: PauseCircle },
     'PAUSED': { bg: 'bg-amber-50 border-amber-100', text: 'text-amber-700', icon: PauseCircle },
+    'PENDING': { bg: 'bg-blue-50 border-blue-100', text: 'text-blue-700', icon: Clock },
     'DRAFT': { bg: 'bg-gray-50 border-gray-100', text: 'text-gray-600', icon: Edit2 },
   };
 
-  const config = statusConfig[safeStatus] || statusConfig['DRAFT'];
+  const config = statusConfig[safeStatus.toUpperCase()] || statusConfig['DRAFT'];
   const Icon = config.icon;
 
   return (
@@ -370,16 +372,15 @@ export default function CampaignTable() {
           />
           <StatCard
             title="Active Campaigns"
-            value={campaigns.filter(c => c.status === 'ACTIVE').length}
+            value={campaigns.filter(c => c.status?.toUpperCase() === 'ACTIVE').length}
             icon={PlayCircle}
             color="text-emerald-600 bg-emerald-100"
           />
-          {/* Placeholder for other stats, maybe total budget or leads generated if available later */}
           <StatCard
-            title="Paused Campaigns"
-            value={campaigns.filter(c => c.status === 'PAUSED').length}
-            icon={PauseCircle}
-            color="text-amber-600 bg-amber-100"
+            title="Pending Campaigns"
+            value={campaigns.filter(c => c.status?.toUpperCase() === 'PENDING').length}
+            icon={Clock}
+            color="text-blue-600 bg-blue-100"
           />
         </div>
       </div>

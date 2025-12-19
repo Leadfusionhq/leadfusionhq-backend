@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useSocket } from '@/context/SocketContext';
 import Sidebar from '@/components/Layout/Sidebar/Sidebar';
 import MainPanel from '@/components/Layout/Dashboard/MainPanel/MainPanel';
-import FloatingChatWidget from '@/components/chat/FloatingChatWidget'; 
+import FloatingChatWidget from '@/components/chat/FloatingChatWidget';
 import Breadcrumbs from '@/components/Breadcrumb/Breadcrumb';
 
 export default function UserLayout({ children }: { children: ReactNode }) {
@@ -34,7 +34,7 @@ export default function UserLayout({ children }: { children: ReactNode }) {
   return (
     <div className="layout_user flex">
       <Sidebar />
-      <div className={` relative transition-all duration-300   z-9 lg:z-9  w-full  ${collapsed?"lg:ml-[6%] lg:w-[94%]":"lg:ml-[17%] lg:w-[83%]"}`}>
+      <div className={` relative transition-all duration-300   z-9 lg:z-9  w-full  ${collapsed ? "lg:ml-[110px] lg:w-[calc(100%-110px)]" : "lg:ml-[260px] lg:w-[calc(100%-260px)]"}`}>
 
         <MainPanel />
         <main className="px-[24px] py-[24px] bg-gray-100 min-h-screen w-full">
@@ -44,11 +44,11 @@ export default function UserLayout({ children }: { children: ReactNode }) {
               Socket: {connected ? '🟢' : '🔴'} | User ID: {user?._id || 'None'}
             </div>
           )}
-           <Breadcrumbs />
+          <Breadcrumbs />
           {children}
         </main>
-          {/* Floating Chat Widget */}
-          <FloatingChatWidget />
+        {/* Floating Chat Widget */}
+        <FloatingChatWidget />
       </div>
     </div>
   );

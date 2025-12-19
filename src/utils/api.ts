@@ -112,7 +112,11 @@ const axiosWrapper = async (
     }
 
     if (data) {
-      config.data = data;
+      if (method.toLowerCase() === 'get') {
+        config.params = data;
+      } else {
+        config.data = data;
+      }
     }
 
     const response = await axios(config);
