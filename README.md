@@ -7,9 +7,11 @@
 ![React](https://img.shields.io/badge/React-19-61DAFB)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6)
 ![Tailwind](https://img.shields.io/badge/Tailwind-4-38B2AC)
-![License](https://img.shields.io/badge/license-ISC-green)
+![License](https://img.shields.io/badge/license-MIT-green)
 
-**A modern, full-stack lead management platform built with Next.js 16, React 19, and TypeScript**
+**A modern frontend application for lead management, built with Next.js 16, React 19, and TypeScript**
+
+> 📌 **Note:** This is the **frontend application** that consumes APIs from the [LeadFusion Node.js Backend](https://github.com/leadfusionhq/leadfusion-api)
 
 [Features](#-features) • [Tech Stack](#-tech-stack) • [Getting Started](#-getting-started) • [Project Structure](#-project-structure) • [API Documentation](#-api-documentation)
 
@@ -95,8 +97,7 @@
 
 - **Node.js** 18+ (see `.nvmrc`)
 - **npm** or **pnpm**
-- **MongoDB** instance
-- **Redis** (optional, for caching)
+- **LeadFusion Backend API** running (see [leadfusion-api](https://github.com/leadfusionhq/leadfusion-api))
 
 ### Installation
 
@@ -250,9 +251,9 @@ npm i --save-dev @types/package-name
 
 ---
 
-##   License
+## License
 
-This project is licensed under the ISC License.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
