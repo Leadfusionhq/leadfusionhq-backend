@@ -1,9 +1,9 @@
 "use client";
 
 export const tabs = [
-    { id: "basic", label: "Basic Info", icon: "📋" },
-    { id: "geography", label: "Geography", icon: "🌍" },
-    // { id: "utilities", label: "Utilities", icon: "⚡" },
-    { id: "delivery", label: "Delivery", icon: "📧" },
-    { id: "notes", label: "Notes", icon: "📝" },
-  ];
+  { id: "basic", label: "Basic Info" },
+  { id: "geography", label: "Geography" },
+  // { id: "utilities", label: "Utilities" },
+  { id: "delivery", label: "Delivery" },
+  { id: "notes", label: "Notes" },
+];

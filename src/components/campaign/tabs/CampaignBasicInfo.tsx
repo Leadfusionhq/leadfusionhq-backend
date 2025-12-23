@@ -1,5 +1,5 @@
 import React from "react";
-import { FormikInput, FormikSelect,FormikRadio } from "@/components/form";
+import { FormikInput, FormikSelect, FormikRadio } from "@/components/form";
 import { STATUS, LEAD_TYPE, EXCLUSIVITY, LANGUAGE, PAYMENT_TYPE } from "@/constants/enums";
 import { Field, ErrorMessage } from "formik";
 
@@ -10,11 +10,11 @@ interface Props {
   isAdmin?: boolean;
 }
 
-const CampaignBasicInfo: React.FC<Props> = ({ values, setFieldValue ,isEditMode = false ,isAdmin = false}) => {
+const CampaignBasicInfo: React.FC<Props> = ({ values, setFieldValue, isEditMode = false, isAdmin = false }) => {
   return (
-    <div className="space-y-6">
-      <h3 className="text-[20px] font-[500] text-[#1C1C1C] mb-4">Basic Information</h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div className="space-y-5 sm:space-y-6">
+      <h3 className="text-lg sm:text-xl font-semibold text-gray-900">Basic Information</h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 md:gap-6">
         <FormikInput name="name" placeholder="Campaign Name" label="Campaign Name *" />
 
         <FormikSelect
@@ -33,7 +33,7 @@ const CampaignBasicInfo: React.FC<Props> = ({ values, setFieldValue ,isEditMode 
             value,
             label: key.replace("_", " "),
           }))}
-        
+
         />
 
         <FormikSelect
@@ -46,11 +46,11 @@ const CampaignBasicInfo: React.FC<Props> = ({ values, setFieldValue ,isEditMode 
         />
 
         {(isAdmin || isEditMode) && (
-          <FormikInput 
-            name="bid_price" 
-            type="number" 
-            min="0" 
-            label="Bid Price *" 
+          <FormikInput
+            name="bid_price"
+            type="number"
+            min="0"
+            label="Bid Price *"
             placeholder="0"
             disabled={isEditMode && !isAdmin}
           />
@@ -65,23 +65,23 @@ const CampaignBasicInfo: React.FC<Props> = ({ values, setFieldValue ,isEditMode 
           }))}
         />
 
-      {/* Payment Type Radio Buttons */}
-    {/* Payment Type Radio Buttons */}
-    <div className="col-span-2">
-      <label className="block text-sm font-medium text-gray-700 mb-2">Payment Type *</label>
-      <div className="flex gap-6">
-        {Object.entries(PAYMENT_TYPE).map(([key, value]) => (
-          <FormikRadio
-            key={value}
-            name="payment_type"
-            label={key.replace(/_/g, " ")}
-            value={value}
-          />
+        {/* Payment Type Radio Buttons */}
+        {/* Payment Type Radio Buttons */}
+        <div className="col-span-1 sm:col-span-2">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Payment Type *</label>
+          <div className="flex flex-wrap gap-4 sm:gap-6">
+            {Object.entries(PAYMENT_TYPE).map(([key, value]) => (
+              <FormikRadio
+                key={value}
+                name="payment_type"
+                label={key.replace(/_/g, " ")}
+                value={value}
+              />
 
-        ))}
-      </div>
-      <ErrorMessage name="payment_type" component="div" className="text-red-500 text-xs mt-1" />
-    </div>
+            ))}
+          </div>
+          <ErrorMessage name="payment_type" component="div" className="text-red-500 text-xs mt-1" />
+        </div>
 
 
         {values.exclusivity === "WARM_TRANSFER" && (
@@ -90,8 +90,8 @@ const CampaignBasicInfo: React.FC<Props> = ({ values, setFieldValue ,isEditMode 
 
         {values.exclusivity === "APPOINTMENT" && (
           <>
-            <div className="col-span-2">
-              <h4 className="text-lg font-medium mb-4">Your Company Contact Info for Homeowners</h4>
+            <div className="col-span-1 sm:col-span-2">
+              <h4 className="text-base sm:text-lg font-medium mb-2 sm:mb-4">Your Company Contact Info for Homeowners</h4>
             </div>
             <FormikInput
               name="company_contact_phone"

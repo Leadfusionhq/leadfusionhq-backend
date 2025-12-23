@@ -2,21 +2,18 @@
 import { Field, ErrorMessage, FieldAttributes } from 'formik';
 
 const FormikRadio = ({ label, errorMessage, ...props }: { label?: string; errorMessage?: string } & FieldAttributes<any>) => (
-  <div className="flex items-center space-x-2">
+  <label className="inline-flex items-center gap-2 cursor-pointer group min-h-[40px]">
     <Field
       {...props}
       type="radio"
-      className="w-5 h-5 text-[#1C1C1C] border-[#E0E0E0] rounded-full focus:ring-[#1C1C1C]"
+      className="w-4 h-4 sm:w-[18px] sm:h-[18px] text-gray-900 border-gray-300 focus:ring-gray-400 focus:ring-2 cursor-pointer"
     />
-    {label && <label className="text-[#1C1C1C] text-lg">{label}</label>}
-    <div className="min-h-[20px]">
-      {errorMessage ? (
-        <div className="text-red-500 text-xs transition-opacity duration-300">{errorMessage}</div>
-      ) : (
-        <ErrorMessage name={props.name} component="div" className="text-red-500 text-xs transition-opacity duration-300" />
-      )}
-    </div>
-  </div>
+    {label && (
+      <span className="text-gray-700 text-sm sm:text-base group-hover:text-gray-900 transition-colors">
+        {label}
+      </span>
+    )}
+  </label>
 );
 
 export default FormikRadio;

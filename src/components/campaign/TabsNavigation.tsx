@@ -156,22 +156,22 @@ export const TabsNavigation = ({
 
 
   return (
-    <div className="flex justify-between items-center relative">
+    <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 sm:gap-4 relative">
       <button
         type="button"
         onClick={() => { if (currentIndex > 0) setActiveTab(tabIds[currentIndex - 1]); }}
-        className={`px-6 py-3 rounded-lg border transition ${currentIndex === 0 ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-white text-[#1C1C1C] border-[#E0E0E0] hover:bg-gray-50 cursor-pointer"}`}
+        className={`px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg border transition text-sm sm:text-base min-h-[44px] ${currentIndex === 0 ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-white text-[#1C1C1C] border-[#E0E0E0] hover:bg-gray-50 cursor-pointer"}`}
         disabled={currentIndex === 0}
       >
         ← Previous
       </button>
 
-      <div className="flex gap-4">
+      <div className="flex gap-2 sm:gap-4">
         {currentIndex < tabIds.length - 1 ? (
           <button
             type="button"
             onClick={handleNext}
-            className="px-6 py-3 bg-[#1C1C1C] text-white rounded-lg hover:bg-[#333333] transition"
+            className="flex-1 sm:flex-none px-4 sm:px-6 py-2.5 sm:py-3 bg-[#1C1C1C] text-white rounded-lg hover:bg-[#333333] transition text-sm sm:text-base min-h-[44px]"
             disabled={isSubmitting}
           >
             Next →
@@ -180,10 +180,10 @@ export const TabsNavigation = ({
           <button
             type={submitForm ? "button" : "submit"}
             onClick={submitForm ? handleSubmitClick : undefined}
-            className="px-8 py-3 bg-[#1C1C1C] text-white text-[18px] font-semibold rounded-lg border-none cursor-pointer transition hover:bg-[#333333]"
+            className="flex-1 sm:flex-none px-4 sm:px-8 py-2.5 sm:py-3 bg-[#1C1C1C] text-white text-sm sm:text-base md:text-[18px] font-semibold rounded-lg border-none cursor-pointer transition hover:bg-[#333333] min-h-[44px]"
             disabled={isSubmitting}
           >
-            {isSubmitting ? (isEditMode ? "Saving Campaign..." : "Creating Campaign...") : (isEditMode ? "Save Campaign" : "Create Campaign")}
+            {isSubmitting ? (isEditMode ? "Saving..." : "Creating...") : (isEditMode ? "Save Campaign" : "Create Campaign")}
           </button>
         )}
       </div>

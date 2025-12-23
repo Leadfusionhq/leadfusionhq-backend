@@ -161,7 +161,9 @@ const StatCard = ({ title, value, icon: Icon, color, subtext }: { title: string,
 };
 
 // Mobile Campaign Card Component
-const MobileCampaignCard = ({ campaign }: { campaign: Campaign }) => {
+const MobileCampaignCard = ({ campaign, onDelete }: { campaign: Campaign; onDelete: () => void }) => {
+  const router = useRouter();
+
   const getStateDisplay = () => {
     const state = campaign.geography?.state;
     if (!state) return "--";
@@ -184,7 +186,7 @@ const MobileCampaignCard = ({ campaign }: { campaign: Campaign }) => {
   };
 
   return (
-    <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm active:bg-gray-50 transition-colors">
+    <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
       {/* Header */}
       <div className="flex items-start justify-between mb-2">
         <div className="min-w-0 flex-1">
@@ -217,8 +219,39 @@ const MobileCampaignCard = ({ campaign }: { campaign: Campaign }) => {
         </div>
       </div>
 
+      {/* Action Buttons */}
+      <div className="flex gap-2 py-3 border-t border-gray-100">
+        <button
+          onClick={() => router.push(`/admin/campaigns/${campaign._id}`)}
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-700 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors min-h-[36px]"
+        >
+          <Eye size={14} />
+          View
+        </button>
+        <button
+          onClick={() => router.push(`/admin/campaigns/${campaign._id}/edit`)}
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-700 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors min-h-[36px]"
+        >
+          <Edit2 size={14} />
+          Edit
+        </button>
+        <button
+          onClick={() => router.push(`/admin/campaigns/${campaign._id}/leads/add`)}
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors min-h-[36px]"
+        >
+          <UserPlus size={14} />
+          Lead
+        </button>
+        <button
+          onClick={onDelete}
+          className="flex items-center justify-center px-3 py-2 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors min-h-[36px]"
+        >
+          <Trash2 size={14} />
+        </button>
+      </div>
+
       {/* Date */}
-      <div className="flex items-center justify-between text-xs text-gray-400 pt-2 border-t border-gray-50">
+      <div className="flex items-center justify-between text-xs text-gray-400">
         <span>Created: {new Date(campaign.createdAt).toLocaleDateString()}</span>
       </div>
     </div>
@@ -660,7 +693,7 @@ export default function CampaignTable() {
           ))
         ) : campaigns.length ? (
           campaigns.map(campaign => (
-            <MobileCampaignCard key={campaign._id} campaign={campaign} />
+            <MobileCampaignCard key={campaign._id} campaign={campaign} onDelete={() => handleDelete(campaign)} />
           ))
         ) : (
           <div className="bg-white rounded-xl p-8 border border-gray-100 text-center">
