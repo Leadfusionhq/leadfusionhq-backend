@@ -19,6 +19,7 @@ const Topbar = () => {
   const [title, setTitle] = useState("");
   const [openNotification, openSetNotification] = useState(false);
   const [openProfile, openSetProfile] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
 
   const role = user?.role ?? "USER";
   const name = user?.name || "User";
@@ -71,6 +72,7 @@ const Topbar = () => {
   const closeAll = () => {
     openSetNotification(false);
     openSetProfile(false);
+    setMobileSearchOpen(false);
   };
 
   return (
@@ -90,31 +92,31 @@ const Topbar = () => {
         {/* Glass Background Layer */}
         <div className="absolute inset-0 bg-white/80 backdrop-blur-md -z-10" />
 
-        <div className="flex h-[72px] items-center justify-between px-6 lg:px-8 gap-4 relative z-10">
+        <div className="flex h-[60px] sm:h-[72px] items-center justify-between px-4 sm:px-6 lg:px-8 gap-2 sm:gap-4 relative z-10">
 
           {/* Left: Sidebar Toggler & Title */}
           <div className="flex items-center gap-6">
             <button
               onClick={() => dispatch(toggleSidebar())}
-              className="p-2 -ml-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100/80 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-100"
+              className="p-2.5 -ml-1 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100/80 active:bg-gray-200 rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-100"
               type="button"
               aria-label="Toggle Sidebar"
             >
               <Menu className="w-5 h-5" />
             </button>
 
-            <div className="flex flex-col justify-center">
+            <div className="flex flex-col justify-center min-w-0">
               {title === "Dashboard" ? (
                 <div className="flex flex-col">
-                  <h3 className="text-lg font-bold text-gray-900 tracking-tight leading-none">
+                  <h3 className="text-base sm:text-lg font-bold text-gray-900 tracking-tight leading-none">
                     Dashboard
                   </h3>
-                  <span className="text-xs text-gray-500 font-medium mt-1">
+                  <span className="text-[10px] sm:text-xs text-gray-500 font-medium mt-0.5 sm:mt-1 hidden sm:block">
                     Welcome back, {name.split(" ")[0]}
                   </span>
                 </div>
               ) : (
-                <h3 className="text-lg font-bold text-gray-900 tracking-tight">
+                <h3 className="text-base sm:text-lg font-bold text-gray-900 tracking-tight truncate max-w-[120px] sm:max-w-none">
                   {title}
                 </h3>
               )}
@@ -122,9 +124,18 @@ const Topbar = () => {
           </div>
 
           {/* Right: Actions */}
-          <div className="flex items-center gap-2 sm:gap-4">
+          <div className="flex items-center gap-1 sm:gap-2 md:gap-4">
 
-            {/* Search Bar */}
+            {/* Mobile Search Toggle Button */}
+            <button
+              onClick={() => setMobileSearchOpen(!mobileSearchOpen)}
+              className="md:hidden p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-50 active:bg-gray-100 transition-all"
+              aria-label="Search"
+            >
+              <Search className="w-5 h-5" />
+            </button>
+
+            {/* Desktop Search Bar */}
             <div className="hidden md:flex items-center relative mr-2 group">
               <Search className="w-4 h-4 text-gray-400 absolute left-3 group-hover:text-gray-600 transition-colors" />
               <input
@@ -140,14 +151,14 @@ const Topbar = () => {
             <div ref={notificationRef} className="relative">
               <button
                 onClick={toggleNotificationCard}
-                className={`p-2.5 rounded-full transition-all duration-200 relative group
-                  ${openNotification ? "bg-gray-100 text-gray-900" : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"}`}
+                className={`p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl transition-all duration-200 relative
+                  ${openNotification ? "bg-gray-100 text-gray-900" : "text-gray-500 hover:bg-gray-50 hover:text-gray-900 active:bg-gray-100"}`}
               >
                 <Bell className="w-5 h-5" />
-                <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+                <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
               </button>
               {openNotification && (
-                <div className="absolute right-0 top-full mt-1 w-80 sm:w-96 z-[120] animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="fixed sm:absolute left-4 right-4 sm:left-auto sm:right-0 top-[70px] sm:top-full sm:mt-1 sm:w-96 z-[120] animate-in fade-in slide-in-from-top-2 duration-200">
                   <NotificationCard />
                 </div>
               )}
@@ -157,8 +168,8 @@ const Topbar = () => {
             <div ref={profileRef} className="relative">
               <button
                 onClick={toggleProfileCard}
-                className={`flex items-center gap-3 p-1.5 pl-2 rounded-full border border-transparent transition-all duration-200
-                  ${openProfile ? "bg-gray-50 border-gray-100" : "hover:bg-gray-50 hover:border-gray-100"}`}
+                className={`flex items-center gap-2 sm:gap-3 p-1.5 sm:pl-2 min-w-[44px] min-h-[44px] rounded-xl border border-transparent transition-all duration-200
+                  ${openProfile ? "bg-gray-50 border-gray-100" : "hover:bg-gray-50 hover:border-gray-100 active:bg-gray-100"}`}
               >
                 <div className="hidden md:flex flex-col items-end mr-1">
                   <span className="text-sm font-semibold text-gray-700 leading-none">{name}</span>
@@ -168,10 +179,10 @@ const Topbar = () => {
                 <div className="relative">
                   <Image
                     src={profileSrc}
-                    width={32}
-                    height={32}
+                    width={36}
+                    height={36}
                     alt="Profile"
-                    className="w-8 h-8 rounded-full object-cover border border-gray-100 shadow-sm"
+                    className="w-9 h-9 sm:w-8 sm:h-8 rounded-full object-cover border border-gray-100 shadow-sm"
                     unoptimized
                   />
                   <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-white rounded-full"></div>

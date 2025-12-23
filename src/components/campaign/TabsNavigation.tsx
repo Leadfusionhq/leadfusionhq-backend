@@ -11,7 +11,7 @@ interface TabsNavigationProps {
   validateForm?: any;
   setTouched?: any;
   setFieldTouched?: (field: string, touched?: boolean, shouldValidate?: boolean) => void;
-  setFieldError?: (field: string, message?: string) => void; 
+  setFieldError?: (field: string, message?: string) => void;
   values?: any;
   errors?: any;
   getTabForField?: (fieldName: string) => string;
@@ -70,8 +70,8 @@ export const TabsNavigation = ({
 
   const getCurrentTabFields = (tabId: string): string[] => {
     const map: Record<string, string[]> = {
-      basic: ['name','status','lead_type','exclusivity','language','poc_phone','company_contact_phone','company_contact_email','bid_price'],
-      geography: ['geography.state','geography.coverage.type','geography.coverage.partial.counties','geography.coverage.partial.zipcode','geography.coverage.partial.zip_codes'],
+      basic: ['name', 'status', 'lead_type', 'exclusivity', 'language', 'poc_phone', 'company_contact_phone', 'company_contact_email', 'bid_price'],
+      geography: ['geography.state', 'geography.coverage.type', 'geography.coverage.partial.counties', 'geography.coverage.partial.zipcode', 'geography.coverage.partial.zip_codes'],
       delivery: [
         'delivery.method',
         'delivery.email.addresses',
@@ -92,12 +92,12 @@ export const TabsNavigation = ({
       setActiveTab(tabIds[safeNextIndex]);
       return;
     }
-  
+
     try {
       const formErrors = await validateForm();
       const flatErrors = flattenErrors(formErrors);
       const currentTabFields = getCurrentTabFields(activeTab);
-  
+
       // Mark touched fields for current tab only
       currentTabFields.forEach(field => {
         if (flatErrors[field]) {
@@ -108,52 +108,52 @@ export const TabsNavigation = ({
           }
         }
       });
-  
+
       // Delivery-specific runtime checks (without toast)
       if (activeTab === 'delivery') {
         const method = values?.delivery?.method || [];
-  
+
         if (!method || method.length === 0) setFieldTouched('delivery.method', true, true);
-  
+
         if (method.includes('email')) {
           if (!values?.delivery?.email?.addresses) setFieldTouched('delivery.email.addresses', true, true);
           if (!values?.delivery?.email?.subject) setFieldTouched('delivery.email.subject', true, true);
         }
-  
+
         if (method.includes('phone') && !values?.delivery?.phone?.numbers) {
           setFieldTouched('delivery.phone.numbers', true, true);
         }
-  
+
         if (method.includes('crm') && !values?.delivery?.crm?.instructions) {
           setFieldTouched('delivery.crm.instructions', true, true);
         }
       }
-  
+
       // Move to the next tab regardless of errors
       const safeNextIndex = Math.min(currentIndex + 1, tabIds.length - 1);
       setActiveTab(tabIds[safeNextIndex]);
-  
+
     } catch (err) {
       console.error('Error during validation', err);
       const safeNextIndex = Math.min(currentIndex + 1, tabIds.length - 1);
       setActiveTab(tabIds[safeNextIndex]);
     }
   };
-  
+
 
   const handleSubmitClick = async () => {
     if (!validateForm || !submitForm) return;
-  
+
     const formErrors = await validateForm();
-  
+
     if (formErrors && Object.keys(formErrors).length > 0) {
       toast.error("Please complete all required fields before submitting.");
       return;
     }
-  
+
     await submitForm();
   };
-  
+
 
   return (
     <div className="flex justify-between items-center relative">
@@ -188,11 +188,11 @@ export const TabsNavigation = ({
         )}
       </div>
 
-      {process.env.NODE_ENV === 'development' && (
+      {/* {process.env.NODE_ENV === 'development' && (
         <div className="text-xs text-gray-500 absolute -top-8 right-0 bg-yellow-100 p-2 rounded">
           Tab: {activeTab} | Index: {currentIndex} | Tabs: {tabIds.join(', ')}
         </div>
-      )}
+      )} */}
     </div>
   );
 };
