@@ -38,10 +38,10 @@ const SidebarItem: FC<SidebarItemProps> = ({ item }) => {
       <div
         className={`relative flex items-center gap-3 overflow-hidden 
         ${collapsed ? "justify-start px-4 lg:justify-center lg:px-2" : "px-4"} 
-        py-3 my-1.5 rounded-xl cursor-pointer transition-all duration-200 ease-[cubic-bezier(0.25,0.1,0.25,1)]
+        py-3.5 min-h-[44px] my-1 rounded-xl cursor-pointer transition-all duration-200 ease-[cubic-bezier(0.25,0.1,0.25,1)]
         ${isActive
             ? 'bg-gradient-to-r from-[#204969] to-[#306A64] text-white shadow-md shadow-[#204969]/20'
-            : 'text-gray-400 hover:text-white hover:bg-white/5'}
+            : 'text-gray-400 hover:text-white hover:bg-white/5 active:bg-white/10'}
         `}
       >
         {/* Premium Active Glow (Left Strip) */}

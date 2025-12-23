@@ -181,17 +181,73 @@ const StatCard = ({ title, value, icon: Icon, color, subtext, onClick, active }:
     return (
         <div
             onClick={onClick}
-            className={`p-6 rounded-2xl shadow-sm border flex items-center gap-4 transition-all duration-200 cursor-pointer 
+            className={`p-3 sm:p-4 md:p-6 rounded-xl sm:rounded-2xl shadow-sm border flex items-center gap-3 sm:gap-4 transition-all duration-200 cursor-pointer 
         ${active ? 'ring-2 ring-black shadow-md scale-[1.01]' : 'hover:scale-[1.01] hover:shadow-md bg-white border-gray-100'} 
         ${isBlack ? "bg-black border-black text-white" : ""}`}
         >
-            <div className={`p-3 rounded-xl ${isBlack ? "bg-gray-800 text-white" : color}`}>
-                <Icon className={`w-6 h-6`} />
+            <div className={`p-2 sm:p-3 rounded-lg sm:rounded-xl ${isBlack ? "bg-gray-800 text-white" : color}`}>
+                <Icon className={`w-5 h-5 sm:w-6 sm:h-6`} />
             </div>
-            <div>
-                <p className={`text-sm font-medium ${isBlack ? "text-gray-400" : "text-gray-500"}`}>{title}</p>
-                <h3 className={`text-2xl font-bold mt-0.5 ${isBlack ? "text-white" : "text-gray-900"}`}>{value}</h3>
-                {subtext && <p className={`text-xs mt-1 ${isBlack ? "text-gray-500" : "text-gray-400"}`}>{subtext}</p>}
+            <div className="min-w-0 flex-1">
+                <p className={`text-xs sm:text-sm font-medium ${isBlack ? "text-gray-400" : "text-gray-500"}`}>{title}</p>
+                <h3 className={`text-lg sm:text-xl md:text-2xl font-bold mt-0.5 ${isBlack ? "text-white" : "text-gray-900"}`}>{value}</h3>
+                {subtext && <p className={`text-[10px] sm:text-xs mt-0.5 sm:mt-1 ${isBlack ? "text-gray-500" : "text-gray-400"} truncate`}>{subtext}</p>}
+            </div>
+        </div>
+    );
+};
+
+// Mobile Lead Card Component
+const MobileLeadCard = ({ lead, onDelete, onReturn }: { lead: Lead, onDelete: () => void, onReturn: () => void }) => {
+    const router = useRouter();
+    const campaignName = typeof lead.campaign_id === 'object' ? lead.campaign_id?.name : lead.campaign_id;
+    const stateName = lead.address.state?.abbreviation || lead.address.state?.name || "--";
+
+    return (
+        <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm active:bg-gray-50 transition-colors">
+            {/* Header Row */}
+            <div className="flex items-start justify-between mb-3">
+                <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-gray-900">{lead.first_name} {lead.last_name}</p>
+                    <p className="text-xs text-gray-500 font-mono mt-0.5">ID: {lead.lead_id}</p>
+                </div>
+                <ActionMenu lead={lead} onDelete={onDelete} onReturn={onReturn} />
+            </div>
+
+            {/* Contact Info */}
+            <div className="space-y-1.5 mb-3">
+                <a href={`mailto:${lead.email}`} className="flex items-center gap-2 text-xs text-gray-600">
+                    <Mail size={12} className="text-gray-400" />
+                    <span className="truncate">{lead.email}</span>
+                </a>
+                {(lead.phone || lead.phone_number) && (
+                    <a href={`tel:${lead.phone || lead.phone_number}`} className="flex items-center gap-2 text-xs text-gray-600">
+                        <Phone size={12} className="text-gray-400" />
+                        <span>{lead.phone || lead.phone_number}</span>
+                    </a>
+                )}
+                <div className="flex items-center gap-2 text-xs text-gray-600">
+                    <MapPin size={12} className="text-gray-400" />
+                    <span>{lead.address.city}, {stateName}</span>
+                </div>
+            </div>
+
+            {/* Campaign & Date */}
+            <div className="flex items-center justify-between text-xs text-gray-500 mb-3 pb-3 border-b border-gray-50">
+                <span className="truncate max-w-[60%]">{campaignName || "N/A"}</span>
+                <span className="flex items-center gap-1">
+                    <Calendar size={10} />
+                    {new Date(lead.createdAt).toLocaleDateString()}
+                </span>
+            </div>
+
+            {/* Status Row */}
+            <div className="flex items-center gap-2 flex-wrap">
+                <StatusBadge status={lead.status || 'New'} type="lead" />
+                {lead.return_status !== 'Not Returned' && (
+                    <StatusBadge status={lead.return_status} type="return" />
+                )}
+                <StatusBadge status={lead.payment_status || 'paid'} type="payment" />
             </div>
         </div>
     );
@@ -517,13 +573,13 @@ export default function AllLeadsTable({ defaultPaymentStatus, defaultReturnStatu
     });
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-500">
+        <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-500">
             {/* --- Stats Section --- */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
                 <StatCard
                     title="All Leads"
                     value={totalRows}
-                    subtext="Total Generated Leads"
+                    subtext="Total Generated"
                     icon={Users}
                     color="bg-purple-100 text-purple-700"
                 />
@@ -537,33 +593,67 @@ export default function AllLeadsTable({ defaultPaymentStatus, defaultReturnStatu
             </div>
 
             {/* --- Header & Filters --- */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 bg-white p-4 sm:p-6 rounded-xl sm:rounded-2xl shadow-sm border border-gray-100">
                 <div>
-                    <h1 className="text-xl font-bold text-gray-900 tracking-tight">All Leads</h1>
-                    <p className="text-sm text-gray-500 mt-1">
-                        Monitor and track all your generated leads.
+                    <h1 className="text-lg sm:text-xl font-bold text-gray-900 tracking-tight">All Leads</h1>
+                    <p className="text-xs sm:text-sm text-gray-500 mt-0.5 sm:mt-1">
+                        Monitor and track leads
                     </p>
                 </div>
 
-                <div className="flex gap-3">
-                    <button
-                        onClick={(e) => setFilterAnchorEl(e.currentTarget)}
-                        className={`flex items-center gap-2 px-3 py-2 border rounded-lg transition-all ${Boolean(filterAnchorEl) || (selectedCampaign || selectedStatus || selectedState)
-                            ? "bg-black text-white border-black shadow-md"
-                            : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
-                            }`}
-                    >
-                        <Filter size={16} />
-                        <span className="text-sm font-medium hidden sm:inline">Filters</span>
-                        {(selectedCampaign || selectedStatus || selectedState) && (
-                            <span className="flex h-2 w-2 rounded-full bg-red-500"></span>
-                        )}
-                    </button>
-                </div>
+                <button
+                    onClick={(e) => setFilterAnchorEl(e.currentTarget)}
+                    className={`flex items-center gap-2 px-4 py-2.5 min-h-[44px] border rounded-xl transition-all ${Boolean(filterAnchorEl) || (selectedCampaign || selectedStatus || selectedState)
+                        ? "bg-black text-white border-black shadow-md"
+                        : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50 active:bg-gray-100"
+                        }`}
+                >
+                    <Filter size={16} />
+                    <span className="text-sm font-medium">Filters</span>
+                    {(selectedCampaign || selectedStatus || selectedState) && (
+                        <span className="flex h-2 w-2 rounded-full bg-red-500"></span>
+                    )}
+                </button>
             </div>
 
-            {/* --- Table --- */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            {/* --- Mobile Card View --- */}
+            <div className="md:hidden space-y-3">
+                {loading ? (
+                    Array.from({ length: 3 }).map((_, i) => (
+                        <div key={i} className="bg-white rounded-xl p-4 border border-gray-100 animate-pulse">
+                            <div className="flex justify-between mb-3">
+                                <div className="h-5 w-32 bg-gray-100 rounded"></div>
+                                <div className="h-5 w-5 bg-gray-100 rounded"></div>
+                            </div>
+                            <div className="space-y-2">
+                                <div className="h-3 w-48 bg-gray-100 rounded"></div>
+                                <div className="h-3 w-32 bg-gray-100 rounded"></div>
+                            </div>
+                            <div className="flex gap-2 mt-3">
+                                <div className="h-5 w-16 bg-gray-100 rounded-full"></div>
+                                <div className="h-5 w-16 bg-gray-100 rounded-full"></div>
+                            </div>
+                        </div>
+                    ))
+                ) : leads.length ? (
+                    leads.map(lead => (
+                        <MobileLeadCard
+                            key={lead._id}
+                            lead={lead}
+                            onDelete={() => handleDelete(lead)}
+                            onReturn={() => handleReturnLead(lead)}
+                        />
+                    ))
+                ) : (
+                    <div className="bg-white rounded-xl p-8 border border-gray-100 text-center">
+                        <Users className="h-10 w-10 text-gray-200 mx-auto mb-3" />
+                        <p className="text-gray-900 font-medium">No leads found</p>
+                    </div>
+                )}
+            </div>
+
+            {/* --- Desktop Table View --- */}
+            <div className="hidden md:block bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full">
                         <thead>
@@ -612,38 +702,43 @@ export default function AllLeadsTable({ defaultPaymentStatus, defaultReturnStatu
                         </tbody>
                     </table>
                 </div>
+            </div>
 
-                {/* Pagination */}
-                <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-white">
-                    <div className="text-sm text-gray-500">
-                        Showing <span className="font-medium text-gray-900">{(pagination.pageIndex * pagination.pageSize) + 1}</span> to <span className="font-medium text-gray-900">{Math.min((pagination.pageIndex + 1) * pagination.pageSize, totalRows)}</span> of <span className="font-medium text-gray-900">{totalRows}</span> results
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <select
-                            value={pagination.pageSize}
-                            onChange={e => table.setPageSize(Number(e.target.value))}
-                            className="block w-full pl-3 pr-8 py-1.5 text-sm border-gray-300 focus:outline-none focus:ring-black focus:border-black rounded-lg border"
+            {/* Pagination - Responsive */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 sm:px-6 py-4 bg-white rounded-xl border border-gray-100">
+                <div className="text-xs sm:text-sm text-gray-500 order-2 sm:order-1">
+                    <span className="hidden sm:inline">Showing </span>
+                    <span className="font-medium text-gray-900">{(pagination.pageIndex * pagination.pageSize) + 1}</span>
+                    <span> - </span>
+                    <span className="font-medium text-gray-900">{Math.min((pagination.pageIndex + 1) * pagination.pageSize, totalRows)}</span>
+                    <span> of </span>
+                    <span className="font-medium text-gray-900">{totalRows}</span>
+                </div>
+                <div className="flex items-center gap-2 order-1 sm:order-2">
+                    <select
+                        value={pagination.pageSize}
+                        onChange={e => table.setPageSize(Number(e.target.value))}
+                        className="hidden sm:block pl-3 pr-8 py-1.5 text-sm border-gray-300 focus:outline-none focus:ring-black focus:border-black rounded-lg border"
+                    >
+                        {[10, 20, 30, 50].map(pageSize => (
+                            <option key={pageSize} value={pageSize}>Show {pageSize}</option>
+                        ))}
+                    </select>
+                    <div className="flex rounded-lg shadow-sm">
+                        <button
+                            onClick={() => table.previousPage()}
+                            disabled={!table.getCanPreviousPage()}
+                            className="inline-flex items-center justify-center w-10 h-10 sm:w-auto sm:h-auto sm:px-3 sm:py-1.5 rounded-l-lg border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 active:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            {[10, 20, 30, 50].map(pageSize => (
-                                <option key={pageSize} value={pageSize}>Show {pageSize}</option>
-                            ))}
-                        </select>
-                        <div className="flex rounded-md shadow-sm">
-                            <button
-                                onClick={() => table.previousPage()}
-                                disabled={!table.getCanPreviousPage()}
-                                className="relative inline-flex items-center px-3 py-1.5 rounded-l-lg border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <ChevronLeft size={16} />
-                            </button>
-                            <button
-                                onClick={() => table.nextPage()}
-                                disabled={!table.getCanNextPage()}
-                                className="relative inline-flex items-center px-3 py-1.5 rounded-r-lg border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <ChevronRight size={16} />
-                            </button>
-                        </div>
+                            <ChevronLeft size={18} />
+                        </button>
+                        <button
+                            onClick={() => table.nextPage()}
+                            disabled={!table.getCanNextPage()}
+                            className="inline-flex items-center justify-center w-10 h-10 sm:w-auto sm:h-auto sm:px-3 sm:py-1.5 rounded-r-lg border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 active:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <ChevronRight size={18} />
+                        </button>
                     </div>
                 </div>
             </div>

@@ -38,24 +38,24 @@ const NotificationCard = () => {
     : notifications;
 
   return (
-    <div className="w-[420px] bg-white shadow-2xl rounded-lg border border-gray-200 z-50 transition-all duration-300">
+    <div className="w-full sm:w-[380px] md:w-[420px] bg-white shadow-2xl rounded-xl border border-gray-200 z-50 transition-all duration-300 max-h-[85vh] sm:max-h-[600px] flex flex-col">
       {/* Header */}
-      <div className="border-b border-gray-200 bg-gray-50 rounded-t-lg">
+      <div className="border-b border-gray-200 bg-gray-50 rounded-t-xl flex-shrink-0">
         <div className="flex">
           <button
             onClick={() => handleTabChange('all')}
-            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${activeTab === 'all'
-                ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
-                : 'text-gray-600 hover:text-gray-800'
+            className={`flex-1 px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-medium transition-colors ${activeTab === 'all'
+              ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
+              : 'text-gray-600 hover:text-gray-800'
               }`}
           >
             All ({notifications.length})
           </button>
           <button
             onClick={() => handleTabChange('unread')}
-            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${activeTab === 'unread'
-                ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
-                : 'text-gray-600 hover:text-gray-800'
+            className={`flex-1 px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-medium transition-colors ${activeTab === 'unread'
+              ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
+              : 'text-gray-600 hover:text-gray-800'
               }`}
           >
             Unread ({unreadCount})
@@ -65,7 +65,7 @@ const NotificationCard = () => {
 
       {/* Actions */}
       {unreadCount > 0 && (
-        <div className="px-4 py-2 bg-gray-50 border-b border-gray-200">
+        <div className="px-3 sm:px-4 py-2 bg-gray-50 border-b border-gray-200 flex-shrink-0">
           <button
             onClick={markAllAsRead}
             className="text-xs text-blue-600 hover:text-blue-800 font-medium"
@@ -76,15 +76,15 @@ const NotificationCard = () => {
       )}
 
       {/* Notifications List */}
-      <div className="max-h-[450px] overflow-y-auto">
+      <div className="flex-1 overflow-y-auto max-h-[50vh] sm:max-h-[350px]">
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
           </div>
         ) : filteredNotifications.length === 0 ? (
           <div className="px-4 py-8 text-center text-gray-500">
-            <div className="text-gray-400 text-3xl mb-2">📭</div>
-            <p className="text-sm">
+            <div className="text-gray-400 text-2xl sm:text-3xl mb-2">📭</div>
+            <p className="text-xs sm:text-sm">
               {activeTab === 'unread' ? 'No unread notifications' : 'No notifications yet'}
             </p>
           </div>
@@ -93,21 +93,21 @@ const NotificationCard = () => {
             <div
               key={notification._id || notification.id}
               onClick={() => handleNotificationClick(notification)}
-              className={`flex items-start gap-3 px-4 py-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer group transition-colors ${!notification.read ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''
+              className={`flex items-start gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer group transition-colors ${!notification.read ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''
                 }`}
             >
               {/* Icon */}
-              <div className="flex-shrink-0 mt-1">
-                {notification.type === 'error' && <span className="text-red-500 text-lg">⚠️</span>}
-                {notification.type === 'success' && <span className="text-green-500 text-lg">✅</span>}
-                {notification.type === 'info' && <span className="text-blue-500 text-lg">ℹ️</span>}
-                {notification.type === 'warning' && <span className="text-yellow-500 text-lg">⚠️</span>}
+              <div className="flex-shrink-0 mt-0.5">
+                {notification.type === 'error' && <span className="text-red-500 text-base sm:text-lg">⚠️</span>}
+                {notification.type === 'success' && <span className="text-green-500 text-base sm:text-lg">✅</span>}
+                {notification.type === 'info' && <span className="text-blue-500 text-base sm:text-lg">ℹ️</span>}
+                {notification.type === 'warning' && <span className="text-yellow-500 text-base sm:text-lg">⚠️</span>}
               </div>
 
               {/* Content */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between">
-                  <h4 className={`text-sm font-medium ${!notification.read ? 'text-gray-900' : 'text-gray-700'
+                <div className="flex items-start justify-between gap-2">
+                  <h4 className={`text-xs sm:text-sm font-medium truncate ${!notification.read ? 'text-gray-900' : 'text-gray-700'
                     }`}>
                     {notification.title}
                   </h4>
@@ -116,19 +116,19 @@ const NotificationCard = () => {
                   )}
                 </div>
 
-                <p className={`text-sm mt-1 break-words ${!notification.read ? 'text-gray-800' : 'text-gray-600'
+                <p className={`text-xs sm:text-sm mt-0.5 sm:mt-1 line-clamp-2 ${!notification.read ? 'text-gray-800' : 'text-gray-600'
                   }`}>
                   {notification.message}
                 </p>
 
-                <div className="flex items-center justify-between mt-2">
-                  <span className="text-xs text-gray-500">
+                <div className="flex items-center justify-between mt-1.5 sm:mt-2 gap-2">
+                  <span className="text-[10px] sm:text-xs text-gray-500">
                     {notification.time}
                   </span>
 
                   {notification.senderId && (
-                    <span className="text-xs text-gray-500">
-                      from {notification.senderId.name}
+                    <span className="text-[10px] sm:text-xs text-gray-500 truncate max-w-[80px] sm:max-w-[120px]">
+                      {notification.senderId.name}
                     </span>
                   )}
                 </div>
@@ -137,7 +137,7 @@ const NotificationCard = () => {
               {/* Delete Button */}
               <button
                 onClick={(e) => handleDelete(e, notification._id || notification.id)}
-                className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-all p-1 rounded"
+                className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-all p-1 rounded flex-shrink-0"
                 title="Delete notification"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -150,16 +150,16 @@ const NotificationCard = () => {
       </div>
 
       {/* Footer */}
-      <div className="px-4 py-3 bg-gray-50 rounded-b-lg border-t border-gray-200">
-        <div className="flex items-center justify-between text-xs text-gray-500">
-          <div className="flex items-center gap-2">
+      <div className="px-3 sm:px-4 py-2.5 sm:py-3 bg-gray-50 rounded-b-xl border-t border-gray-200 flex-shrink-0">
+        <div className="flex items-center justify-between text-[10px] sm:text-xs text-gray-500">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <div className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`}></div>
             <span>{connected ? 'Connected' : 'Disconnected'}</span>
           </div>
 
           <button
             onClick={() => fetchNotifications(activeTab === 'unread')}
-            className="text-blue-600 hover:text-blue-800"
+            className="text-blue-600 hover:text-blue-800 p-1"
           >
             Refresh
           </button>

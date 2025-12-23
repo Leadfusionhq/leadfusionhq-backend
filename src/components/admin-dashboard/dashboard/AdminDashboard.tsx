@@ -283,61 +283,47 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-gray-50 p-3 sm:p-4 md:p-6 lg:p-8">
       {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+      <div className="mb-4 sm:mb-6 md:mb-8">
+        <div className="flex items-center justify-between flex-wrap gap-3 sm:gap-4">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">
               Admin Dashboard
             </h1>
-            <p className="text-gray-600">
-              Welcome back, {user?.name || 'Admin'}! Here&apos;s what&apos;s happening.
+            <p className="text-sm sm:text-base text-gray-600 truncate">
+              Welcome back, {user?.name || 'Admin'}!
             </p>
-
           </div>
 
-          {/* Global Date Filter */}
-          {/* <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg shadow-sm border border-gray-200">
-            <Calendar className="w-4 h-4 text-gray-500" />
-            <select
-              className="text-sm border-0 focus:ring-0 text-gray-700 font-medium"
-              value={leadDateRange}
-              onChange={(e) => setLeadDateRange(e.target.value as any)}
-            >
-              <option value="7d">Last 7 Days</option>
-              <option value="30d">Last 30 Days</option>
-              <option value="mtd">Month to Date</option>
-            </select>
-          </div> */}
-          {/* ✅ ADD THIS - View Logs Button */}
+          {/* View Logs Button */}
           <Link href="/admin/logs">
-            <button className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors shadow-sm">
+            <button className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-gray-900 text-white text-sm rounded-lg hover:bg-gray-800 active:bg-gray-700 transition-colors shadow-sm min-h-[44px]">
               <Activity className="w-4 h-4" />
-              View Logs
+              <span className="hidden sm:inline">View Logs</span>
             </button>
           </Link>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 md:gap-6 mb-4 sm:mb-6 md:mb-8">
         {/* Total Users */}
         {loading ? (
           <SkeletonCard />
         ) : (
-          <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between mb-4">
-              <div className="bg-blue-50 p-3 rounded-lg">
-                <Users className="w-6 h-6 text-blue-600" />
+          <div className="bg-white rounded-xl sm:rounded-lg shadow-sm p-3 sm:p-4 md:p-6 border border-gray-100 hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between mb-2 sm:mb-4">
+              <div className="bg-blue-50 p-2 sm:p-3 rounded-lg">
+                <Users className="w-4 h-4 sm:w-6 sm:h-6 text-blue-600" />
               </div>
               <div className="flex flex-col items-end">
-                <span className="text-3xl font-bold text-gray-900">{stats.totalUsers.toLocaleString()}</span>
-                <span className="text-xs text-gray-500">Total Users</span>
+                <span className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">{stats.totalUsers.toLocaleString()}</span>
+                <span className="text-[10px] sm:text-xs text-gray-500">Total Users</span>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-gray-50">
+            <div className="hidden sm:grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-gray-50">
               <div className="flex items-center gap-2">
                 <div className="p-1.5 bg-indigo-50 rounded text-indigo-600">
                   <Shield className="w-3.5 h-3.5" />
@@ -385,45 +371,41 @@ export default function AdminDashboard() {
         {loading ? (
           <SkeletonCard />
         ) : (
-          <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow relative">
+          <div className="bg-white rounded-xl sm:rounded-lg shadow-sm p-3 sm:p-4 md:p-6 border border-gray-100 hover:shadow-md transition-shadow relative">
             {revenueLoading && (
               <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center rounded-lg z-10">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
               </div>
             )}
-            <div className="flex items-center justify-between mb-4">
-              <div className="bg-green-50 p-3 rounded-lg">
-                <DollarSign className="w-6 h-6 text-green-600" />
+            <div className="flex items-center justify-between mb-2 sm:mb-4">
+              <div className="bg-green-50 p-2 sm:p-3 rounded-lg">
+                <DollarSign className="w-4 h-4 sm:w-6 sm:h-6 text-green-600" />
               </div>
               <select
-                className="text-xs border border-gray-200 rounded px-2 py-1 text-gray-600 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="text-[10px] sm:text-xs border border-gray-200 rounded px-1.5 sm:px-2 py-0.5 sm:py-1 text-gray-600 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 max-w-[90px] sm:max-w-none truncate"
                 value={revenueRange}
                 onChange={(e) => setRevenueRange(e.target.value as any)}
                 disabled={revenueLoading}
               >
                 <option value="today">Today</option>
                 <option value="yesterday">Yesterday</option>
-
-                <option value="7d">Last 7 Days</option>
-                <option value="30d">Last 30 Days</option>
-
-                <option value="mtd">Month to Date (MTD)</option>
-                <option value="q1">Q1 (Jan–Mar)</option>
-                <option value="q2">Q2 (Apr–Jun)</option>
-                <option value="q3">Q3 (Jul–Sep)</option>
-                <option value="q4">Q4 (Oct–Dec)</option>
-
+                <option value="7d">7 Days</option>
+                <option value="30d">30 Days</option>
+                <option value="mtd">MTD</option>
+                <option value="q1">Q1</option>
+                <option value="q2">Q2</option>
+                <option value="q3">Q3</option>
+                <option value="q4">Q4</option>
                 <option value="this_year">This Year</option>
                 <option value="last_year">Last Year</option>
-
               </select>
             </div>
-            <p className="text-gray-600 text-sm mb-1">Total Revenue</p>
-            <p className="text-3xl font-bold text-gray-900">
+            <p className="text-gray-600 text-xs sm:text-sm mb-0.5 sm:mb-1">Total Revenue</p>
+            <p className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">
               ${stats.totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
             {revenueWindow?.from && revenueWindow?.to && (
-              <p className="text-xs text-gray-500 mt-2">
+              <p className="text-[10px] sm:text-xs text-gray-500 mt-1 sm:mt-2">
                 {new Date(revenueWindow.from).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} -
                 {' '}{new Date(revenueWindow.to).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
               </p>
@@ -435,15 +417,17 @@ export default function AdminDashboard() {
         {loading ? (
           <SkeletonCard />
         ) : (
-          <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between mb-4">
-              <div className="bg-purple-50 p-3 rounded-lg">
-                <FileText className="w-6 h-6 text-purple-600" />
+          <div className="bg-white rounded-xl sm:rounded-lg shadow-sm p-3 sm:p-4 md:p-6 border border-gray-100 hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between mb-2 sm:mb-4">
+              <div className="bg-purple-50 p-2 sm:p-3 rounded-lg">
+                <FileText className="w-4 h-4 sm:w-6 sm:h-6 text-purple-600" />
+              </div>
+              <div className="flex flex-col items-end">
+                <span className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">{stats.totalLeads.toLocaleString()}</span>
+                <span className="text-[10px] sm:text-xs text-gray-500">Total Leads</span>
               </div>
             </div>
-            <p className="text-gray-600 text-sm mb-1">Total Number of Leads</p>
-            <p className="text-3xl font-bold text-gray-900">{stats.totalLeads.toLocaleString()}</p>
-            <div className="flex items-center gap-4 mt-2">
+            <div className="hidden sm:flex items-center gap-4 mt-2">
               <span className="text-xs text-green-600">
                 {stats.activeLeads} Active
               </span>
@@ -458,15 +442,17 @@ export default function AdminDashboard() {
         {loading ? (
           <SkeletonCard />
         ) : (
-          <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between mb-4">
-              <div className="bg-orange-50 p-3 rounded-lg">
-                <Activity className="w-6 h-6 text-orange-600" />
+          <div className="bg-white rounded-xl sm:rounded-lg shadow-sm p-3 sm:p-4 md:p-6 border border-gray-100 hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between mb-2 sm:mb-4">
+              <div className="bg-orange-50 p-2 sm:p-3 rounded-lg">
+                <Activity className="w-4 h-4 sm:w-6 sm:h-6 text-orange-600" />
+              </div>
+              <div className="flex flex-col items-end">
+                <span className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">{stats.totalCampaigns.toLocaleString()}</span>
+                <span className="text-[10px] sm:text-xs text-gray-500">Campaigns</span>
               </div>
             </div>
-            <p className="text-gray-600 text-sm mb-1">Total Campaigns</p>
-            <p className="text-3xl font-bold text-gray-900">{stats.totalCampaigns.toLocaleString()}</p>
-            <div className="flex items-center gap-4 mt-2">
+            <div className="hidden sm:flex items-center gap-4 mt-2">
               <span className="text-xs text-green-600">
                 {stats.activeCampaigns} Active
               </span>
@@ -479,7 +465,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Leads Charts */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6 md:mb-8">
         {/* Active Leads */}
         {loading ? (
           <SkeletonChart />

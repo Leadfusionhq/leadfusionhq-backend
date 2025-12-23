@@ -4,8 +4,8 @@ import CampaignNote from "@/components/campaign/tabs/CampaignNote";
 import CampaignGeography from "@/components/campaign/tabs/CampaignGeography";
 import CampaignDelivery from "@/components/campaign/tabs/CampaignDelivery";
 import CampaignUtility from "@/components/campaign/tabs/CampaignUtility";
-import  {initialValues}  from '@/constants/initialCampaign';
-import { Utility ,County } from "@/types/campaign";
+import { initialValues } from '@/constants/initialCampaign';
+import { Utility, County } from "@/types/campaign";
 
 export const renderTabContent = (
   activeTab: string,
@@ -33,7 +33,7 @@ export const renderTabContent = (
           // countiesList={countiesList}
           // isLoadingCounties={isLoadingCounties}
           loadStates={loadStates}
-          isEditMode={isEditMode} 
+          isEditMode={isEditMode}
           isAdmin={isAdmin}
           formKey={formKey} // Pass formKey
         />
@@ -47,7 +47,7 @@ export const renderTabContent = (
           setFieldValue={setFieldValue}
           activeDeliveryTab={activeDeliveryTab}
           setActiveDeliveryTab={setActiveDeliveryTab}
-          isEditMode={isEditMode} 
+          isEditMode={isEditMode}
           formKey={formKey} // Pass formKey
         />
       );
