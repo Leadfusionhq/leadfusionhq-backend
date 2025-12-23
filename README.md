@@ -261,7 +261,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 For support, please contact the development team or open an issue on GitHub.
 
-- **GitHub Issues**: [Report a bug](https://github.com/leadfusionhq/leadfusion/issues)
+- **GitHub Issues**: [Report a bug](https://github.com/rahulsharma1902)
 
 ---
 
