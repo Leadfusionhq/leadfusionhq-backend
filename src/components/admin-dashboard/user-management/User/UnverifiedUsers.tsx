@@ -72,13 +72,85 @@ const UnverifiedBadge = () => (
 const StatCard = ({ title, value, icon: Icon, color }: { title: string, value: string | number, icon: any, color: string }) => {
     const isBlack = color.includes('bg-black');
     return (
-        <div className={`p-6 rounded-2xl shadow-sm border flex items-center gap-4 transition-all duration-200 hover:scale-[1.01] hover:shadow-md ${isBlack ? "bg-black border-black text-white" : "bg-white border-gray-100"}`}>
-            <div className={`p-3 rounded-xl ${isBlack ? "bg-gray-800 text-white" : color}`}>
-                <Icon className={`w-6 h-6`} />
+        <div className={`p-4 sm:p-6 rounded-2xl shadow-sm border flex items-center gap-3 sm:gap-4 transition-all duration-200 hover:scale-[1.01] hover:shadow-md ${isBlack ? "bg-black border-black text-white" : "bg-white border-gray-100"}`}>
+            <div className={`p-2 sm:p-3 rounded-xl ${isBlack ? "bg-gray-800 text-white" : color}`}>
+                <Icon className={`w-5 h-5 sm:w-6 sm:h-6`} />
             </div>
             <div>
-                <p className={`text-sm font-medium ${isBlack ? "text-gray-400" : "text-gray-500"}`}>{title}</p>
-                <h3 className={`text-2xl font-bold mt-0.5 ${isBlack ? "text-white" : "text-gray-900"}`}>{value}</h3>
+                <p className={`text-xs sm:text-sm font-medium ${isBlack ? "text-gray-400" : "text-gray-500"}`}>{title}</p>
+                <h3 className={`text-xl sm:text-2xl font-bold mt-0.5 ${isBlack ? "text-white" : "text-gray-900"}`}>{value}</h3>
+            </div>
+        </div>
+    );
+};
+
+// Mobile Unverified User Card Component
+const MobileUnverifiedUserCard = ({
+    user,
+    onApprove,
+    onResend,
+    onEdit,
+    onDelete
+}: {
+    user: User;
+    onApprove: () => void;
+    onResend: () => void;
+    onEdit: () => void;
+    onDelete: () => void;
+}) => {
+    return (
+        <div className="bg-white rounded-xl p-4 border border-amber-100 shadow-sm">
+            {/* Header */}
+            <div className="flex items-start gap-3 mb-3">
+                <div className="relative h-10 w-10 min-w-10 rounded-full overflow-hidden border border-amber-100 shadow-sm">
+                    <Image
+                        src={user.image || "/images/icons/User.svg"}
+                        alt={user.name}
+                        fill
+                        className="object-cover"
+                    />
+                </div>
+                <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-gray-900 truncate">{user.name}</p>
+                    <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                </div>
+                <UnverifiedBadge />
+            </div>
+
+            {/* Info Grid */}
+            <div className="grid grid-cols-2 gap-2 text-[10px] text-gray-500 mb-3">
+                <div>
+                    <p className="text-gray-400">Company</p>
+                    <p className="font-medium text-gray-700 truncate">{user.companyName || '--'}</p>
+                </div>
+                <div>
+                    <p className="text-gray-400">Joined</p>
+                    <p className="font-medium text-gray-700">{new Date(user.createdAt).toLocaleDateString()}</p>
+                </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-2 py-3 border-t border-gray-100">
+                <button
+                    onClick={onApprove}
+                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-emerald-600 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors min-h-[36px]"
+                >
+                    <Check size={14} />
+                    Approve
+                </button>
+                <button
+                    onClick={onResend}
+                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors min-h-[36px]"
+                >
+                    <Mail size={14} />
+                    Resend
+                </button>
+                <button
+                    onClick={onDelete}
+                    className="flex items-center justify-center px-3 py-2 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors min-h-[36px]"
+                >
+                    <Trash2 size={14} />
+                </button>
             </div>
         </div>
     );
@@ -302,8 +374,83 @@ export default function UnverifiedUsersTable() {
             </div>
 
 
-            {/* --- Table Container --- */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            {/* --- Mobile Cards View --- */}
+            <div className="md:hidden space-y-3">
+                {/* Mobile Search */}
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <input
+                        type="text"
+                        placeholder="Search unverified users..."
+                        value={globalFilter}
+                        onChange={(e) => setGlobalFilter(e.target.value)}
+                        className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-gray-300 transition-all shadow-sm"
+                    />
+                </div>
+
+                {/* User Cards */}
+                {loading ? (
+                    Array.from({ length: 3 }).map((_, i) => (
+                        <div key={i} className="bg-white rounded-xl p-4 border border-amber-100 animate-pulse">
+                            <div className="flex gap-3 mb-3">
+                                <div className="h-10 w-10 bg-gray-100 rounded-full"></div>
+                                <div className="space-y-2 flex-1">
+                                    <div className="h-4 w-32 bg-gray-100 rounded"></div>
+                                    <div className="h-3 w-40 bg-gray-100 rounded"></div>
+                                </div>
+                            </div>
+                        </div>
+                    ))
+                ) : users.length ? (
+                    users.map(user => (
+                        <MobileUnverifiedUserCard
+                            key={user._id}
+                            user={user}
+                            onApprove={() => handleApproveUser(user)}
+                            onResend={() => handleResendVerification(user)}
+                            onEdit={() => router.push(`/admin/user-management/user/${user._id}/edit`)}
+                            onDelete={() => { setSelectedUser(user); setConfirmOpen(true); }}
+                        />
+                    ))
+                ) : (
+                    <div className="bg-white rounded-xl p-8 border border-gray-100 text-center">
+                        <CheckCircle2 className="h-10 w-10 text-emerald-500 mx-auto mb-3" />
+                        <p className="text-gray-900 font-medium">All Clear!</p>
+                        <p className="text-sm text-gray-500">No unverified users found.</p>
+                    </div>
+                )}
+
+                {/* Mobile Pagination */}
+                {!loading && users.length > 0 && (
+                    <div className="flex items-center justify-between bg-white rounded-xl p-3 border border-gray-100 shadow-sm mt-3">
+                        <p className="text-xs text-gray-600">
+                            {totalRows > 0 ? (pagination.pageIndex * pagination.pageSize) + 1 : 0}-{Math.min((pagination.pageIndex + 1) * pagination.pageSize, totalRows)} of {totalRows}
+                        </p>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => table.previousPage()}
+                                disabled={!table.getCanPreviousPage()}
+                                className="p-2 border border-gray-200 rounded-lg disabled:opacity-50 hover:bg-gray-50 transition-all min-w-[40px] min-h-[40px] flex items-center justify-center"
+                            >
+                                <ChevronLeft size={16} />
+                            </button>
+                            <span className="text-sm font-medium text-gray-700 px-2">
+                                {pagination.pageIndex + 1}
+                            </span>
+                            <button
+                                onClick={() => table.nextPage()}
+                                disabled={!table.getCanNextPage()}
+                                className="p-2 border border-gray-200 rounded-lg disabled:opacity-50 hover:bg-gray-50 transition-all min-w-[40px] min-h-[40px] flex items-center justify-center"
+                            >
+                                <ChevronRight size={16} />
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* --- Desktop Table Container --- */}
+            <div className="hidden md:block bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
 
                 {/* Controls */}
                 <div className="p-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">

@@ -2,8 +2,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { Skeleton, Box, Button, Typography } from "@mui/material";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
+import { Search, ChevronDown, ChevronUp, Edit2, Trash2, HelpCircle, ChevronLeft, ChevronRight, X, List } from "lucide-react";
 
 interface FAQ {
     _id: string;
@@ -33,21 +33,19 @@ interface FAQListProps {
     onPageChange?: (page: number) => void;
 }
 
-const FAQList = ({ 
-    faqs, 
-    onEdit, 
-    onDelete, 
-    onSearch, 
+const FAQList = ({
+    faqs,
+    onEdit,
+    onDelete,
+    onSearch,
     loading = false,
     pagination,
-    onPageChange 
+    onPageChange
 }: FAQListProps) => {
     const [searchTerm, setSearchTerm] = useState("");
     const [expandedFAQ, setExpandedFAQ] = useState<string | null>(null);
-     // dialog state
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-
+    const [confirmOpen, setConfirmOpen] = useState(false);
+    const [selectedId, setSelectedId] = useState<string | null>(null);
 
     const handleSearchSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -62,22 +60,20 @@ const FAQList = ({
     const handleDeleteClick = (id: string) => {
         setSelectedId(id);
         setConfirmOpen(true);
-      };
-    
-      const handleConfirmDelete = () => {
+    };
+
+    const handleConfirmDelete = () => {
         if (selectedId) {
-          onDelete(selectedId);
+            onDelete(selectedId);
         }
         setConfirmOpen(false);
         setSelectedId(null);
-      };
-    
-      const handleCancelDelete = () => {
+    };
+
+    const handleCancelDelete = () => {
         setConfirmOpen(false);
         setSelectedId(null);
-      };
-
-
+    };
 
     const toggleExpanded = (faqId: string) => {
         setExpandedFAQ(expandedFAQ === faqId ? null : faqId);
@@ -87,70 +83,62 @@ const FAQList = ({
         return new Date(dateString).toLocaleDateString('en-US', {
             year: 'numeric',
             month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
+            day: 'numeric'
         });
     };
 
     const renderPagination = () => {
         if (!pagination || !onPageChange || pagination.pages <= 1) return null;
-    
+
         const { current, pages } = pagination;
-        const pageNumbers: (number | string)[] = []; // Explicitly type the array
-        
-        // Show first page
-        if (current > 3) {
-            pageNumbers.push(1);
-            if (current > 4) pageNumbers.push('...');
-        }
-        
-        // Show pages around current
-        for (let i = Math.max(1, current - 2); i <= Math.min(pages, current + 2); i++) {
-            pageNumbers.push(i);
-        }
-        
-        // Show last page
-        if (current < pages - 2) {
-            if (current < pages - 3) pageNumbers.push('...');
-            pageNumbers.push(pages);
-        }
-    
+
         return (
-            <div className="flex items-center justify-between mt-6 px-4 py-3 bg-white border-t border-gray-200">
-                <div className="text-sm text-gray-500">
-                    Showing {((current - 1) * pagination.limit) + 1} to {Math.min(current * pagination.limit, pagination.total)} of {pagination.total} results
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-5 sm:px-6 py-4 bg-gray-50/50 border-t border-gray-100">
+                <div className="text-xs sm:text-sm text-gray-500">
+                    Showing <span className="font-medium text-gray-900">{((current - 1) * pagination.limit) + 1}</span> to <span className="font-medium text-gray-900">{Math.min(current * pagination.limit, pagination.total)}</span> of <span className="font-medium text-gray-900">{pagination.total}</span>
                 </div>
-                <div className="flex space-x-1">
+                <div className="flex items-center gap-1">
                     <button
                         onClick={() => onPageChange(current - 1)}
                         disabled={current === 1}
-                        className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="p-2 border border-gray-200 bg-white rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all min-w-[40px] min-h-[40px] flex items-center justify-center"
                     >
-                        Previous
+                        <ChevronLeft className="w-4 h-4" />
                     </button>
-                    {pageNumbers.map((page, index) => (
-                        <button
-                            key={index}
-                            onClick={() => typeof page === 'number' ? onPageChange(page) : null}
-                            disabled={page === '...' || page === current}
-                            className={`px-3 py-1 text-sm border border-gray-300 rounded-md ${
-                                page === current 
-                                    ? 'bg-gray-900 text-white border-gray-900' 
-                                    : page === '...' 
-                                        ? 'cursor-default' 
-                                        : 'hover:bg-gray-50'
-                            }`}
-                        >
-                            {page}
-                        </button>
-                    ))}
+
+                    {/* Page numbers */}
+                    {Array.from({ length: Math.min(5, pages) }, (_, i) => {
+                        let pageNum: number;
+                        if (pages <= 5) {
+                            pageNum = i + 1;
+                        } else if (current <= 3) {
+                            pageNum = i + 1;
+                        } else if (current >= pages - 2) {
+                            pageNum = pages - 4 + i;
+                        } else {
+                            pageNum = current - 2 + i;
+                        }
+
+                        return (
+                            <button
+                                key={pageNum}
+                                onClick={() => onPageChange(pageNum)}
+                                className={`px-3 py-2 text-sm rounded-lg min-w-[40px] min-h-[40px] transition-all ${pageNum === current
+                                    ? 'bg-black text-white font-medium'
+                                    : 'bg-white border border-gray-200 hover:bg-gray-50 text-gray-700'
+                                    }`}
+                            >
+                                {pageNum}
+                            </button>
+                        );
+                    })}
+
                     <button
                         onClick={() => onPageChange(current + 1)}
                         disabled={current === pages}
-                        className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="p-2 border border-gray-200 bg-white rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all min-w-[40px] min-h-[40px] flex items-center justify-center"
                     >
-                        Next
+                        <ChevronRight className="w-4 h-4" />
                     </button>
                 </div>
             </div>
@@ -158,153 +146,161 @@ const FAQList = ({
     };
 
     return (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             {/* Header */}
-            <div className="p-6 border-b border-gray-200">
-                <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-lg font-medium text-gray-800">
-                        FAQ List {pagination && `(${pagination.total} total)`}
-                    </h2>
+            <div className="p-5 sm:p-6 border-b border-gray-100">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-gray-100 rounded-xl">
+                            <List className="w-5 h-5 text-gray-600" />
+                        </div>
+                        <div>
+                            <h2 className="text-base sm:text-lg font-semibold text-gray-900">
+                                FAQ List
+                            </h2>
+                            {pagination && (
+                                <p className="text-xs text-gray-500">{pagination.total} questions total</p>
+                            )}
+                        </div>
+                    </div>
                 </div>
-                
-      
+
                 {/* Search */}
-                {/* ✅ Search bar should always be visible */}
-                <form onSubmit={handleSearchSubmit} className="flex space-x-3 mb-3">
-                <div className="flex-1">
-                    <input
-                    type="text"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Search FAQs by question or answer..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md 
-                                focus:outline-none focus:ring-2 focus:ring-gray-500 
-                                focus:border-gray-500"
-                    />
-                </div>
-                <button
-                    type="submit"
-                    className="px-4 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 text-sm font-medium"
-                >
-                    Search
-                </button>
-                {searchTerm && (
+                <form onSubmit={handleSearchSubmit} className="flex flex-col sm:flex-row gap-2">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                            type="text"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            placeholder="Search by question or answer..."
+                            className="w-full pl-10 pr-10 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-gray-300 focus:bg-white text-sm transition-all"
+                        />
+                        {searchTerm && (
+                            <button
+                                type="button"
+                                onClick={handleSearchClear}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-200 rounded-full transition-colors"
+                            >
+                                <X className="w-4 h-4 text-gray-400" />
+                            </button>
+                        )}
+                    </div>
                     <button
-                    type="button"
-                    onClick={handleSearchClear}
-                    className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 text-sm font-medium"
+                        type="submit"
+                        className="px-5 py-3 bg-black text-white rounded-xl hover:bg-gray-800 text-sm font-medium transition-all min-h-[48px] shadow-sm hover:shadow-md"
                     >
-                    Clear
+                        Search
                     </button>
-                )}
                 </form>
-
-                {/* ✅ Results / message */}
-               
-                <div>{/* Render FAQ list here */}</div>
-                
-
-
             </div>
 
             {/* Content */}
-            <div className="divide-y divide-gray-200">
+            <div className="divide-y divide-gray-100">
                 {loading ? (
-                    <div className="p-8 text-center">
-                        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                        <p className="mt-2 text-gray-500">Loading FAQs...</p>
+                    <div className="p-8 sm:p-12 text-center">
+                        <div className="inline-flex items-center justify-center w-12 h-12 bg-gray-100 rounded-full mb-4">
+                            <div className="w-6 h-6 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin"></div>
+                        </div>
+                        <p className="text-gray-500 text-sm">Loading FAQs...</p>
                     </div>
                 ) : faqs.length === 0 ? (
-                    <div className="p-8 text-center text-gray-500">
-                        <p>No FAQs found.</p>
-                        {searchTerm && <p className="text-sm mt-1">Try adjusting your search terms.</p>}
+                    <div className="p-8 sm:p-12 text-center">
+                        <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-50 rounded-full mb-4">
+                            <HelpCircle className="w-8 h-8 text-gray-300" />
+                        </div>
+                        <p className="text-gray-900 font-medium mb-1">No FAQs found</p>
+                        <p className="text-sm text-gray-500">
+                            {searchTerm ? "Try adjusting your search terms" : "Add your first FAQ using the form above"}
+                        </p>
                     </div>
                 ) : (
-                    faqs.map((faq) => (
-                        <div key={faq._id} className="p-6">
-                            <div className="flex items-start justify-between">
-                                <div className="flex-1">
-                                    <div className="flex items-center space-x-3 mb-2">
-                                        <h3 
-                                            className="text-sm font-medium text-gray-900 cursor-pointer hover:text-gray-700"
-                                            onClick={() => toggleExpanded(faq._id)}
-                                        >
-                                            {faq.question}
-                                        </h3>
-                                    </div>
-                                    
-                                    {expandedFAQ === faq._id && (
-                                        <div className="mt-3 space-y-3">
-                                            <div>
-                                                <p className="text-sm text-gray-600 leading-relaxed">
-                                                    {faq.answer}
-                                                </p>
-                                            </div>
-                                            <div className="text-xs text-gray-500 space-y-1">
-                                             
-                                                {faq.createdBy && (
-                                                    <p>By: {faq.createdBy.name}</p>
-                                                )}
-                                               
-                                            </div>
+                    faqs.map((faq, index) => (
+                        <div
+                            key={faq._id}
+                            className={`group transition-colors ${expandedFAQ === faq._id ? 'bg-gray-50/50' : 'hover:bg-gray-50/30'}`}
+                        >
+                            <div className="p-4 sm:p-5">
+                                {/* Mobile: Stack layout / Desktop: Row layout */}
+                                <div className="flex flex-col sm:flex-row sm:items-start gap-3">
+                                    {/* Number + Question */}
+                                    <div className="flex items-start gap-3 flex-1 min-w-0">
+                                        <div className="hidden sm:flex flex-shrink-0 w-7 h-7 bg-gray-100 rounded-lg items-center justify-center text-xs font-medium text-gray-500 mt-0.5">
+                                            {index + 1 + ((pagination?.current || 1) - 1) * (pagination?.limit || 10)}
                                         </div>
-                                    )}
-                                </div>
-                                
-                                <div className="flex items-center space-x-2 ml-4">
-                                    <button
-                                        onClick={() => toggleExpanded(faq._id)}
-                                        className="text-gray-400 hover:text-gray-600 transition-colors"
-                                        title={expandedFAQ === faq._id ? "Collapse" : "Expand"}
-                                    >
-                                        <svg className={`w-5 h-5 transition-transform ${
-                                            expandedFAQ === faq._id ? 'rotate-180' : ''
-                                        }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                        </svg>
-                                    </button>
-                                  
-                                    <div className="flex gap-2">
-                                    <Button
-                                        className="!bg-[#838383] !text-white hover:!bg-[#6b6b6b]"
-                                        size="small"
-                                        sx={{
-                                        fontSize: "11px",
-                                        minWidth: "50px",
-                                        height: "26px",
-                                        padding: "0px 6px",
-                                        textTransform: "capitalize",
-                                        fontWeight: 500,
-                                        }}
-                                        onClick={() => onEdit(faq)}
-                                    >
-                                        Edit
-                                    </Button>
 
-                                    <Button
-                                        className="!bg-white !text-[#838383] hover:!bg-[#f5f5f5] border border-[#838383]"
-                                        size="small"
-                                        sx={{
-                                        fontSize: "11px",
-                                        minWidth: "50px",
-                                        height: "26px",
-                                        padding: "0px 6px",
-                                        textTransform: "capitalize",
-                                        fontWeight: 500,
-                                        }}
-                                        onClick={() => handleDeleteClick(faq._id)}
-                                    >
-                                        Delete
-                                    </Button>
+                                        <div className="flex-1 min-w-0">
+                                            <button
+                                                onClick={() => toggleExpanded(faq._id)}
+                                                className="w-full text-left group/question"
+                                            >
+                                                <h3 className="text-sm font-medium text-gray-900 leading-relaxed break-words group-hover/question:text-gray-700">
+                                                    {faq.question}
+                                                </h3>
+                                            </button>
+
+                                            {/* Expanded Answer */}
+                                            {expandedFAQ === faq._id && (
+                                                <div className="mt-3">
+                                                    <div className="p-3 sm:p-4 bg-white rounded-xl border border-gray-200 shadow-sm">
+                                                        <p className="text-sm text-gray-600 leading-relaxed break-words whitespace-pre-wrap">
+                                                            {faq.answer}
+                                                        </p>
+                                                        {faq.createdBy && (
+                                                            <div className="mt-3 pt-3 border-t border-gray-100 flex flex-wrap items-center gap-2 text-xs text-gray-400">
+                                                                <span>Created by {faq.createdBy.name}</span>
+                                                                {faq.createdAt && (
+                                                                    <>
+                                                                        <span className="hidden sm:inline">•</span>
+                                                                        <span>{formatDate(faq.createdAt)}</span>
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
 
-                                    <ConfirmDialog
-                                        open={confirmOpen}
-                                        title="Delete FAQ"
-                                        message="Are you sure you want to delete this FAQ? This action cannot be undone."
-                                        onConfirm={handleConfirmDelete}
-                                        onCancel={handleCancelDelete}
-                                    />
+                                    {/* Actions - Full width on mobile, inline on desktop */}
+                                    <div className="flex items-center justify-end gap-2 sm:gap-1.5 flex-shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100">
+                                        <button
+                                            onClick={() => toggleExpanded(faq._id)}
+                                            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 sm:p-2 text-gray-500 hover:text-gray-700 bg-gray-50 sm:bg-transparent hover:bg-gray-100 rounded-lg transition-all min-h-[40px] text-xs font-medium sm:font-normal"
+                                            title={expandedFAQ === faq._id ? "Collapse" : "Expand"}
+                                        >
+                                            {expandedFAQ === faq._id ? (
+                                                <>
+                                                    <ChevronUp className="w-4 h-4" />
+                                                    <span className="sm:hidden">Collapse</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <ChevronDown className="w-4 h-4" />
+                                                    <span className="sm:hidden">View</span>
+                                                </>
+                                            )}
+                                        </button>
+
+                                        <button
+                                            onClick={() => onEdit(faq)}
+                                            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 sm:p-2 text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 sm:bg-transparent sm:text-gray-400 sm:hover:text-blue-600 sm:hover:bg-blue-50 rounded-lg transition-all min-h-[40px] text-xs font-medium sm:font-normal"
+                                            title="Edit"
+                                        >
+                                            <Edit2 className="w-4 h-4" />
+                                            <span className="sm:hidden">Edit</span>
+                                        </button>
+
+                                        <button
+                                            onClick={() => handleDeleteClick(faq._id)}
+                                            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 sm:p-2 text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 sm:bg-transparent sm:text-gray-400 sm:hover:text-red-600 sm:hover:bg-red-50 rounded-lg transition-all min-h-[40px] text-xs font-medium sm:font-normal"
+                                            title="Delete"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                            <span className="sm:hidden">Delete</span>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -314,6 +310,14 @@ const FAQList = ({
 
             {/* Pagination */}
             {renderPagination()}
+
+            <ConfirmDialog
+                open={confirmOpen}
+                title="Delete FAQ"
+                message="Are you sure you want to delete this FAQ? This action cannot be undone."
+                onConfirm={handleConfirmDelete}
+                onCancel={handleCancelDelete}
+            />
         </div>
     );
 };

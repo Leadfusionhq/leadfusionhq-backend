@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/redux/store';
 import Image from 'next/image';
@@ -9,7 +9,7 @@ import { removeToken } from '@/utils/auth';
 import { logout } from '@/redux/auth/authSlice';
 import { useLoader } from '@/context/LoaderContext';
 import { toast } from 'react-toastify';
-import { LayoutDashboard, Settings, LogOut, User as UserIcon, Sparkles } from 'lucide-react';
+import { LayoutDashboard, Settings, LogOut, Sparkles, MessageCircle } from 'lucide-react';
 
 interface ProfileCardProps {
   onClose?: () => void;
@@ -20,6 +20,23 @@ const ProfileCard: React.FC<ProfileCardProps> = ({ onClose }) => {
   const { showLoader, hideLoader } = useLoader();
   const dispatch = useDispatch<AppDispatch>();
   const router = useRouter();
+
+  // Chat widget state
+  const [chatHidden, setChatHidden] = useState(false);
+
+  useEffect(() => {
+    const dismissed = localStorage.getItem('chatWidgetDismissed');
+    setChatHidden(dismissed === 'true');
+  }, []);
+
+  const handleShowChat = () => {
+    localStorage.removeItem('chatWidgetDismissed');
+    setChatHidden(false);
+    toast.success("Chat widget restored!", { autoClose: 2000 });
+    onClose?.();
+    // Trigger a page reload to show the chat widget
+    window.location.reload();
+  };
 
   const profileSrc = user?.avatar
     ? `${process.env.NEXT_PUBLIC_BACKEND_API_URL}${user.avatar}`
@@ -117,6 +134,19 @@ const ProfileCard: React.FC<ProfileCardProps> = ({ onClose }) => {
             </Link>
           );
         })}
+
+        {/* Show Chat Option - Only shown when chat is hidden */}
+        {chatHidden && (
+          <button
+            onClick={handleShowChat}
+            className="w-full flex items-center gap-3 px-4 py-2.5 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-xl transition-all duration-200 group font-medium text-sm"
+          >
+            <div className="p-1.5 rounded-lg bg-gray-50 text-gray-500 group-hover:bg-white group-hover:text-[#306A64] group-hover:shadow-sm transition-all">
+              <MessageCircle className="w-4 h-4" />
+            </div>
+            Show Chat
+          </button>
+        )}
       </div>
 
       {/* Divider */}
@@ -145,3 +175,4 @@ const ProfileCard: React.FC<ProfileCardProps> = ({ onClose }) => {
 };
 
 export default ProfileCard;
+

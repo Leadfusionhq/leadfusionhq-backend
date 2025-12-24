@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Formik, Form, Field, ErrorMessage } from "formik";
 import * as Yup from "yup";
+import { HelpCircle, MessageSquare, Sparkles } from "lucide-react";
 
 interface FAQ {
     _id: string;
@@ -40,8 +41,7 @@ const AddFAQForm = ({ editingFAQ, onSave, onCancel }: AddFAQFormProps) => {
                 question: values.question.trim(),
                 answer: values.answer.trim(),
             });
-            
-            // Clear the form after successful save (only for new FAQs)
+
             if (!editingFAQ) {
                 resetForm();
             }
@@ -58,92 +58,119 @@ const AddFAQForm = ({ editingFAQ, onSave, onCancel }: AddFAQFormProps) => {
     };
 
     return (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-            <h2 className="text-lg font-medium text-gray-800 mb-4">
-                {editingFAQ ? "Edit FAQ" : "Add New FAQ"}
-            </h2>
-            
-            <Formik
-                initialValues={initialValues}
-                validationSchema={validationSchema}
-                onSubmit={handleSubmit}
-                enableReinitialize
-            >
-                {({ isSubmitting, errors, touched, resetForm }) => (
-                    <Form className="space-y-4">
-                        <div>
-                            <label htmlFor="question" className="block text-sm font-medium text-gray-700 mb-2">
-                                Question
-                            </label>
-                            <Field
-                                id="question"
-                                name="question"
-                                type="text"
-                                placeholder="Enter FAQ question"
-                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 ${
-                                    errors.question && touched.question
-                                        ? "border-red-500"
-                                        : "border-gray-300"
-                                }`}
-                                disabled={isSubmitting}
-                            />
-                            <ErrorMessage
-                                name="question"
-                                component="div"
-                                className="text-red-500 text-sm mt-1"
-                            />
-                        </div>
-                        
-                        <div>
-                            <label htmlFor="answer" className="block text-sm font-medium text-gray-700 mb-2">
-                                Answer
-                            </label>
-                            <Field
-                                as="textarea"
-                                id="answer"
-                                name="answer"
-                                placeholder="Enter FAQ answer"
-                                rows={4}
-                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 resize-vertical ${
-                                    errors.answer && touched.answer
-                                        ? "border-red-500"
-                                        : "border-gray-300"
-                                }`}
-                                disabled={isSubmitting}
-                            />
-                            <ErrorMessage
-                                name="answer"
-                                component="div"
-                                className="text-red-500 text-sm mt-1"
-                            />
-                        </div>
-                        
-                        <div className="flex space-x-3">
-                            <button
-                                type="submit"
-                                disabled={isSubmitting}
-                                className="px-4 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed text-sm font-medium transition-colors"
-                            >
-                                {isSubmitting ? (
-                                    editingFAQ ? "Updating..." : "Saving..."
-                                ) : (
-                                    editingFAQ ? "Update FAQ" : "Save FAQ"
-                                )}
-                            </button>
-                            {editingFAQ && (
-                                <button
-                                    type="button"
-                                    onClick={() => handleCancel(resetForm)}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-6">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-gray-900 to-gray-800 px-5 sm:px-6 py-4">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-white/10 rounded-xl">
+                        {editingFAQ ? <MessageSquare className="w-5 h-5 text-white" /> : <Sparkles className="w-5 h-5 text-white" />}
+                    </div>
+                    <div>
+                        <h2 className="text-base sm:text-lg font-semibold text-white">
+                            {editingFAQ ? "Edit FAQ" : "Add New FAQ"}
+                        </h2>
+                        <p className="text-xs text-gray-300">
+                            {editingFAQ ? "Update the question and answer" : "Create a new frequently asked question"}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Form */}
+            <div className="p-5 sm:p-6">
+                <Formik
+                    initialValues={initialValues}
+                    validationSchema={validationSchema}
+                    onSubmit={handleSubmit}
+                    enableReinitialize
+                >
+                    {({ isSubmitting, errors, touched, resetForm, values }) => (
+                        <Form className="space-y-5">
+                            <div>
+                                <label htmlFor="question" className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                                    <HelpCircle className="w-4 h-4 text-gray-400" />
+                                    Question
+                                </label>
+                                <Field
+                                    id="question"
+                                    name="question"
+                                    type="text"
+                                    placeholder="What would users commonly ask?"
+                                    className={`w-full px-4 py-3 bg-gray-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-black/10 focus:border-gray-400 focus:bg-white text-sm transition-all ${errors.question && touched.question
+                                            ? "border-red-300 bg-red-50/50"
+                                            : "border-gray-200"
+                                        }`}
                                     disabled={isSubmitting}
-                                    className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                                />
+                                <div className="flex justify-between items-center mt-1.5">
+                                    <ErrorMessage
+                                        name="question"
+                                        component="div"
+                                        className="text-red-500 text-xs"
+                                    />
+                                    <span className="text-xs text-gray-400">{values.question.length}/500</span>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label htmlFor="answer" className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                                    <MessageSquare className="w-4 h-4 text-gray-400" />
+                                    Answer
+                                </label>
+                                <Field
+                                    as="textarea"
+                                    id="answer"
+                                    name="answer"
+                                    placeholder="Provide a clear and helpful answer..."
+                                    rows={4}
+                                    className={`w-full px-4 py-3 bg-gray-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-black/10 focus:border-gray-400 focus:bg-white text-sm resize-y transition-all ${errors.answer && touched.answer
+                                            ? "border-red-300 bg-red-50/50"
+                                            : "border-gray-200"
+                                        }`}
+                                    disabled={isSubmitting}
+                                />
+                                <div className="flex justify-between items-center mt-1.5">
+                                    <ErrorMessage
+                                        name="answer"
+                                        component="div"
+                                        className="text-red-500 text-xs"
+                                    />
+                                    <span className="text-xs text-gray-400">{values.answer.length}/2000</span>
+                                </div>
+                            </div>
+
+                            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                                <button
+                                    type="submit"
+                                    disabled={isSubmitting}
+                                    className="w-full sm:w-auto px-6 py-3 bg-black text-white rounded-xl hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed text-sm font-medium transition-all shadow-sm hover:shadow-md min-h-[48px] flex items-center justify-center gap-2"
                                 >
-                                    Cancel
+                                    {isSubmitting ? (
+                                        <>
+                                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                            {editingFAQ ? "Updating..." : "Saving..."}
+                                        </>
+                                    ) : (
+                                        <>
+                                            {editingFAQ ? "Update FAQ" : "Save FAQ"}
+                                        </>
+                                    )}
                                 </button>
-                            )}
-                        </div>
-                    </Form>
-                )}
-            </Formik>
+                                {editingFAQ && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleCancel(resetForm)}
+                                        disabled={isSubmitting}
+                                        className="w-full sm:w-auto px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium min-h-[48px]"
+                                    >
+                                        Cancel
+                                    </button>
+                                )}
+                            </div>
+                        </Form>
+                    )}
+                </Formik>
+            </div>
         </div>
     );
 };
