@@ -23,7 +23,7 @@ const breadcrumbConfig: Record<string, BreadcrumbConfig> = {
   'new': { label: 'Create New', icon: Plus },
   'profile': { label: 'My Profile', icon: Users },
   'notifications': { label: 'Notifications', icon: Bell },
-  
+
   // User Dashboard Routes
   'dashboard': { label: 'Dashboard', icon: Home },
 };
@@ -43,11 +43,11 @@ export default function Breadcrumbs({ customItems = null }: BreadcrumbsProps) {
 
   // Split path into segments
   const pathSegments = pathname.split('/').filter(Boolean);
-  
+
   // Determine dashboard type
   const isAdminRoute = pathname.startsWith('/admin');
   const isUserRoute = pathname.startsWith('/dashboard');
-  
+
   // Determine dashboard path
   const dashboardPath = isAdminRoute ? '/admin/dashboard' : '/dashboard';
   const dashboardLabel = isAdminRoute ? 'Admin Dashboard' : 'Dashboard';
@@ -81,26 +81,26 @@ export default function Breadcrumbs({ customItems = null }: BreadcrumbsProps) {
 
   pathSegments.forEach((segment, index) => {
     cumulativePath += `/${segment}`;
-    
+
     // Skip 'admin', 'user', and 'dashboard' segments (already handled above)
     if (segment === 'admin' || segment === 'user' || segment === 'dashboard' || segment === 'user-dashboard') {
       return;
     }
 
     // Check if this is a UUID/ID (dynamic segment)
-    const isId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(segment) || 
-                 /^[0-9a-f]{24}$/i.test(segment) || 
-                 /^\d+$/.test(segment);
+    const isId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(segment) ||
+      /^[0-9a-f]{24}$/i.test(segment) ||
+      /^\d+$/.test(segment);
 
     if (isId) {
       // Get the parent segment to determine what kind of details page this is
       const parentSegment = pathSegments[index - 1];
       let label = 'Details';
-      
+
       if (parentSegment === 'campaigns') label = 'Campaign Details';
       else if (parentSegment === 'users') label = 'User Details';
       else if (parentSegment === 'leads') label = 'Lead Details';
-      
+
       breadcrumbItems.push({
         href: cumulativePath,
         label: label,
@@ -126,9 +126,9 @@ export default function Breadcrumbs({ customItems = null }: BreadcrumbsProps) {
 }
 
 // Breadcrumb Display Component
-function BreadcrumbDisplay({ 
+function BreadcrumbDisplay({
   items,
-}: { 
+}: {
   items: BreadcrumbItem[];
 }) {
   // Don't render if no items
@@ -137,29 +137,29 @@ function BreadcrumbDisplay({
   }
 
   return (
-    <nav className="flex items-center flex-wrap gap-2 px-4 py-3 bg-white rounded-lg border border-gray-200 mb-6 shadow-sm">
+    <nav className="flex items-center flex-wrap gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 sm:py-3 bg-white rounded-lg border border-gray-200 mb-4 sm:mb-6 shadow-sm overflow-hidden">
       {items.map((item, index) => {
         const isLast = item.isCurrent;
         const Icon = item.icon;
 
         return (
-          <div key={`${item.href}-${index}`} className="flex items-center">
-            {index > 0 && <ChevronRight size={14} className="mx-2 text-gray-400" />}
-            
+          <div key={`${item.href}-${index}`} className="flex items-center min-w-0">
+            {index > 0 && <ChevronRight size={12} className="mx-1 sm:mx-2 text-gray-400 flex-shrink-0" />}
+
             {isLast ? (
-              // Current page - not clickable
-              <span className="flex items-center gap-1.5 text-sm font-semibold text-gray-900">
-                {Icon && <Icon size={16} />}
-                {item.label}
+              // Current page - not clickable, truncate long text
+              <span className="flex items-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-semibold text-gray-900 truncate max-w-[120px] sm:max-w-[200px] md:max-w-none">
+                {Icon && <Icon size={14} className="flex-shrink-0 hidden sm:block" />}
+                <span className="truncate">{item.label}</span>
               </span>
             ) : (
-              // Previous pages - clickable
-              <Link 
+              // Previous pages - clickable, truncate long text
+              <Link
                 href={item.href}
-                className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-blue-600 transition-colors duration-200"
+                className="flex items-center gap-1 sm:gap-1.5 text-xs sm:text-sm text-gray-600 hover:text-blue-600 transition-colors duration-200 truncate max-w-[100px] sm:max-w-[150px] md:max-w-none"
               >
-                {Icon && <Icon size={16} />}
-                {item.label}
+                {Icon && <Icon size={14} className="flex-shrink-0 hidden sm:block" />}
+                <span className="truncate">{item.label}</span>
               </Link>
             )}
           </div>
