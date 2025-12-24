@@ -361,27 +361,38 @@ export default function ClientDashboard() {
             ) : data && (
               <>
                 {/* Active Leads Chart */}
-                <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100">
-                  <div className="flex items-center justify-between mb-6">
+                <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 border border-gray-100">
+                  <div className="flex items-center justify-between mb-4 sm:mb-6">
                     <div>
                       <div className="flex items-center gap-2 mb-1">
-                        <CheckCircle className="w-5 h-5 text-green-600" />
-                        <p className="text-gray-600 text-sm font-medium">Active Leads</p>
+                        <CheckCircle className="w-4 sm:w-5 h-4 sm:h-5 text-green-600" />
+                        <p className="text-gray-600 text-xs sm:text-sm font-medium">Active Leads</p>
                       </div>
-                      <p className="text-3xl font-bold text-gray-900">{data.lead_metrics.active.toLocaleString()}</p>
+                      <p className="text-2xl sm:text-3xl font-bold text-gray-900">{data.lead_metrics.active.toLocaleString()}</p>
                       <p className="text-xs text-gray-500 mt-1">Status: Active</p>
                     </div>
                   </div>
-                  <ResponsiveContainer width="100%" height={150}>
-                    <LineChart data={data.charts.leads_trend}>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <LineChart data={data.charts.leads_trend} margin={{ top: 5, right: 5, left: -15, bottom: 45 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                       <XAxis
                         dataKey="date"
-                        tick={{ fontSize: 11 }}
+                        tick={{ fontSize: 10 }}
                         stroke="#94a3b8"
-                        interval={Math.floor((data.charts.leads_trend?.length || 0) / 5)}
+                        interval="preserveStartEnd"
+                        angle={-45}
+                        textAnchor="end"
+                        height={50}
+                        tickFormatter={(value) => {
+                          // Shorten date format for mobile
+                          const parts = value.split('-');
+                          if (parts.length >= 2) {
+                            return `${parts[1]}/${parts[2] || ''}`;
+                          }
+                          return value;
+                        }}
                       />
-                      <YAxis tick={{ fontSize: 12 }} stroke="#94a3b8" width={30} />
+                      <YAxis tick={{ fontSize: 10 }} stroke="#94a3b8" width={25} />
                       <Tooltip
                         contentStyle={{
                           backgroundColor: '#fff',
@@ -394,9 +405,9 @@ export default function ClientDashboard() {
                         type="monotone"
                         dataKey="count"
                         stroke="#10b981"
-                        strokeWidth={3}
-                        dot={{ fill: '#10b981', r: 4 }}
-                        activeDot={{ r: 6 }}
+                        strokeWidth={2}
+                        dot={{ fill: '#10b981', r: 3 }}
+                        activeDot={{ r: 5 }}
                         name="Leads"
                       />
                     </LineChart>
@@ -404,27 +415,38 @@ export default function ClientDashboard() {
                 </div>
 
                 {/* Returned Leads Chart */}
-                <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100">
-                  <div className="flex items-center justify-between mb-6">
+                <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 border border-gray-100">
+                  <div className="flex items-center justify-between mb-4 sm:mb-6">
                     <div>
                       <div className="flex items-center gap-2 mb-1">
-                        <XCircle className="w-5 h-5 text-red-600" />
-                        <p className="text-gray-600 text-sm font-medium">Returned Leads</p>
+                        <XCircle className="w-4 sm:w-5 h-4 sm:h-5 text-red-600" />
+                        <p className="text-gray-600 text-xs sm:text-sm font-medium">Returned Leads</p>
                       </div>
-                      <p className="text-3xl font-bold text-gray-900">{data.lead_metrics.returned.toLocaleString()}</p>
+                      <p className="text-2xl sm:text-3xl font-bold text-gray-900">{data.lead_metrics.returned.toLocaleString()}</p>
                       <p className="text-xs text-gray-500 mt-1">Status: Pending/Approved/Rejected</p>
                     </div>
                   </div>
-                  <ResponsiveContainer width="100%" height={150}>
-                    <LineChart data={data.charts.returned_leads_trend || data.charts.leads_trend}>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <LineChart data={data.charts.returned_leads_trend || data.charts.leads_trend} margin={{ top: 5, right: 5, left: -15, bottom: 45 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                       <XAxis
                         dataKey="date"
-                        tick={{ fontSize: 11 }}
+                        tick={{ fontSize: 10 }}
                         stroke="#94a3b8"
-                        interval={Math.floor((data.charts.leads_trend?.length || 0) / 5)}
+                        interval="preserveStartEnd"
+                        angle={-45}
+                        textAnchor="end"
+                        height={50}
+                        tickFormatter={(value) => {
+                          // Shorten date format for mobile
+                          const parts = value.split('-');
+                          if (parts.length >= 2) {
+                            return `${parts[1]}/${parts[2] || ''}`;
+                          }
+                          return value;
+                        }}
                       />
-                      <YAxis tick={{ fontSize: 12 }} stroke="#94a3b8" width={30} />
+                      <YAxis tick={{ fontSize: 10 }} stroke="#94a3b8" width={25} />
                       <Tooltip
                         contentStyle={{
                           backgroundColor: '#fff',
@@ -437,9 +459,9 @@ export default function ClientDashboard() {
                         type="monotone"
                         dataKey="count"
                         stroke="#ef4444"
-                        strokeWidth={3}
-                        dot={{ fill: '#ef4444', r: 4 }}
-                        activeDot={{ r: 6 }}
+                        strokeWidth={2}
+                        dot={{ fill: '#ef4444', r: 3 }}
+                        activeDot={{ r: 5 }}
                         name="Returned"
                       />
                     </LineChart>
@@ -543,8 +565,8 @@ export default function ClientDashboard() {
       {
         !loading && data && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
-            <div className="p-6 border-b border-gray-50 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-gray-900">Top Campaign Performance</h3>
+            <div className="p-4 sm:p-6 border-b border-gray-50 flex items-center justify-between">
+              <h3 className="text-base sm:text-lg font-bold text-gray-900">Top Campaign Performance</h3>
               <Link
                 href="/dashboard/campaigns"
                 className="text-sm font-semibold text-blue-600 hover:text-blue-700"
@@ -552,7 +574,45 @@ export default function ClientDashboard() {
                 View All
               </Link>
             </div>
-            <div className="overflow-x-auto">
+
+            {/* Mobile Cards View */}
+            <div className="md:hidden divide-y divide-gray-100">
+              {data.campaign_performance.length > 0 ? (
+                data.campaign_performance.map((camp) => (
+                  <div key={camp.id} className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-sm font-semibold text-gray-900 truncate mb-1">
+                          {camp.name}
+                        </h4>
+                        <div className="flex items-center gap-3 text-xs text-gray-500">
+                          <span>{camp.total_leads.toLocaleString()} leads</span>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize
+                            ${camp.status.toLowerCase() === 'active' ? 'bg-green-50 text-green-700' :
+                              camp.status.toLowerCase() === 'completed' ? 'bg-gray-100 text-gray-700' :
+                                'bg-orange-50 text-orange-700'}`}>
+                            {camp.status.toLowerCase()}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => router.push(`/dashboard/campaigns/${camp.id}`)}
+                        className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors flex-shrink-0"
+                      >
+                        <Eye size={18} />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="p-8 text-center text-gray-500 text-sm">
+                  No active campaigns found.
+                </div>
+              )}
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100">
