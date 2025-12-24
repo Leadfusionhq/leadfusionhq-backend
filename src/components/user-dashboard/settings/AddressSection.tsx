@@ -60,7 +60,7 @@ const AddressSection = () => {
             name: state.name,
             abbreviation: state.abbreviation,
           }));
-          
+
           setStateOptions(options);
         }
       } catch (err) {
@@ -88,7 +88,7 @@ const AddressSection = () => {
     // ✅ Type the address properly
     const address: Address = typeof user?.address === 'object' ? user.address : {};
 
-    
+
     // Find matching state from options
     let stateValue: StateOption | null = null;
     if (address.state && stateOptions.length > 0) {
@@ -157,27 +157,26 @@ const AddressSection = () => {
   };
 
   return (
-    <div className="p-6 sm:p-8">
+    <div className="p-4 sm:p-6 md:p-8">
       {/* Section Header */}
-      <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-200">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 pb-4 border-b border-gray-200">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
             <span>📍</span> Address Details
           </h2>
-          <p className="text-sm text-gray-500 mt-1">Manage your location information</p>
+          <p className="text-xs sm:text-sm text-gray-500 mt-1">Manage your location information</p>
         </div>
         <button
           onClick={() => setIsEditing(!isEditing)}
-          className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-            isEditing
+          className={`w-full sm:w-auto px-4 py-2.5 sm:py-2 rounded-xl font-medium transition-all duration-200 text-sm ${isEditing
               ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
               : 'bg-gradient-to-r from-[#306A64] to-[#204D9D] text-white hover:shadow-lg'
-          }`}
+            }`}
         >
           {isEditing ? '✕ Cancel' : '✏️ Edit'}
         </button>
       </div>
-  
+
       <Formik
         initialValues={getInitialValues()}
         validationSchema={validationSchema}
@@ -186,7 +185,7 @@ const AddressSection = () => {
       >
         {({ values, errors, touched, setFieldValue }) => (
           <Form className="space-y-6">
-  
+
             {/* ✅ Only show Smart Address Lookup when editing */}
             {isEditing && (
               <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl border border-blue-100">
@@ -202,7 +201,7 @@ const AddressSection = () => {
                     <p className="text-sm text-gray-600">Start typing to search and auto-fill your address</p>
                   </div>
                 </div>
-  
+
                 <FormikGoogleAddressInput
                   name="full_address"
                   placeholder="Start typing your address..."
@@ -219,14 +218,14 @@ const AddressSection = () => {
                   }}
                   onAddressSelect={(addressData) => {
                     if (!isEditing) return; // ✅ Prevent unwanted auto updates
-  
+
                     if (addressData) {
                       const selectedState = stateOptions.find(
                         (state) =>
                           state.abbreviation === addressData.addressComponents.state ||
                           state.name.toLowerCase() === addressData.addressComponents.state?.toLowerCase()
                       );
-  
+
                       if (selectedState) setFieldValue('state', selectedState);
                       if (addressData.coordinates) setFieldValue('coordinates', addressData.coordinates);
                       if (addressData.placeId) setFieldValue('place_id', addressData.placeId);
@@ -235,13 +234,13 @@ const AddressSection = () => {
                 />
               </div>
             )}
-  
-      
-  
+
+
+
 
             {/* Address Details Grid */}
-            <div className="bg-gray-50 p-6 rounded-xl space-y-6">
-              <h3 className="font-semibold text-gray-900 text-lg mb-4">Address Components</h3>
+            <div className="bg-gray-50 p-4 sm:p-6 rounded-xl space-y-4 sm:space-y-6">
+              <h3 className="font-semibold text-gray-900 text-base sm:text-lg mb-4">Address Components</h3>
 
               {/* Street Address */}
               <div>
@@ -251,11 +250,10 @@ const AddressSection = () => {
                 <Field
                   name="street"
                   disabled={!isEditing}
-                  className={`w-full px-4 py-3 border rounded-lg transition-all duration-200 ${
-                    isEditing
+                  className={`w-full px-4 py-3 border rounded-lg transition-all duration-200 ${isEditing
                       ? 'border-gray-300 bg-white focus:border-[#306A64] focus:ring-2 focus:ring-[#306A64]/20'
                       : 'border-gray-200 bg-gray-100 cursor-not-allowed'
-                  }`}
+                    }`}
                   placeholder="123 Main Street"
                 />
                 <ErrorMessage name="street" component="div" className="text-red-500 text-xs mt-1" />
@@ -270,11 +268,10 @@ const AddressSection = () => {
                   <Field
                     name="city"
                     disabled={!isEditing}
-                    className={`w-full px-4 py-3 border rounded-lg transition-all duration-200 ${
-                      isEditing
+                    className={`w-full px-4 py-3 border rounded-lg transition-all duration-200 ${isEditing
                         ? 'border-gray-300 bg-white focus:border-[#306A64] focus:ring-2 focus:ring-[#306A64]/20'
                         : 'border-gray-200 bg-gray-100 cursor-not-allowed'
-                    }`}
+                      }`}
                     placeholder="Los Angeles"
                   />
                   <ErrorMessage name="city" component="div" className="text-red-500 text-xs mt-1" />
@@ -312,11 +309,10 @@ const AddressSection = () => {
                   <Field
                     name="zip_code"
                     disabled={!isEditing}
-                    className={`w-full px-4 py-3 border rounded-lg transition-all duration-200 ${
-                      isEditing
+                    className={`w-full px-4 py-3 border rounded-lg transition-all duration-200 ${isEditing
                         ? 'border-gray-300 bg-white focus:border-[#306A64] focus:ring-2 focus:ring-[#306A64]/20'
                         : 'border-gray-200 bg-gray-100 cursor-not-allowed'
-                    }`}
+                      }`}
                     placeholder="90001"
                   />
                   <ErrorMessage name="zip_code" component="div" className="text-red-500 text-xs mt-1" />
@@ -349,7 +345,7 @@ const AddressSection = () => {
                     <div className="flex-1">
                       <p className="text-sm font-semibold text-gray-900">GPS Coordinates Captured</p>
                       <p className="text-xs text-gray-600 mt-1">
-                      Lat: {values.coordinates.lat.toFixed(6)}, Lng: {values.coordinates.lng.toFixed(6)}
+                        Lat: {values.coordinates.lat.toFixed(6)}, Lng: {values.coordinates.lng.toFixed(6)}
                       </p>
                     </div>
                   </div>
@@ -363,10 +359,10 @@ const AddressSection = () => {
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="px-8 py-3 bg-gradient-to-r from-[#306A64] to-[#204D9D] text-white font-semibold rounded-lg hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full sm:w-auto px-6 sm:px-8 py-3 bg-gradient-to-r from-[#306A64] to-[#204D9D] text-white font-semibold rounded-xl hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
                 >
                   {isLoading ? (
-                    <span className="flex items-center gap-2">
+                    <span className="flex items-center justify-center gap-2">
                       <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />

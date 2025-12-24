@@ -61,7 +61,7 @@ const BasicInformationSection = () => {
     setIsLoading(true);
     try {
       const fullName = `${values.firstName.trim()} ${values.lastName.trim()}`;
-      
+
       // ✅ Fixed: Use UPDATE_MY_PROFILE instead of UPDATE_PROFILE
       const response = await axiosWrapper(
         'put',
@@ -73,19 +73,19 @@ const BasicInformationSection = () => {
           companyName: values.companyName,
         },
         token ?? undefined
-      )as { user: any; message: string };
+      ) as { user: any; message: string };
       console.log('✅ API Response:', response);
       console.log('👤 Updated User:', response.user);
-  
+
       toast.success(response.message || 'Profile updated successfully!');
       setIsEditing(false);
-  
+
       // ✅ Use correct field — no `.data`
       dispatch(setUser(response.user));
-  
+
       // Optionally dispatch Redux action to update user in store
       // dispatch(updateUserInfo(response.data.user));
-      
+
     } catch (error: any) {
       toast.error(error?.message || 'Failed to update profile');
     } finally {
@@ -94,22 +94,21 @@ const BasicInformationSection = () => {
   };
 
   return (
-    <div className="p-6 sm:p-8">
+    <div className="p-4 sm:p-6 md:p-8">
       {/* Section Header */}
-      <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-200">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 pb-4 border-b border-gray-200">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
             <span>👤</span> Basic Information
           </h2>
-          <p className="text-sm text-gray-500 mt-1">Update your personal details</p>
+          <p className="text-xs sm:text-sm text-gray-500 mt-1">Update your personal details</p>
         </div>
         <button
           onClick={() => setIsEditing(!isEditing)}
-          className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-            isEditing
+          className={`w-full sm:w-auto px-4 py-2.5 sm:py-2 rounded-xl font-medium transition-all duration-200 text-sm ${isEditing
               ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
               : 'bg-gradient-to-r from-[#306A64] to-[#204D9D] text-white hover:shadow-lg'
-          }`}
+            }`}
         >
           {isEditing ? '✕ Cancel' : '✏️ Edit'}
         </button>
@@ -132,11 +131,10 @@ const BasicInformationSection = () => {
                 <Field
                   name="firstName"
                   disabled={!isEditing}
-                  className={`w-full px-4 py-3 border rounded-lg transition-all duration-200 ${
-                    isEditing
+                  className={`w-full px-4 py-3 border rounded-lg transition-all duration-200 ${isEditing
                       ? 'border-gray-300 bg-white focus:border-[#306A64] focus:ring-2 focus:ring-[#306A64]/20'
                       : 'border-gray-200 bg-gray-50 cursor-not-allowed'
-                  }`}
+                    }`}
                   placeholder="Enter first name"
                 />
                 <ErrorMessage name="firstName" component="div" className="text-red-500 text-xs mt-1" />
@@ -149,11 +147,10 @@ const BasicInformationSection = () => {
                 <Field
                   name="lastName"
                   disabled={!isEditing}
-                  className={`w-full px-4 py-3 border rounded-lg transition-all duration-200 ${
-                    isEditing
+                  className={`w-full px-4 py-3 border rounded-lg transition-all duration-200 ${isEditing
                       ? 'border-gray-300 bg-white focus:border-[#306A64] focus:ring-2 focus:ring-[#306A64]/20'
                       : 'border-gray-200 bg-gray-50 cursor-not-allowed'
-                  }`}
+                    }`}
                   placeholder="Enter last name"
                 />
                 <ErrorMessage name="lastName" component="div" className="text-red-500 text-xs mt-1" />
@@ -170,11 +167,10 @@ const BasicInformationSection = () => {
                   name="email"
                   type="email"
                   disabled={!isEditing}
-                  className={`w-full px-4 py-3 border rounded-lg transition-all duration-200 ${
-                    isEditing
+                  className={`w-full px-4 py-3 border rounded-lg transition-all duration-200 ${isEditing
                       ? 'border-gray-300 bg-white focus:border-[#306A64] focus:ring-2 focus:ring-[#306A64]/20'
                       : 'border-gray-200 bg-gray-50 cursor-not-allowed'
-                  }`}
+                    }`}
                   placeholder="your.email@example.com"
                 />
                 {user?.isEmailVerified && (
@@ -195,11 +191,10 @@ const BasicInformationSection = () => {
                 <Field
                   name="phoneNumber"
                   disabled={!isEditing}
-                  className={`w-full px-4 py-3 border rounded-lg transition-all duration-200 ${
-                    isEditing
+                  className={`w-full px-4 py-3 border rounded-lg transition-all duration-200 ${isEditing
                       ? 'border-gray-300 bg-white focus:border-[#306A64] focus:ring-2 focus:ring-[#306A64]/20'
                       : 'border-gray-200 bg-gray-50 cursor-not-allowed'
-                  }`}
+                    }`}
                   placeholder="+1 (555) 123-4567"
                 />
                 <ErrorMessage name="phoneNumber" component="div" className="text-red-500 text-xs mt-1" />
@@ -212,11 +207,10 @@ const BasicInformationSection = () => {
                 <Field
                   name="companyName"
                   disabled={!isEditing}
-                  className={`w-full px-4 py-3 border rounded-lg transition-all duration-200 ${
-                    isEditing
+                  className={`w-full px-4 py-3 border rounded-lg transition-all duration-200 ${isEditing
                       ? 'border-gray-300 bg-white focus:border-[#306A64] focus:ring-2 focus:ring-[#306A64]/20'
                       : 'border-gray-200 bg-gray-50 cursor-not-allowed'
-                  }`}
+                    }`}
                   placeholder="Your Company Inc."
                 />
                 <ErrorMessage name="companyName" component="div" className="text-red-500 text-xs mt-1" />
@@ -229,10 +223,10 @@ const BasicInformationSection = () => {
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="px-8 py-3 bg-gradient-to-r from-[#306A64] to-[#204D9D] text-white font-semibold rounded-lg hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full sm:w-auto px-6 sm:px-8 py-3 bg-gradient-to-r from-[#306A64] to-[#204D9D] text-white font-semibold rounded-xl hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
                 >
                   {isLoading ? (
-                    <span className="flex items-center gap-2">
+                    <span className="flex items-center justify-center gap-2">
                       <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />

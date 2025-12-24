@@ -3,11 +3,11 @@ import { useChat } from '@/context/ChatContext';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/redux/store';
 import AdminSelectionModal from './AdminSelectionModal';
-import { 
-  MessageCircle, 
-  X, 
-  Send, 
-  Paperclip, 
+import {
+  MessageCircle,
+  X,
+  Send,
+  Paperclip,
   Minimize2,
   Maximize2,
   Users,
@@ -35,17 +35,38 @@ const FloatingChatWidget: React.FC = () => {
   } = useChat();
 
   const { user } = useSelector((state: RootState) => state.auth);
-  
+
   // Widget states
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
+  const [isDismissed, setIsDismissed] = useState(false);
   const [currentView, setCurrentView] = useState<'list' | 'chat'>('list');
   const [messageInput, setMessageInput] = useState('');
   const [showAdminSelection, setShowAdminSelection] = useState(false);
-  
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Check localStorage for dismissed state on mount
+  useEffect(() => {
+    const dismissed = localStorage.getItem('chatWidgetDismissed');
+    if (dismissed === 'true') {
+      setIsDismissed(true);
+    }
+  }, []);
+
+  // Handle dismiss
+  const handleDismiss = () => {
+    setIsDismissed(true);
+    localStorage.setItem('chatWidgetDismissed', 'true');
+  };
+
+  // Handle show chat button again
+  const handleShowChat = () => {
+    setIsDismissed(false);
+    localStorage.removeItem('chatWidgetDismissed');
+  };
   // Auto scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -54,7 +75,7 @@ const FloatingChatWidget: React.FC = () => {
   // Handle sending messages
   const handleSendMessage = async () => {
     if (!currentChat || !messageInput.trim()) return;
-    
+
     try {
       await sendMessage(currentChat._id, messageInput.trim(), 'text', {});
       setMessageInput('');
@@ -102,7 +123,7 @@ const FloatingChatWidget: React.FC = () => {
     const date = new Date(dateString);
     const now = new Date();
     const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
-    
+
     if (diffInHours < 1) {
       return 'now';
     } else if (diffInHours < 24) {
@@ -114,7 +135,7 @@ const FloatingChatWidget: React.FC = () => {
   const filteredChats = chats.filter(chat => {
     const otherUser = user?.role === 'ADMIN' ? chat.userId : chat.adminId;
     return otherUser.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-           chat.subject?.toLowerCase().includes(searchTerm.toLowerCase());
+      chat.subject?.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
   // If user not logged in, don't show widget
@@ -122,27 +143,44 @@ const FloatingChatWidget: React.FC = () => {
 
   return (
     <>
-      {/* Floating Chat Button */}
-      {!isOpen && (
-        <button
-          onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 w-14 h-14 bg-[#000] text-white rounded-full shadow-lg hover:shadow-xl transform hover:scale-110 transition-all duration-300 z-50 flex items-center justify-center"
-        >
-          <MessageCircle className="w-6 h-6" />
-          {unreadCount > 0 && (
-            <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full min-w-[20px] h-5 flex items-center justify-center px-1 font-semibold animate-bounce">
-              {unreadCount > 99 ? '99+' : unreadCount}
-            </div>
-          )}
-        </button>
+      {/* Note: When dismissed, chat button is completely hidden. 
+          User can restore it by clearing localStorage or from settings */}
+
+      {/* Floating Chat Button with Dismiss */}
+      {!isOpen && !isDismissed && (
+        <div className="fixed bottom-6 right-6 z-50">
+          {/* Main Chat Button */}
+          <button
+            onClick={() => setIsOpen(true)}
+            className="w-14 h-14 bg-[#000] text-white rounded-full shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 flex items-center justify-center"
+          >
+            <MessageCircle className="w-6 h-6" />
+            {unreadCount > 0 && (
+              <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full min-w-[20px] h-5 flex items-center justify-center px-1 font-semibold animate-bounce">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </div>
+            )}
+          </button>
+
+          {/* Dismiss Button - Always visible */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDismiss();
+            }}
+            className="absolute -top-1 -left-1 w-6 h-6 bg-white text-gray-400 rounded-full shadow-md hover:bg-red-50 hover:text-red-500 transition-all duration-200 flex items-center justify-center border border-gray-200"
+            title="Hide chat button"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
       )}
 
       {/* Chat Widget Popup */}
       {isOpen && (
-        <div 
-          className={`fixed bottom-6 right-6 bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 transition-all duration-300 ${
-            isMinimized ? 'w-80 h-16' : 'w-96 h-[600px]'
-          }`}
+        <div
+          className={`fixed bottom-6 right-6 bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 transition-all duration-300 ${isMinimized ? 'w-80 h-16' : 'w-96 h-[600px]'
+            }`}
         >
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-[#000] text-white rounded-t-2xl">
@@ -155,17 +193,17 @@ const FloatingChatWidget: React.FC = () => {
                   <ArrowLeft className="w-4 h-4" />
                 </button>
               )}
-              
+
               <div className="flex items-center gap-2">
                 <MessageCircle className="w-5 h-5" />
                 <span className="font-semibold">
-                  {currentView === 'chat' && currentChat ? 
-                    getChatParticipant(currentChat).name : 
+                  {currentView === 'chat' && currentChat ?
+                    getChatParticipant(currentChat).name :
                     'Messages'
                   }
                 </span>
               </div>
-              
+
               {unreadCount > 0 && (
                 <div className="bg-red-500 text-white text-xs rounded-full px-2 py-1 min-w-[20px] text-center">
                   {unreadCount}
@@ -238,7 +276,7 @@ const FloatingChatWidget: React.FC = () => {
                         {filteredChats.map((chat) => {
                           const participant = getChatParticipant(chat);
                           const unreadCount = user?.role === 'ADMIN' ? chat.unreadCount?.admin : chat.unreadCount?.user;
-                          
+
                           return (
                             <div
                               key={chat._id}
@@ -262,7 +300,7 @@ const FloatingChatWidget: React.FC = () => {
                                       {chat.lastMessage?.sentAt && formatTime(chat.lastMessage.sentAt.toString())}
                                     </span>
                                   </div>
-                                  
+
                                   <div className="flex items-center justify-between">
                                     <p className="text-xs text-gray-600 truncate">
                                       {chat.lastMessage?.content || 'No messages yet'}
@@ -311,13 +349,12 @@ const FloatingChatWidget: React.FC = () => {
                     ) : (
                       messages.map((message) => {
                         const isOwnMessage = message.senderId._id === user?._id;
-                        
+
                         return (
                           <div
                             key={message._id}
-                            className={`flex gap-2 ${isOwnMessage ? 'justify-end' : 'justify-start'} ${
-                              message.isDeleted ? 'opacity-50' : ''
-                            }`}
+                            className={`flex gap-2 ${isOwnMessage ? 'justify-end' : 'justify-start'} ${message.isDeleted ? 'opacity-50' : ''
+                              }`}
                           >
                             {!isOwnMessage && (
                               <div className="w-6 h-6 bg-gradient-to-br from-gray-400 to-gray-600 rounded-full flex items-center justify-center text-white text-xs font-semibold flex-shrink-0 mt-1">
@@ -327,11 +364,10 @@ const FloatingChatWidget: React.FC = () => {
 
                             <div className={`max-w-[75%] ${isOwnMessage ? 'order-first' : ''}`}>
                               <div
-                                className={`relative group rounded-xl px-3 py-2 text-sm ${
-                                  isOwnMessage
-                                    ? 'bg-[#000] text-white'
-                                    : 'bg-gray-100 text-gray-900'
-                                }`}
+                                className={`relative group rounded-xl px-3 py-2 text-sm ${isOwnMessage
+                                  ? 'bg-[#000] text-white'
+                                  : 'bg-gray-100 text-gray-900'
+                                  }`}
                               >
                                 {message.isDeleted ? (
                                   <p className="italic text-gray-500 text-xs">Message deleted</p>
@@ -359,9 +395,8 @@ const FloatingChatWidget: React.FC = () => {
                                 )}
                               </div>
 
-                              <div className={`text-xs text-gray-500 mt-1 ${
-                                isOwnMessage ? 'text-right' : 'text-left'
-                              }`}>
+                              <div className={`text-xs text-gray-500 mt-1 ${isOwnMessage ? 'text-right' : 'text-left'
+                                }`}>
                                 <span>{formatTime(message.createdAt)}</span>
                                 {message.isEdited && <span className="ml-1">(edited)</span>}
                                 {isOwnMessage && (
@@ -381,19 +416,19 @@ const FloatingChatWidget: React.FC = () => {
                         );
                       })
                     )}
-                    
+
                     {/* Typing indicator */}
                     {typingUsers.length > 0 && (
                       <div className="flex items-center gap-2 text-gray-500 text-xs">
                         <div className="flex gap-1">
                           <div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce"></div>
-                          <div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-                          <div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                          <div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                          <div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                         </div>
                         <span>{typingUsers[0].name} is typing...</span>
                       </div>
                     )}
-                    
+
                     <div ref={messagesEndRef} />
                   </div>
 
@@ -406,7 +441,7 @@ const FloatingChatWidget: React.FC = () => {
                         className="hidden"
                         accept="image/*,application/pdf,.doc,.docx"
                       />
-                      
+
                       <button
                         onClick={() => fileInputRef.current?.click()}
                         className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -433,11 +468,10 @@ const FloatingChatWidget: React.FC = () => {
                       <button
                         onClick={handleSendMessage}
                         disabled={!messageInput.trim()}
-                        className={`p-2 rounded-lg transition-all ${
-                          messageInput.trim()
-                            ? 'bg-[#000] text-white hover:shadow-lg'
-                            : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                        }`}
+                        className={`p-2 rounded-lg transition-all ${messageInput.trim()
+                          ? 'bg-[#000] text-white hover:shadow-lg'
+                          : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                          }`}
                       >
                         <Send className="w-4 h-4" />
                       </button>
@@ -451,7 +485,7 @@ const FloatingChatWidget: React.FC = () => {
       )}
 
       {/* Admin Selection Modal */}
-      <AdminSelectionModal 
+      <AdminSelectionModal
         isOpen={showAdminSelection}
         onClose={() => setShowAdminSelection(false)}
         onSelectAdmin={handleAdminSelection}

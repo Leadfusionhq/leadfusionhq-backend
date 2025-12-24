@@ -141,13 +141,129 @@ const StatusBadge = ({ status, type = 'status' }: { status: string, type?: 'stat
 const StatCard = ({ title, value, icon: Icon, color }: { title: string, value: string | number, icon: any, color: string }) => {
   const isBlack = color.includes('bg-black');
   return (
-    <div className={`p-6 rounded-2xl shadow-sm border flex items-center gap-4 transition-all duration-200 hover:scale-[1.01] hover:shadow-md ${isBlack ? "bg-black border-black text-white" : "bg-white border-gray-100"}`}>
-      <div className={`p-3 rounded-xl ${isBlack ? "bg-gray-800 text-white" : color}`}>
-        <Icon className={`w-6 h-6`} />
+    <div className={`p-4 sm:p-6 rounded-2xl shadow-sm border flex items-center gap-3 sm:gap-4 transition-all duration-200 hover:scale-[1.01] hover:shadow-md ${isBlack ? "bg-black border-black text-white" : "bg-white border-gray-100"}`}>
+      <div className={`p-2 sm:p-3 rounded-xl ${isBlack ? "bg-gray-800 text-white" : color}`}>
+        <Icon className={`w-5 h-5 sm:w-6 sm:h-6`} />
       </div>
       <div>
-        <p className={`text-sm font-medium ${isBlack ? "text-gray-400" : "text-gray-500"}`}>{title}</p>
-        <h3 className={`text-2xl font-bold mt-0.5 ${isBlack ? "text-white" : "text-gray-900"}`}>{value}</h3>
+        <p className={`text-xs sm:text-sm font-medium ${isBlack ? "text-gray-400" : "text-gray-500"}`}>{title}</p>
+        <h3 className={`text-xl sm:text-2xl font-bold mt-0.5 ${isBlack ? "text-white" : "text-gray-900"}`}>{value}</h3>
+      </div>
+    </div>
+  );
+};
+
+// Mobile Lead Card Component
+const MobileLeadCard = ({
+  lead,
+  onView,
+  onReturn,
+  onPay,
+  canReturn,
+  canPay
+}: {
+  lead: Lead;
+  onView: () => void;
+  onReturn: () => void;
+  onPay: () => void;
+  canReturn: boolean;
+  canPay: boolean;
+}) => {
+  const campaign = typeof lead.campaign_id === 'object' && lead.campaign_id !== null ? lead.campaign_id : null;
+  const stateName = typeof lead.address?.state === 'object' && lead.address?.state !== null
+    ? (lead.address.state.abbreviation || lead.address.state.name)
+    : lead.address?.state || '';
+
+  return (
+    <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
+      {/* Header */}
+      <div className="flex items-start justify-between mb-2">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-gray-900 truncate">
+            {lead.first_name} {lead.last_name}
+          </p>
+          <p className="text-xs text-gray-500 font-mono mt-0.5">#{lead.lead_id}</p>
+        </div>
+        <StatusBadge status={lead.status || 'New'} />
+      </div>
+
+      {/* Contact Info */}
+      <div className="space-y-1 mb-3 text-xs text-gray-600">
+        <div className="flex items-center gap-1.5 truncate">
+          <Mail size={11} className="text-gray-400 flex-shrink-0" />
+          <span className="truncate">{lead.email}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Phone size={11} className="text-gray-400 flex-shrink-0" />
+          <span>{lead.phone || '--'}</span>
+        </div>
+      </div>
+
+      {/* Info Grid */}
+      <div className="grid grid-cols-3 gap-2 text-[10px] text-gray-500 mb-3">
+        <div>
+          <p className="text-gray-400">Location</p>
+          <p className="font-medium text-gray-700">{lead.address?.city || '--'}, {stateName}</p>
+        </div>
+        <div>
+          <p className="text-gray-400">Campaign</p>
+          <p className="font-medium text-gray-700 truncate">{campaign?.name || '--'}</p>
+        </div>
+        <div>
+          <p className="text-gray-400">Cost</p>
+          <p className="font-medium text-gray-700">${lead.original_cost || 0}</p>
+        </div>
+      </div>
+
+      {/* Status Row */}
+      <div className="flex items-center gap-2 mb-3 text-[10px]">
+        <span className={`px-2 py-0.5 rounded-full border ${lead.return_status === 'Not Returned' ? 'bg-gray-50 text-gray-500 border-gray-200' :
+          lead.return_status === 'Pending' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+            lead.return_status === 'Approved' ? 'bg-green-50 text-green-700 border-green-200' :
+              'bg-red-50 text-red-700 border-red-200'
+          }`}>
+          Return: {lead.return_status === 'Not Returned' ? 'None' : lead.return_status}
+        </span>
+        <span className={`px-2 py-0.5 rounded-full border ${lead.payment_status === 'paid' ? 'bg-green-50 text-green-700 border-green-200' :
+          lead.payment_status?.includes('pending') ? 'bg-amber-50 text-amber-700 border-amber-200' :
+            'bg-gray-50 text-gray-500 border-gray-200'
+          }`}>
+          {lead.payment_status?.replace(/_/g, ' ') || 'Paid'}
+        </span>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex gap-2 py-3 border-t border-gray-100">
+        <button
+          onClick={onView}
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-700 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors min-h-[36px]"
+        >
+          <Eye size={14} />
+          View
+        </button>
+        {canReturn && (
+          <button
+            onClick={onReturn}
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-amber-600 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors min-h-[36px]"
+          >
+            <RotateCcw size={14} />
+            Return
+          </button>
+        )}
+        {canPay && (
+          <button
+            onClick={onPay}
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-green-600 bg-green-50 rounded-lg hover:bg-green-100 transition-colors min-h-[36px]"
+          >
+            <CreditCard size={14} />
+            Pay
+          </button>
+        )}
+      </div>
+
+      {/* Date */}
+      <div className="flex items-center justify-between text-xs text-gray-400">
+        <span>Created: {new Date(lead.createdAt).toLocaleDateString()}</span>
       </div>
     </div>
   );
@@ -642,8 +758,112 @@ export default function LeadTable() {
         </div>
       </div>
 
-      {/* Table Container */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      {/* --- Mobile Cards View --- */}
+      <div className="md:hidden space-y-3">
+        {/* Mobile Search */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search leads..."
+            value={globalFilter}
+            onChange={(e) => setGlobalFilter(e.target.value)}
+            className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-gray-300 transition-all shadow-sm"
+          />
+        </div>
+
+        {/* Mobile Tabs */}
+        <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-1">
+          {[
+            { id: 'all', label: 'All' },
+            { id: 'payment_pending', label: 'Pay Pending' },
+            { id: 'return_approved', label: 'Returned' }
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${activeTab === tab.id
+                  ? 'bg-black text-white'
+                  : 'bg-white text-gray-600 border border-gray-200'
+                }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+          <span className="px-2 py-1 text-xs text-gray-500 bg-gray-100 rounded-lg">{totalRows}</span>
+        </div>
+
+        {/* Lead Cards */}
+        {loading ? (
+          Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="bg-white rounded-xl p-4 border border-gray-100 animate-pulse">
+              <div className="flex justify-between mb-3">
+                <div className="space-y-2 flex-1">
+                  <div className="h-4 w-32 bg-gray-100 rounded"></div>
+                  <div className="h-3 w-20 bg-gray-100 rounded"></div>
+                </div>
+                <div className="h-6 w-16 bg-gray-100 rounded-full"></div>
+              </div>
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                <div className="h-8 bg-gray-100 rounded"></div>
+                <div className="h-8 bg-gray-100 rounded"></div>
+                <div className="h-8 bg-gray-100 rounded"></div>
+              </div>
+            </div>
+          ))
+        ) : leads.length ? (
+          leads.map(lead => (
+            <MobileLeadCard
+              key={lead._id}
+              lead={lead}
+              onView={() => router.push(`/dashboard/leads/${lead._id}`)}
+              onReturn={() => handleReturnClick(lead)}
+              onPay={() => handlePayLead(lead._id)}
+              canReturn={isLeadReturnable(lead.createdAt) &&
+                (lead.return_status === "Not Returned" || lead.return_status === "Rejected") &&
+                lead.return_attempts < (lead.max_return_attempts || 2)}
+              canPay={Boolean(lead.payment_status && lead.payment_status.toLowerCase().includes('pending'))}
+            />
+          ))
+        ) : (
+          <div className="bg-white rounded-xl p-8 border border-gray-100 text-center">
+            <User className="h-10 w-10 text-gray-200 mx-auto mb-3" />
+            <p className="text-gray-900 font-medium">No leads found</p>
+            <p className="text-sm text-gray-500">Try adjusting filters</p>
+          </div>
+        )}
+
+        {/* Mobile Pagination */}
+        {!loading && leads.length > 0 && (
+          <div className="flex items-center justify-between bg-white rounded-xl p-3 border border-gray-100 shadow-sm mt-3">
+            <p className="text-xs text-gray-600">
+              {totalRows > 0 ? (pagination.pageIndex * pagination.pageSize) + 1 : 0}-{Math.min((pagination.pageIndex + 1) * pagination.pageSize, totalRows)} of {totalRows}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => table.previousPage()}
+                disabled={!table.getCanPreviousPage()}
+                className="p-2 border border-gray-200 rounded-lg disabled:opacity-50 hover:bg-gray-50 transition-all min-w-[40px] min-h-[40px] flex items-center justify-center"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <span className="text-sm font-medium text-gray-700 px-2">
+                {pagination.pageIndex + 1}
+              </span>
+              <button
+                onClick={() => table.nextPage()}
+                disabled={!table.getCanNextPage()}
+                className="p-2 border border-gray-200 rounded-lg disabled:opacity-50 hover:bg-gray-50 transition-all min-w-[40px] min-h-[40px] flex items-center justify-center"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* --- Desktop Table Container --- */}
+      <div className="hidden md:block bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
 
         {/* Controls */}
         <div className="p-5 border-b border-gray-100 flex flex-col gap-4 bg-white/50 backdrop-blur-sm">

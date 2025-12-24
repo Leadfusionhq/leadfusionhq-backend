@@ -147,14 +147,112 @@ const StatCard = ({ title, value, icon: Icon, color, subtext }: { title: string,
   const isBlack = color.includes('bg-black');
 
   return (
-    <div className={`p-6 rounded-2xl shadow-sm border flex items-center gap-4 transition-all duration-200 hover:scale-[1.01] hover:shadow-md ${isBlack ? "bg-black border-black text-white" : "bg-white border-gray-100"}`}>
-      <div className={`p-3 rounded-xl ${isBlack ? "bg-gray-800 text-white" : color}`}>
-        <Icon className={`w-6 h-6`} />
+    <div className={`p-3 sm:p-4 md:p-6 rounded-xl sm:rounded-2xl shadow-sm border flex items-center gap-3 sm:gap-4 transition-all duration-200 hover:scale-[1.01] hover:shadow-md ${isBlack ? "bg-black border-black text-white" : "bg-white border-gray-100"}`}>
+      <div className={`p-2 sm:p-3 rounded-lg sm:rounded-xl ${isBlack ? "bg-gray-800 text-white" : color}`}>
+        <Icon className={`w-5 h-5 sm:w-6 sm:h-6`} />
       </div>
-      <div>
-        <p className={`text-sm font-medium ${isBlack ? "text-gray-400" : "text-gray-500"}`}>{title}</p>
-        <h3 className={`text-2xl font-bold mt-0.5 ${isBlack ? "text-white" : "text-gray-900"}`}>{value}</h3>
-        {subtext && <p className={`text-xs mt-1 ${isBlack ? "text-gray-500" : "text-gray-400"}`}>{subtext}</p>}
+      <div className="min-w-0 flex-1">
+        <p className={`text-xs sm:text-sm font-medium ${isBlack ? "text-gray-400" : "text-gray-500"} truncate`}>{title}</p>
+        <h3 className={`text-lg sm:text-xl md:text-2xl font-bold mt-0.5 ${isBlack ? "text-white" : "text-gray-900"}`}>{value}</h3>
+        {subtext && <p className={`text-[10px] sm:text-xs mt-0.5 sm:mt-1 ${isBlack ? "text-gray-500" : "text-gray-400"} truncate`}>{subtext}</p>}
+      </div>
+    </div>
+  );
+};
+
+// Mobile Campaign Card Component
+const MobileCampaignCard = ({ campaign, onDelete }: { campaign: Campaign; onDelete: () => void }) => {
+  const router = useRouter();
+
+  const getStateDisplay = () => {
+    const state = campaign.geography?.state;
+    if (!state) return "--";
+    if (Array.isArray(state)) {
+      return state.length > 1 ? `${state[0].abbreviation || state[0].name}+${state.length - 1}` : (state[0]?.abbreviation || state[0]?.name || "--");
+    }
+    if (typeof state === 'string') return state;
+    return state.abbreviation || state.name || "--";
+  };
+
+  const getCoverage = () => {
+    const coverage = campaign.geography?.coverage;
+    if (!coverage) return "--";
+    if (coverage.type === 'nationwide') return 'Nationwide';
+    if (coverage.type === 'statewide') return 'Statewide';
+    if (coverage.type === 'partial' && coverage.partial?.zip_codes) {
+      return `${coverage.partial.zip_codes.length} zips`;
+    }
+    return coverage.type || "--";
+  };
+
+  return (
+    <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
+      {/* Header */}
+      <div className="flex items-start justify-between mb-2">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-gray-900 truncate">{campaign.name}</p>
+          <p className="text-xs text-gray-500 font-mono mt-0.5">#{campaign.campaign_id}</p>
+        </div>
+        <StatusBadge status={campaign.status} />
+      </div>
+
+      {/* Client */}
+      {campaign.user_id && (
+        <p className="text-xs text-gray-600 mb-3 truncate">
+          <span className="text-gray-400">Client:</span> {campaign.user_id.name || campaign.user_id.email}
+        </p>
+      )}
+
+      {/* Info Grid */}
+      <div className="grid grid-cols-3 gap-2 text-[10px] text-gray-500 mb-3">
+        <div>
+          <p className="text-gray-400">Type</p>
+          <p className="font-medium text-gray-700 capitalize">{campaign.lead_type?.toLowerCase() || "--"}</p>
+        </div>
+        <div>
+          <p className="text-gray-400">State</p>
+          <p className="font-medium text-gray-700">{getStateDisplay()}</p>
+        </div>
+        <div>
+          <p className="text-gray-400">Coverage</p>
+          <p className="font-medium text-gray-700 capitalize">{getCoverage()}</p>
+        </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex gap-2 py-3 border-t border-gray-100">
+        <button
+          onClick={() => router.push(`/admin/campaigns/${campaign._id}`)}
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-700 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors min-h-[36px]"
+        >
+          <Eye size={14} />
+          View
+        </button>
+        <button
+          onClick={() => router.push(`/admin/campaigns/${campaign._id}/edit`)}
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-700 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors min-h-[36px]"
+        >
+          <Edit2 size={14} />
+          Edit
+        </button>
+        <button
+          onClick={() => router.push(`/admin/campaigns/${campaign._id}/leads/add`)}
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors min-h-[36px]"
+        >
+          <UserPlus size={14} />
+          Lead
+        </button>
+        <button
+          onClick={onDelete}
+          className="flex items-center justify-center px-3 py-2 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors min-h-[36px]"
+        >
+          <Trash2 size={14} />
+        </button>
+      </div>
+
+      {/* Date */}
+      <div className="flex items-center justify-between text-xs text-gray-400">
+        <span>Created: {new Date(campaign.createdAt).toLocaleDateString()}</span>
       </div>
     </div>
   );
@@ -511,58 +609,60 @@ export default function CampaignTable() {
   // Assuming totalRows is total campaigns.
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-500">
 
       {/* --- Stats Section --- */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
         <StatCard
-          title="Total Campaigns"
+          title="Total"
           value={totalRows}
           icon={Megaphone}
           color="text-white bg-black"
         />
         <StatCard
-          title="Active Now"
+          title="Active"
           value={activeCount > 0 ? activeCount : "--"}
-          subtext="On current page"
+          subtext="Current page"
           icon={PlayCircle}
           color="text-emerald-600 bg-emerald-100"
         />
-        <StatCard
-          title="Campaign types"
-          value={new Set(campaigns.map(c => c.lead_type)).size}
-          subtext="Variety"
-          icon={ListFilter}
-          color="text-blue-600 bg-blue-100"
-        />
+        <div className="hidden md:block">
+          <StatCard
+            title="Types"
+            value={new Set(campaigns.map(c => c.lead_type)).size}
+            subtext="Variety"
+            icon={ListFilter}
+            color="text-blue-600 bg-blue-100"
+          />
+        </div>
       </div>
 
       {/* --- Header & Filters --- */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Campaigns</h1>
-          <p className="text-sm text-gray-500 mt-1">Manage marketing campaigns, track performance & status.</p>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 bg-white p-4 sm:p-6 rounded-xl sm:rounded-2xl shadow-sm border border-gray-100">
+        <div className="min-w-0">
+          <h1 className="text-lg sm:text-2xl font-bold text-gray-900 tracking-tight">Campaigns</h1>
+          <p className="text-xs sm:text-sm text-gray-500 mt-0.5 sm:mt-1 hidden sm:block">Manage campaigns, track performance</p>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+        <div className="flex flex-row gap-2 w-full sm:w-auto">
           {/* Search */}
-          <div className="relative group">
+          <div className="relative group flex-1 sm:flex-none">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-hover:text-black transition-colors" />
             <input
               type="text"
-              placeholder="Search campaigns..."
+              placeholder="Search..."
               value={globalFilter ?? ""}
               onChange={(e) => setGlobalFilter(e.target.value)}
-              className="w-full sm:w-64 pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black/20 transition-all"
+              className="w-full sm:w-48 md:w-64 pl-10 pr-4 py-2.5 min-h-[44px] bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black/20 transition-all"
             />
           </div>
 
           {/* Filter Button */}
           <button
             onClick={handleFilterClick}
-            className={`flex items-center gap-2 px-3 py-2 border rounded-lg transition-all ${Boolean(filterAnchorEl) || (selectedUser || selectedState || selectedStatus || selectedLeadType)
+            className={`flex items-center gap-2 px-4 py-2.5 min-h-[44px] border rounded-xl transition-all ${Boolean(filterAnchorEl) || (selectedUser || selectedState || selectedStatus || selectedLeadType)
               ? "bg-black text-white border-black shadow-md"
-              : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+              : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50 active:bg-gray-100"
               }`}
           >
             <Filter size={16} />
@@ -574,8 +674,38 @@ export default function CampaignTable() {
         </div>
       </div>
 
-      {/* --- Table --- */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      {/* --- Mobile Card View --- */}
+      <div className="md:hidden space-y-3">
+        {loading ? (
+          Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="bg-white rounded-xl p-4 border border-gray-100 animate-pulse">
+              <div className="flex justify-between mb-2">
+                <div className="h-5 w-32 bg-gray-100 rounded"></div>
+                <div className="h-5 w-16 bg-gray-100 rounded-full"></div>
+              </div>
+              <div className="h-3 w-24 bg-gray-100 rounded mb-3"></div>
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                <div className="h-8 bg-gray-100 rounded"></div>
+                <div className="h-8 bg-gray-100 rounded"></div>
+                <div className="h-8 bg-gray-100 rounded"></div>
+              </div>
+            </div>
+          ))
+        ) : campaigns.length ? (
+          campaigns.map(campaign => (
+            <MobileCampaignCard key={campaign._id} campaign={campaign} onDelete={() => handleDelete(campaign)} />
+          ))
+        ) : (
+          <div className="bg-white rounded-xl p-8 border border-gray-100 text-center">
+            <Megaphone className="h-10 w-10 text-gray-200 mx-auto mb-3" />
+            <p className="text-gray-900 font-medium">No campaigns found</p>
+            <p className="text-sm text-gray-500">Try adjusting filters</p>
+          </div>
+        )}
+      </div>
+
+      {/* --- Desktop Table --- */}
+      <div className="hidden md:block bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -625,38 +755,43 @@ export default function CampaignTable() {
             </tbody>
           </table>
         </div>
+      </div>
 
-        {/* Pagination */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-white">
-          <div className="text-sm text-gray-500">
-            Showing <span className="font-medium text-gray-900">{(pagination.pageIndex * pagination.pageSize) + 1}</span> to <span className="font-medium text-gray-900">{Math.min((pagination.pageIndex + 1) * pagination.pageSize, totalRows)}</span> of <span className="font-medium text-gray-900">{totalRows}</span> results
-          </div>
-          <div className="flex items-center gap-2">
-            <select
-              value={pagination.pageSize}
-              onChange={e => table.setPageSize(Number(e.target.value))}
-              className="block w-full pl-3 pr-8 py-1.5 text-sm border-gray-300 focus:outline-none focus:ring-black focus:border-black rounded-lg border"
+      {/* Pagination - Responsive */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 sm:px-6 py-4 bg-white rounded-xl border border-gray-100">
+        <div className="text-xs sm:text-sm text-gray-500 order-2 sm:order-1">
+          <span className="hidden sm:inline">Showing </span>
+          <span className="font-medium text-gray-900">{(pagination.pageIndex * pagination.pageSize) + 1}</span>
+          <span> - </span>
+          <span className="font-medium text-gray-900">{Math.min((pagination.pageIndex + 1) * pagination.pageSize, totalRows)}</span>
+          <span> of </span>
+          <span className="font-medium text-gray-900">{totalRows}</span>
+        </div>
+        <div className="flex items-center gap-2 order-1 sm:order-2">
+          <select
+            value={pagination.pageSize}
+            onChange={e => table.setPageSize(Number(e.target.value))}
+            className="hidden sm:block pl-3 pr-8 py-1.5 text-sm border-gray-300 focus:outline-none focus:ring-black focus:border-black rounded-lg border"
+          >
+            {[10, 20, 30, 50].map(pageSize => (
+              <option key={pageSize} value={pageSize}>Show {pageSize}</option>
+            ))}
+          </select>
+          <div className="flex rounded-lg shadow-sm">
+            <button
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+              className="inline-flex items-center justify-center w-10 h-10 sm:w-auto sm:h-auto sm:px-3 sm:py-1.5 rounded-l-lg border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 active:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {[10, 20, 30, 50].map(pageSize => (
-                <option key={pageSize} value={pageSize}>Show {pageSize}</option>
-              ))}
-            </select>
-            <div className="flex rounded-md shadow-sm">
-              <button
-                onClick={() => table.previousPage()}
-                disabled={!table.getCanPreviousPage()}
-                className="relative inline-flex items-center px-3 py-1.5 rounded-l-lg border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ChevronLeft size={16} />
-              </button>
-              <button
-                onClick={() => table.nextPage()}
-                disabled={!table.getCanNextPage()}
-                className="relative inline-flex items-center px-3 py-1.5 rounded-r-lg border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ChevronRight size={16} />
-              </button>
-            </div>
+              <ChevronLeft size={18} />
+            </button>
+            <button
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+              className="inline-flex items-center justify-center w-10 h-10 sm:w-auto sm:h-auto sm:px-3 sm:py-1.5 rounded-r-lg border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 active:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ChevronRight size={18} />
+            </button>
           </div>
         </div>
       </div>

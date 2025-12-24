@@ -40,10 +40,13 @@ export default function UserLayout({ children }: { children: ReactNode }) {
         <main className="px-[24px] py-[24px] bg-gray-100 min-h-screen w-full">
           {/* Debug info - remove in production */}
           {process.env.NODE_ENV === 'development' && (
-            <div className="fixed top-20 right-4 bg-black text-white text-xs px-2 py-1 rounded z-50">
-              Socket: {connected ? '🟢' : '🔴'} | User ID: {user?._id || 'None'}
-            </div>
+            !connected && (
+              <div className="fixed top-20 right-4 bg-red-600 text-white text-xs px-2 py-1 rounded z-50">
+                Socket Disconnected 🔴 | User ID: {user?._id || 'None'}
+              </div>
+            )
           )}
+
           <Breadcrumbs />
           {children}
         </main>
