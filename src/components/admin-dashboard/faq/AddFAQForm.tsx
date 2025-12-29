@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, forwardRef } from "react";
 import { Formik, Form, Field, ErrorMessage } from "formik";
 import * as Yup from "yup";
 import { HelpCircle, MessageSquare, Sparkles } from "lucide-react";
@@ -18,7 +18,7 @@ interface AddFAQFormProps {
     onCancel: () => void;
 }
 
-const AddFAQForm = ({ editingFAQ, onSave, onCancel }: AddFAQFormProps) => {
+const AddFAQForm = forwardRef<HTMLDivElement, AddFAQFormProps>(({ editingFAQ, onSave, onCancel }, ref) => {
     const initialValues = {
         question: editingFAQ?.question || "",
         answer: editingFAQ?.answer || "",
@@ -58,7 +58,7 @@ const AddFAQForm = ({ editingFAQ, onSave, onCancel }: AddFAQFormProps) => {
     };
 
     return (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-6">
+        <div ref={ref} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-6">
             {/* Header */}
             <div className="bg-gradient-to-r from-gray-900 to-gray-800 px-5 sm:px-6 py-4">
                 <div className="flex items-center gap-3">
@@ -97,8 +97,8 @@ const AddFAQForm = ({ editingFAQ, onSave, onCancel }: AddFAQFormProps) => {
                                     type="text"
                                     placeholder="What would users commonly ask?"
                                     className={`w-full px-4 py-3 bg-gray-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-black/10 focus:border-gray-400 focus:bg-white text-sm transition-all ${errors.question && touched.question
-                                            ? "border-red-300 bg-red-50/50"
-                                            : "border-gray-200"
+                                        ? "border-red-300 bg-red-50/50"
+                                        : "border-gray-200"
                                         }`}
                                     disabled={isSubmitting}
                                 />
@@ -124,8 +124,8 @@ const AddFAQForm = ({ editingFAQ, onSave, onCancel }: AddFAQFormProps) => {
                                     placeholder="Provide a clear and helpful answer..."
                                     rows={4}
                                     className={`w-full px-4 py-3 bg-gray-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-black/10 focus:border-gray-400 focus:bg-white text-sm resize-y transition-all ${errors.answer && touched.answer
-                                            ? "border-red-300 bg-red-50/50"
-                                            : "border-gray-200"
+                                        ? "border-red-300 bg-red-50/50"
+                                        : "border-gray-200"
                                         }`}
                                     disabled={isSubmitting}
                                 />
@@ -173,6 +173,8 @@ const AddFAQForm = ({ editingFAQ, onSave, onCancel }: AddFAQFormProps) => {
             </div>
         </div>
     );
-};
+});
+
+AddFAQForm.displayName = "AddFAQForm";
 
 export default AddFAQForm;

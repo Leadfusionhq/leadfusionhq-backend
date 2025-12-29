@@ -289,7 +289,7 @@ const FAQList = ({
                                             title="Edit"
                                         >
                                             <Edit2 className="w-4 h-4" />
-                                            <span className="sm:hidden">Edit</span>
+                                            {/* <span className="sm:hidden">Edit</span> */}
                                         </button>
 
                                         <button
@@ -298,7 +298,7 @@ const FAQList = ({
                                             title="Delete"
                                         >
                                             <Trash2 className="w-4 h-4" />
-                                            <span className="sm:hidden">Delete</span>
+                                            {/* <span className="sm:hidden">Delete</span> */}
                                         </button>
                                     </div>
                                 </div>
