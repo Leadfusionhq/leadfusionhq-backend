@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import AddFAQForm from "@/components/admin-dashboard/faq/AddFAQForm";
 import FAQList from "@/components/admin-dashboard/faq/FAQList";
 import { toast } from "react-toastify";
@@ -37,6 +37,7 @@ interface FAQResponse {
 
 const FAQManagement = () => {
   const { user, token } = useSelector((state: RootState) => state.auth);
+  const formRef = useRef<HTMLDivElement>(null);
 
   const [faqs, setFaqs] = useState<FAQ[]>([]);
   const [editingFAQ, setEditingFAQ] = useState<FAQ | null>(null);
@@ -111,7 +112,16 @@ const FAQManagement = () => {
 
   const handleCancel = () => setEditingFAQ(null);
 
-  const handleEdit = (faq: FAQ) => setEditingFAQ(faq);
+  const handleEdit = (faq: FAQ) => {
+    setEditingFAQ(faq);
+    // Scroll to the form smoothly
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+    }, 100);
+  };
 
 
   // Delete FAQ
@@ -151,7 +161,8 @@ const FAQManagement = () => {
   }
 
   return (
-    <div className="max-w-5xl mx-auto p-4 sm:p-6 min-h-screen">
+    // <div className="max-w-5xl mx-auto p-4 sm:p-6 min-h-screen ">
+    <div className="min-h-screen p-4 sm:p-6 ">
       {/* Page Header */}
       <div className="mb-6 sm:mb-8">
         <div className="flex items-center gap-3 mb-2">
@@ -167,7 +178,7 @@ const FAQManagement = () => {
         </div>
       </div>
 
-      <AddFAQForm editingFAQ={editingFAQ} onSave={handleSave} onCancel={handleCancel} />
+      <AddFAQForm ref={formRef} editingFAQ={editingFAQ} onSave={handleSave} onCancel={handleCancel} />
 
       <FAQList
         faqs={faqs}
