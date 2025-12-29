@@ -95,6 +95,8 @@ const getLeads = async (page = 1, limit = 10, filters = {}, search = "") => {
       ...(filters.campaign_id && { campaign_id: filters.campaign_id }),
       ...(filters.status && { status: filters.status }),
       ...(filters.state && { 'address.state': normalizeId(filters.state) }),
+      ...(filters.payment_status && { payment_status: new RegExp(filters.payment_status, 'i') }),
+      ...(filters.return_status && { return_status: new RegExp(filters.return_status, 'i') }),
     };
 
     if (search) {
@@ -157,6 +159,8 @@ const getLeadByUserId = async (page = 1, limit = 10, user_id, filters = {}, sear
 
   if (filters.status) baseQuery.status = filters.status;
   if (filters.state) baseQuery['address.state'] = normalizeId(filters.state);
+  if (filters.return_status) baseQuery.return_status = new RegExp(filters.return_status, 'i');
+  if (filters.payment_status) baseQuery.payment_status = new RegExp(filters.payment_status, 'i');
 
   if (search) {
     const parts = search.trim().split(/\s+/);

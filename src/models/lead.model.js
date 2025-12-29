@@ -1,14 +1,14 @@
 const mongoose = require('mongoose');
 
 const leadSchema = new mongoose.Schema({
-  lead_id: { 
+  lead_id: {
     type: String,
     unique: true,
     sparse: true
   },
-  user_id: { 
+  user_id: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User', 
+    ref: 'User',
     required: true,
     index: true
   },
@@ -18,7 +18,7 @@ const leadSchema = new mongoose.Schema({
     required: true,
     index: true
   },
-  
+
   // Personal Information
   first_name: {
     type: String,
@@ -44,7 +44,7 @@ const leadSchema = new mongoose.Schema({
     maxlength: 10,
     trim: true
   },
-  
+
   // Contact Information
   email: {
     type: String,
@@ -62,7 +62,7 @@ const leadSchema = new mongoose.Schema({
     trim: true,
     index: true  // Index for duplicate checking
   },
-  
+
   // Demographics
   homeowner_desc: {
     type: String,
@@ -78,7 +78,7 @@ const leadSchema = new mongoose.Schema({
     min: 0,
     max: 150
   },
-  
+
   // Property Information
   dwelltype: {
     type: String,
@@ -88,7 +88,7 @@ const leadSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
-  
+
   // Address Components
   predir: {
     type: String,
@@ -115,7 +115,7 @@ const leadSchema = new mongoose.Schema({
     trim: true,
     maxlength: 20
   },
-  
+
   // Main Address Object
   address: {
     street: {
@@ -140,7 +140,7 @@ const leadSchema = new mongoose.Schema({
       trim: true,
       index: true
     },
-    state: { 
+    state: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'State',
       required: true,
@@ -151,8 +151,7 @@ const leadSchema = new mongoose.Schema({
       required: true,
       minlength: 5,
       maxlength: 10,
-      trim: true,
-      index: true
+      trim: true
     },
     zip: {
       type: String,
@@ -180,32 +179,32 @@ const leadSchema = new mongoose.Schema({
   },
 
   transaction_id: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Transaction',
-      default: null,
-      index: true // Add index for faster queries
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Transaction',
+    default: null,
+    index: true // Add index for faster queries
   },
   original_cost: {
-      type: Number,
-      default: 0,
-      min: 0
+    type: Number,
+    default: 0,
+    min: 0
   },
-  
+
   // Additional Information
   note: {
     type: String,
     maxlength: 1000,
     trim: true
   },
-  
+
   // Status and Metadata
   status: {
     type: String,
-    enum: ['active', 'inactive', 'contacted', 'converted', 'invalid','payment_pending'],
+    enum: ['active', 'inactive', 'contacted', 'converted', 'invalid', 'payment_pending'],
     default: 'active',
     index: true
   },
-    // NEW: Payment tracking fields
+  // NEW: Payment tracking fields
   payment_status: {
     type: String,
     enum: ['paid', 'pending', 'failed', 'refunded'],
@@ -221,7 +220,7 @@ const leadSchema = new mongoose.Schema({
     type: String,
     default: null
   },
-  
+
   // Processing Information
   source: {
     type: String,
@@ -235,7 +234,7 @@ const leadSchema = new mongoose.Schema({
     source_campaign: { type: String },
     received_at: { type: Date }
   },
-  
+
   return_status: {
     type: String,
     enum: ['Not Returned', 'Pending', 'Approved', 'Rejected'],
@@ -246,30 +245,30 @@ const leadSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
-    // ✅ ONLY ADD THESE TWO SIMPLE FIELDS
-    return_reason: {
-      type: String,
-      trim: true,
-      default: null
-    },
-    return_comments: {
-      type: String,
-      maxlength: 1000,
-      trim: true,
-      default: null
-    },
-    return_requested_at: {
-      type: Date,
-      default: null,
-      index: true
-    },
+  // ✅ ONLY ADD THESE TWO SIMPLE FIELDS
+  return_reason: {
+    type: String,
+    trim: true,
+    default: null
+  },
+  return_comments: {
+    type: String,
+    maxlength: 1000,
+    trim: true,
+    default: null
+  },
+  return_requested_at: {
+    type: Date,
+    default: null,
+    index: true
+  },
 
-    
+
   max_return_attempts: {
     type: Number,
     default: 2
   },
-  
+
   // Timestamps
   createdAt: {
     type: Date,
@@ -280,7 +279,7 @@ const leadSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
-  
+
   // Last contact attempt
   lastContactedAt: {
     type: Date,
@@ -290,8 +289,8 @@ const leadSchema = new mongoose.Schema({
 
 // Compound indexes for efficient querying
 // leadSchema.index({ campaign_id: 1, phone_number: 1 }, { unique: true });
-leadSchema.index({ campaign_id: 1, email: 1 }, { 
-  unique: true, 
+leadSchema.index({ campaign_id: 1, email: 1 }, {
+  unique: true,
   sparse: true,
   partialFilterExpression: { email: { $exists: true, $ne: null, $ne: "" } }
 });
@@ -311,22 +310,22 @@ leadSchema.index({
 // Pre-save middleware
 leadSchema.pre('save', function (next) {
   this.updatedAt = Date.now();
-  
+
   // Ensure phone and phone_number are consistent
   if (this.phone_number && !this.phone) {
     this.phone = this.phone_number;
   }
-  
+
   // Ensure both zip fields are populated
   if (this.address && this.address.zip_code && !this.address.zip) {
     this.address.zip = this.address.zip_code;
   }
-  
+
   next();
 });
 
 // Virtual for full name
-leadSchema.virtual('fullName').get(function() {
+leadSchema.virtual('fullName').get(function () {
   const parts = [this.first_name];
   if (this.middle_name) parts.push(this.middle_name);
   parts.push(this.last_name);
@@ -335,7 +334,7 @@ leadSchema.virtual('fullName').get(function() {
 });
 
 // Virtual for display address
-leadSchema.virtual('displayAddress').get(function() {
+leadSchema.virtual('displayAddress').get(function () {
   if (!this.address) return '';
   const parts = [this.address.full_address, this.address.city];
   return parts.filter(Boolean).join(', ');
@@ -346,32 +345,32 @@ leadSchema.set('toJSON', { virtuals: true });
 leadSchema.set('toObject', { virtuals: true });
 
 // Static method to find duplicates
-leadSchema.statics.findDuplicates = function(campaignId, phone, email) {
+leadSchema.statics.findDuplicates = function (campaignId, phone, email) {
   const query = { campaign_id: campaignId };
   const conditions = [];
-  
+
   if (phone) {
     conditions.push({ phone_number: phone });
   }
-  
+
   if (email) {
     conditions.push({ email: email });
   }
-  
+
   if (conditions.length === 0) {
     return this.find({ _id: null }); // Return empty result
   }
-  
+
   query.$or = conditions;
   return this.find(query);
 };
 
 // Static method for bulk operations with better error handling
-leadSchema.statics.insertManyWithErrorHandling = async function(leads, options = {}) {
+leadSchema.statics.insertManyWithErrorHandling = async function (leads, options = {}) {
   try {
-    const result = await this.insertMany(leads, { 
-      ordered: false, 
-      ...options 
+    const result = await this.insertMany(leads, {
+      ordered: false,
+      ...options
     });
     return {
       success: true,
@@ -382,7 +381,7 @@ leadSchema.statics.insertManyWithErrorHandling = async function(leads, options =
     if (error.name === 'BulkWriteError') {
       const inserted = error.result.insertedCount || 0;
       const errors = error.writeErrors || [];
-      
+
       return {
         success: inserted > 0,
         inserted,

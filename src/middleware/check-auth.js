@@ -54,6 +54,8 @@ module.exports = async (req, res, next) => {
                 return next(new ErrorHandler(404, "Couldn't find your account, please create an account"));
             }
 
+            // Add id as an alias for _id for convenience
+            user.id = user._id;
             req.user = user;
         } catch (err) {
             console.error("Auth Middleware Error:", err);

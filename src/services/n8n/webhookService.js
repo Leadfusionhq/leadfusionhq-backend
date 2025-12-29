@@ -108,6 +108,7 @@ const sendToN8nWebhook = async (campaignData) => {
       lead_type: leadTypeKey,
       boberdoo_lead_type_id: boberdooTypeId,
       active_days: activeDays,
+      status: campaignData.status || 'active',
 
     };
 
