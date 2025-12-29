@@ -5,11 +5,11 @@ const createFAQService = async (faqData, userId) => {
   const { question, answer } = faqData;
 
   // Check if FAQ with same question already exists
-  const existingFAQ = await FAQ.findOne({ 
-    question: { $regex: new RegExp(`^${question}$`, 'i') }, 
-    isActive: true 
+  const existingFAQ = await FAQ.findOne({
+    question: { $regex: new RegExp(`^${question}$`, 'i') },
+    isActive: true
   });
-  
+
   if (existingFAQ) {
     throw new ErrorHandler(409, 'FAQ with this question already exists');
   }
@@ -24,19 +24,19 @@ const createFAQService = async (faqData, userId) => {
 };
 
 const getAllFAQsService = async (options = {}) => {
-  const { 
-    page = 1, 
-    limit = 10, 
-    search, 
+  const {
+    page = 1,
+    limit = 10,
+    search,
     isActive = true,
-    includeInactive = false 
+    includeInactive = false
   } = options;
 
   const skip = (page - 1) * limit;
-  
+
   // Build query
   const query = {};
-  
+
   if (!includeInactive) {
     query.isActive = isActive;
   }
@@ -50,7 +50,7 @@ const getAllFAQsService = async (options = {}) => {
 
   // Get total count for pagination
   const total = await FAQ.countDocuments(query);
-  
+
   // Get FAQs with pagination
   const faqs = await FAQ.find(query)
     .populate('createdBy', 'name email')
@@ -74,17 +74,17 @@ const getFAQByIdService = async (faqId) => {
   const faq = await FAQ.findById(faqId)
     .populate('createdBy', 'name email')
     .populate('updatedBy', 'name email');
-    
+
   if (!faq) {
     throw new ErrorHandler(404, 'FAQ not found');
   }
-  
+
   return faq;
 };
 
 const updateFAQService = async (faqId, updateData, userId) => {
   const faq = await FAQ.findById(faqId);
-  
+
   if (!faq) {
     throw new ErrorHandler(404, 'FAQ not found');
   }
@@ -96,7 +96,7 @@ const updateFAQService = async (faqId, updateData, userId) => {
       question: { $regex: new RegExp(`^${updateData.question}$`, 'i') },
       isActive: true
     });
-    
+
     if (existingFAQ) {
       throw new ErrorHandler(409, 'FAQ with this question already exists');
     }
@@ -107,14 +107,14 @@ const updateFAQService = async (faqId, updateData, userId) => {
     { ...updateData, updatedBy: userId },
     { new: true }
   ).populate('createdBy', 'name email')
-   .populate('updatedBy', 'name email');
+    .populate('updatedBy', 'name email');
 
   return updatedFAQ;
 };
 
 const softDeleteFAQService = async (faqId, userId) => {
   const faq = await FAQ.findById(faqId);
-  
+
   if (!faq) {
     throw new ErrorHandler(404, 'FAQ not found');
   }
@@ -130,7 +130,7 @@ const softDeleteFAQService = async (faqId, userId) => {
 
 const hardDeleteFAQService = async (faqId) => {
   const faq = await FAQ.findById(faqId);
-  
+
   if (!faq) {
     throw new ErrorHandler(404, 'FAQ not found');
   }
@@ -141,7 +141,7 @@ const hardDeleteFAQService = async (faqId) => {
 
 const toggleFAQStatusService = async (faqId, userId) => {
   const faq = await FAQ.findById(faqId);
-  
+
   if (!faq) {
     throw new ErrorHandler(404, 'FAQ not found');
   }
@@ -151,7 +151,7 @@ const toggleFAQStatusService = async (faqId, userId) => {
     { isActive: !faq.isActive, updatedBy: userId },
     { new: true }
   ).populate('createdBy', 'name email')
-   .populate('updatedBy', 'name email');
+    .populate('updatedBy', 'name email');
 
   return updatedFAQ;
 };
@@ -159,9 +159,9 @@ const toggleFAQStatusService = async (faqId, userId) => {
 // Public service - get only active FAQs without admin details
 const getPublicFAQsService = async (options = {}) => {
   const { limit = 50, search } = options;
-  
+
   const query = { isActive: true };
-  
+
   if (search) {
     query.$or = [
       { question: { $regex: search, $options: 'i' } },
