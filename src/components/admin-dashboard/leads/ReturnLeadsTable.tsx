@@ -22,7 +22,8 @@ import {
   DialogActions,
   Button,
   Box,
-  Typography
+  Typography,
+  Tooltip
 } from "@mui/material";
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
@@ -38,7 +39,8 @@ import {
   CheckCircle2,
   XCircle,
   AlertCircle,
-  Filter
+  Filter,
+  Calendar
 } from "lucide-react";
 import ConfirmDialog from '@/components/common/ConfirmDialog';
 import { Menu, MenuItem, IconButton, Popover } from "@mui/material";
@@ -120,16 +122,93 @@ const StatCard = ({ title, value, icon: Icon, color, subtext, onClick, active }:
   return (
     <div
       onClick={onClick}
-      className={`p-6 rounded-2xl shadow-sm border flex items-center gap-4 transition-all duration-200 cursor-pointer 
+      className={`p-4 sm:p-6 rounded-xl sm:rounded-2xl shadow-sm border flex items-center gap-3 sm:gap-4 transition-all duration-200 cursor-pointer 
       ${active ? 'ring-2 ring-black shadow-md scale-[1.01]' : 'hover:scale-[1.01] hover:shadow-md bg-white border-gray-100'}`}
     >
-      <div className={`p-3 rounded-xl ${color}`}>
-        <Icon className={`w-6 h-6`} />
+      <div className={`p-2.5 sm:p-3 rounded-lg sm:rounded-xl ${color}`}>
+        <Icon className={`w-5 h-5 sm:w-6 sm:h-6`} />
       </div>
-      <div>
-        <p className={`text-sm font-medium text-gray-500`}>{title}</p>
-        <h3 className={`text-2xl font-bold mt-0.5 text-gray-900`}>{value}</h3>
-        {subtext && <p className={`text-xs mt-1 text-gray-400`}>{subtext}</p>}
+      <div className="min-w-0 flex-1">
+        <p className={`text-xs sm:text-sm font-medium text-gray-500`}>{title}</p>
+        <h3 className={`text-lg sm:text-2xl font-bold mt-0.5 text-gray-900 truncate`}>{value}</h3>
+        {subtext && <p className={`text-[10px] sm:text-xs mt-0.5 sm:mt-1 text-gray-400 truncate`}>{subtext}</p>}
+      </div>
+    </div>
+  );
+};
+
+// Mobile Return Card Component
+const MobileReturnCard = ({ lead, onApprove, onReject, onViewDetails }: {
+  lead: ReturnLead,
+  onApprove: () => void,
+  onReject: () => void,
+  onViewDetails: () => void
+}) => {
+  const campaignName = typeof lead.campaign_id === 'object' ? lead.campaign_id?.name : lead.campaign_id;
+
+  return (
+    <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm active:bg-gray-50 transition-colors">
+      {/* Header Row */}
+      <div className="flex items-start justify-between mb-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-gray-900">{lead.first_name} {lead.last_name}</p>
+          <p className="text-xs text-gray-500 font-mono mt-0.5">ID: {lead.lead_id}</p>
+        </div>
+        <ActionMenu
+          lead={lead}
+          onApprove={onApprove}
+          onReject={onReject}
+          onViewDetails={onViewDetails}
+        />
+      </div>
+
+      {/* Campaign & Date */}
+      <div className="flex items-center justify-between text-xs text-gray-500 mb-3 pb-3 border-b border-gray-50">
+        <span className="truncate max-w-[60%]">{campaignName || "N/A"}</span>
+        <span className="flex items-center gap-1">
+          <Calendar size={10} className="w-3 h-3" />
+          {new Date(lead.updatedAt).toLocaleDateString()}
+        </span>
+      </div>
+
+      {/* Reason Section */}
+      <div className="mb-4">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 text-[10px] font-semibold border border-amber-100">
+            {RETURN_REASON_LABELS[lead.return_reason || ''] || lead.return_reason || 'N/A'}
+          </span>
+          {lead.return_comments && (
+            <Tooltip title="View Comments" arrow placement="top">
+              <button
+                onClick={onViewDetails}
+                className="p-1 hover:bg-gray-100 rounded-full transition-colors focus:outline-none"
+              >
+                <Info size={14} className="text-blue-500" />
+              </button>
+            </Tooltip>
+          )}
+        </div>
+      </div>
+
+      {/* Status Row */}
+      <div className="flex items-center justify-between">
+        <StatusBadge status={lead.return_status} />
+        {lead.return_status === 'Pending' && (
+          <div className="flex gap-2">
+            <button
+              onClick={onApprove}
+              className="px-3 py-1 bg-emerald-50 text-emerald-700 text-[10px] font-bold rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-colors"
+            >
+              Approve
+            </button>
+            <button
+              onClick={onReject}
+              className="px-3 py-1 bg-red-50 text-red-700 text-[10px] font-bold rounded-lg border border-red-100 hover:bg-red-100 transition-colors"
+            >
+              Reject
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -259,13 +338,14 @@ export default function ReturnLeadsTable({ defaultStatus = "", isAllLeads = fals
             {RETURN_REASON_LABELS[row.original.return_reason || ''] || row.original.return_reason || 'N/A'}
           </span>
           {row.original.return_comments && (
-            <button
-              onClick={() => handleViewDetails(row.original)}
-              className="p-1 hover:bg-gray-100 rounded-full transition-colors focus:outline-none"
-              title="View Comments"
-            >
-              <Info size={16} className="text-blue-500" />
-            </button>
+            <Tooltip title="View Comments" arrow placement="top">
+              <button
+                onClick={() => handleViewDetails(row.original)}
+                className="p-1 hover:bg-gray-100 rounded-full transition-colors focus:outline-none"
+              >
+                <Info size={16} className="text-blue-500" />
+              </button>
+            </Tooltip>
           )}
         </div>
       ),
@@ -359,8 +439,46 @@ export default function ReturnLeadsTable({ defaultStatus = "", isAllLeads = fals
         </div>
       </div>
 
-      {/* Container */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      {/* Mobile Card View */}
+      <div className="md:hidden space-y-3">
+        {loading ? (
+          Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="bg-white rounded-xl p-4 border border-gray-100 animate-pulse">
+              <div className="flex justify-between mb-3">
+                <div className="h-5 w-32 bg-gray-100 rounded"></div>
+                <div className="h-5 w-5 bg-gray-100 rounded"></div>
+              </div>
+              <div className="space-y-2">
+                <div className="h-3 w-48 bg-gray-100 rounded"></div>
+                <div className="h-3 w-32 bg-gray-100 rounded"></div>
+              </div>
+              <div className="flex gap-2 mt-3">
+                <div className="h-5 w-16 bg-gray-100 rounded-full"></div>
+                <div className="h-5 w-16 bg-gray-100 rounded-full"></div>
+              </div>
+            </div>
+          ))
+        ) : returnLeads.length ? (
+          returnLeads.map(lead => (
+            <MobileReturnCard
+              key={lead._id}
+              lead={lead}
+              onApprove={() => handleApprove(lead)}
+              onReject={() => handleReject(lead)}
+              onViewDetails={() => handleViewDetails(lead)}
+            />
+          ))
+        ) : (
+          <div className="bg-white rounded-xl p-12 border border-gray-100 text-center">
+            <Undo2 className="h-10 w-10 text-gray-200 mx-auto mb-3" />
+            <p className="text-gray-900 font-medium text-lg">No return requests</p>
+            <p className="text-gray-500 text-sm">All caught up!</p>
+          </div>
+        )}
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="hidden md:block bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -410,38 +528,38 @@ export default function ReturnLeadsTable({ defaultStatus = "", isAllLeads = fals
             </tbody>
           </table>
         </div>
+      </div>
 
-        {/* Pagination */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-white">
-          <div className="text-sm text-gray-500">
-            Showing <span className="font-medium text-gray-900">{(pagination.pageIndex * pagination.pageSize) + 1}</span> to <span className="font-medium text-gray-900">{Math.min((pagination.pageIndex + 1) * pagination.pageSize, totalRows)}</span> of <span className="font-medium text-gray-900">{totalRows}</span> results
-          </div>
-          <div className="flex items-center gap-2">
-            <select
-              value={pagination.pageSize}
-              onChange={e => table.setPageSize(Number(e.target.value))}
-              className="block w-full pl-3 pr-8 py-1.5 text-sm border-gray-300 focus:outline-none focus:ring-black focus:border-black rounded-lg border"
+      {/* Pagination - Responsive */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-4 sm:px-6 py-4 bg-white rounded-xl border border-gray-100">
+        <div className="text-xs sm:text-sm text-gray-500 order-2 sm:order-1">
+          Showing <span className="font-medium text-gray-900">{(pagination.pageIndex * pagination.pageSize) + 1}</span> to <span className="font-medium text-gray-900">{Math.min((pagination.pageIndex + 1) * pagination.pageSize, totalRows)}</span> of <span className="font-medium text-gray-900">{totalRows}</span> results
+        </div>
+        <div className="flex items-center gap-2 order-1 sm:order-2">
+          <select
+            value={pagination.pageSize}
+            onChange={e => table.setPageSize(Number(e.target.value))}
+            className="hidden sm:block pl-3 pr-8 py-1.5 text-sm border-gray-300 focus:outline-none focus:ring-black focus:border-black rounded-lg border"
+          >
+            {[10, 20, 30, 50].map(pageSize => (
+              <option key={pageSize} value={pageSize}>Show {pageSize}</option>
+            ))}
+          </select>
+          <div className="flex rounded-lg shadow-sm">
+            <button
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+              className="inline-flex items-center justify-center w-10 h-10 sm:w-auto sm:h-auto sm:px-3 sm:py-1.5 rounded-l-lg border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 active:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {[10, 20, 30, 50].map(pageSize => (
-                <option key={pageSize} value={pageSize}>Show {pageSize}</option>
-              ))}
-            </select>
-            <div className="flex rounded-md shadow-sm">
-              <button
-                onClick={() => table.previousPage()}
-                disabled={!table.getCanPreviousPage()}
-                className="relative inline-flex items-center px-3 py-1.5 rounded-l-lg border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ChevronLeft size={16} />
-              </button>
-              <button
-                onClick={() => table.nextPage()}
-                disabled={!table.getCanNextPage()}
-                className="relative inline-flex items-center px-3 py-1.5 rounded-r-lg border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ChevronRight size={16} />
-              </button>
-            </div>
+              <ChevronLeft size={18} />
+            </button>
+            <button
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+              className="inline-flex items-center justify-center w-10 h-10 sm:w-auto sm:h-auto sm:px-3 sm:py-1.5 rounded-r-lg border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 active:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronRight size={18} />
+            </button>
           </div>
         </div>
       </div>

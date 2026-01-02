@@ -46,7 +46,7 @@ export default function LeadsClient() {
       <div className="transition-all duration-300 ease-in-out">
         {activeTab === 'all' && <AllLeadsTable />}
         {activeTab === 'payment_pending' && <AllLeadsTable defaultPaymentStatus="pending" />}
-        {activeTab === 'approve_returns' && <ReturnLeadsTable defaultStatus="Approve" isAllLeads={true} />}
+        {activeTab === 'approve_returns' && <ReturnLeadsTable defaultStatus="Approved" isAllLeads={true} />}
         {activeTab === 'returned' && <ReturnLeadsTable />}
       </div>
     </div>
