@@ -43,7 +43,7 @@ import {
 } from "lucide-react";
 import { toast } from 'react-toastify';
 import ConfirmDialog from "@/components/common/ConfirmDialog";
-import { Menu, MenuItem, IconButton } from "@mui/material";
+import { Menu, MenuItem, IconButton, Tooltip, Popover, List, ListItem, ListItemIcon, ListItemText, Typography, Divider, Chip } from "@mui/material";
 import useDebounce from '@/hooks/useDebounce';
 
 // --- Types ---
@@ -219,9 +219,21 @@ const MobileUserCard = ({ user, onEdit, onAddBalance, onToggleStatus, onDelete, 
         </div>
         <div>
           <p className="text-gray-400">Card</p>
-          <p className="font-medium text-gray-700">
-            {defaultCard ? `${defaultCard.brand} •${defaultCard.cardLastFour}` : '--'}
-          </p>
+          <div className="flex items-center gap-1">
+            <CardListPopover
+              paymentMethods={user.paymentMethods || []}
+              trigger={
+                <button className="flex items-center gap-1 font-medium text-gray-700 hover:text-black transition-colors">
+                  {defaultCard ? `${defaultCard.brand} •${defaultCard.cardLastFour}` : '--'}
+                  {user.paymentMethods && user.paymentMethods.length > 1 && (
+                    <span className="text-[9px] text-blue-600 font-bold">
+                      (+{user.paymentMethods.length - 1})
+                    </span>
+                  )}
+                </button>
+              }
+            />
+          </div>
         </div>
       </div>
 
@@ -520,24 +532,39 @@ export default function UserTable() {
     // --- NEW: Default Card Column ---
     {
       id: "defaultCard",
-      header: "Default Card",
+      header: "Payment Methods",
       cell: ({ row }) => {
-        const defaultCard = row.original.paymentMethods?.find(pm => pm.isDefault) || row.original.paymentMethods?.[0];
+        const paymentMethods = row.original.paymentMethods || [];
+        const defaultCard = paymentMethods.find(pm => pm.isDefault) || paymentMethods[0];
 
         if (!defaultCard) {
           return <span className="text-xs text-gray-400 italic">No card linked</span>;
         }
 
+        const otherCardsCount = paymentMethods.length - 1;
+
         return (
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-gray-50 rounded border border-gray-100">
-              <CreditCard className="w-4 h-4 text-gray-600" />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-xs font-semibold text-gray-900 uppercase">{defaultCard.brand}</span>
-              <span className="text-[10px] text-gray-500">•••• {defaultCard.cardLastFour}</span>
-            </div>
-          </div>
+          <CardListPopover
+            paymentMethods={paymentMethods}
+            trigger={
+              <div className="flex items-center gap-2 cursor-pointer group">
+                <div className="p-1.5 bg-gray-50 rounded border border-gray-100 group-hover:bg-gray-100 transition-colors">
+                  <CreditCard className="w-4 h-4 text-gray-600" />
+                </div>
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-semibold text-gray-900 uppercase">{defaultCard.brand}</span>
+                    {otherCardsCount > 0 && (
+                      <span className="px-1 py-0.5 bg-blue-50 text-[9px] font-bold text-blue-600 rounded border border-blue-100 group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-600 transition-all">
+                        +{otherCardsCount}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-gray-500">•••• {defaultCard.cardLastFour}</span>
+                </div>
+              </div>
+            }
+          />
         );
       },
     },
@@ -669,8 +696,8 @@ export default function UserTable() {
               key={tab.id}
               onClick={() => setStatusFilter(tab.id as any)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${statusFilter === tab.id
-                  ? 'bg-black text-white'
-                  : 'bg-white text-gray-600 border border-gray-200'
+                ? 'bg-black text-white'
+                : 'bg-white text-gray-600 border border-gray-200'
                 }`}
             >
               {tab.label}
@@ -991,6 +1018,86 @@ export default function UserTable() {
   );
 }
 
+
+// Sub-component for Card List Popover
+const CardListPopover = ({
+  paymentMethods,
+  trigger
+}: {
+  paymentMethods: PaymentMethod[];
+  trigger: React.ReactNode
+}) => {
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const open = Boolean(anchorEl);
+
+  const handleClick = (event: React.MouseEvent<HTMLElement>) => {
+    event.stopPropagation();
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleClose = (event: React.MouseEvent<HTMLElement> | {}) => {
+    if (event && 'stopPropagation' in event) event.stopPropagation();
+    setAnchorEl(null);
+  };
+
+  return (
+    <>
+      <div onClick={handleClick}>
+        {trigger}
+      </div>
+      <Popover
+        open={open}
+        anchorEl={anchorEl}
+        onClose={handleClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+        PaperProps={{
+          sx: {
+            width: 280,
+            mt: 1,
+            borderRadius: '16px',
+            boxShadow: '0 10px 40px rgba(0,0,0,0.12)',
+            border: '1px solid #f3f4f6',
+            overflow: 'hidden'
+          }
+        }}
+      >
+        <div className="p-4 bg-gray-50/50 border-b border-gray-100">
+          <Typography className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+            <CreditCard size={14} /> Registered Cards
+          </Typography>
+        </div>
+        <List className="py-0">
+          {paymentMethods.map((pm, index) => (
+            <div key={index}>
+              <ListItem className="py-3 px-4 hover:bg-gray-50 transition-colors">
+                <ListItemIcon className="min-w-[40px]">
+                  <div className="p-2 bg-white rounded-lg border border-gray-100 shadow-sm">
+                    <CreditCard className="w-4 h-4 text-gray-600" />
+                  </div>
+                </ListItemIcon>
+                <ListItemText
+                  primary={
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-gray-900 uppercase">{pm.brand}</span>
+                      {pm.isDefault && (
+                        <Chip label="Default" size="small" className="h-4 text-[9px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-100" />
+                      )}
+                    </div>
+                  }
+                  secondary={
+                    <span className="text-xs text-gray-500 font-medium tracking-wider">•••• •••• •••• {pm.cardLastFour}</span>
+                  }
+                />
+              </ListItem>
+              {index < paymentMethods.length - 1 && <Divider className="opacity-50" />}
+            </div>
+          ))}
+        </List>
+      </Popover>
+    </>
+  );
+};
 
 // Sub-component for Menu to keep cleaner
 const ActionMenu = ({
