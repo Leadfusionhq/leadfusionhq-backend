@@ -36,20 +36,7 @@ const updateCampaign = wrapAsync(async (req, res) => {
   sendResponse(res, { result }, 'Campaign has been updated successfully', 200);
 });
 
-// const getCampaigns = wrapAsync(async (req, res) => {
-//   const { page, limit } = getPaginationParams(req.query);
-//   const user = req.user;
 
-//   let data;
-
-//   if (user.role === CONSTANT_ENUM.USER_ROLE.ADMIN) {
-//     data = await CampaignServices.getCampaigns(page, limit);
-//   } else {
-//     data = await CampaignServices.getCampaignsByUserId(page, limit, user._id);
-//   }
-
-//   sendResponse(res, data, "Campaigns fetched successfully", 200);
-// });
 const getCampaigns = wrapAsync(async (req, res) => {
   const { page, limit } = getPaginationParams(req.query);
   const user = req.user;
@@ -68,15 +55,6 @@ const getCampaigns = wrapAsync(async (req, res) => {
   sendResponse(res, data, "Campaigns fetched successfully", 200);
 });
 
-
-// const getCampaignById = wrapAsync(async (req, res) => {
-//   const user_id = req.user._id;
-//   const { campaignId } = req.params;
-
-//   const data = await CampaignServices.getCampaignById(campaignId, user_id);
-
-//   sendResponse(res, {data}, 'Campaign fetched successfully', 200);
-// });
 
 const getCampaignById = wrapAsync(async (req, res) => {
   const user_id = req.user._id;
