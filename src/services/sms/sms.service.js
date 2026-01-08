@@ -43,9 +43,9 @@ const sendSms = async (smsData) => {
   const inputList = Array.isArray(to)
     ? to
     : String(to)
-        .split(',')
-        .map((num) => num.replace(/-/g, '').trim())
-        .filter(Boolean);
+      .split(',')
+      .map((num) => num.replace(/-/g, '').trim())
+      .filter(Boolean);
 
   if (!inputList.length) {
     throw new ErrorHandler('No valid phone numbers provided', 400);
