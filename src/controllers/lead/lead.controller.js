@@ -274,9 +274,7 @@ const createLead = wrapAsync(async (req, res) => {
       throw new ErrorHandler(400, 'Campaign ID is required');
     }
 
-    // ========================================
-    // ✅ GET CAMPAIGN DATA
-    // ========================================
+    // Get campaign data
     const campaign = await Campaign.findById(campaign_id);
     if (!campaign) {
       throw new ErrorHandler(404, 'Campaign not found');
@@ -288,9 +286,7 @@ const createLead = wrapAsync(async (req, res) => {
     const lead_id = await generateUniqueLeadId();
     const assignedBy = req.user._id;
 
-    // ========================================
-    // ✅ TRY BILLING FIRST (before creating lead)
-    // ========================================
+    // Try billing first
     let billingResult;
 
     if (campaign.payment_type === "prepaid") {
@@ -314,18 +310,14 @@ const createLead = wrapAsync(async (req, res) => {
       throw new ErrorHandler(400, "Invalid campaign payment type.");
     }
 
-    // ========================================
-    // ✅ CHECK PAYMENT RESULT
-    // ========================================
+    // Check payment result
     const isPaid = billingResult.success;
     leadLogger.info(`Payment result: ${isPaid ? 'SUCCESS' : 'FAILED'}`, {
       ...logMeta,
       error: billingResult.message || null
     });
 
-    // ========================================
-    // ✅ CREATE LEAD WITH STATUS BASED ON PAYMENT
-    // ========================================
+    // Create lead with status based on payment
     let leadData = {
       ...req.body,
       user_id: campaign.user_id,
@@ -351,9 +343,7 @@ const createLead = wrapAsync(async (req, res) => {
       campaign_owner_id: result.campaign_id?.user_id,
     });
 
-    // ========================================
-    // ✅ IF PAYMENT SUCCEEDED - Do existing low balance check (for prepaid)
-    // ========================================
+    // If payment succeeded, do existing low balance check (for prepaid)
     if (isPaid) {
       leadLogger.info('Billing and balance updated successfully', {
         ...logMeta,
@@ -501,17 +491,12 @@ const createLead = wrapAsync(async (req, res) => {
       }
     }
 
-    // ========================================
-    // ✅ COMMIT TRANSACTION - Lead is now saved!
-    // ========================================
+    // Commit transaction
     await session.commitTransaction();
     session.endSession();
 
-    // ========================================
-    // ✅ POST-COMMIT: Handle based on payment result
-    // ========================================
+    // Handle based on payment result
     if (isPaid) {
-      // (POST-COMMIT flows unchanged)
       const campaignOwner = await User.findById(campaign.user_id);
 
       try {
@@ -590,7 +575,7 @@ const createLead = wrapAsync(async (req, res) => {
             });
           }
         }
-        // ✅ NEW: Send lead assignment email to ADMINS
+        // Send lead assignment email to ADMINS
         try {
           const EXCLUDED = new Set([
             'admin@gmail.com',
@@ -609,7 +594,7 @@ const createLead = wrapAsync(async (req, res) => {
             .map(e => e.trim().toLowerCase())
             .filter(e => !EXCLUDED.has(e));
 
-          // ✅ NEW: override with env emails if present (still an array)
+          // Override with env emails if present (still an array)
           console.log("ENV CHECK → ADMIN_NOTIFICATION_EMAILS =", process.env.ADMIN_NOTIFICATION_EMAILS);
 
           console.log("Admin before override =", adminEmails);
@@ -728,16 +713,13 @@ View Lead: ${process.env.UI_LINK}/dashboard/leads/${result._id}`;
       sendResponse(res, { leadData: result }, 'Lead has been created successfully', 201);
 
     } else {
-      // ========================================
-      // ✅ PAYMENT FAILED
-      // ========================================
+
       leadLogger.warn('Payment failed, lead saved as pending', {
         ...logMeta,
         lead_id: result.lead_id,
         error: billingResult.message
       });
 
-      // Handle payment failure async
       (async () => {
         await BillingServices.handlePaymentFailure({
           userId: campaign.user_id,
@@ -749,7 +731,6 @@ View Lead: ${process.env.UI_LINK}/dashboard/leads/${result._id}`;
         });
       })();
 
-      // Return response immediately
       sendResponse(res, {
         leadData: result,
         paymentStatus: 'pending'
@@ -779,7 +760,6 @@ const getLeads = wrapAsync(async (req, res) => {
   const search = req.query.search || "";
 
   let data;
-  // after
   if (isAdmin) {
     const allowedFilterKeys = ['campaign_id', 'status', 'state', 'return_status', 'payment_status'];
     const filters = extractFilters(req.query, allowedFilterKeys);
@@ -801,7 +781,7 @@ const getReturnLeads = wrapAsync(async (req, res) => {
   sendResponse(res, data, "Return leads fetched successfully", 200);
 });
 
-// ✅ Updated rejectReturnLead with logging
+// Updated rejectReturnLead with logging
 const rejectReturnLead = wrapAsync(async (req, res) => {
   const { lead_id, return_status } = req.body;
 
@@ -883,7 +863,7 @@ const rejectReturnLead = wrapAsync(async (req, res) => {
 });
 
 
-// ✅ Updated approveReturnLead with logging
+//  Updated approveReturnLead with logging
 const approveReturnLead = wrapAsync(async (req, res) => {
   const { lead_id, return_status } = req.body;
 
@@ -940,9 +920,7 @@ const approveReturnLead = wrapAsync(async (req, res) => {
       new_balance: result.newBalance
     });
 
-    // ---------------------------------------------------
-    // 📧 SAFE EMAIL PAYLOAD (no destructuring issues)
-    // ---------------------------------------------------
+    // Send user lead return status email
     try {
       if (lead.user_id?.email) {
         const safeLeadData = lead.toObject ? lead.toObject() : lead;
