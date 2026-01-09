@@ -4,16 +4,16 @@ const { generateVerificationToken, getTokenExpiration } = require('../../utils/t
 const UserServices = require('../user.service');
 
 const registerUser = async (data) => {
-  const { 
-    email, 
-    password, 
+  const {
+    email,
+    password,
     confirmPassword,
-    name, 
-    phoneNumber, 
-    companyName, 
-    address 
+    name,
+    phoneNumber,
+    companyName,
+    address
   } = data;
-  
+
   const normalizedEmail = email.toLowerCase();
 
   const existingUser = await UserServices.getUserByEmail(normalizedEmail);
@@ -56,7 +56,7 @@ const registerUser = async (data) => {
     isEmailVerified: false,
     verificationToken,
     verificationTokenExpires,
-    
+
     // Set country to "United States" for Boberdoo (US-only registration)
     country: 'United States',
     region: stateValue, // Store state abbreviation in region field
