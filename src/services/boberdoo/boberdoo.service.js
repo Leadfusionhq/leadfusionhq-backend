@@ -673,7 +673,7 @@ async function syncUserToBoberdooById(userId) {
 
 // Create or insert a campaign in Boberdoo
 
-// 🗓️ Day mapping between API and DB
+//  Day mapping between API and DB
 const DAY_MAPPING = {
   Sunday: "SUNDAY",
   Monday: "MONDAY",
@@ -684,7 +684,7 @@ const DAY_MAPPING = {
   Saturday: "SATURDAY",
 };
 
-// 🔁 Convert DB-style → API-style (e.g., MONDAY → Monday)
+//  Convert DB-style → API-style (e.g., MONDAY → Monday)
 function convertDbDaysToApi(daysFromDb = []) {
   const reverseMap = Object.fromEntries(
     Object.entries(DAY_MAPPING).map(([api, db]) => [db, api])
@@ -695,6 +695,8 @@ function getDeliveryType(leadType) {
   switch (leadType) {
     case "ROOFING":
       return "100281 - N8N to CRM DelieveryRoof";
+    case "ROOF_CLEANING":
+      return "100287 - N8N to CRM DelieveryRoofCleaning";
     case "GUTTERS":
       return "100283 - N8N to CRM DelieveryGutters";
     case "HVAC":
@@ -705,7 +707,7 @@ function getDeliveryType(leadType) {
 }
 
 
-// 🗺️ Get state abbreviation or fallback
+//  Get state abbreviation or fallback
 function getStateAbbreviation(state) {
   if (!state) return "";
   if (typeof state === "string") return state;
@@ -719,7 +721,6 @@ async function createCampaignInBoberdoo(campaignData, partnerId) {
     if (!leadTypeId)
       return { success: false, error: `Invalid lead type: ${campaignData.lead_type}` };
 
-    // NEW: Delivery type logic
     const deliveryType = getDeliveryType(campaignData.lead_type);
 
 
@@ -730,23 +731,20 @@ async function createCampaignInBoberdoo(campaignData, partnerId) {
     const coverageType = campaignData.geography.coverage?.type || "FULL_STATE";
     const zipMode = coverageType === "FULL_STATE" ? 0 : 1;
 
-    // 🕒 Day conversion
     const activeDaysArray = campaignData.delivery?.schedule?.days
       ?.filter(d => d.active)
       ?.map(d => d.day.toUpperCase()) || [];
     const activeDays = convertDbDaysToApi(activeDaysArray).join(",");
 
-    // ⏰ Time range
 
 
     const schedule = campaignData.delivery?.schedule || {};
     const scheduleStart = schedule.start_time || "09:00";
     const scheduleEnd = schedule.end_time || "17:00";
     const timezone = schedule.timezone || "America/New_York";
-    const timeRange = `${scheduleStart}-${scheduleEnd}`; // ✅ fixed syntax
+    const timeRange = `${scheduleStart}-${scheduleEnd}`;
 
 
-    // 📦 Handle ZIP codes (only for PARTIAL)
     const zipCodes =
       coverageType === "PARTIAL"
         ? (campaignData.geography?.coverage?.partial?.zip_codes || []).join(",")
@@ -761,7 +759,13 @@ async function createCampaignInBoberdoo(campaignData, partnerId) {
         Roof_Material: "0",
       };
     }
-
+    if (campaignData.lead_type === "ROOF_CLEANING") {
+      extraLeadTypeFields = {
+        Project_Type: "0",
+        Homeowner: "0",
+        Roof_Material: "0",
+      };
+    }
     if (campaignData.lead_type === "GUTTERS" || campaignData.lead_type === "HVAC") {
       extraLeadTypeFields = {
         Project_Type: "0",
@@ -790,14 +794,14 @@ async function createCampaignInBoberdoo(campaignData, partnerId) {
       Delivery_Type: deliveryType,
       State: stateList,
       Zip_Mode: zipMode,
-      Zip: zipCodes, // ✅ Added
+      Zip: zipCodes,
       Day_Of_Week_Accept_Leads: activeDays,
-      // Time_Of_Day_Accept_Leads: timeRange, // ✅ global range
-      Timezone: timezone, // ✅ NEW
+      // Time_Of_Day_Accept_Leads: timeRange, // global range
+      Timezone: timezone,
       ...extraLeadTypeFields,
     };
 
-    console.log("🟢 Payload sent to Boberdoo (Create):", payload);
+    console.log("Payload sent to Boberdoo (Create):", payload);
 
     const response = await axios.post(CAMPAIGN_API_URL, null, {
       params: payload,
@@ -826,7 +830,6 @@ async function updateCampaignInBoberdoo(campaignData, filterSetId, partnerId) {
     if (!leadTypeId) return { success: false, error: `Invalid lead type: ${campaignData.lead_type}` };
     if (!filterSetId) return { success: false, error: "Filter_Set_ID is required for update" };
 
-    // NEW: Delivery type logic
     const deliveryType = getDeliveryType(campaignData.lead_type);
 
 
@@ -846,7 +849,7 @@ async function updateCampaignInBoberdoo(campaignData, filterSetId, partnerId) {
     const scheduleStart = schedule.start_time || "09:00";
     const scheduleEnd = schedule.end_time || "17:00";
     const timezone = schedule.timezone || "America/New_York";
-    const timeRange = `${scheduleStart}-${scheduleEnd}`; // ✅ fixed syntax
+    const timeRange = `${scheduleStart}-${scheduleEnd}`; //  fixed syntax
 
 
     const zipCodes =
@@ -863,7 +866,13 @@ async function updateCampaignInBoberdoo(campaignData, filterSetId, partnerId) {
         Roof_Material: "0",
       };
     }
-
+    if (campaignData.lead_type === "ROOF_CLEANING") {
+      extraLeadTypeFields = {
+        Project_Type: "0",
+        Homeowner: "0",
+        Roof_Material: "0",
+      };
+    }
     if (campaignData.lead_type === "GUTTERS" || campaignData.lead_type === "HVAC") {
       extraLeadTypeFields = {
         Project_Type: "0",
@@ -893,15 +902,14 @@ async function updateCampaignInBoberdoo(campaignData, filterSetId, partnerId) {
       Delivery_Type: deliveryType,
       State: stateList,
       Zip_Mode: zipMode,
-      Zip: zipCodes, // ✅ Added for update too
+      Zip: zipCodes,
       Day_Of_Week_Accept_Leads: activeDays,
-      // Time_Of_Day_Accept_Leads: timeRange, // ✅ global range
-      Timezone: timezone, // ✅ NEW
-      // ✅ Merge roofing fields conditionally
+      // Time_Of_Day_Accept_Leads: timeRange, // 
+      Timezone: timezone,
       ...extraLeadTypeFields,
     };
 
-    console.log("🟡 Payload sent to Boberdoo (Update):", payload);
+    console.log(" Payload sent to Boberdoo (Update):", payload);
 
     const response = await axios.post(CAMPAIGN_API_URL, null, {
       params: payload,
@@ -912,7 +920,7 @@ async function updateCampaignInBoberdoo(campaignData, filterSetId, partnerId) {
     const data = typeof response.data === "string" ? safeJson(response.data) : response.data;
 
     if (data?.response?.status === "Success") {
-      console.log(`✅ Campaign ${campaignData._id || campaignData.campaign_id} updated successfully in Boberdoo`);
+      console.log(` Campaign ${campaignData._id || campaignData.campaign_id} updated successfully in Boberdoo`);
       return { success: true, filterSetId, data };
     }
 

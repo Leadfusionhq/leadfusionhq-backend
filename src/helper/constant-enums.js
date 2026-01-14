@@ -8,6 +8,7 @@ const LEAD_TYPE = {
   ROOFING: 'ROOFING',
   GUTTERS: 'GUTTERS',
   HVAC: 'HVAC',
+  ROOF_CLEANING: 'ROOF_CLEANING',
 };
 
 const BOBERDOO_LEAD_TYPE_MAP = {
@@ -15,6 +16,7 @@ const BOBERDOO_LEAD_TYPE_MAP = {
   ROOFING: 35,
   GUTTERS: 37,
   HVAC: 39,
+  ROOF_CLEANING: 41,
 };
 
 
@@ -89,7 +91,7 @@ module.exports = {
   STATUS,
   DAYS_OF_WEEK,
   LANGUAGE,
-  
+
   CONTENT_TYPE,
   CHAT_STATUS,
   PAYMENT_TYPE,
