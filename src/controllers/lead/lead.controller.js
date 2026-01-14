@@ -355,147 +355,20 @@ const createLead = wrapAsync(async (req, res) => {
       // Your existing low balance check for PREPAID
       try {
         const remainingBalance = billingResult.newBalance;
-
-        if (campaign.payment_type === "prepaid" && remainingBalance < leadCost) {
-          const owner = await User.findById(campaign.user_id);
-
-          // 1️⃣ TRIGGER WEBHOOK FIRST (to stop n8n lead flow)
-          try {
-            const lowBalanceResp = await sendLowBalanceAlert({
-              campaign_name: campaign.name,
-              filter_set_id: campaign.boberdoo_filter_set_id,
-              partner_id: owner.integrations?.boberdoo?.external_id || "",
-              email: owner.email,
-              user_id: owner._id,
-              campaign_id: campaign._id
-            });
-
-            if (lowBalanceResp.success) {
-              leadLogger.info("Low Balance webhook sent successfully", {
-                campaignId: campaign._id,
-                response: lowBalanceResp
-              });
-            } else {
-              leadLogger.warn("Low Balance webhook failed", {
-                campaignId: campaign._id,
-                error: lowBalanceResp.error || "Unknown error",
-                response: lowBalanceResp
-              });
-            }
-          } catch (err) {
-            leadLogger.error("Fatal error while sending low balance webhook", err, {
-              error: err.message
-            });
-          }
-
-          // 2️⃣ SEND LOW BALANCE EMAIL TO USER (unchanged)
-          try {
-            const emailResp = await MAIL_HANDLER.sendInsufficientBalanceEmail({
-              to: owner.email,
-              userName: owner.name || owner.fullName || owner.email,
-              requiredAmount: leadCost,
-              currentBalance: remainingBalance,
-              campaignName: campaign.name || `Campaign #${campaign._id}`,
-              campaignId: campaign._id
-            });
-
-            if (emailResp?.data?.id) {
-              leadLogger.info("Low Balance email sent successfully", {
-                email_to: owner.email,
-                response_id: emailResp.data.id
-              });
-            } else {
-              leadLogger.warn("Low Balance email sending failed", {
-                email_to: owner.email,
-                error: emailResp?.error || "Unknown error",
-                response: emailResp
-              });
-            }
-          } catch (err) {
-            leadLogger.error("Fatal error sending low balance user email", err, {
-              error: err.message
-            });
-          }
-
-          // 3️⃣ SEND LOW BALANCE EMAIL TO ADMINS (unchanged)
-          try {
-            const EXCLUDED = new Set([
-              'admin@gmail.com',
-              'admin123@gmail.com',
-              'admin1234@gmail.com',
-            ]);
-
-            const adminUsers = await User.find({
-              role: { $in: ['ADMIN', 'SUPER_ADMIN'] },
-              isActive: { $ne: false }
-            }).select('email');
-
-            let adminEmails = (adminUsers || [])
-              .map(a => a.email)
-              .filter(Boolean)
-              .map(e => e.trim().toLowerCase())
-              .filter(e => !EXCLUDED.has(e));
-
-            // ✅ NEW: override with env emails if present (still an array)
-            console.log("ENV CHECK → ADMIN_NOTIFICATION_EMAILS =", process.env.ADMIN_NOTIFICATION_EMAILS);
-
-            console.log("Admin before override =", adminEmails);
-
-            if (process.env.ADMIN_NOTIFICATION_EMAILS) {
-              adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS
-                .split(',')
-                .map(e => e.trim().toLowerCase())
-                .filter(Boolean);
-            }
-
-            console.log("Admin AFTER override =", adminEmails);
-
-            const emailString = adminEmails.join(',');
-            const adminEmailResp = await MAIL_HANDLER.sendLowBalanceAdminEmail({
-              to: emailString,
-              userEmail: owner.email,
-              userName: owner.name || owner.fullName || "",
-              campaignName: campaign.name,
-              campaignId: campaign._id,
-              requiredAmount: leadCost,
-              currentBalance: remainingBalance
-            });
-
-            if (adminEmailResp?.data?.id) {
-              leadLogger.info("Low Balance ADMIN email sent successfully", {
-                email_to: adminEmails,
-                response_id: adminEmailResp.data.id
-              });
-            } else {
-              leadLogger.warn("Low Balance ADMIN email failed", {
-                email_to: adminEmails,
-                error: adminEmailResp?.error || "Unknown error",
-                response: adminEmailResp
-              });
-            }
-
-          } catch (err) {
-            leadLogger.error("Fatal error sending low balance admin email", err, {
-              error: err.message
-            });
-          }
-
-          leadLogger.warn("Low balance flow completed (webhook + user email + admin email)", {
-            campaignId: campaign._id,
-            userId: owner._id,
-            balance: remainingBalance
-          });
-        }
+        await BillingServices.checkAndSendLowBalanceAlerts({
+          campaign,
+          leadCost,
+          remainingBalance,
+          logger: leadLogger
+        });
       } catch (lowBalanceErr) {
         leadLogger.error('Error in low balance check', lowBalanceErr);
       }
     }
 
-    // Commit transaction
     await session.commitTransaction();
     session.endSession();
 
-    // Handle based on payment result
     if (isPaid) {
       const campaignOwner = await User.findById(campaign.user_id);
 
@@ -575,7 +448,6 @@ const createLead = wrapAsync(async (req, res) => {
             });
           }
         }
-        // Send lead assignment email to ADMINS
         try {
           const EXCLUDED = new Set([
             'admin@gmail.com',
@@ -594,7 +466,6 @@ const createLead = wrapAsync(async (req, res) => {
             .map(e => e.trim().toLowerCase())
             .filter(e => !EXCLUDED.has(e));
 
-          // Override with env emails if present (still an array)
           console.log("ENV CHECK → ADMIN_NOTIFICATION_EMAILS =", process.env.ADMIN_NOTIFICATION_EMAILS);
 
           console.log("Admin before override =", adminEmails);
@@ -649,12 +520,7 @@ const createLead = wrapAsync(async (req, res) => {
             const fullName = `${result.first_name || ''} ${result.last_name || ''}`.trim();
             const phoneNumber = result.phone_number || result.phone || '';
             const email = result.email || '';
-            // const address = [
-            //   result?.address?.full_address || '',
-            // ].filter(Boolean).join(', ');
             const address = formatFullAddress(result.address);
-
-
             const campaignName = campaign?.name || 'N/A';
 
             const MAX_NOTE_LENGTH = 100;

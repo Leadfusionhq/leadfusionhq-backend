@@ -112,4 +112,23 @@ const sendSms = async (smsData) => {
   };
 };
 
-module.exports = { sendSms };
+
+const listSentSms = async (opts = {}) => {
+  if (!smsService) {
+    throw new Error('Notifyre SMS service not initialized');
+  }
+
+  try {
+    const response = await smsService.listSentSms(opts);
+    return { success: true, data: response };
+  } catch (err) {
+    console.error('[Notifyre] listSentSms error', err);
+    return {
+      success: false,
+      error: err?.message || 'Failed to list sent SMS',
+      details: err,
+    };
+  }
+};
+
+module.exports = { sendSms, listSentSms };
