@@ -17,7 +17,8 @@ const createEmailTemplate = ({
   buttonUrl = '',
   footerText = '',
   warningText = '',
-  companyName = 'Leadfusionhq'
+  companyName = 'Leadfusionhq',
+  fallbackUrl = ''
 }) => {
   return `<!DOCTYPE html>
   <html>
@@ -68,7 +69,15 @@ const createEmailTemplate = ({
                 <!-- Action Button -->
                 <div style="text-align: center; margin: 30px 0;">
                   <a href="${buttonUrl}" style="background: linear-gradient(to right, #204D9D, #306A64); color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 4px 8px rgba(32, 77, 157, 0.3); transition: all 0.3s ease;">${buttonText}</a>
-                </div>` : ''}
+                </div>
+                
+                ${fallbackUrl ? `
+                  <div style="text-align: center; margin: 20px 0; font-size: 14px; color: #666; word-break: break-all;">
+                    <p style="margin-bottom: 5px;">If the button doesn't work, you can click or copy-paste this link:</p>
+                    <a href="${fallbackUrl}" style="color: #204D9D; text-decoration: underline;">${fallbackUrl}</a>
+                  </div>
+                ` : ''}
+                ` : ''}
 
                 ${warningText ? `<p style="text-align: center; font-size: 14px; color: #dc3545; background-color: #f8d7da; padding: 12px; border-radius: 6px; border-left: 4px solid #dc3545; margin: 20px 0;"><strong>⚠️ Important:</strong> ${warningText}</p>` : ''}
 
@@ -118,13 +127,14 @@ const sendEmailToUserWithOTP = async ({ to, email, otp }) => {
 
 const sendVerificationEmail = async ({ to, name, token }) => {
   const verifyUrl = `${process.env.UI_LINK}/verify-email?token=${token}`;
-  
+
   const html = createEmailTemplate({
     title: 'Email Verification',
     greeting: `Hello ${name}!`,
     mainText: 'Welcome to our platform! Please verify your email address to activate your account.',
     buttonText: 'Verify Email',
     buttonUrl: verifyUrl,
+    fallbackUrl: verifyUrl,
     warningText: 'This verification link expires in 24 hours.',
     footerText: 'If you did not sign up for this account, you can safely ignore this email.'
   });
@@ -143,12 +153,13 @@ const sendAccountCreationEmailWithVerification = async ({ to, name, token, passw
   const html = createEmailTemplate({
     title: 'Account Created',
     greeting: `Welcome ${name}!`,
-    mainText: 'Your account has been successfully created by our team. ' + 
-              (password ? 'Below is your temporary password:' : 'Please verify your email to get started.'),
+    mainText: 'Your account has been successfully created by our team. ' +
+      (password ? 'Below is your temporary password:' : 'Please verify your email to get started.'),
     highlightedContent: password || '',
     highlightLabel: password ? 'Temporary Password' : '',
     buttonText: 'Verify Email & Activate Account',
     buttonUrl: verifyUrl,
+    fallbackUrl: verifyUrl,
     warningText: password ? 'Please change your password after logging in for security.' : 'This verification link expires in 24 hours.',
     footerText: 'If you did not expect this email, please contact our support team immediately.'
   });
@@ -248,11 +259,11 @@ const sendTestMail = async (toEmail) => {
 };
 
 const sendLeadAssignEmail = async ({ to, name, leadName, assignedBy, leadDetailsUrl, campaignName, leadData, realleadId, subject }) => {
-  
-  const recipients = Array.isArray(to) 
-    ? to 
+
+  const recipients = Array.isArray(to)
+    ? to
     : to.split(',').map(email => email.trim());
-  
+
   const {
     first_name,
     last_name,
@@ -268,29 +279,29 @@ const sendLeadAssignEmail = async ({ to, name, leadName, assignedBy, leadDetails
   const emailDisplay = email || 'N/A';
 
   // ✅ Phone with black clickable link
-  const phoneDisplay = phone_number 
-    ? `<a href="tel:${phone_number}" style="color: #000; text-decoration: none;">${phone_number}</a>` 
+  const phoneDisplay = phone_number
+    ? `<a href="tel:${phone_number}" style="color: #000; text-decoration: none;">${phone_number}</a>`
     : 'N/A';
 
   // const addressParts = [
-    // address.street,
-    // address?.full_address,
-    // address.city,
-    // address.state?.name || address.state, 
-    // address.zip_code
+  // address.street,
+  // address?.full_address,
+  // address.city,
+  // address.state?.name || address.state, 
+  // address.zip_code
   // ].filter(Boolean); 
-  
+
   // const fullAddress = addressParts.length > 0 ? addressParts.join(', ') : 'N/A';
-//  const composedAddressParts = [
-//     address?.street,
-//     address?.city,
-//     address?.state?.name || address?.state,
-//     address?.zip_code
-//   ].filter(Boolean);
+  //  const composedAddressParts = [
+  //     address?.street,
+  //     address?.city,
+  //     address?.state?.name || address?.state,
+  //     address?.zip_code
+  //   ].filter(Boolean);
 
-//   const composedAddress = composedAddressParts.join(', ');
+  //   const composedAddress = composedAddressParts.join(', ');
 
-//   const fullAddress = address?.full_address || composedAddress || 'N/A';
+  //   const fullAddress = address?.full_address || composedAddress || 'N/A';
   const fullAddress = formatFullAddress(address);
   const addressDisplay = makeAddressLink(fullAddress);
 
@@ -304,7 +315,7 @@ const sendLeadAssignEmail = async ({ to, name, leadName, assignedBy, leadDetails
   //   : fullAddress;
 
   const leadDetailsLink = `https://www.leadfusionhq.com/dashboard/leads/${realleadId}`;
-  
+
   // ✅ Gmail-style table layout - everything left-aligned
   const mainText = `
     <div style="max-width: 600px; margin: 0; padding: 0;">
@@ -419,20 +430,20 @@ const sendLeadAssignEmail = async ({ to, name, leadName, assignedBy, leadDetails
  * Email sent to ADMINS when a new lead is assigned
  * Same structure as sendLeadAssignEmail but includes campaign owner info
  */
-const sendLeadAssignAdminEmail = async ({ 
-  to, 
+const sendLeadAssignAdminEmail = async ({
+  to,
   userName,
   userEmail,
-  leadName, 
-  assignedBy, 
-  leadDetailsUrl, 
-  campaignName, 
-  leadData, 
-  realleadId, 
-  subject 
+  leadName,
+  assignedBy,
+  leadDetailsUrl,
+  campaignName,
+  leadData,
+  realleadId,
+  subject
 }) => {
-  const recipients = Array.isArray(to) 
-    ? to 
+  const recipients = Array.isArray(to)
+    ? to
     : to.split(',').map(email => email.trim());
 
   const {
@@ -450,8 +461,8 @@ const sendLeadAssignAdminEmail = async ({
   const emailDisplay = email || 'N/A';
 
   // ✅ Phone with black clickable link
-  const phoneDisplay = phone_number 
-    ? `<a href="tel:${phone_number}" style="color: #000; text-decoration: none;">${phone_number}</a>` 
+  const phoneDisplay = phone_number
+    ? `<a href="tel:${phone_number}" style="color: #000; text-decoration: none;">${phone_number}</a>`
     : 'N/A';
 
   const fullAddress = formatFullAddress(address);
@@ -606,12 +617,12 @@ const sendLeadReturnEmail = async ({ adminEmails, lead, campaign, returnedBy, re
     address = {},
     lead_id,
   } = lead;
-    // ✅ Filter out admin@gmail.com from recipients
-    const filteredAdmins = Array.isArray(adminEmails)
+  // ✅ Filter out admin@gmail.com from recipients
+  const filteredAdmins = Array.isArray(adminEmails)
     ? adminEmails.filter(email => email.toLowerCase() !== 'admin@gmail.com')
     : adminEmails.split(',')
-        .map(e => e.trim())
-        .filter(email => email.toLowerCase() !== 'admin@gmail.com');
+      .map(e => e.trim())
+      .filter(email => email.toLowerCase() !== 'admin@gmail.com');
 
   // If no valid admins after filtering, skip email
   if (filteredAdmins.length === 0) {
@@ -619,13 +630,13 @@ const sendLeadReturnEmail = async ({ adminEmails, lead, campaign, returnedBy, re
     return null;
   }
 
-  
+
   const fullName = `${first_name || ''} ${last_name || ''}`.trim() || 'N/A';
   const emailDisplay = email || 'N/A';
 
   // ✅ Phone with black clickable link
-  const phoneDisplay = phone_number 
-    ? `<a href="tel:${phone_number}" style="color: #000; text-decoration: none;">${phone_number}</a>` 
+  const phoneDisplay = phone_number
+    ? `<a href="tel:${phone_number}" style="color: #000; text-decoration: none;">${phone_number}</a>`
     : 'N/A';
 
   // const addressParts = [
@@ -635,9 +646,9 @@ const sendLeadReturnEmail = async ({ adminEmails, lead, campaign, returnedBy, re
   //   address.state?.name || address.state, 
   //   address.zip_code
   // ].filter(Boolean); 
-  
+
   // const fullAddress = addressParts.length > 0 ? addressParts.join(', ') : 'N/A';
-  
+
   // const addressDisplay = fullAddress !== 'N/A'
   //   ? `<a href="https://maps.google.com/?q=${encodeURIComponent(fullAddress)}" target="_blank" rel="noopener noreferrer" style="color: #000; text-decoration: none;">${fullAddress}</a>`
   //   : fullAddress;
@@ -824,8 +835,8 @@ const sendUserLeadReturnStatusEmail = async ({
     returnStatus === "Approved"
       ? "#16a34a"
       : returnStatus === "Rejected"
-      ? "#dc2626"
-      : "#f59e0b";
+        ? "#dc2626"
+        : "#f59e0b";
 
   const mainText = `
     <div style="max-width:600px;margin:0;padding:0;">
@@ -875,34 +886,31 @@ const sendUserLeadReturnStatusEmail = async ({
               <td style="padding:6px 10px;">${campaignName}</td>
             </tr>
 
-            ${
-              returnReason
-                ? `
+            ${returnReason
+      ? `
                   <tr>
                     <td colspan="2" style="padding:12px 10px;border-top:1px solid #eee;">
                       <strong style="color:#dc2626;">Return Reason:</strong><br>
                       ${returnReason}
                     </td>
                   </tr>`
-                : ""
-            }
+      : ""
+    }
 
-            ${
-              returnComments
-                ? `
+            ${returnComments
+      ? `
                   <tr>
                     <td colspan="2" style="padding:12px 10px;border-top:1px solid #eee;">
                       <strong style="color:#dc2626;">Additional Comments:</strong><br>
                       ${returnComments}
                     </td>
                   </tr>`
-                : ""
-            }
+      : ""
+    }
 
             <!-- Refund Section -->
-            ${
-              returnStatus === "Approved"
-                ? `
+            ${returnStatus === "Approved"
+      ? `
                   <tr>
                     <td colspan="2" style="padding:15px;border-top:1px solid #eee;">
                       <div style="padding:12px;background:#ecfdf5;border-left:4px solid #16a34a;
@@ -914,8 +922,8 @@ const sendUserLeadReturnStatusEmail = async ({
                       </div>
                     </td>
                   </tr>`
-                : ""
-            }
+      : ""
+    }
 
           </table>
 
@@ -951,9 +959,9 @@ const sendUserLeadReturnStatusEmail = async ({
 /**
  * Send New User Registration Notification to Admin
  */
-const sendNewUserRegistrationToAdmin = async ({ 
-  adminEmails, 
-  userName, 
+const sendNewUserRegistrationToAdmin = async ({
+  adminEmails,
+  userName,
   userEmail,
   companyName,
   phoneNumber,
@@ -1045,22 +1053,22 @@ const sendNewUserRegistrationToAdmin = async ({
 
 
 // Add these new email functions to your existing emailService.js
-const sendTransactionEmail = async ({ 
-  to, 
-  userName, 
-  transactionType, 
-  amount, 
-  transactionId, 
-  date, 
-  newBalance, 
+const sendTransactionEmail = async ({
+  to,
+  userName,
+  transactionType,
+  amount,
+  transactionId,
+  date,
+  newBalance,
   description = '',
-  metadata = {} 
+  metadata = {}
 }) => {
   const formattedAmount = Math.abs(Number(amount || 0)).toFixed(2);
 
   // Optional metadata (keeps signature unchanged)
-  const userEmail     = metadata.userEmail || to;
-  const oldBalance    = metadata.oldBalance;
+  const userEmail = metadata.userEmail || to;
+  const oldBalance = metadata.oldBalance;
   const paymentMethod = metadata.payment_type || '';
 
   // Make Place of Supply EXACTLY what the email uses (fullAddress)
@@ -1411,11 +1419,11 @@ async function sendCampaignCreatedEmailToUser(campaign) {
     const campaignName = campaign?.name || "N/A";
     const campaignId = campaign?.campaign_id || "N/A";
     const syncStatus = campaign?.boberdoo_sync_status || "N/A";
-    const createdAt = campaign?.createdAt 
-      ? new Date(campaign.createdAt).toLocaleString('en-US', { 
-          dateStyle: 'medium', 
-          timeStyle: 'short' 
-        })
+    const createdAt = campaign?.createdAt
+      ? new Date(campaign.createdAt).toLocaleString('en-US', {
+        dateStyle: 'medium',
+        timeStyle: 'short'
+      })
       : "N/A";
 
     // ---- Campaign Details Table ----
@@ -1492,17 +1500,17 @@ async function sendCampaignCreatedEmailToUser(campaign) {
 /**
  * Send Funds Added Email
  */
-const sendFundsAddedEmail = async ({ 
-  to, 
-  userName, 
-  amount, 
-  transactionId, 
+const sendFundsAddedEmail = async ({
+  to,
+  userName,
+  amount,
+  transactionId,
   paymentMethod,
-  newBalance 
+  newBalance
 }) => {
-  const date = new Date().toLocaleString('en-US', { 
-    dateStyle: 'medium', 
-    timeStyle: 'short' 
+  const date = new Date().toLocaleString('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
   });
 
   return sendTransactionEmail({
@@ -1521,18 +1529,18 @@ const sendFundsAddedEmail = async ({
 /**
  * Send Auto Top-Up Email
  */
-const sendAutoTopUpEmail = async ({ 
-  to, 
-  userName, 
-  amount, 
-  transactionId, 
+const sendAutoTopUpEmail = async ({
+  to,
+  userName,
+  amount,
+  transactionId,
   triggerReason,
   newBalance,
-  threshold 
+  threshold
 }) => {
-  const date = new Date().toLocaleString('en-US', { 
-    dateStyle: 'medium', 
-    timeStyle: 'short' 
+  const date = new Date().toLocaleString('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
   });
 
   const autoTopUpDetails = `
@@ -1574,22 +1582,22 @@ const sendAutoTopUpEmail = async ({
 /**
  * Send Lead Payment Email
  */
-const sendLeadPaymentEmail = async ({ 
-  to, 
-  userName, 
-  leadCost, 
+const sendLeadPaymentEmail = async ({
+  to,
+  userName,
+  leadCost,
   leadId,
   leadName,
   campaignName,
   payment_type,
   full_address,
-  transactionId, 
+  transactionId,
   newBalance,
   leadData = {}
 }) => {
-  const date = new Date().toLocaleString('en-US', { 
-    dateStyle: 'medium', 
-    timeStyle: 'short' 
+  const date = new Date().toLocaleString('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
   });
 
   const {
@@ -1601,7 +1609,7 @@ const sendLeadPaymentEmail = async ({
   } = leadData;
 
   const fullName = `${first_name} ${last_name}`.trim() || leadName || 'N/A';
-  
+
   const addressParts = [
     // address.street,
     address?.full_address,
@@ -1609,7 +1617,7 @@ const sendLeadPaymentEmail = async ({
     // address.state?.name || address.state, 
     // address.zip_code
   ].filter(Boolean);
-  
+
   // const fullAddress = full_address ?? 'N/A';
 
   // const composedAddressParts = [
@@ -1702,8 +1710,8 @@ const sendLeadPaymentEmail = async ({
     date,
     newBalance,
     description: `Lead ${leadId} assigned to ${campaignName}`,
-    metadata: { 
-      leadId, 
+    metadata: {
+      leadId,
       campaignName,
       payment_type,
       fullAddress,
@@ -1716,11 +1724,11 @@ const sendLeadPaymentEmail = async ({
 /**
  * Send Low Balance Warning
  */
-const sendLowBalanceWarning = async ({ 
-  to, 
-  userName, 
-  currentBalance, 
-  threshold 
+const sendLowBalanceWarning = async ({
+  to,
+  userName,
+  currentBalance,
+  threshold
 }) => {
   const warningContent = `
     <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 30px 0; background: linear-gradient(135deg, #fef3c7 0%, #fde68
@@ -1801,9 +1809,9 @@ const sendLowBalanceWarning = async ({
 /**
  * Send Insufficient Balance Email
  */
-const sendLowBalanceWarningEmail = async ({ 
-  to, 
-  userName, 
+const sendLowBalanceWarningEmail = async ({
+  to,
+  userName,
   partnerId,
   email,
   currentBalance,
@@ -1916,7 +1924,7 @@ const sendLowBalanceWarningEmail = async ({
     buttonText: 'Add Funds Now',
     buttonUrl: `${process.env.UI_LINK}/dashboard/billing`,
     warningText: 'Your account may stop receiving new leads soon. Please add funds to keep services active.',
-    
+
   });
 
   return resend.emails.send({
@@ -1928,10 +1936,10 @@ const sendLowBalanceWarningEmail = async ({
 };
 
 
-const sendInsufficientBalanceEmail = async ({ 
-  to, 
-  userName, 
-  requiredAmount, 
+const sendInsufficientBalanceEmail = async ({
+  to,
+  userName,
+  requiredAmount,
   currentBalance,
   campaignName,
   campaignId
@@ -2121,28 +2129,28 @@ const sendLowBalanceAdminEmail = async ({
 };
 
 const sendCampaignResumedEmail = async ({ to, userName, email, partnerId }) => {
-    const html = createEmailTemplate({
-        title: '✅ Lead Service Resumed',
-        greeting: `Hello ${userName}!`,
-        mainText: `
+  const html = createEmailTemplate({
+    title: '✅ Lead Service Resumed',
+    greeting: `Hello ${userName}!`,
+    mainText: `
             <p>Your lead service has been resumed successfully.</p>
             <p><strong>Partner ID:</strong> ${partnerId}</p>
             <p><strong>Email:</strong> ${email}</p>
         `,
-        footerText: 'If you have any questions, please contact support.'
-    });
+    footerText: 'If you have any questions, please contact support.'
+  });
 
-    return resend.emails.send({
-        from: FROM_EMAIL,
-        to,
-        subject: `✅ Lead Service Resumed`,
-        html
-    });
+  return resend.emails.send({
+    from: FROM_EMAIL,
+    to,
+    subject: `✅ Lead Service Resumed`,
+    html
+  });
 };
 const sendCampaignResumedAdminEmail = async ({ to, userName, userEmail, partnerId }) => {
-    const recipients = Array.isArray(to) ? to : [to];
+  const recipients = Array.isArray(to) ? to : [to];
 
-    const table = `
+  const table = `
         <table cellpadding="0" cellspacing="0" border="0"
                style="width: 100%; font-family: Arial, sans-serif; font-size: 14px; color: #1e3a8a; line-height: 1.6;">
           <tr>
@@ -2156,21 +2164,21 @@ const sendCampaignResumedAdminEmail = async ({ to, userName, userEmail, partnerI
         </table>
     `;
 
-    const html = createEmailTemplate({
-        title: 'Lead Service Resumed – Balance Added',
-        mainText: `
+  const html = createEmailTemplate({
+    title: 'Lead Service Resumed – Balance Added',
+    mainText: `
             <p>The lead assignment service for the user has been resumed after sufficient funds were added:</p>
             ${table}
         `,
-        footerText: ''
-    });
+    footerText: ''
+  });
 
-    return resend.emails.send({
-        from: FROM_EMAIL,
-        to: recipients,
-        subject: `Lead Service Resumed – Partner ID ${partnerId}`,
-        html
-    });
+  return resend.emails.send({
+    from: FROM_EMAIL,
+    to: recipients,
+    subject: `Lead Service Resumed – Partner ID ${partnerId}`,
+    html
+  });
 };
 
 const sendFailedLeadPaymentEmail = async ({ to, userName, leadId, amount, cardLast4, errorMessage }) => {
@@ -2234,9 +2242,9 @@ const sendFailedLeadPaymentAdminEmail = async ({ to, userName, userEmail, leadId
  * Email sent to USER when PENDING leads are successfully charged
  * Shows ALL charged leads in one table
  */
-const sendPendingLeadsPaymentSuccessEmail = async ({ 
-  to, 
-  userName, 
+const sendPendingLeadsPaymentSuccessEmail = async ({
+  to,
+  userName,
   chargedLeads,  // Array of all charged leads
   totalAmount,
   newBalance,
@@ -2350,8 +2358,8 @@ const sendPendingLeadsPaymentSuccessEmail = async ({
  * Email sent to ADMINS when PENDING leads are successfully charged
  * Shows ALL charged leads in one table
  */
-const sendPendingLeadsPaymentSuccessAdminEmail = async ({ 
-  to, 
+const sendPendingLeadsPaymentSuccessAdminEmail = async ({
+  to,
   userName,
   userEmail,
   chargedLeads,  // Array of all charged leads
@@ -2490,24 +2498,24 @@ module.exports = {
   sendLeadAssignEmail,
   sendLeadAssignAdminEmail,
   sendLeadReturnEmail,
-sendUserLeadReturnStatusEmail,
-    // ✅ New Transaction Email Functions
-    sendTransactionEmail,
-    sendFundsAddedEmail,
-    sendAutoTopUpEmail,
-    sendLeadPaymentEmail,
-    sendLowBalanceWarning,
-    sendInsufficientBalanceEmail,
-    sendNewUserRegistrationToAdmin,
-    sendCampaignCreatedEmailtoN8N,
-    sendLowBalanceAdminEmail,
-    sendCampaignResumedEmail,
-    sendCampaignResumedAdminEmail,
-    sendLowBalanceWarningEmail,
-    sendFailedLeadPaymentEmail,
-    sendFailedLeadPaymentAdminEmail,
-    sendPendingLeadsPaymentSuccessEmail,
-    sendPendingLeadsPaymentSuccessAdminEmail,
-    sendCampaignCreatedEmailToAdmin,
-    sendCampaignCreatedEmailToUser
+  sendUserLeadReturnStatusEmail,
+  // ✅ New Transaction Email Functions
+  sendTransactionEmail,
+  sendFundsAddedEmail,
+  sendAutoTopUpEmail,
+  sendLeadPaymentEmail,
+  sendLowBalanceWarning,
+  sendInsufficientBalanceEmail,
+  sendNewUserRegistrationToAdmin,
+  sendCampaignCreatedEmailtoN8N,
+  sendLowBalanceAdminEmail,
+  sendCampaignResumedEmail,
+  sendCampaignResumedAdminEmail,
+  sendLowBalanceWarningEmail,
+  sendFailedLeadPaymentEmail,
+  sendFailedLeadPaymentAdminEmail,
+  sendPendingLeadsPaymentSuccessEmail,
+  sendPendingLeadsPaymentSuccessAdminEmail,
+  sendCampaignCreatedEmailToAdmin,
+  sendCampaignCreatedEmailToUser
 };
