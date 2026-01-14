@@ -8,6 +8,7 @@ export const LEAD_TYPE = {
   ROOFING: 'ROOFING',
   GUTTERS: 'GUTTERS',
   HVAC: 'HVAC',
+  ROOF_CLEANING: 'ROOF_CLEANING',
 } as const;
 
 
@@ -20,7 +21,7 @@ export const EXCLUSIVITY = {
   // APPOINTMENT: 'APPOINTMENT',
 } as const;
 
-export const PAYMENT_TYPE ={
+export const PAYMENT_TYPE = {
   PREPAID: 'prepaid',
   PAY_AS_YOU_GO: 'payasyougo',
 } as const;
@@ -28,8 +29,8 @@ export const PAYMENT_TYPE ={
 export const STATUS = {
   PENDING: 'PENDING',
   ACTIVE: 'ACTIVE',
-//   PAUSED: 'PAUSED',
-//   REJECTED: 'REJECTED',
+  //   PAUSED: 'PAUSED',
+  //   REJECTED: 'REJECTED',
 } as const;
 
 export const LANGUAGE = {
