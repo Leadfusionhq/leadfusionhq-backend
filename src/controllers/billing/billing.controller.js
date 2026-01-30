@@ -164,6 +164,11 @@ const saveCard = wrapAsync(async (req, res) => {
         return sendResponse(res, { data }, 'Your card details have been saved', 201);
     } catch (err) {
         billingLogger.error('Failed to save card', err, { userId: user_id });
+
+        if (err.statusCode) {
+            throw err;
+        }
+
         throw new ErrorHandler(500, 'Failed to save your card details. Please try again later.');
     }
 });

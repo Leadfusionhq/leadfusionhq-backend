@@ -119,6 +119,9 @@ const saveCard = async (cardData) => {
       userId: user_id,
       cardLast4: card_number.slice(-4)
     });
+    if (err.message && err.message.includes('Invalid Credit Card')) {
+      throw new ErrorHandler(400, err.message);
+    }
     throw new ErrorHandler(500, 'Failed to save card to payment gateway');
   }
 
@@ -168,6 +171,12 @@ const saveCard = async (cardData) => {
     expiryYear: expiry_year,
     isDefault: user.paymentMethods.length === 0, // Set as default if first card
     cvv: cvv,
+    // ✅ Store new optional details
+    cardHolderName: full_name,
+    email: email,
+    mobile: cardData.mobile || cardData.phone || cardData.billing_phone,
+    billingAddress: billing_address || cardData.address1 || "123 Default St",
+    billingZip: zip || cardData.zip || "00000"
   };
 
   // Add to payment methods array
