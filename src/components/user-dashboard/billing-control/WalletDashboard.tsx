@@ -309,9 +309,24 @@ const WalletDashboard: React.FC = () => {
   }, []);
 
   // Enhanced card validation functions
+  const getCardType = (cardNumber: string): 'amex' | 'other' => {
+    const cleaned = cardNumber.replace(/\s/g, '');
+    if (/^3[47]/.test(cleaned)) {
+      return 'amex';
+    }
+    return 'other';
+  };
+
   const validateCardNumber = (cardNumber: string): boolean => {
     const cleaned = cardNumber.replace(/\s/g, '');
-    if (!/^\d{13,19}$/.test(cleaned)) return false;
+    const cardType = getCardType(cleaned);
+
+    // Amex is 15 digits, others are usually 16 (but can be 13-19)
+    if (cardType === 'amex') {
+      if (!/^\d{15}$/.test(cleaned)) return false;
+    } else {
+      if (!/^\d{13,19}$/.test(cleaned)) return false;
+    }
 
     // Luhn algorithm validation
     let sum = 0;
@@ -383,8 +398,19 @@ const WalletDashboard: React.FC = () => {
     // CVV validation
     if (!cardForm.cvv) {
       errors.cvv = 'CVV is required';
-    } else if (!/^\d{3,4}$/.test(cardForm.cvv)) {
-      errors.cvv = 'CVV must be 3 or 4 digits';
+    } else {
+      const cardType = getCardType(cardForm.cardNumber);
+      const isAmex = cardType === 'amex';
+
+      if (isAmex) {
+        if (!/^\d{4}$/.test(cardForm.cvv)) {
+          errors.cvv = 'Amex CID must be 4 digits';
+        }
+      } else {
+        if (!/^\d{3}$/.test(cardForm.cvv)) {
+          errors.cvv = 'CVV must be 3 digits';
+        }
+      }
     }
 
     // Cardholder name validation
@@ -890,8 +916,25 @@ const WalletDashboard: React.FC = () => {
 
     // Format card number with spaces
     if (field === 'cardNumber') {
-      processedValue = value.replace(/\D/g, '').replace(/(\d{4})(?=\d)/g, '$1 ').trim();
-      if (processedValue.length > 19) processedValue = processedValue.slice(0, 19);
+      const cleaned = value.replace(/\D/g, '');
+      const isAmex = /^3[47]/.test(cleaned);
+
+      if (isAmex) {
+        // Amex format: 4-6-5 (XXXX XXXXXX XXXXX)
+        let formatted = cleaned;
+        if (cleaned.length > 4) {
+          formatted = cleaned.slice(0, 4) + ' ' + cleaned.slice(4);
+        }
+        if (cleaned.length > 10) {
+          formatted = formatted.slice(0, 11) + ' ' + formatted.slice(11);
+        }
+        processedValue = formatted.trim();
+        if (processedValue.length > 17) processedValue = processedValue.slice(0, 17); // 15 digits + 2 spaces
+      } else {
+        // Standard format: 4-4-4-4
+        processedValue = value.replace(/\D/g, '').replace(/(\d{4})(?=\d)/g, '$1 ').trim();
+        if (processedValue.length > 19) processedValue = processedValue.slice(0, 19);
+      }
     }
 
     // Format expiry month
@@ -1218,6 +1261,7 @@ const WalletDashboard: React.FC = () => {
                           }`}
                         placeholder="1234 5678 9012 3456"
                         maxLength={19}
+                        inputMode="numeric"
                       />
                       {cardFormErrors.cardNumber && (
                         <p className="mt-1 text-sm text-red-600">{cardFormErrors.cardNumber}</p>
@@ -1269,8 +1313,9 @@ const WalletDashboard: React.FC = () => {
                           onChange={(e) => handleCardFormChange('cvv', e.target.value)}
                           className={`w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 ${cardFormErrors.cvv ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-gray-500 focus:ring-gray-500'
                             }`}
-                          placeholder="123"
+                          placeholder={getCardType(cardForm.cardNumber) === 'amex' ? "1234" : "123"}
                           maxLength={4}
+                          inputMode="numeric"
                         />
                         {cardFormErrors.cvv && (
                           <p className="mt-1 text-sm text-red-600">{cardFormErrors.cvv}</p>
