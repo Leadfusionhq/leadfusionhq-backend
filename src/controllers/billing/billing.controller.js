@@ -522,6 +522,31 @@ const chargeSingleLead = wrapAsync(async (req, res) => {
     }
 });
 
+const retryPendingPayments = wrapAsync(async (req, res) => {
+    const user_id = req.user._id;
+
+    billingLogger.info('User attempting manual payment retry', { userId: user_id });
+
+    try {
+        const result = await BillingServices.retryUserPendingPayments(user_id);
+
+        return sendResponse(
+            res,
+            { result },
+            result.message || 'Payment retry completed',
+            200
+        );
+    } catch (err) {
+        billingLogger.error('Failed to retry pending payments', err, { userId: user_id });
+
+        if (err.statusCode) {
+            throw err;
+        }
+
+        throw new ErrorHandler(500, 'Failed to retry payments. Please try again later.');
+    }
+});
+
 module.exports = {
     chargeSingleLead,
     getCurrentContract,
@@ -540,4 +565,5 @@ module.exports = {
     testAutoTopUp,
     getRevenueFromGateway,
     getReceipt,
+    retryPendingPayments
 };
