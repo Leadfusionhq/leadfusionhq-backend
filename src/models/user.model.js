@@ -253,6 +253,32 @@ const regularUserSchema = new mongoose.Schema({
     createdAt: {
       type: Date,
       default: Date.now
+    },
+    // ✅ NEW OPTIONAL FIELDS
+    cardHolderName: {
+      type: String,
+      required: false,
+      trim: true
+    },
+    email: {
+      type: String,
+      required: false,
+      trim: true
+    },
+    mobile: {
+      type: String,
+      required: false,
+      trim: true
+    },
+    billingAddress: {
+      type: String,
+      required: false,
+      trim: true
+    },
+    billingZip: {
+      type: String,
+      required: false,
+      trim: true
     }
   }],
   defaultPaymentMethod: {
