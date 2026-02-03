@@ -187,4 +187,10 @@ billingRouter.post(
   billingController.chargeSingleLead
 );
 
+billingRouter.post(
+  '/retry-pending-payments',
+  // checkAuth, // Already applied globally to router
+  billingController.retryPendingPayments
+);
+
 module.exports = billingRouter;
