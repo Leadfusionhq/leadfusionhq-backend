@@ -265,6 +265,7 @@ export const BILLING_API = {
 
 
   CHARGE_SINGLE_LEAD: `${BILLING_API_BASE}/charge-single-lead/:leadId`,
+  RETRY_PENDING_PAYMENTS: `${BILLING_API_BASE}/retry-pending-payments`,
 
 };
 

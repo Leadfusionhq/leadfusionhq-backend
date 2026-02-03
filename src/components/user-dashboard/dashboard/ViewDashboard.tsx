@@ -20,7 +20,7 @@ import {
 import { Skeleton, Chip, IconButton } from '@mui/material';
 import Link from 'next/link';
 import axiosWrapper from "@/utils/api";
-import { DASHBOARD_API } from "@/utils/apiUrl";
+import { DASHBOARD_API, BILLING_API } from "@/utils/apiUrl";
 import { RootState } from '@/redux/store';
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-toastify';
@@ -97,10 +97,69 @@ export default function ClientDashboard() {
 
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [retryLoading, setRetryLoading] = useState<boolean>(false);
   const [dateRange, setDateRange] = useState<string>('30d');
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleRetryPendingPayments = async () => {
+    if (!token) return;
+
+    try {
+      setRetryLoading(true);
+      const res = await axiosWrapper(
+        "post",
+        BILLING_API.RETRY_PENDING_PAYMENTS,
+        {},
+        token
+      ) as any;
+
+      if (res?.success || res?.message === 'Pending payments recovered successfully') {
+        toast.success(res?.message || "Pending payments recovered successfully");
+
+        // Optimistically update UI to remove the alert immediately
+        if (data) {
+          setData({
+            ...data,
+            lead_metrics: {
+              ...(data.lead_metrics || {
+                active: 0,
+                pending_return: 0,
+                returned: 0,
+                rejected_return: 0,
+                payment_pending: 0
+              }),
+              payment_pending: 0
+            }
+          });
+        }
+
+        // Refresh dashboard data to update the counts (balance, etc.)
+        await fetchDashboardData();
+
+        // FORCE update UI to remove the alert immediately
+        // (The backend might return stale count data for a few seconds, so we override it)
+        setData(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            lead_metrics: {
+              ...prev.lead_metrics,
+              payment_pending: 0
+            }
+          };
+        });
+      } else {
+        toast.error(res.message || "Failed to retry pending payments");
+      }
+    } catch (err) {
+      console.error("Error retrying payments:", err);
+      toast.error(getErrorMessage(err));
+    } finally {
+      setRetryLoading(false);
+    }
   };
 
   const fetchDashboardData = async () => {
@@ -222,7 +281,7 @@ export default function ClientDashboard() {
         </div>
       </div>
 
-      {/* Alerts */}
+      {/* Low Balance Alert */}
       {
         data?.billing?.is_low_balance && (
           <div className="mb-8 bg-orange-50 rounded-xl border border-orange-100 p-4">
@@ -243,6 +302,42 @@ export default function ClientDashboard() {
                 className="px-4 py-2 bg-white text-orange-700 border border-orange-200 rounded-lg hover:bg-orange-50 transition-colors text-sm font-semibold shadow-sm"
               >
                 Add Funds
+              </button>
+            </div>
+          </div>
+        )
+      }
+
+      {
+        (data?.lead_metrics?.payment_pending || 0) > 0 && (
+          <div className="mb-8 bg-red-50 rounded-xl border border-red-100 p-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="bg-red-100 p-2 rounded-lg">
+                  <AlertCircle className="w-5 h-5 text-red-600" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-900">Pending Payments Detected</h4>
+                  <p className="text-sm text-gray-600 mt-0.5">
+                    You have <span className="font-medium text-red-700">{data?.lead_metrics?.payment_pending}</span> leads with pending payments. This may affect your service.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleRetryPendingPayments}
+                disabled={retryLoading}
+                className="px-4 py-2 bg-white text-red-700 border border-red-200 rounded-lg hover:bg-red-50 transition-colors text-sm font-semibold shadow-sm flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {retryLoading ? (
+                  <>
+                    <div className="w-3 h-3 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    Pay For All Pending Leads
+                  </>
+                )}
               </button>
             </div>
           </div>
