@@ -20,6 +20,7 @@ interface Card {
   expiryYear: string;
   isDefault: boolean;
   cardholderName?: string;
+  cardHolderName?: string; // API uses this casing
 }
 
 interface AutoTopUpRule {
@@ -1456,10 +1457,12 @@ const WalletDashboard: React.FC = () => {
                       <CreditCard className="w-8 h-8 text-gray-400" />
                       <div>
                         <p className="font-medium text-black">**** **** **** {card.cardLastFour}</p>
-                        <p className="text-sm text-gray-500">{card.brand} • {card.expiryMonth}/{card.expiryYear}</p>
-                        {card.cardholderName && (
-                          <p className="text-xs text-gray-400">{card.cardholderName}</p>
+                        {(card.cardHolderName || card.cardholderName) && (
+                          <p className="text-sm font-medium text-gray-700 truncate max-w-[200px]" title={card.cardHolderName || card.cardholderName}>
+                            {card.cardHolderName || card.cardholderName}
+                          </p>
                         )}
+                        <p className="text-sm text-gray-500">{card.brand} • {card.expiryMonth}/{card.expiryYear}</p>
                       </div>
                     </div>
 
