@@ -148,7 +148,7 @@ const saveCard = wrapAsync(async (req, res) => {
     //     throw new ErrorHandler(400, 'You must accept the latest contract before saving payment information.');
     // }
 
-    const { makeDefault = false } = req.body;
+    const { makeDefault = true } = req.body;
     const cardData = { ...req.body, user_id, email };
 
     billingLogger.info('User attempting to save card', {
