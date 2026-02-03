@@ -1365,7 +1365,143 @@ const chargeSingleLead = async (userId, leadId) => {
 };
 
 
+const checkAndSendLowBalanceAlerts = async ({ campaign, leadCost, remainingBalance, logger = console }) => {
+  try {
+    const owner = await User.findById(campaign.user_id);
+    if (!owner) return;
+
+    if (campaign.payment_type === "prepaid" && remainingBalance < leadCost) {
+
+      // TRIGGER WEBHOOK FIRST
+      try {
+        const lowBalanceResp = await sendLowBalanceAlert({
+          campaign_name: campaign.name,
+          filter_set_id: campaign.boberdoo_filter_set_id,
+          partner_id: owner.integrations?.boberdoo?.external_id || "",
+          email: owner.email,
+          user_id: owner._id,
+          campaign_id: campaign._id
+        });
+
+        if (lowBalanceResp.success) {
+          logger.info("Low Balance webhook sent successfully", {
+            campaignId: campaign._id,
+            response: lowBalanceResp
+          });
+        } else {
+          logger.warn("Low Balance webhook failed", {
+            campaignId: campaign._id,
+            error: lowBalanceResp.error || "Unknown error",
+            response: lowBalanceResp
+          });
+        }
+      } catch (err) {
+        logger.error("Fatal error while sending low balance webhook", err, {
+          error: err.message
+        });
+      }
+
+      //SEND LOW BALANCE EMAIL TO USER
+      try {
+        const emailResp = await MAIL_HANDLER.sendInsufficientBalanceEmail({
+          to: owner.email,
+          userName: owner.name || owner.fullName || owner.email,
+          requiredAmount: leadCost,
+          currentBalance: remainingBalance,
+          campaignName: campaign.name || `Campaign #${campaign._id}`,
+          campaignId: campaign._id
+        });
+
+        if (emailResp?.data?.id) {
+          logger.info("Low Balance email sent successfully", {
+            email_to: owner.email,
+            response_id: emailResp.data.id
+          });
+        } else {
+          logger.warn("Low Balance email sending failed", {
+            email_to: owner.email,
+            error: emailResp?.error || "Unknown error",
+            response: emailResp
+          });
+        }
+      } catch (err) {
+        logger.error("Fatal error sending low balance user email", err, {
+          error: err.message
+        });
+      }
+
+      // SEND LOW BALANCE EMAIL TO ADMINS
+      try {
+        const EXCLUDED = new Set([
+          'admin@gmail.com',
+          'admin123@gmail.com',
+          'admin1234@gmail.com',
+        ]);
+
+        const adminUsers = await User.find({
+          role: { $in: ['ADMIN', 'SUPER_ADMIN'] },
+          isActive: { $ne: false }
+        }).select('email');
+
+        let adminEmails = (adminUsers || [])
+          .map(a => a.email)
+          .filter(Boolean)
+          .map(e => e.trim().toLowerCase())
+          .filter(e => !EXCLUDED.has(e));
+
+        if (process.env.ADMIN_NOTIFICATION_EMAILS) {
+          adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS
+            .split(',')
+            .map(e => e.trim().toLowerCase())
+            .filter(Boolean);
+        }
+
+        const emailString = adminEmails.join(',');
+
+        if (adminEmails.length > 0) {
+          const adminEmailResp = await MAIL_HANDLER.sendLowBalanceAdminEmail({
+            to: emailString,
+            userEmail: owner.email,
+            userName: owner.name || owner.fullName || "",
+            campaignName: campaign.name,
+            campaignId: campaign._id,
+            requiredAmount: leadCost,
+            currentBalance: remainingBalance
+          });
+
+          if (adminEmailResp?.data?.id) {
+            logger.info("Low Balance ADMIN email sent successfully", {
+              email_to: adminEmails,
+              response_id: adminEmailResp.data.id
+            });
+          } else {
+            logger.warn("Low Balance ADMIN email failed", {
+              email_to: adminEmails,
+              error: adminEmailResp?.error || "Unknown error",
+              response: adminEmailResp
+            });
+          }
+        }
+      } catch (err) {
+        logger.error("Fatal error sending low balance admin email", err, {
+          error: err.message
+        });
+      }
+
+      logger.warn("Low balance flow completed (webhook + user email + admin email)", {
+        campaignId: campaign._id,
+        userId: owner._id,
+        balance: remainingBalance
+      });
+    }
+  } catch (err) {
+    logger.error('Error in low balance check logic', err);
+  }
+};
+
+
 module.exports = {
+  checkAndSendLowBalanceAlerts,
   chargeSingleLead,
   getCurrentContract,
   getUserContractStatus,

@@ -8,7 +8,8 @@ const API = {
   SEND_SMS: '/send',
   BULK_SEND: '/bulk-send',
   LEAD_ASSIGN: '/lead-assign',
-  STATUS: '/status/:messageId'
+  STATUS: '/status/:messageId',
+  GET_ALL_SMS: '/get-all-sms'
 };
 
 
@@ -16,6 +17,8 @@ smsRouter.post(API.SEND_SMS, SmsController.sendSMS);
 // smsRouter.post(API.BULK_SEND, SmsController.sendBulkSMS);
 // smsRouter.post(API.LEAD_ASSIGN, SmsController.sendLeadAssignSMS);
 // smsRouter.get(API.STATUS, SmsController.getSMSStatus);
+
+smsRouter.get(API.GET_ALL_SMS, SmsController.listSentSms);
 
 smsRouter.get(API.INFO, (req, res) => {
   res.json({
@@ -27,7 +30,8 @@ smsRouter.get(API.INFO, (req, res) => {
       send: 'POST /api/sms/send',
       bulkSend: 'POST /api/sms/bulk-send',
       leadAssign: 'POST /api/sms/lead-assign',
-      status: 'GET /api/sms/status/:messageId'
+      status: 'GET /api/sms/status/:messageId',
+      getAllSms: 'GET /api/sms/get-all-sms'
     },
     security: {
       auth: 'JWT authentication required',

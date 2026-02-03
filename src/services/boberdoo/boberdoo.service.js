@@ -673,7 +673,7 @@ async function syncUserToBoberdooById(userId) {
 
 // Create or insert a campaign in Boberdoo
 
-// 🗓️ Day mapping between API and DB
+//  Day mapping between API and DB
 const DAY_MAPPING = {
   Sunday: "SUNDAY",
   Monday: "MONDAY",
@@ -684,7 +684,7 @@ const DAY_MAPPING = {
   Saturday: "SATURDAY",
 };
 
-// 🔁 Convert DB-style → API-style (e.g., MONDAY → Monday)
+//  Convert DB-style → API-style (e.g., MONDAY → Monday)
 function convertDbDaysToApi(daysFromDb = []) {
   const reverseMap = Object.fromEntries(
     Object.entries(DAY_MAPPING).map(([api, db]) => [db, api])
@@ -695,6 +695,8 @@ function getDeliveryType(leadType) {
   switch (leadType) {
     case "ROOFING":
       return "100281 - N8N to CRM DelieveryRoof";
+    case "ROOF_CLEANING":
+      return "100287 - N8N to CRM DelieveryRoofCleaning";
     case "GUTTERS":
       return "100283 - N8N to CRM DelieveryGutters";
     case "HVAC":
@@ -705,7 +707,7 @@ function getDeliveryType(leadType) {
 }
 
 
-// 🗺️ Get state abbreviation or fallback
+//  Get state abbreviation or fallback
 function getStateAbbreviation(state) {
   if (!state) return "";
   if (typeof state === "string") return state;
@@ -719,7 +721,6 @@ async function createCampaignInBoberdoo(campaignData, partnerId) {
     if (!leadTypeId)
       return { success: false, error: `Invalid lead type: ${campaignData.lead_type}` };
 
-    // NEW: Delivery type logic
     const deliveryType = getDeliveryType(campaignData.lead_type);
 
 
@@ -730,23 +731,20 @@ async function createCampaignInBoberdoo(campaignData, partnerId) {
     const coverageType = campaignData.geography.coverage?.type || "FULL_STATE";
     const zipMode = coverageType === "FULL_STATE" ? 0 : 1;
 
-    // 🕒 Day conversion
     const activeDaysArray = campaignData.delivery?.schedule?.days
       ?.filter(d => d.active)
       ?.map(d => d.day.toUpperCase()) || [];
     const activeDays = convertDbDaysToApi(activeDaysArray).join(",");
 
-    // ⏰ Time range
 
 
     const schedule = campaignData.delivery?.schedule || {};
     const scheduleStart = schedule.start_time || "09:00";
     const scheduleEnd = schedule.end_time || "17:00";
     const timezone = schedule.timezone || "America/New_York";
-    const timeRange = `${scheduleStart}-${scheduleEnd}`; // ✅ fixed syntax
+    const timeRange = `${scheduleStart}-${scheduleEnd}`;
 
 
-    // 📦 Handle ZIP codes (only for PARTIAL)
     const zipCodes =
       coverageType === "PARTIAL"
         ? (campaignData.geography?.coverage?.partial?.zip_codes || []).join(",")
@@ -761,7 +759,13 @@ async function createCampaignInBoberdoo(campaignData, partnerId) {
         Roof_Material: "0",
       };
     }
-
+    if (campaignData.lead_type === "ROOF_CLEANING") {
+      extraLeadTypeFields = {
+        Project_Type: "0",
+        Homeowner: "0",
+        Roof_Material: "0",
+      };
+    }
     if (campaignData.lead_type === "GUTTERS" || campaignData.lead_type === "HVAC") {
       extraLeadTypeFields = {
         Project_Type: "0",
@@ -790,14 +794,14 @@ async function createCampaignInBoberdoo(campaignData, partnerId) {
       Delivery_Type: deliveryType,
       State: stateList,
       Zip_Mode: zipMode,
-      Zip: zipCodes, // ✅ Added
+      Zip: zipCodes,
       Day_Of_Week_Accept_Leads: activeDays,
-      // Time_Of_Day_Accept_Leads: timeRange, // ✅ global range
-      Timezone: timezone, // ✅ NEW
+      // Time_Of_Day_Accept_Leads: timeRange, // global range
+      Timezone: timezone,
       ...extraLeadTypeFields,
     };
 
-    console.log("🟢 Payload sent to Boberdoo (Create):", payload);
+    console.log("Payload sent to Boberdoo (Create):", payload);
 
     const response = await axios.post(CAMPAIGN_API_URL, null, {
       params: payload,
@@ -826,7 +830,6 @@ async function updateCampaignInBoberdoo(campaignData, filterSetId, partnerId) {
     if (!leadTypeId) return { success: false, error: `Invalid lead type: ${campaignData.lead_type}` };
     if (!filterSetId) return { success: false, error: "Filter_Set_ID is required for update" };
 
-    // NEW: Delivery type logic
     const deliveryType = getDeliveryType(campaignData.lead_type);
 
 
@@ -846,7 +849,7 @@ async function updateCampaignInBoberdoo(campaignData, filterSetId, partnerId) {
     const scheduleStart = schedule.start_time || "09:00";
     const scheduleEnd = schedule.end_time || "17:00";
     const timezone = schedule.timezone || "America/New_York";
-    const timeRange = `${scheduleStart}-${scheduleEnd}`; // ✅ fixed syntax
+    const timeRange = `${scheduleStart}-${scheduleEnd}`; //  fixed syntax
 
 
     const zipCodes =
@@ -863,7 +866,13 @@ async function updateCampaignInBoberdoo(campaignData, filterSetId, partnerId) {
         Roof_Material: "0",
       };
     }
-
+    if (campaignData.lead_type === "ROOF_CLEANING") {
+      extraLeadTypeFields = {
+        Project_Type: "0",
+        Homeowner: "0",
+        Roof_Material: "0",
+      };
+    }
     if (campaignData.lead_type === "GUTTERS" || campaignData.lead_type === "HVAC") {
       extraLeadTypeFields = {
         Project_Type: "0",
@@ -893,15 +902,14 @@ async function updateCampaignInBoberdoo(campaignData, filterSetId, partnerId) {
       Delivery_Type: deliveryType,
       State: stateList,
       Zip_Mode: zipMode,
-      Zip: zipCodes, // ✅ Added for update too
+      Zip: zipCodes,
       Day_Of_Week_Accept_Leads: activeDays,
-      // Time_Of_Day_Accept_Leads: timeRange, // ✅ global range
-      Timezone: timezone, // ✅ NEW
-      // ✅ Merge roofing fields conditionally
+      // Time_Of_Day_Accept_Leads: timeRange, // 
+      Timezone: timezone,
       ...extraLeadTypeFields,
     };
 
-    console.log("🟡 Payload sent to Boberdoo (Update):", payload);
+    console.log(" Payload sent to Boberdoo (Update):", payload);
 
     const response = await axios.post(CAMPAIGN_API_URL, null, {
       params: payload,
@@ -912,7 +920,7 @@ async function updateCampaignInBoberdoo(campaignData, filterSetId, partnerId) {
     const data = typeof response.data === "string" ? safeJson(response.data) : response.data;
 
     if (data?.response?.status === "Success") {
-      console.log(`✅ Campaign ${campaignData._id || campaignData.campaign_id} updated successfully in Boberdoo`);
+      console.log(` Campaign ${campaignData._id || campaignData.campaign_id} updated successfully in Boberdoo`);
       return { success: true, filterSetId, data };
     }
 
@@ -985,7 +993,6 @@ const processBoberdoLead = async (leadData) => {
   session.startTransaction();
 
   try {
-    // ✅ 1. Find campaign by Boberdoo filter_set_id
     const campaign = await Campaign.findOne({
       boberdoo_filter_set_id: leadData.filter_set_id
     });
@@ -994,19 +1001,17 @@ const processBoberdoLead = async (leadData) => {
       throw new ErrorHandler(404, `Campaign not found for filter_set_id: ${leadData.filter_set_id}`);
     }
 
-    console.log('✅ Campaign found:', {
+    console.log(' Campaign found:', {
       internal_id: campaign._id,
       name: campaign.name,
       filter_set_id: campaign.boberdoo_filter_set_id
     });
 
-    // ✅ 2. Check if campaign is active (case-insensitive)
     const isActive = String(campaign.status).toUpperCase() === 'ACTIVE';
     if (!isActive) {
       throw new ErrorHandler(400, `Campaign "${campaign.name}" is not active. Status: ${campaign.status}`);
     }
 
-    // ✅ 3. Convert state code to ObjectId
     const state = await State.findOne({
       abbreviation: leadData.address.state_code.toUpperCase()
     });
@@ -1015,30 +1020,16 @@ const processBoberdoLead = async (leadData) => {
       throw new ErrorHandler(400, `Invalid state code: ${leadData.address.state_code}`);
     }
 
-    // ✅ 4. Check prepaid balance
     const leadCost = campaign.bid_price || 0;
-    // if (campaign.payment_type === 'prepaid') {
-    //     const campaignUser = await User.findById(campaign.user_id);
-    //     if (!campaignUser) {
-    //         throw new ErrorHandler(404, 'Campaign user not found');
-    //     }
 
-    //     const totalAvailable = (campaignUser.balance || 0) + (campaignUser.refundMoney || 0);
-    //     if (totalAvailable < leadCost) {
-    //         throw new ErrorHandler(400, `Insufficient funds for campaign "${campaign.name}". Required: $${leadCost}, Available: $${totalAvailable}`);
-    //     }
-    // }
-
-    // ✅ 5. Generate unique lead ID (STAYS THE SAME)
     const lead_id = await generateUniqueLeadId();
 
-    // ✅ 6. TRY BILLING FIRST (MOVED BEFORE LEAD CREATION)
     let billingResult;
 
     if (campaign.payment_type === "prepaid" && leadCost > 0) {
       billingResult = await BillingServices.assignLeadPrepaid(
         campaign.user_id,
-        lead_id,  // ← Changed from createdLead._id to lead_id
+        lead_id,
         leadCost,
         campaign.user_id,
         session
@@ -1046,7 +1037,7 @@ const processBoberdoLead = async (leadData) => {
     } else if (campaign.payment_type === "payasyougo") {
       billingResult = await BillingServices.assignLeadPayAsYouGo(
         campaign.user_id,
-        lead_id,  // ← Changed from createdLead._id to lead_id
+        lead_id,
         leadCost,
         campaign.user_id,
         session,
@@ -1056,11 +1047,9 @@ const processBoberdoLead = async (leadData) => {
       throw new ErrorHandler(400, "Invalid campaign payment type.");
     }
 
-    // ✅ NEW: Check payment result
     const isPaid = billingResult.success;
-    console.log(`💳 Payment result: ${isPaid ? 'SUCCESS' : 'FAILED'} - ${billingResult.message || ''}`);
+    console.log(`Payment result: ${isPaid ? 'SUCCESS' : 'FAILED'} - ${billingResult.message || ''}`);
 
-    // ✅ 7. Prepare lead data (UPDATED)
     const preparedLead = {
       lead_id,
       user_id: campaign.user_id,
@@ -1086,7 +1075,6 @@ const processBoberdoLead = async (leadData) => {
       note: leadData.note,
       source: 'boberdo',
 
-      // ✅ NEW: Set status based on payment result
       status: isPaid ? 'active' : 'payment_pending',
       payment_status: isPaid ? 'paid' : 'pending',
       lead_cost: leadCost,
@@ -1102,36 +1090,42 @@ const processBoberdoLead = async (leadData) => {
       }
     };
 
-    // ✅ 8. Create lead
     const newLead = await Lead.create([preparedLead], { session });
     const createdLead = newLead[0];
 
-    console.log('✅ Lead created:', {
+    console.log('Lead created:', {
       lead_id: createdLead.lead_id,
       internal_id: createdLead._id,
       status: createdLead.status,
       payment_status: createdLead.payment_status
     });
 
-    // ✅ 9. Commit transaction
     await session.commitTransaction();
     session.endSession();
 
-    // ✅ 10. Populate lead for response
     const populatedLead = await Lead.findById(createdLead._id)
       .populate('campaign_id', 'name campaign_id')
       .populate('address.state', 'name abbreviation');
 
-    // ✅ 11. Handle based on payment result
     if (isPaid) {
-      // Send notifications for successful payment
-      process.nextTick(() => {
+      process.nextTick(async () => {
         sendBoberdoLeadNotifications(populatedLead, campaign, billingResult)
-          .then(() => console.log('✅ Boberdo notifications sent successfully'))
-          .catch(err => console.error('❌ Failed to send Boberdo lead notifications:', err));
+          .then(() => console.log('Boberdo notifications sent successfully'))
+          .catch(err => console.error('Failed to send Boberdo lead notifications:', err));
+
+        // Check for Low Balance
+        try {
+          await BillingServices.checkAndSendLowBalanceAlerts({
+            campaign,
+            leadCost,
+            remainingBalance: billingResult.newBalance,
+            logger: leadLogger
+          });
+        } catch (err) {
+          console.error('Error in low balance check logic (Boberdoo)', err);
+        }
       });
     } else {
-      // Handle payment failure
       process.nextTick(async () => {
         await BillingServices.handlePaymentFailure({
           userId: campaign.user_id,
@@ -1169,7 +1163,7 @@ const sendBoberdoLeadNotifications = async (lead, campaign, billingResult) => {
       return;
     }
 
-    // ✅ Email delivery
+    // Email delivery
     if (campaign?.delivery?.method?.includes('email') && campaign?.delivery?.email?.addresses) {
       try {
         await MAIL_HANDLER.sendLeadAssignEmail({
@@ -1179,10 +1173,8 @@ const sendBoberdoLeadNotifications = async (lead, campaign, billingResult) => {
           assignedBy: 'Boberdo Integration',
           leadDetailsUrl: `${process.env.UI_LINK}/dashboard/leads/${lead._id}`,
           campaignName: campaign.name,
-          // ✅ Add this
           note: lead.note ?? "",
 
-          // ✅ Replace this carefully
           leadData: {
             ...(lead.toObject ? lead.toObject() : lead),
             note: lead.note ?? ""
@@ -1221,7 +1213,7 @@ const sendBoberdoLeadNotifications = async (lead, campaign, billingResult) => {
         .map(e => e.trim().toLowerCase())
         .filter(e => !EXCLUDED.has(e));
 
-      // ✅ NEW: override with env emails if present (still an array)
+      // override with env emails if present (still an array)
       console.log("ENV CHECK → ADMIN_NOTIFICATION_EMAILS =", process.env.ADMIN_NOTIFICATION_EMAILS);
 
       console.log("Admin before override =", adminEmails);
@@ -1245,10 +1237,7 @@ const sendBoberdoLeadNotifications = async (lead, campaign, billingResult) => {
           assignedBy: 'Boberdoo Integration',
           leadDetailsUrl: `${process.env.UI_LINK}/dashboard/leads/${lead._id}`,
           campaignName: campaign.name,
-          // ✅ Add this
           note: lead.note ?? "",
-
-          // ✅ Replace this carefully
           leadData: {
             ...(lead.toObject ? lead.toObject() : lead),
             note: lead.note ?? ""
@@ -1268,17 +1257,12 @@ const sendBoberdoLeadNotifications = async (lead, campaign, billingResult) => {
       });
     }
 
-    // ✅ SMS delivery
+    // SMS delivery
     if (campaign?.delivery?.method?.includes('phone') && campaign?.delivery?.phone?.numbers) {
       try {
         const fullName = `${lead.first_name || ''} ${lead.last_name || ''}`.trim();
         const phoneNumber = lead.phone_number || lead.phone || '';
         const email = lead.email || '';
-        // const address = [
-        // lead?.address?.full_address || '',
-        // lead?.address?.city || '',
-        // lead?.address?.zip_code || '',
-        // ].filter(Boolean).join(', ');
         const address = formatFullAddress(lead.address);
 
         const campaignName = campaign?.name || 'N/A';
