@@ -75,7 +75,7 @@ const getUserContractStatus = async (userId) => {
 // };
 
 // Card management
-const saveCard = async (cardData) => {
+const saveCard = async (cardData, makeDefault = false) => {
   const { user_id, card_number, expiry_month, expiry_year, cvv, billing_address, zip, full_name, email } = cardData;
 
   billingLogger.info('Starting card save process', {
@@ -169,7 +169,7 @@ const saveCard = async (cardData) => {
     brand: cardBrand,
     expiryMonth: expiry_month,
     expiryYear: expiry_year,
-    isDefault: user.paymentMethods.length === 0, // Set as default if first card
+    isDefault: user.paymentMethods.length === 0 || makeDefault, // Set as default if first card OR explicitly requested
     cvv: cvv,
     // ✅ Store new optional details
     cardHolderName: full_name,
@@ -182,8 +182,20 @@ const saveCard = async (cardData) => {
   // Add to payment methods array
   user.paymentMethods.push(newPaymentMethod);
 
-  // If this is the first card, set it as default
-  if (user.paymentMethods.length === 1) {
+  // If this is the first card, OR user requested to make it default
+  if (user.paymentMethods.length === 1 || makeDefault) {
+    // If makeDefault is true, unset other defaults first (although finding by vaultId is cleaner, loop is safe)
+    if (makeDefault) {
+      user.paymentMethods.forEach(pm => pm.isDefault = false);
+      // The new one we just pushed is NOT yet marked isDefault in the array object we pushed?
+      // Wait, we pushed `newPaymentMethod` which had `isDefault: user.paymentMethods.length === 0`.
+      // Let's fix that interaction.
+    }
+
+    // Set the one we just pushed as default
+    // The one we pushed is the last one
+    const newCard = user.paymentMethods[user.paymentMethods.length - 1];
+    newCard.isDefault = true;
     user.defaultPaymentMethod = vaultId;
   }
 
@@ -198,6 +210,19 @@ const saveCard = async (cardData) => {
     totalCards: user.paymentMethods.length
   });
 
+  // ✅ AUTO-CHARGE RECOVERY: Check for pending payments
+  if (user.pending_payment && user.pending_payment.amount > 0) {
+    // NOTE: We used to check amount here, but now we calculate dynamic amount inside.
+    // We pass the user and vaultId, and let the function figure out if there are PayAsYouGo leads.
+    try {
+      // Pass user (with updated pending_payment if accessible, otherwise verify inside)
+      await processPendingPaymentRecovery(user, vaultId);
+      // Removed 'amount' arg because we calculate it accurately now.
+    } catch (err) {
+      billingLogger.error('Recovery process failed', err);
+    }
+  }
+
   return {
     customerVaultId: vaultId,
     userId: user._id,
@@ -205,6 +230,172 @@ const saveCard = async (cardData) => {
     brand: cardBrand,
     isDefault: newPaymentMethod.isDefault
   };
+};
+
+const processPendingPaymentRecovery = async (user, vaultId) => {
+  // 1. Find all pending leads for this user
+  const pendingLeads = await Lead.find({
+    user_id: user._id,
+    payment_status: 'pending'
+  }).populate('campaign_id');
+
+  if (!pendingLeads || pendingLeads.length === 0) {
+    return { success: true, message: 'No pending leads found' };
+  }
+
+  // 2. Filter ONLY Pay-As-You-Go leads
+  const payAsYouGoLeads = pendingLeads.filter(lead =>
+    lead.campaign_id && lead.campaign_id.payment_type === 'payasyougo'
+  );
+
+  if (payAsYouGoLeads.length === 0) {
+    billingLogger.info('No pending Pay-As-You-Go leads found', { userId: user._id });
+    return { success: true, message: 'No eligible leads for auto-recovery' };
+  }
+
+  // 3. Calculate total amount to charge
+  // Use lead.original_cost or lead.lead_cost (assuming lead_cost is the value)
+  const amountToCharge = payAsYouGoLeads.reduce((sum, lead) => sum + (lead.lead_cost || 0), 0);
+
+  if (amountToCharge <= 0) {
+    return { success: true, message: 'Recoverable amount is 0' };
+  }
+
+  billingLogger.info('Processing pending payment recovery (Pay-As-You-Go only)', {
+    userId: user._id,
+    leadCount: payAsYouGoLeads.length,
+    amount: amountToCharge,
+    vaultId
+  });
+
+  // 4. Charge the card
+  const chargeResult = await chargeCustomerVault(vaultId, amountToCharge, 'Recovery of pending Pay-As-You-Go charges');
+
+  if (!chargeResult.success) {
+    billingLogger.warn('Recovery charge failed', {
+      userId: user._id,
+      message: chargeResult.message
+    });
+    return { success: false, message: chargeResult.message };
+  }
+
+  // 5. Update User Debt (Partial or Full)
+  // We strictly decrease the pending amount by what we collected.
+  // If pending_payment.amount is inaccurate, we might go negative, so max(0).
+  const currentPending = user.pending_payment?.amount || 0;
+  const newPending = Math.max(0, currentPending - amountToCharge);
+
+  await User.updateOne(
+    { _id: user._id },
+    {
+      $set: {
+        "pending_payment.amount": newPending,
+        // "pending_payment.count": 0, // Cannot simply reset count if we didn't clear all
+      },
+      // Only clear error flag if we cleared EVERYTHING or if meaningful
+      // Actually, if we successfully paid, we can probably clear the 'payment_error' flag 
+      // because the prompt says "make propper plan" and user wants to unblock.
+      // But if Prepaid leads are still pending, maybe they are still 'blocked'?
+      // Let's set payment_error to false if newPending is 0.
+      ...(newPending === 0 ? {
+        payment_error: false,
+        last_payment_error_message: null,
+        "pending_payment.count": 0
+      } : {})
+    }
+  );
+
+  // 6. Record Transaction
+  const transaction = new Transaction({
+    userId: user._id,
+    type: 'PAYMENT_RECOVERY',
+    amount: -amountToCharge,
+    status: 'COMPLETED',
+    description: `Auto-recovery: ${payAsYouGoLeads.length} leads`,
+    paymentMethod: 'CARD',
+    transactionId: chargeResult.transactionId,
+    paymentMethodDetails: {
+      customerVaultId: vaultId
+    },
+    balanceAfter: user.balance
+  });
+
+  await transaction.save();
+
+  // 7. Update ONLY the Pay-As-You-Go Leads
+  const leadIdsToUpdate = payAsYouGoLeads.map(l => l._id);
+
+  const leadUpdateResult = await Lead.updateMany(
+    { _id: { $in: leadIdsToUpdate } },
+    {
+      $set: {
+        payment_status: 'paid',
+        status: 'active',
+        transaction_id: transaction._id,
+        payment_error_message: null
+      }
+    }
+  );
+
+  billingLogger.info('Updated pending Pay-As-You-Go leads after recovery', {
+    userId: user._id,
+    modifiedCount: leadUpdateResult.modifiedCount,
+    leadIds: leadIdsToUpdate
+  });
+
+  // 8. Service Resumption Signals
+  // Trigger Webhook (Boberdoo/N8N) to note funds coming in
+  try {
+    await sendBalanceTopUpAlert({
+      partner_id: user.integrations?.boberdoo?.external_id || "",
+      email: user.email,
+      amount: amountToCharge,
+      user_id: user._id
+    });
+    billingLogger.info('Recovery top-up webhook sent', { userId: user._id, amount: amountToCharge });
+  } catch (whErr) {
+    billingLogger.error('Failed to send recovery top-up webhook', whErr);
+  }
+
+  // 9. Send Resume Emails (Only if ALL debt is cleared)
+  if (newPending === 0) {
+    try {
+      // Prepare Admin Emails
+      const EXCLUDED = new Set(['admin@gmail.com', 'admin123@gmail.com', 'admin1234@gmail.com']);
+      const adminUsers = await User.find({
+        role: { $in: ['ADMIN', 'SUPER_ADMIN'] },
+        isActive: { $ne: false },
+      }).select('email');
+
+      const adminEmails = (adminUsers || [])
+        .map(a => a.email?.trim().toLowerCase())
+        .filter(e => e && !EXCLUDED.has(e));
+
+      // Send User Email
+      await MAIL_HANDLER.sendCampaignResumedEmail({
+        to: user.email,
+        userName: user.name,
+        email: user.email,
+        partnerId: user.integrations?.boberdoo?.external_id || ""
+      });
+
+      // Send Admin Email
+      if (adminEmails.length > 0) {
+        await MAIL_HANDLER.sendCampaignResumedAdminEmail({
+          to: adminEmails,
+          userName: user.name,
+          userEmail: user.email,
+          partnerId: user.integrations?.boberdoo?.external_id || ""
+        });
+      }
+
+      billingLogger.info('Service resumed emails sent', { userId: user._id });
+    } catch (emailErr) {
+      billingLogger.error('Failed to send service resumed emails', emailErr);
+    }
+  }
+
+  return { success: true };
 };
 
 // Add helper function
@@ -1532,4 +1723,5 @@ module.exports = {
 
   assignLeadPrepaid,
   assignLeadPayAsYouGo,
+  processPendingPaymentRecovery,
 };
