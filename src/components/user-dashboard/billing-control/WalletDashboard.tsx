@@ -79,6 +79,7 @@ interface TermsResponse {
 interface BalanceResponse {
   balance: {
     balance: number;
+    pending_balance: number;
   };
 }
 
@@ -129,6 +130,7 @@ const WalletDashboard: React.FC = () => {
 
   // State management
   const [balance, setBalance] = useState<number>(0);
+  const [pendingBalance, setPendingBalance] = useState<number>(0);
   const [cards, setCards] = useState<Card[]>([]);
   const [autoTopUp, setAutoTopUp] = useState<AutoTopUpRule>({
     enabled: false,
@@ -687,13 +689,15 @@ const WalletDashboard: React.FC = () => {
         fetchTransactions({ page: 1, limit: 50 })
       ]);
 
-      const calculatedBalance = calculateBalanceFromTransactions(transactionsResponse.transactions);
+      setCards(cardsResponse.cards || []);
 
-      // Fetch auto top-up settings (placeholder for actual API)
+      // Fetch auto top-up settings and balance
       const autoTopUpResponse = await axiosWrapper("get", BILLING_API.GET_BALANCE, {}, token) as any;
 
-      setBalance(calculatedBalance);
-      setCards(cardsResponse.cards || []);
+      // Use balance from API directly
+      setBalance(autoTopUpResponse.balance.balance);
+      setPendingBalance(autoTopUpResponse.balance.pending_balance || 0);
+
       const autoTopUpData = autoTopUpResponse.balance.autoTopUp;
 
       setAutoTopUp({
@@ -1062,9 +1066,21 @@ const WalletDashboard: React.FC = () => {
         {/* Balance Card */}
         <div className="bg-black rounded-xl p-4 sm:p-6 text-white mb-4 sm:mb-6 md:mb-8">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-300 text-xs sm:text-sm">Current Balance</p>
-              <p className="text-2xl sm:text-3xl font-bold">${balance.toFixed(2)}</p>
+            <div className="flex items-center gap-4">
+              <div>
+                <p className="text-gray-500 text-sm font-medium mb-1">Current Balance</p>
+                <p className="text-4xl font-bold text-white-900 tracking-tight">
+                  ${balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+              {pendingBalance > 0 && (
+                <div className="pl-4 border-l border-gray-200">
+                  <p className="text-red-500 text-sm font-medium mb-1">Pending Balance</p>
+                  <p className="text-4xl font-bold text-red-600 tracking-tight">
+                    -${pendingBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+              )}
             </div>
             <DollarSign className="w-10 h-10 sm:w-12 sm:h-12 text-gray-400" />
           </div>
