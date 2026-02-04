@@ -217,7 +217,7 @@ const saveCard = async (cardData, makeDefault = false) => {
     // We pass the user and vaultId, and let the function figure out if there are PayAsYouGo leads.
     try {
       // Pass user (with updated pending_payment if accessible, otherwise verify inside)
-      await processPendingPaymentRecovery(user, vaultId);
+      await processPendingPaymentRecovery(user, vaultId, { includeAll: true });
       // Removed 'amount' arg because we calculate it accurately now.
     } catch (err) {
       billingLogger.error('Recovery process failed', err);
