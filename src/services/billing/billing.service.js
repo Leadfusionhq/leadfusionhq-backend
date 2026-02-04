@@ -233,8 +233,12 @@ const saveCard = async (cardData, makeDefault = false) => {
   };
 };
 
-const processPendingPaymentRecovery = async (user, vaultId, options = {}) => {
-  // 1. Find all pending leads for this user
+const processPendingPaymentRecovery = async (userParam, vaultId, options = {}) => {
+  // 0. Fetch fresh user to ensure balance/debt are up to date
+  const user = await User.findById(userParam._id);
+  if (!user) return { success: false, message: 'User not found for recovery' };
+
+  // 1. Find all pending leads
   const pendingLeads = await Lead.find({
     user_id: user._id,
     payment_status: 'pending'
@@ -244,216 +248,183 @@ const processPendingPaymentRecovery = async (user, vaultId, options = {}) => {
     return { success: true, message: 'No pending leads found' };
   }
 
-  // 2. Filter Leads
-  // Default: Pay-As-You-Go only.
-  // If options.includeAll is true, take ALL pending leads (Prepaid + Pay-As-You-Go).
+  // 2. Filter Eligible Leads (Default: PayAsYouGo, Option: IncludeAll)
   const leadsToRecover = pendingLeads.filter(lead => {
     if (options.includeAll) return true;
     return lead.campaign_id && lead.campaign_id.payment_type === 'payasyougo';
   });
 
   if (leadsToRecover.length === 0) {
-    billingLogger.info('No eligible pending leads found for recovery', { userId: user._id, includeAll: options.includeAll });
-    return { success: true, message: 'No eligible leads for recovery' };
+    billingLogger.info('No eligible pending leads found', { userId: user._id });
+    return { success: true, message: 'No eligible leads' };
   }
 
-  // 3. Calculate total amount to charge
-  // Use lead.original_cost or lead.lead_cost (assuming lead_cost is the value)
-  const amountToCharge = leadsToRecover.reduce((sum, lead) => sum + (lead.lead_cost || 0), 0);
-
-  if (amountToCharge <= 0) {
+  const totalAmountToRecover = leadsToRecover.reduce((sum, lead) => sum + (lead.lead_cost || 0), 0);
+  if (totalAmountToRecover <= 0) {
     return { success: true, message: 'Recoverable amount is 0' };
   }
 
-  billingLogger.info('Processing pending payment recovery', {
-    userId: user._id,
-    leadCount: leadsToRecover.length,
-    amount: amountToCharge,
-    vaultId
-  });
+  billingLogger.info(`Recovering ${totalAmountToRecover} for ${leadsToRecover.length} leads`, { userId: user._id });
 
-  // 4. Charge the card
-  const chargeResult = await chargeCustomerVault(vaultId, amountToCharge, `Recovery of ${leadsToRecover.length} pending leads`);
+  // 3. Calculate Split (Balance vs Card)
+  const currentBalance = user.balance || 0;
+  const usableBalance = Math.max(0, currentBalance);
 
-  if (!chargeResult.success) {
-    billingLogger.warn('Recovery charge failed', {
-      userId: user._id,
-      message: chargeResult.message
-    });
-    return { success: false, message: chargeResult.message };
+  let amountFromBalance = 0;
+  let amountFromCard = 0;
+
+  if (usableBalance >= totalAmountToRecover) {
+    amountFromBalance = totalAmountToRecover;
+  } else {
+    amountFromBalance = usableBalance;
+    amountFromCard = totalAmountToRecover - usableBalance;
   }
 
-  // 5. Update User Debt (Partial or Full)
-  // We strictly decrease the pending amount by what we collected.
-  // If pending_payment.amount is inaccurate, we might go negative, so max(0).
+  // 4. Charge Card (If needed)
+  let chargeResult = null;
+  if (amountFromCard > 0) {
+    chargeResult = await chargeCustomerVault(vaultId, amountFromCard, `Recovery: ${leadsToRecover.length} leads`);
+    if (!chargeResult.success) {
+      billingLogger.warn('Recovery charge failed', { userId: user._id, message: chargeResult.message });
+      return { success: false, message: chargeResult.message };
+    }
+  }
+
+  // 5. Update User Balance & Debt (Atomic & Calculated)
+  // We calculate the *final* balance here to avoid any $inc ambiguity
+  const finalBalance = Math.max(0, currentBalance - amountFromBalance);
+
+  // Calculate new pending debt
   const currentPending = user.pending_payment?.amount || 0;
-  const newPending = Math.max(0, currentPending - amountToCharge);
+  const newPending = Math.max(0, currentPending - totalAmountToRecover);
 
-  await User.updateOne(
-    { _id: user._id },
-    {
-      $set: {
-        "pending_payment.amount": newPending,
-        // "pending_payment.count": 0, // Cannot simply reset count if we didn't clear all
-      },
-      // Only clear error flag if we cleared EVERYTHING or if meaningful
-      // Actually, if we successfully paid, we can probably clear the 'payment_error' flag 
-      // because the prompt says "make propper plan" and user wants to unblock.
-      // But if Prepaid leads are still pending, maybe they are still 'blocked'?
-      // Let's set payment_error to false if newPending is 0.
-      ...(newPending === 0 ? {
-        payment_error: false,
-        last_payment_error_message: null,
-        "pending_payment.count": 0
-      } : {})
-    }
-  );
+  // Update user object directly for reliable persistence
+  user.balance = finalBalance;
 
-  // 6. Record Transaction
-  const transaction = new Transaction({
-    userId: user._id,
-    type: 'PAYMENT_RECOVERY',
-    amount: -amountToCharge,
-    status: 'COMPLETED',
-    amount: -amountToCharge,
-    status: 'COMPLETED',
-    description: `Auto-recovery: ${leadsToRecover.length} leads`,
-    paymentMethod: 'CARD',
-    transactionId: chargeResult.transactionId,
-    paymentMethodDetails: {
-      customerVaultId: vaultId
-    },
-    balanceAfter: user.balance
-  });
+  if (!user.pending_payment) user.pending_payment = {};
+  user.pending_payment.amount = newPending;
 
-  await transaction.save();
-
-  // 7. Update ONLY the Recovered Leads
-  const leadIdsToUpdate = leadsToRecover.map(l => l._id);
-
-  const leadUpdateResult = await Lead.updateMany(
-    { _id: { $in: leadIdsToUpdate } },
-    {
-      $set: {
-        payment_status: 'paid',
-        status: 'active',
-        transaction_id: transaction._id,
-        payment_error_message: null
-      }
-    }
-  );
-
-  billingLogger.info('Updated pending leads after recovery', {
-    userId: user._id,
-    modifiedCount: leadUpdateResult.modifiedCount,
-    leadIds: leadIdsToUpdate
-  });
-
-  // 8. Service Resumption Signals
-  // Trigger Webhook (Boberdoo/N8N) to note funds coming in
-  try {
-    await sendBalanceTopUpAlert({
-      partner_id: user.integrations?.boberdoo?.external_id || "",
-      email: user.email,
-      amount: amountToCharge,
-      user_id: user._id
-    });
-    billingLogger.info('Recovery top-up webhook sent', { userId: user._id, amount: amountToCharge });
-  } catch (whErr) {
-    billingLogger.error('Failed to send recovery top-up webhook', whErr);
-  }
-
-  // 9. Send Resume Emails (Only if ALL debt is cleared)
-  // 9. Send Emails & SMS (Only if ALL debt is cleared)
+  // Clear error flags if debt is gone
   if (newPending === 0) {
-    try {
-      // ---------------------------------------------------------
-      // A) Prepare "Charged Leads" Data for Detailed Email
-      // ---------------------------------------------------------
-      const chargedLeads = leadsToRecover.map(lead => ({
-        leadId: lead.lead_id,
-        firstName: lead.first_name,
-        lastName: lead.last_name,
-        email: lead.email,
-        phone: lead.phone_number,
-        campaignName: lead.campaign_id?.name || 'Unknown Campaign',
-        amount: lead.lead_cost || 0,
-        paymentMethod: 'CARD', // We just charged the card
-        transactionId: chargeResult.transactionId
-      }));
-
-      const totalAmount = amountToCharge;
-      const newBalance = user.balance || 0; // Balance usually unaffected by direct card charge for pending
-
-      // ---------------------------------------------------------
-      // B) Send USER Email (Detailed Receipt)
-      // ---------------------------------------------------------
-      await MAIL_HANDLER.sendPendingLeadsPaymentSuccessEmail({
-        to: user.email,
-        userName: user.name || user.fullName || user.email,
-        chargedLeads: chargedLeads,
-        totalAmount: totalAmount,
-        newBalance: newBalance,
-        paymentMethod: 'CARD',
-        cardLast4: chargeResult.last4 || 'N/A' // chargeResult might not have last4, fallback needed or passed from saveCard context? 
-        // Actually chargeCustomerVault returns transactionId, responseCode, message. 
-        // We might not have last4 here easily unless we queried vault. 
-        // But user.paymentMethods has it.
-      });
-
-      // ---------------------------------------------------------
-      // C) Send ADMIN Email
-      // ---------------------------------------------------------
-      // Prepare Admin Emails
-      let adminEmails = [];
-
-      // Use ONLY env variable as requested
-      if (process.env.ADMIN_NOTIFICATION_EMAILS) {
-        adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS
-          .split(',')
-          .map(e => e.trim().toLowerCase())
-          .filter(Boolean);
-      }
-
-      if (adminEmails.length > 0) {
-        await MAIL_HANDLER.sendPendingLeadsPaymentSuccessAdminEmail({
-          to: adminEmails,
-          userName: user.name || user.fullName || user.email,
-          userEmail: user.email,
-          chargedLeads: chargedLeads,
-          totalAmount: totalAmount,
-          newBalance: newBalance,
-          paymentMethod: 'CARD',
-          cardLast4: chargeResult.last4 || 'N/A'
-        });
-      }
-
-      billingLogger.info('Recovery success emails sent', { userId: user._id });
-
-    } catch (emailErr) {
-      billingLogger.error('Failed to send recovery success emails', emailErr);
-    }
-
-    // ---------------------------------------------------------
-    // D) Send SMS Notification
-    // ---------------------------------------------------------
-    if (user.phoneNumber) {
-      try {
-        const smsMessage = `LeadFusion Alert: We successfully recovered $${amountToCharge.toFixed(2)} for ${leadsToRecover.length} pending lead(s). Your service has resumed.`;
-
-        await sendSms({
-          to: user.phoneNumber,
-          message: smsMessage
-        });
-
-        billingLogger.info('Recovery SMS sent', { userId: user._id, phone: user.phoneNumber });
-      } catch (smsErr) {
-        billingLogger.error('Failed to send recovery SMS', smsErr);
-      }
-    }
+    user.payment_error = false;
+    user.last_payment_error_message = null;
+    user.pending_payment.count = 0;
   }
+
+  await user.save();
+
+  // 6. Record Transactions
+  await recordRecoveryTransactions(user._id, amountFromBalance, amountFromCard, vaultId, chargeResult, finalBalance, leadsToRecover.length);
+
+  // 7. Update Leads
+  const leadIds = leadsToRecover.map(l => l._id);
+  await Lead.updateMany(
+    { _id: { $in: leadIds } },
+    { $set: { payment_status: 'paid', status: 'active', payment_error_message: null } }
+  );
+
+  // 8. Notifications & Webhooks
+  await handleRecoveryNotifications(user, amountFromCard, amountFromBalance, totalAmountToRecover, leadsToRecover, chargeResult, finalBalance, newPending === 0);
 
   return { success: true };
+};
+
+// --------------------------------------------------------------------------
+// Helper: Record Transactions
+// --------------------------------------------------------------------------
+const recordRecoveryTransactions = async (userId, fromBalance, fromCard, vaultId, chargeResult, finalBalance, count) => {
+  if (fromBalance > 0) {
+    await new Transaction({
+      userId,
+      type: 'PAYMENT_RECOVERY',
+      amount: -fromBalance,
+      status: 'COMPLETED',
+      description: `Auto-recovery: ${count} leads (Balance)`,
+      paymentMethod: 'BALANCE',
+      balanceAfter: finalBalance
+    }).save();
+  }
+
+  if (fromCard > 0 && chargeResult) {
+    await new Transaction({
+      userId,
+      type: 'PAYMENT_RECOVERY',
+      amount: -fromCard,
+      status: 'COMPLETED',
+      description: `Auto-recovery: ${count} leads (Card)`,
+      paymentMethod: 'CARD',
+      transactionId: chargeResult.transactionId,
+      paymentMethodDetails: { customerVaultId: vaultId },
+      balanceAfter: finalBalance
+    }).save();
+  }
+};
+
+// --------------------------------------------------------------------------
+// Helper: Notifications
+// --------------------------------------------------------------------------
+const handleRecoveryNotifications = async (user, fromCard, fromBalance, totalAmount, leads, chargeResult, finalBalance, isFullClear) => {
+  // Webhook (Only for externally added funds)
+  if (fromCard > 0) {
+    try {
+      await sendBalanceTopUpAlert({
+        partner_id: user.integrations?.boberdoo?.external_id || "",
+        email: user.email,
+        amount: fromCard,
+        user_id: user._id
+      });
+    } catch (e) { billingLogger.error('Webhook failed', e); }
+  }
+
+  // Emails & SMS (Only if fully cleared)
+  if (isFullClear) {
+    try {
+      const paymentMethodStr = (fromCard > 0 && fromBalance > 0) ? 'SPLIT (Balance + Card)' : (fromCard > 0 ? 'CARD' : 'BALANCE');
+      const cardLast4 = fromCard > 0 ? (chargeResult?.last4 || 'N/A') : 'N/A';
+
+      const chargedLeads = leads.map(l => ({
+        leadId: l.lead_id,
+        firstName: l.first_name,
+        lastName: l.last_name,
+        email: l.email,
+        amount: l.lead_cost || 0,
+        paymentMethod: paymentMethodStr,
+        campaignName: l.campaign_id?.name || 'Unknown'
+      }));
+
+      await MAIL_HANDLER.sendPendingLeadsPaymentSuccessEmail({
+        to: user.email,
+        userName: user.name,
+        chargedLeads,
+        totalAmount,
+        newBalance: finalBalance,
+        paymentMethod: paymentMethodStr,
+        cardLast4
+      });
+
+      if (user.phoneNumber) {
+        await sendSms({ to: user.phoneNumber, message: `LeadFusion Alert: Recovered $${totalAmount.toFixed(2)} for ${leads.length} leads. Service resumed.` });
+      }
+
+      // Admin Email (Simplified logic)
+      if (process.env.ADMIN_NOTIFICATION_EMAILS) {
+        const admins = process.env.ADMIN_NOTIFICATION_EMAILS.split(',').map(e => e.trim()).filter(Boolean);
+        if (admins.length) {
+          await MAIL_HANDLER.sendPendingLeadsPaymentSuccessAdminEmail({
+            to: admins,
+            userName: user.name,
+            userEmail: user.email,
+            chargedLeads,
+            totalAmount,
+            newBalance: finalBalance,
+            paymentMethod: paymentMethodStr,
+            cardLast4
+          });
+        }
+      }
+
+    } catch (e) { billingLogger.error('Notification failed', e); }
+  }
 };
 
 // Add helper function
