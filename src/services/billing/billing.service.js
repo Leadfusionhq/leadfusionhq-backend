@@ -1167,8 +1167,27 @@ const getUserBalance = async (userId) => {
     cardLastFour = defaultCard ? defaultCard.cardLastFour : null;
   }
 
+  // Calculate pending balance
+  const pendingBalanceResult = await Lead.aggregate([
+    {
+      $match: {
+        user_id: new mongoose.Types.ObjectId(userId),
+        payment_status: 'pending'
+      }
+    },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: "$lead_cost" }
+      }
+    }
+  ]);
+
+  const pendingBalance = pendingBalanceResult[0]?.total || 0;
+
   return {
     balance: user.balance || 0,
+    pending_balance: pendingBalance,
     hasStoredCard: user.hasStoredCard || false,
     cardLastFour,
     autoTopUp: user.autoTopUp || { enabled: false }
