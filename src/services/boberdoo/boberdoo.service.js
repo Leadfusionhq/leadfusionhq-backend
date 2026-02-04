@@ -1026,7 +1026,8 @@ const processBoberdoLead = async (leadData) => {
 
     let billingResult;
 
-    if (campaign.payment_type === "prepaid" && leadCost > 0) {
+    // if (campaign.payment_type === "prepaid" && leadCost > 0) {
+    if (campaign.payment_type === "prepaid") {
       billingResult = await BillingServices.assignLeadPrepaid(
         campaign.user_id,
         lead_id,
