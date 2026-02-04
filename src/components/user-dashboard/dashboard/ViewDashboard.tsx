@@ -72,6 +72,7 @@ interface DashboardData {
   };
   billing: {
     current_balance: number;
+    pending_balance: number;
     spent_this_period: number;
     added_this_period: number;
     currency: string;
@@ -382,9 +383,17 @@ export default function ClientDashboard() {
                 <div className="bg-green-50 p-3 rounded-lg">
                   <DollarSign className="w-6 h-6 text-green-600" />
                 </div>
-                <div className="flex flex-col items-end">
-                  <span className="text-3xl font-bold text-gray-900">${data.billing.current_balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
-                  <span className="text-xs text-gray-500">Account Balance</span>
+                <div className="flex items-center gap-4">
+                  <div className="flex flex-col items-end">
+                    <span className="text-2xl font-bold text-gray-900">${data.billing.current_balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                    <span className="text-xs text-gray-500">Available</span>
+                  </div>
+                  {data.billing.pending_balance > 0 && (
+                    <div className="flex flex-col items-end pl-4 border-l border-gray-200">
+                      <span className="text-2xl font-bold text-red-600">-${data.billing.pending_balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                      <span className="text-xs text-red-500 font-medium">Pending</span>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-50 text-xs">
