@@ -11,7 +11,7 @@ const NMI_QUERY_URL = process.env.NMI_QUERY_URL;
 const SECURITY_KEY = process.env.NMI_SECURITY_KEY;
 const dayjs = require('dayjs');
 const fetchWrapper = require('../../utils/fetchWrapper');
-const { sendBalanceTopUpAlert, processSingleLeadPayment } = require('../../services/n8n/webhookService.js');
+const { sendBalanceTopUpAlert } = require('../../services/n8n/webhookService.js');
 const MAIL_HANDLER = require('../../mail/mails');
 const formatForNmi = (d) => dayjs(d).format('MM/DD/YYYY');
 const { sendToN8nWebhook, sendLowBalanceAlert } = require('../../services/n8n/webhookService.js');
@@ -1628,17 +1628,91 @@ const getRevenueFromNmi = async ({ start, end }) => {
 
 
 const chargeSingleLead = async (userId, leadId) => {
-  const user = await User.findById(userId);
-  if (!user) {
-    throw new ErrorHandler(404, 'User not found');
-  }
-  const lead = await Lead.findById(leadId);
-  if (!lead) {
-    throw new ErrorHandler(404, 'Lead not found');
-  }
-  const result = await processSingleLeadPayment(userId, leadId);
+  const logMeta = { user_id: userId, lead_id: leadId, action: 'Charge Single Lead' };
 
-  return result;
+  // 1. Fetch Data
+  const user = await User.findById(userId);
+  if (!user) throw new ErrorHandler(404, 'User not found');
+
+  // Find lead by ID (or lead_id fallback)
+  let lead = await Lead.findOne({ _id: leadId }).populate('campaign_id');
+  if (!lead) {
+    lead = await Lead.findOne({ lead_id: leadId }).populate('campaign_id');
+  }
+  if (!lead) throw new ErrorHandler(404, 'Lead not found');
+
+  if (lead.payment_status === 'paid') {
+    return { success: true, message: 'Lead is already paid', alreadyPaid: true };
+  }
+
+  const campaign = lead.campaign_id;
+  if (!campaign) throw new ErrorHandler(400, 'Campaign not found for lead');
+
+  // 2. Process Payment (Unified Logic)
+  // Force 'payasyougo' logic to enable Split Payment (Refund -> Balance -> Card)
+  // regardless of campaign type, as requested for this manual route.
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const paymentResult = await processLeadTransaction({
+      user,
+      leadId: lead._id,
+      amount: lead.lead_cost,
+      paymentType: 'payasyougo', // Force split payment support
+      assignedBy: userId,
+      session,
+      descriptionPrefix: 'Single Lead Charge'
+    });
+
+    if (!paymentResult.success) {
+      await session.abortTransaction();
+      return { success: false, error: paymentResult.error, message: paymentResult.message };
+    }
+
+    // 3. Update Lead Status
+    lead.payment_status = 'paid';
+    lead.status = 'active';
+    lead.transaction_id = paymentResult.transactionId; // MongoDB ID from our new function
+    lead.payment_error_message = null;
+    await lead.save({ session });
+
+    // 4. Update User Stats (Pending Payment)
+    if (user.pending_payment && user.pending_payment.amount > 0) {
+      user.pending_payment.amount = Math.max(0, user.pending_payment.amount - lead.lead_cost);
+      if (user.pending_payment.count > 0) user.pending_payment.count -= 1;
+      await user.save({ session });
+    }
+
+    await session.commitTransaction();
+
+    // 5. Send Notifications (Async - outside transaction)
+    // We import BoberDoService here to avoid top-level call issues if any, or just use existing require
+    const BoberDoService = require('../../services/boberdoo/boberdoo.service');
+    process.nextTick(async () => {
+      try {
+        await BoberDoService.sendBoberdoLeadNotifications(lead, campaign, paymentResult);
+      } catch (err) {
+        billingLogger.error('Failed to send Boberdoo notifications for single lead charge', err, logMeta);
+      }
+    });
+
+    return {
+      success: true,
+      message: 'Lead charged successfully',
+      transactionId: paymentResult.transactionId,
+      newBalance: paymentResult.newBalance,
+      amountFromBalance: paymentResult.amountFromBalance,
+      amountFromCard: paymentResult.amountFromCard
+    };
+
+  } catch (error) {
+    await session.abortTransaction();
+    billingLogger.error('Single lead charge transaction error', error, logMeta);
+    throw new ErrorHandler(500, error.message || 'Payment processing failed');
+  } finally {
+    session.endSession();
+  }
 };
 
 
