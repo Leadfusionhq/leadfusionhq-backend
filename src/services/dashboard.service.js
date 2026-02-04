@@ -324,6 +324,20 @@ class DashboardService {
                                     }
                                 }
                             }
+                        ],
+                        // Global Pending Balance (All Time)
+                        globalPendingBalance: [
+                            {
+                                $match: {
+                                    payment_status: 'pending'
+                                }
+                            },
+                            {
+                                $group: {
+                                    _id: null,
+                                    total: { $sum: "$lead_cost" }
+                                }
+                            }
                         ]
                     }
                 }
@@ -517,6 +531,7 @@ class DashboardService {
                 },
                 billing: {
                     current_balance: user?.balance || 0,
+                    pending_balance: summaryMetrics[0]?.globalPendingBalance[0]?.total || 0,
                     currency: user?.currency || 'USD',
                     spent_this_period: billingPeriodStats.spent,
                     added_this_period: billingPeriodStats.added,
