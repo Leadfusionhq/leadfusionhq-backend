@@ -291,24 +291,28 @@ const processPendingPaymentRecovery = async (userParam, vaultId, options = {}) =
   }
 
   // 5. Update User Balance & Debt (Atomic & Calculated)
+  // 5. Update User Balance & Debt (Atomic & Calculated)
   // We calculate the *final* balance here to avoid any $inc ambiguity
   const finalBalance = Math.max(0, currentBalance - amountFromBalance);
 
-  // Calculate new pending debt
-  const currentPending = user.pending_payment?.amount || 0;
-  const newPending = Math.max(0, currentPending - totalAmountToRecover);
+  // Calculate new pending debt statistics from ACTUAL data (fix desyncs)
+  // leadsToRecover are the ones we just paid.
+  // We subtract them from the original 'pendingLeads' list to see what's left.
+  const remainingLeads = pendingLeads.filter(pl => !leadsToRecover.some(lr => lr._id.equals(pl._id)));
+  const newPending = remainingLeads.reduce((sum, l) => sum + (l.lead_cost || 0), 0);
+  const newPendingCount = remainingLeads.length;
 
   // Update user object directly for reliable persistence
   user.balance = finalBalance;
 
   if (!user.pending_payment) user.pending_payment = {};
   user.pending_payment.amount = newPending;
+  user.pending_payment.count = newPendingCount;
 
   // Clear error flags if debt is gone
   if (newPending === 0) {
     user.payment_error = false;
     user.last_payment_error_message = null;
-    user.pending_payment.count = 0;
   }
 
   await user.save();
@@ -364,7 +368,7 @@ const recordRecoveryTransactions = async (userId, fromBalance, fromCard, vaultId
 // Helper: Notifications
 // --------------------------------------------------------------------------
 const handleRecoveryNotifications = async (user, fromCard, fromBalance, totalAmount, leads, chargeResult, finalBalance, isFullClear) => {
-  // Webhook (Only for externally added funds)
+  console.log('handleRecoveryNotifications', { user, fromCard, fromBalance, totalAmount, leads, chargeResult, finalBalance, isFullClear });
   if (fromCard > 0) {
     try {
       await sendBalanceTopUpAlert({
@@ -376,7 +380,6 @@ const handleRecoveryNotifications = async (user, fromCard, fromBalance, totalAmo
     } catch (e) { billingLogger.error('Webhook failed', e); }
   }
 
-  // Emails & SMS (Only if fully cleared)
   if (isFullClear) {
     try {
       const paymentMethodStr = (fromCard > 0 && fromBalance > 0) ? 'SPLIT (Balance + Card)' : (fromCard > 0 ? 'CARD' : 'BALANCE');
