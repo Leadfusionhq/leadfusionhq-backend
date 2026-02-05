@@ -1,8 +1,7 @@
 const { Resend } = require('resend');
-
 const resend = new Resend(process.env.RESEND_API_KEY);
-
-const FROM_EMAIL = 'Leadfusionhq <noreply@leadfusionhq.com>';
+// const { User } = require('../models/user.model'); // ❌ No longer needed
+const FROM_EMAIL = 'Lead Fusion <info@leadfusionhq.com>';
 
 const { generateTransactionReceipt } = require('../services/pdf/receiptGenerator');
 const { formatFullAddress, makeAddressLink } = require('../utils/address.utile');
@@ -1731,6 +1730,7 @@ const sendLeadPaymentEmail = async ({
 
   let bccRecipients = [];
 
+  // 1. Try ENV Override first (Priority)
   if (process.env.ADMIN_NOTIFICATION_EMAILS) {
     const adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS
       .split(',')
@@ -1738,6 +1738,12 @@ const sendLeadPaymentEmail = async ({
       .filter(e => e && !EXCLUDED.has(e));
 
     bccRecipients.push(...adminEmails);
+  }
+
+  // 2. Fallback to Static Email if empty (No DB lookup)
+  if (bccRecipients.length === 0) {
+    console.log('⚠️ No ADMIN_NOTIFICATION_EMAILS set, falling back to info@leadfusionhq.com');
+    bccRecipients.push('info@leadfusionhq.com');
   }
 
   // Remove duplicates and filter valid
