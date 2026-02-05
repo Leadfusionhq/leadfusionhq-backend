@@ -1688,16 +1688,13 @@ const chargeSingleLead = async (userId, leadId) => {
 
     await session.commitTransaction();
 
-    // Send Notifications (Async - outside transaction)
-    // We import BoberDoService here to avoid top-level call issues if any, or just use existing require
+    // Send Notifications (Async - fire and forget)
     const BoberDoService = require('../../services/boberdoo/boberdoo.service');
-    process.nextTick(async () => {
-      try {
-        await BoberDoService.sendBoberdoLeadNotifications(lead, campaign, paymentResult);
-      } catch (err) {
-        billingLogger.error('Failed to send Boberdoo notifications for single lead charge', err, logMeta);
-      }
 
+    (async () => {
+      billingLogger.info('DEBUG: Starting async notifications for single lead charge', logMeta);
+
+      // 1. Send Receipt
       try {
         await sendLeadPaymentReceipt({
           user,
@@ -1708,7 +1705,16 @@ const chargeSingleLead = async (userId, leadId) => {
       } catch (err) {
         billingLogger.error('Failed to send lead payment receipt for single lead charge', err, logMeta);
       }
-    });
+
+      // 2. Send Boberdo Notifications
+      try {
+        await BoberDoService.sendBoberdoLeadNotifications(lead, campaign, paymentResult);
+      } catch (err) {
+        billingLogger.error('Failed to send Boberdoo notifications for single lead charge', err, logMeta);
+      }
+
+      billingLogger.info('DEBUG: Finished async notifications for single lead charge', logMeta);
+    })();
 
     return {
       success: true,
@@ -1917,6 +1923,8 @@ async function sendLeadPaymentReceipt({
   billingResult
 }) {
   try {
+    billingLogger.info('DEBUG: Entering sendLeadPaymentReceipt', { userId: user?._id, leadId: lead?.lead_id });
+
     const leadCost = lead.lead_cost || campaign.bid_price || 0;
     const leadName = `${lead.first_name} ${lead.last_name}`.trim();
     const full_address = lead.address?.full_address || "N/A";
@@ -1952,8 +1960,8 @@ async function sendLeadPaymentReceipt({
     return { success: true };
   } catch (err) {
     billingLogger.error('Failed to send lead payment receipt email', err, {
-      userId: user._id,
-      leadId: lead.lead_id
+      userId: user?._id,
+      leadId: lead?.lead_id
     });
     return { success: false, error: err.message };
   }
