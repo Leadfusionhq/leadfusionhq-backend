@@ -16,6 +16,7 @@ const { leadLogger, logger } = require('../../utils/logger');
 const API_URL = (process.env.BOBERDOO_API_URL || 'https://leadfusionhq.leadportal.com/apiJSON.php').trim();
 const API_KEY = (process.env.BOBERDOO_API_KEY || '').trim();
 const API_UPDATE_KEY = (process.env.BOBERDOO_UPDATE_API_KEY || '').trim();
+const ReceiptService = require('../billing/receipt.service');
 const { sendToN8nWebhook, sendLowBalanceAlert } = require('../../services/n8n/webhookService.js');
 const { billingLogger } = require('../../utils/logger');
 const CREATE_ACTION = 'createNewPartner'; // fixed here
@@ -1135,19 +1136,16 @@ const processBoberdoLead = async (leadData) => {
           const ownerForReceipt = await User.findById(campaign.user_id).select('name email');
 
           if (ownerForReceipt) {
-            console.log('DEBUG: BillingServices type:', typeof BillingServices);
-            console.log('DEBUG: sendLeadPaymentReceipt type:', typeof BillingServices?.sendLeadPaymentReceipt);
-
-            if (typeof BillingServices.sendLeadPaymentReceipt === 'function') {
-              await BillingServices.sendLeadPaymentReceipt({
+            try {
+              await ReceiptService.sendLeadPaymentReceipt({
                 user: ownerForReceipt,
                 lead: populatedLead,
                 campaign,
                 billingResult
               });
-              console.log('✅ Boberdoo lead receipt email sent');
-            } else {
-              console.error('❌ CRITICAL: BillingServices.sendLeadPaymentReceipt is NOT a function', BillingServices);
+              console.log('✅ Boberdoo lead receipt email sent (via ReceiptService)');
+            } catch (receiptErr) {
+              console.error('❌ Failed to send Boberdoo lead receipt email', receiptErr);
             }
           }
         } catch (receiptErr) {
