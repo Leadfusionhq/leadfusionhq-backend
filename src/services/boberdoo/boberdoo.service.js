@@ -1135,13 +1135,20 @@ const processBoberdoLead = async (leadData) => {
           const ownerForReceipt = await User.findById(campaign.user_id).select('name email');
 
           if (ownerForReceipt) {
-            await BillingServices.sendLeadPaymentReceipt({
-              user: ownerForReceipt,
-              lead: populatedLead,
-              campaign,
-              billingResult
-            });
-            console.log('✅ Boberdoo lead receipt email sent');
+            console.log('DEBUG: BillingServices type:', typeof BillingServices);
+            console.log('DEBUG: sendLeadPaymentReceipt type:', typeof BillingServices?.sendLeadPaymentReceipt);
+
+            if (typeof BillingServices.sendLeadPaymentReceipt === 'function') {
+              await BillingServices.sendLeadPaymentReceipt({
+                user: ownerForReceipt,
+                lead: populatedLead,
+                campaign,
+                billingResult
+              });
+              console.log('✅ Boberdoo lead receipt email sent');
+            } else {
+              console.error('❌ CRITICAL: BillingServices.sendLeadPaymentReceipt is NOT a function', BillingServices);
+            }
           }
         } catch (receiptErr) {
           console.error('❌ Failed to send Boberdoo lead receipt email', receiptErr);
