@@ -1593,6 +1593,8 @@ const sendLeadPaymentEmail = async ({
   full_address,
   transactionId,
   newBalance,
+  amountFromBalance = 0,
+  amountFromCard = 0,
   leadData = {}
 }) => {
   const date = new Date().toLocaleString('en-US', {
@@ -1609,6 +1611,19 @@ const sendLeadPaymentEmail = async ({
   } = leadData;
 
   const fullName = `${first_name} ${last_name}`.trim() || leadName || 'N/A';
+
+  // Format the breakdown string
+  let breakdown = '';
+  const bal = parseFloat(amountFromBalance || 0);
+  const card = parseFloat(amountFromCard || 0);
+
+  if (bal > 0 && card > 0) {
+    breakdown = ` (Split: $${bal.toFixed(2)} Wallet, $${card.toFixed(2)} Card)`;
+  } else if (bal > 0) {
+    breakdown = ' (Paid via Wallet)';
+  } else if (card > 0) {
+    breakdown = ' (Paid via Card)';
+  }
 
   const addressParts = [
     // address.street,
@@ -1701,15 +1716,36 @@ const sendLeadPaymentEmail = async ({
     </table>
   `;
 
+  // ✅ Include ADMIN emails in the receipt
+  const EXCLUDED = new Set([
+    'admin@gmail.com',
+    'admin123@gmail.com',
+    'admin1234@gmail.com'
+  ]); // add any other internal testing emails to ignore if needed
+
+  let recipients = [to]; // start with the user
+
+  if (process.env.ADMIN_NOTIFICATION_EMAILS) {
+    const adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS
+      .split(',')
+      .map(e => e.trim().toLowerCase())
+      .filter(e => e && !EXCLUDED.has(e));
+
+    recipients.push(...adminEmails);
+  }
+
+  // Remove duplicates and filter valid
+  recipients = [...new Set(recipients)].filter(Boolean);
+
   return sendTransactionEmail({
-    to,
+    to: recipients,
     userName,
     transactionType: 'Lead Assignment',
     amount: -parseFloat(leadCost),
     transactionId,
     date,
     newBalance,
-    description: `Lead ${leadId} assigned to ${campaignName}`,
+    description: `Lead ${leadId} assigned to ${campaignName}${breakdown}`,
     metadata: {
       leadId,
       campaignName,

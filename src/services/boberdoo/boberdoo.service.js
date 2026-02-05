@@ -1125,6 +1125,41 @@ const processBoberdoLead = async (leadData) => {
         } catch (err) {
           console.error('Error in low balance check logic (Boberdoo)', err);
         }
+
+        // ✅ Send Transaction Receipt Email (User + Admin)
+        try {
+          // We need to fetch owner name if not available in campaign object
+          // (It was fetched in sendBoberdoLeadNotifications -> campaignOwner)
+          // ideally we reuse it, but here we can refetch or just pass what we have
+          const ownerForReceipt = await User.findById(campaign.user_id).select('name email');
+
+          if (ownerForReceipt) {
+            await MAIL_HANDLER.sendLeadPaymentEmail({
+              to: ownerForReceipt.email,
+              userName: ownerForReceipt.name,
+              leadCost: leadCost,
+              leadId: populatedLead.lead_id,
+              leadName: `${populatedLead.first_name} ${populatedLead.last_name}`.trim(),
+              campaignName: campaign.name,
+              payment_type: campaign.payment_type,
+              full_address: populatedLead.address?.full_address || "N/A",
+              transactionId: billingResult.transactionId,
+              newBalance: billingResult.newBalance,
+              amountFromBalance: billingResult.amountFromBalance, // ✅ Pass split info
+              amountFromCard: billingResult.amountFromCard,       // ✅ Pass split info
+              leadData: {
+                first_name: populatedLead.first_name,
+                last_name: populatedLead.last_name,
+                phone_number: populatedLead.phone_number,
+                email: populatedLead.email,
+                address: populatedLead.address
+              }
+            });
+            console.log('✅ Boberdoo lead receipt email sent');
+          }
+        } catch (receiptErr) {
+          console.error('❌ Failed to send Boberdoo lead receipt email', receiptErr);
+        }
       });
     } else {
       process.nextTick(async () => {
