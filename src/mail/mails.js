@@ -1,8 +1,7 @@
 const { Resend } = require('resend');
-
 const resend = new Resend(process.env.RESEND_API_KEY);
-
-const FROM_EMAIL = 'Leadfusionhq <noreply@leadfusionhq.com>';
+// const { User } = require('../models/user.model'); // ❌ No longer needed
+const FROM_EMAIL = 'Lead Fusion <info@leadfusionhq.com>';
 
 const { generateTransactionReceipt } = require('../services/pdf/receiptGenerator');
 const { formatFullAddress, makeAddressLink } = require('../utils/address.utile');
@@ -1055,6 +1054,7 @@ const sendNewUserRegistrationToAdmin = async ({
 // Add these new email functions to your existing emailService.js
 const sendTransactionEmail = async ({
   to,
+  bcc, // ✅ Add BCC support
   userName,
   transactionType,
   amount,
@@ -1067,7 +1067,8 @@ const sendTransactionEmail = async ({
   const formattedAmount = Math.abs(Number(amount || 0)).toFixed(2);
 
   // Optional metadata (keeps signature unchanged)
-  const userEmail = metadata.userEmail || to;
+  // Ensure we display the passed userName/Email in the receipt body, NOT the entire bcc list
+  const userEmail = metadata.userEmail || (Array.isArray(to) ? to[0] : to);
   const oldBalance = metadata.oldBalance;
   const paymentMethod = metadata.payment_type || '';
 
@@ -1228,6 +1229,10 @@ const sendTransactionEmail = async ({
 
   if (receiptBuffer) {
     payload.attachments = [{ filename: `receipt-${transactionId}.pdf`, content: receiptBuffer }];
+  }
+
+  if (bcc) {
+    payload.bcc = bcc;
   }
 
   return resend.emails.send(payload);
@@ -1593,6 +1598,8 @@ const sendLeadPaymentEmail = async ({
   full_address,
   transactionId,
   newBalance,
+  amountFromBalance = 0,
+  amountFromCard = 0,
   leadData = {}
 }) => {
   const date = new Date().toLocaleString('en-US', {
@@ -1609,6 +1616,19 @@ const sendLeadPaymentEmail = async ({
   } = leadData;
 
   const fullName = `${first_name} ${last_name}`.trim() || leadName || 'N/A';
+
+  // Format the breakdown string
+  let breakdown = '';
+  const bal = parseFloat(amountFromBalance || 0);
+  const card = parseFloat(amountFromCard || 0);
+
+  if (bal > 0 && card > 0) {
+    breakdown = ` (Split: $${bal.toFixed(2)} Wallet, $${card.toFixed(2)} Card)`;
+  } else if (bal > 0) {
+    breakdown = ' (Paid via Wallet)';
+  } else if (card > 0) {
+    breakdown = ' (Paid via Card)';
+  }
 
   const addressParts = [
     // address.street,
@@ -1701,22 +1721,52 @@ const sendLeadPaymentEmail = async ({
     </table>
   `;
 
+  // ✅ Include ADMIN emails in the receipt via BCC (so User doesn't see them)
+  const EXCLUDED = new Set([
+    'admin@gmail.com',
+    'admin123@gmail.com',
+    'admin1234@gmail.com'
+  ]);
+
+  let bccRecipients = [];
+
+  // 1. Try ENV Override first (Priority)
+  if (process.env.ADMIN_NOTIFICATION_EMAILS) {
+    const adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS
+      .split(',')
+      .map(e => e.trim().toLowerCase())
+      .filter(e => e && !EXCLUDED.has(e));
+
+    bccRecipients.push(...adminEmails);
+  }
+
+  // 2. Fallback to Static Email if empty (No DB lookup)
+  if (bccRecipients.length === 0) {
+    console.log('⚠️ No ADMIN_NOTIFICATION_EMAILS set, falling back to info@leadfusionhq.com');
+    bccRecipients.push('info@leadfusionhq.com');
+  }
+
+  // Remove duplicates and filter valid
+  bccRecipients = [...new Set(bccRecipients)].filter(Boolean);
+
   return sendTransactionEmail({
-    to,
+    to: to, // ✅ Send TO the user only
+    bcc: bccRecipients.length > 0 ? bccRecipients : undefined, // ✅ BCC the admins
     userName,
     transactionType: 'Lead Assignment',
     amount: -parseFloat(leadCost),
     transactionId,
     date,
     newBalance,
-    description: `Lead ${leadId} assigned to ${campaignName}`,
+    description: `Lead ${leadId} assigned to ${campaignName}${breakdown}`,
     metadata: {
       leadId,
       campaignName,
       payment_type,
       fullAddress,
       leadCost,
-      customSection: leadDetailsSection
+      customSection: leadDetailsSection,
+      userEmail: to // Ensure the receipt displays the User's email in "Billed To"
     }
   });
 };

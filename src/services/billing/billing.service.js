@@ -11,10 +11,11 @@ const NMI_QUERY_URL = process.env.NMI_QUERY_URL;
 const SECURITY_KEY = process.env.NMI_SECURITY_KEY;
 const dayjs = require('dayjs');
 const fetchWrapper = require('../../utils/fetchWrapper');
-const { sendBalanceTopUpAlert, processSingleLeadPayment } = require('../../services/n8n/webhookService.js');
+const { sendBalanceTopUpAlert } = require('../../services/n8n/webhookService.js');
 const MAIL_HANDLER = require('../../mail/mails');
 const formatForNmi = (d) => dayjs(d).format('MM/DD/YYYY');
 const { sendToN8nWebhook, sendLowBalanceAlert } = require('../../services/n8n/webhookService.js');
+const { sendSms } = require('../../services/sms/sms.service');
 
 // Contract management
 const getCurrentContract = async () => {
@@ -75,7 +76,7 @@ const getUserContractStatus = async (userId) => {
 // };
 
 // Card management
-const saveCard = async (cardData) => {
+const saveCard = async (cardData, makeDefault = false) => {
   const { user_id, card_number, expiry_month, expiry_year, cvv, billing_address, zip, full_name, email } = cardData;
 
   billingLogger.info('Starting card save process', {
@@ -119,6 +120,9 @@ const saveCard = async (cardData) => {
       userId: user_id,
       cardLast4: card_number.slice(-4)
     });
+    if (err.message && err.message.includes('Invalid Credit Card')) {
+      throw new ErrorHandler(400, err.message);
+    }
     throw new ErrorHandler(500, 'Failed to save card to payment gateway');
   }
 
@@ -166,15 +170,33 @@ const saveCard = async (cardData) => {
     brand: cardBrand,
     expiryMonth: expiry_month,
     expiryYear: expiry_year,
-    isDefault: user.paymentMethods.length === 0, // Set as default if first card
+    isDefault: user.paymentMethods.length === 0 || makeDefault, // Set as default if first card OR explicitly requested
     cvv: cvv,
+    // ✅ Store new optional details
+    cardHolderName: full_name,
+    email: email,
+    mobile: cardData.mobile || cardData.phone || cardData.billing_phone,
+    billingAddress: billing_address || cardData.address1 || "123 Default St",
+    billingZip: zip || cardData.zip || "00000"
   };
 
   // Add to payment methods array
   user.paymentMethods.push(newPaymentMethod);
 
-  // If this is the first card, set it as default
-  if (user.paymentMethods.length === 1) {
+  // If this is the first card, OR user requested to make it default
+  if (user.paymentMethods.length === 1 || makeDefault) {
+    // If makeDefault is true, unset other defaults first (although finding by vaultId is cleaner, loop is safe)
+    if (makeDefault) {
+      user.paymentMethods.forEach(pm => pm.isDefault = false);
+      // The new one we just pushed is NOT yet marked isDefault in the array object we pushed?
+      // Wait, we pushed `newPaymentMethod` which had `isDefault: user.paymentMethods.length === 0`.
+      // Let's fix that interaction.
+    }
+
+    // Set the one we just pushed as default
+    // The one we pushed is the last one
+    const newCard = user.paymentMethods[user.paymentMethods.length - 1];
+    newCard.isDefault = true;
     user.defaultPaymentMethod = vaultId;
   }
 
@@ -189,6 +211,19 @@ const saveCard = async (cardData) => {
     totalCards: user.paymentMethods.length
   });
 
+  // ✅ AUTO-CHARGE RECOVERY: Check for pending payments
+  if (user.pending_payment && user.pending_payment.amount > 0) {
+    // NOTE: We used to check amount here, but now we calculate dynamic amount inside.
+    // We pass the user and vaultId, and let the function figure out if there are PayAsYouGo leads.
+    try {
+      // Pass user (with updated pending_payment if accessible, otherwise verify inside)
+      await processPendingPaymentRecovery(user, vaultId, { includeAll: true });
+      // Removed 'amount' arg because we calculate it accurately now.
+    } catch (err) {
+      billingLogger.error('Recovery process failed', err);
+    }
+  }
+
   return {
     customerVaultId: vaultId,
     userId: user._id,
@@ -196,6 +231,204 @@ const saveCard = async (cardData) => {
     brand: cardBrand,
     isDefault: newPaymentMethod.isDefault
   };
+};
+
+const processPendingPaymentRecovery = async (userParam, vaultId, options = {}) => {
+  // 0. Fetch fresh user to ensure balance/debt are up to date
+  const user = await User.findById(userParam._id);
+  if (!user) return { success: false, message: 'User not found for recovery' };
+
+  // 1. Find all pending leads
+  const pendingLeads = await Lead.find({
+    user_id: user._id,
+    payment_status: 'pending'
+  }).populate('campaign_id');
+
+  if (!pendingLeads || pendingLeads.length === 0) {
+    return { success: true, message: 'No pending leads found' };
+  }
+
+  // 2. Filter Eligible Leads (Default: PayAsYouGo, Option: IncludeAll)
+  const leadsToRecover = pendingLeads.filter(lead => {
+    if (options.includeAll) return true;
+    return lead.campaign_id && lead.campaign_id.payment_type === 'payasyougo';
+  });
+
+  if (leadsToRecover.length === 0) {
+    billingLogger.info('No eligible pending leads found', { userId: user._id });
+    return { success: true, message: 'No eligible leads' };
+  }
+
+  const totalAmountToRecover = leadsToRecover.reduce((sum, lead) => sum + (lead.lead_cost || 0), 0);
+  if (totalAmountToRecover <= 0) {
+    return { success: true, message: 'Recoverable amount is 0' };
+  }
+
+  billingLogger.info(`Recovering ${totalAmountToRecover} for ${leadsToRecover.length} leads`, { userId: user._id });
+
+  // 3. Calculate Split (Balance vs Card)
+  const currentBalance = user.balance || 0;
+  const usableBalance = Math.max(0, currentBalance);
+
+  let amountFromBalance = 0;
+  let amountFromCard = 0;
+
+  if (usableBalance >= totalAmountToRecover) {
+    amountFromBalance = totalAmountToRecover;
+  } else {
+    amountFromBalance = usableBalance;
+    amountFromCard = totalAmountToRecover - usableBalance;
+  }
+
+  // 4. Charge Card (If needed)
+  let chargeResult = null;
+  if (amountFromCard > 0) {
+    chargeResult = await chargeCustomerVault(vaultId, amountFromCard, `Recovery: ${leadsToRecover.length} leads`);
+    if (!chargeResult.success) {
+      billingLogger.warn('Recovery charge failed', { userId: user._id, message: chargeResult.message });
+      return { success: false, message: chargeResult.message };
+    }
+  }
+
+  // 5. Update User Balance & Debt (Atomic & Calculated)
+  // 5. Update User Balance & Debt (Atomic & Calculated)
+  // We calculate the *final* balance here to avoid any $inc ambiguity
+  const finalBalance = Math.max(0, currentBalance - amountFromBalance);
+
+  // Calculate new pending debt statistics from ACTUAL data (fix desyncs)
+  // leadsToRecover are the ones we just paid.
+  // We subtract them from the original 'pendingLeads' list to see what's left.
+  const remainingLeads = pendingLeads.filter(pl => !leadsToRecover.some(lr => lr._id.equals(pl._id)));
+  const newPending = remainingLeads.reduce((sum, l) => sum + (l.lead_cost || 0), 0);
+  const newPendingCount = remainingLeads.length;
+
+  // Update user object directly for reliable persistence
+  user.balance = finalBalance;
+
+  if (!user.pending_payment) user.pending_payment = {};
+  user.pending_payment.amount = newPending;
+  user.pending_payment.count = newPendingCount;
+
+  // Clear error flags if debt is gone
+  if (newPending === 0) {
+    user.payment_error = false;
+    user.last_payment_error_message = null;
+  }
+
+  await user.save();
+
+  // 6. Record Transactions
+  await recordRecoveryTransactions(user._id, amountFromBalance, amountFromCard, vaultId, chargeResult, finalBalance, leadsToRecover.length);
+
+  // 7. Update Leads
+  const leadIds = leadsToRecover.map(l => l._id);
+  await Lead.updateMany(
+    { _id: { $in: leadIds } },
+    { $set: { payment_status: 'paid', status: 'active', payment_error_message: null } }
+  );
+
+  // 8. Notifications & Webhooks
+  await handleRecoveryNotifications(user, amountFromCard, amountFromBalance, totalAmountToRecover, leadsToRecover, chargeResult, finalBalance, newPending === 0);
+
+  return { success: true };
+};
+
+// --------------------------------------------------------------------------
+// Helper: Record Transactions
+// --------------------------------------------------------------------------
+const recordRecoveryTransactions = async (userId, fromBalance, fromCard, vaultId, chargeResult, finalBalance, count) => {
+  if (fromBalance > 0) {
+    await new Transaction({
+      userId,
+      type: 'PAYMENT_RECOVERY',
+      amount: -fromBalance,
+      status: 'COMPLETED',
+      description: `Auto-recovery: ${count} leads (Balance)`,
+      paymentMethod: 'BALANCE',
+      balanceAfter: finalBalance
+    }).save();
+  }
+
+  if (fromCard > 0 && chargeResult) {
+    await new Transaction({
+      userId,
+      type: 'PAYMENT_RECOVERY',
+      amount: -fromCard,
+      status: 'COMPLETED',
+      description: `Auto-recovery: ${count} leads (Card)`,
+      paymentMethod: 'CARD',
+      transactionId: chargeResult.transactionId,
+      paymentMethodDetails: { customerVaultId: vaultId },
+      balanceAfter: finalBalance
+    }).save();
+  }
+};
+
+// --------------------------------------------------------------------------
+// Helper: Notifications
+// --------------------------------------------------------------------------
+const handleRecoveryNotifications = async (user, fromCard, fromBalance, totalAmount, leads, chargeResult, finalBalance, isFullClear) => {
+  console.log('handleRecoveryNotifications', { user, fromCard, fromBalance, totalAmount, leads, chargeResult, finalBalance, isFullClear });
+  // ✅ UPDATED: Trigger webhook if Card charged OR if Full Clear via Balance
+  if (fromCard > 0 || (isFullClear && fromBalance > 0)) {
+    try {
+      await sendBalanceTopUpAlert({
+        partner_id: user.integrations?.boberdoo?.external_id || "",
+        email: user.email,
+        amount: totalAmount, // ✅ Send TOTAL amount (Card + Balance)
+        user_id: user._id
+      });
+    } catch (e) { billingLogger.error('Webhook failed', e); }
+  }
+
+  if (isFullClear) {
+    try {
+      const paymentMethodStr = (fromCard > 0 && fromBalance > 0) ? 'SPLIT (Balance + Card)' : (fromCard > 0 ? 'CARD' : 'BALANCE');
+      const cardLast4 = fromCard > 0 ? (chargeResult?.last4 || 'N/A') : 'N/A';
+
+      const chargedLeads = leads.map(l => ({
+        leadId: l.lead_id,
+        firstName: l.first_name,
+        lastName: l.last_name,
+        email: l.email,
+        amount: l.lead_cost || 0,
+        paymentMethod: paymentMethodStr,
+        campaignName: l.campaign_id?.name || 'Unknown'
+      }));
+
+      await MAIL_HANDLER.sendPendingLeadsPaymentSuccessEmail({
+        to: user.email,
+        userName: user.name,
+        chargedLeads,
+        totalAmount,
+        newBalance: finalBalance,
+        paymentMethod: paymentMethodStr,
+        cardLast4
+      });
+
+      if (user.phoneNumber) {
+        await sendSms({ to: user.phoneNumber, message: `LeadFusion Alert: Recovered $${totalAmount.toFixed(2)} for ${leads.length} leads. Service resumed.` });
+      }
+
+      // Admin Email (Simplified logic)
+      if (process.env.ADMIN_NOTIFICATION_EMAILS) {
+        const admins = process.env.ADMIN_NOTIFICATION_EMAILS.split(',').map(e => e.trim()).filter(Boolean);
+        if (admins.length) {
+          await MAIL_HANDLER.sendPendingLeadsPaymentSuccessAdminEmail({
+            to: admins,
+            userName: user.name,
+            userEmail: user.email,
+            chargedLeads,
+            totalAmount,
+            newBalance: finalBalance,
+            paymentMethod: paymentMethodStr,
+            cardLast4
+          });
+        }
+      }
+
+    } catch (e) { billingLogger.error('Notification failed', e); }
+  }
 };
 
 // Add helper function
@@ -512,206 +745,235 @@ const assignLead = async (userId, leadId, leadCost, assignedBy) => {
   }
 };
 
-// only check balance (no card deduction)
-const assignLeadNew = async (userId, leadId, leadCost, assignedBy, session) => {
+// Unified assignment via processLeadTransaction
+const assignLeadNew = async (userId, leadId, leadCost, assignedBy, session, paymentType = 'prepaid') => {
   const user = await User.findById(userId).session(session);
-  if (!user) throw new ErrorHandler(404, 'User not found');
+  if (!user) throw new ErrorHandler(404, 'User not found'); // Restored throw for controller
 
-  // const currentBalance = user.balance || 0;
-  // if (currentBalance < leadCost) {
-  //   throw new ErrorHandler(400, 'Insufficient balance to assign lead');
-  // }
+  // Use the global unified processor
+  const result = await processLeadTransaction({
+    user,
+    leadId,
+    amount: leadCost,
+    paymentType, // Defaults to 'prepaid' logic (strict balance check) if not provided
+    assignedBy,
+    session,
+    descriptionPrefix: 'Lead assigned (New)'
+  });
 
-  // user.balance = currentBalance - leadCost;
-  // await user.save({ session });
+  // Controller expects a throw on failure, not a return object
+  if (!result.success) {
+    throw new ErrorHandler(400, result.message || 'Payment failed');
+  }
 
+  return result;
+};
+
+
+// --------------------------------------------------------------------------
+// Unified Lead Payment Processor
+// --------------------------------------------------------------------------
+const processLeadTransaction = async ({
+  user,
+  leadId,
+  amount,
+  paymentType, // 'prepaid' | 'payasyougo'
+  assignedBy,
+  session,
+  descriptionPrefix = 'Lead assigned'
+}) => {
   const currentBalance = user.balance || 0;
-  let currentRefund = user.refundMoney || 0;
+  const currentRefund = user.refundMoney || 0;
 
-  if (currentRefund >= leadCost) {
-    user.refundMoney = currentRefund - leadCost;
-  } else {
-    const remainingCost = leadCost - currentRefund;
+  // 1. Calculate Split (Refund -> Balance -> Card)
+  let amountFromRefund = 0;
+  let amountFromBalance = 0;
+  let amountFromCard = 0;
 
-    user.refundMoney = 0;
+  let remainingToPay = amount;
 
-    if (currentBalance < remainingCost) {
-      throw new ErrorHandler(400, 'Insufficient balance to assign lead');
+  // A. Use Refund Money first
+  if (currentRefund > 0) {
+    amountFromRefund = Math.min(currentRefund, remainingToPay);
+    remainingToPay -= amountFromRefund;
+  }
+
+  // B. Use Wallet Balance next
+  if (remainingToPay > 0 && currentBalance > 0) {
+    amountFromBalance = Math.min(currentBalance, remainingToPay);
+    remainingToPay -= amountFromBalance;
+  }
+
+  // C. Remainder to Card
+  amountFromCard = remainingToPay;
+
+  // 2. Validate PREPAID constraints
+  if (paymentType === 'prepaid' && amountFromCard > 0) {
+    return {
+      success: false,
+      error: 'INSUFFICIENT_BALANCE',
+      message: `Insufficient funds (Balance + Refund). Required: $${amount}, Available: $${currentBalance + currentRefund}`
+    };
+  }
+
+  // 3. Charge Card (If needed)
+  let chargeResult = null;
+  let cardGatewayTxnId = null;
+
+  if (amountFromCard > 0) {
+    // Find default card
+    const defaultPaymentMethod = user.paymentMethods?.find(pm => pm.isDefault);
+
+    if (!defaultPaymentMethod?.customerVaultId) {
+      return {
+        success: false,
+        error: 'NO_PAYMENT_METHOD',
+        message: 'Insufficient balance and no default payment method found.'
+      };
     }
-    user.balance = currentBalance - remainingCost;
+
+    chargeResult = await chargeCustomerVault(
+      defaultPaymentMethod.customerVaultId,
+      amountFromCard,
+      `${descriptionPrefix}: ${leadId} (Partial/Full Card)`
+    );
+
+    if (!chargeResult.success) {
+      billingLogger.error("Lead assignment card charge failed", {
+        userId: user._id,
+        amount: amountFromCard,
+        message: chargeResult.message
+      });
+      return {
+        success: false,
+        error: 'CARD_DECLINED',
+        message: chargeResult.message || 'Card payment failed',
+        responseCode: chargeResult.responseCode,
+        cardLast4: defaultPaymentMethod.cardLastFour
+      };
+    }
+
+    // Success
+    cardGatewayTxnId = chargeResult.transactionId;
+
+    // Clear error flags if payment succeeds
+    if (user.payment_error) {
+      user.payment_error = false;
+      user.last_payment_error_message = null;
+    }
+  }
+
+  // 4. Update User Funds (Memory) - Validated by save() later
+  if (amountFromRefund > 0) {
+    user.refundMoney = Math.max(0, currentRefund - amountFromRefund);
+  }
+  if (amountFromBalance > 0) {
+    user.balance = Math.max(0, currentBalance - amountFromBalance);
   }
 
   await user.save({ session });
 
-  const transaction = new Transaction({
-    userId,
-    type: 'MANUAL',
-    amount: -leadCost,
-    status: 'COMPLETED',
-    description: `Lead assigned: ${leadId}`,
-    paymentMethod: 'BALANCE',
-    leadId,
-    assignedBy,
-    balanceAfter: user.balance
-  });
-  await transaction.save({ session });
+  // 5. Record Transactions
+  let primaryTransactionId = null; // This will hold the MongoDB ObjectId
 
-  return {
-    paymentMethod: 'BALANCE',
-    newBalance: user.balance,
-    transactionId: transaction._id,
-    leadId
-  };
-};
-
-
-
-const assignLeadPrepaid = async (userId, leadId, leadCost, assignedBy, session) => {
-  const user = await User.findById(userId).session(session);
-  // ✅ CHANGE 1: Return instead of throw
-  if (!user) {
-    return { success: false, error: 'USER_NOT_FOUND', message: 'User not found' };
-    // OLD: throw new ErrorHandler(404, 'User not found');
-  }
-
-  const currentBalance = user.balance || 0;
-
-  if (currentBalance < leadCost) {
-    // throw new ErrorHandler(400, 'Insufficient balance to assign lead');
-    return { success: false, error: 'INSUFFICIENT_BALANCE', message: `Insufficient balance. Required: $${leadCost}, Available: $${currentBalance}` };
-
-  }
-
-  user.balance = currentBalance - leadCost;
-  await user.save({ session });
-
-  const transaction = new Transaction({
-    userId,
-    type: "LEAD_ASSIGNMENT",
-    amount: -leadCost,
-    status: "COMPLETED",
-    description: `Lead assigned (Prepaid): ${leadId}`,
-    paymentMethod: "BALANCE",
-    leadId,
-    assignedBy,
-    balanceAfter: user.balance
-  });
-
-  await transaction.save({ session });
-
-  return {
-    success: true,
-    paymentMethod: "BALANCE",
-    newBalance: user.balance,
-    leadId,
-    transactionId: transaction._id
-  };
-};
-
-
-
-const assignLeadPayAsYouGo = async (userId, leadId, leadCost, assignedBy, session, campaignMeta = {}) => {
-  const user = await User.findById(userId).session(session);
-  if (!user) {
-    return { success: false, error: 'USER_NOT_FOUND', message: 'User not found' };
-  }
-
-  const currentBalance = user.balance || 0;
-
-  // 1️⃣ FIRST TRY: Deduct from BALANCE
-  if (currentBalance >= leadCost) {
-    user.balance = currentBalance - leadCost;
-    await user.save({ session });
-
-    const transaction = new Transaction({
-      userId,
+  // A. Refund Transaction (Internal logic often grouped with balance, but tracking separately is cleaner if schema allows,
+  // or we can just treat it as 'BALANCE' type but with description note)
+  if (amountFromRefund > 0) {
+    // NOTE: 'refundMoney' is internal credit. We'll record it as a BALANCE payment for simplicity unless strictly separated.
+    // checking assignLeadNew: it logged 'MANUAL' type 'BALANCE' method for the total amount.
+    // We will log it as BALANCE payment.
+    const refundTxn = new Transaction({
+      userId: user._id,
       type: "LEAD_ASSIGNMENT",
-      amount: -leadCost,
+      amount: -amountFromRefund,
       status: "COMPLETED",
-      description: `Lead assigned (Pay-As-You-Go from Balance): ${leadId}`,
+      description: `${descriptionPrefix}: ${leadId} (Refund Credit)`,
+      paymentMethod: "BALANCE",
+      leadId,
+      assignedBy,
+      balanceAfter: user.balance // This might be misleading if we only deducted refundMoney, but user.balance is what remains.
+    });
+    await refundTxn.save({ session });
+    if (!primaryTransactionId) primaryTransactionId = refundTxn._id;
+  }
+
+  // B. Balance Transaction
+  if (amountFromBalance > 0) {
+    const balanceTxn = new Transaction({
+      userId: user._id,
+      type: "LEAD_ASSIGNMENT",
+      amount: -amountFromBalance,
+      status: "COMPLETED",
+      description: `${descriptionPrefix}: ${leadId} (Wallet Balance)`,
       paymentMethod: "BALANCE",
       leadId,
       assignedBy,
       balanceAfter: user.balance
     });
+    await balanceTxn.save({ session });
 
-    await transaction.save({ session });
+    if (!primaryTransactionId) primaryTransactionId = balanceTxn._id;
+  }
 
-    return {
-      success: true,
-      paymentMethod: "BALANCE",
-      transactionId: transaction._id,
+  if (amountFromCard > 0 && chargeResult) {
+    const cardTxn = new Transaction({
+      userId: user._id,
+      type: "LEAD_ASSIGNMENT",
+      amount: -amountFromCard,
+      status: "COMPLETED",
+      description: `${descriptionPrefix}: ${leadId} (Card)`,
+      paymentMethod: "CARD",
+      transactionId: cardGatewayTxnId,
+      paymentMethodDetails: {
+        customerVaultId: user.defaultPaymentMethod
+      },
       leadId,
-      newBalance: user.balance
-    };
-  }
-
-  // 2️⃣ FALLBACK: NMI CARD CHARGE
-  const defaultPaymentMethod = user.paymentMethods?.find(pm => pm.isDefault === true);
-  if (!defaultPaymentMethod) {
-    return {
-      success: false,
-      error: 'NO_PAYMENT_METHOD',
-      message: 'No default payment method found'
-    };
-  }
-
-  const last4 = defaultPaymentMethod.cardLastFour || "N/A";
-  const vaultId = defaultPaymentMethod.customerVaultId;
-
-  if (!vaultId) {
-    return { success: false, error: 'INVALID_VAULT', message: 'Default payment method missing customerVaultId' };
-  }
-
-  const chargeResult = await chargeCustomerVault(vaultId, leadCost, `Lead assignment: ${leadId}`);
-
-  // ❌ PAYMENT FAILED - Just return, caller handles everything
-  if (!chargeResult.success) {
-    billingLogger.error("Card charge failed", {
-      user_id: user._id,
-      responseCode: chargeResult.responseCode,
-      message: chargeResult.message
+      assignedBy,
+      balanceAfter: user.balance
     });
+    await cardTxn.save({ session });
 
-    return {
-      success: false,
-      error: 'CARD_DECLINED',
-      message: chargeResult.message || 'Card payment failed',
-      responseCode: chargeResult.responseCode,
-      cardLast4: last4
-    };
+    primaryTransactionId = cardTxn._id;
   }
-
-  // 3️⃣ SUCCESSFUL CARD PAYMENT → CLEAR PAYMENT ERROR
-  if (user.payment_error) {
-    user.payment_error = false;
-    user.last_payment_error_message = null;
-    await user.save({ session });
-  }
-
-  const transaction = new Transaction({
-    userId,
-    type: "LEAD_ASSIGNMENT",
-    amount: -leadCost,
-    status: "COMPLETED",
-    description: `Lead assigned (Pay-As-You-Go - Card Charge): ${leadId}`,
-    paymentMethod: "CARD",
-    transactionId: chargeResult.transactionId,
-    leadId,
-    assignedBy,
-    balanceAfter: user.balance || 0
-  });
-
-  await transaction.save({ session });
 
   return {
     success: true,
-    paymentMethod: "CARD",
-    transactionId: transaction._id,
-    gatewayTransactionId: chargeResult.transactionId,
-    leadId,
-    newBalance: user.balance || 0
+    newBalance: user.balance,
+    transactionId: primaryTransactionId,
+    gatewayTransactionId: cardGatewayTxnId,
+    amountFromBalance,
+    amountFromCard
   };
+};
+
+const assignLeadPrepaid = async (userId, leadId, leadCost, assignedBy, session) => {
+  const user = await User.findById(userId).session(session);
+  if (!user) return { success: false, error: 'USER_NOT_FOUND', message: 'User not found' };
+
+  return await processLeadTransaction({
+    user,
+    leadId,
+    amount: leadCost,
+    paymentType: 'prepaid',
+    assignedBy,
+    session,
+    descriptionPrefix: 'Lead assigned (Prepaid)'
+  });
+};
+
+const assignLeadPayAsYouGo = async (userId, leadId, leadCost, assignedBy, session, campaignMeta = {}) => {
+  const user = await User.findById(userId).session(session);
+  if (!user) return { success: false, error: 'USER_NOT_FOUND', message: 'User not found' };
+
+  return await processLeadTransaction({
+    user,
+    leadId,
+    amount: leadCost,
+    paymentType: 'payasyougo',
+    assignedBy,
+    session,
+    descriptionPrefix: 'Lead assigned (Pay-As-You-Go)'
+  });
 };
 
 /**
@@ -909,8 +1171,27 @@ const getUserBalance = async (userId) => {
     cardLastFour = defaultCard ? defaultCard.cardLastFour : null;
   }
 
+  // Calculate pending balance
+  const pendingBalanceResult = await Lead.aggregate([
+    {
+      $match: {
+        user_id: new mongoose.Types.ObjectId(userId),
+        payment_status: 'pending'
+      }
+    },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: "$lead_cost" }
+      }
+    }
+  ]);
+
+  const pendingBalance = pendingBalanceResult[0]?.total || 0;
+
   return {
     balance: user.balance || 0,
+    pending_balance: pendingBalance,
     hasStoredCard: user.hasStoredCard || false,
     cardLastFour,
     autoTopUp: user.autoTopUp || { enabled: false }
@@ -1351,17 +1632,91 @@ const getRevenueFromNmi = async ({ start, end }) => {
 
 
 const chargeSingleLead = async (userId, leadId) => {
-  const user = await User.findById(userId);
-  if (!user) {
-    throw new ErrorHandler(404, 'User not found');
-  }
-  const lead = await Lead.findById(leadId);
-  if (!lead) {
-    throw new ErrorHandler(404, 'Lead not found');
-  }
-  const result = await processSingleLeadPayment(userId, leadId);
+  const logMeta = { user_id: userId, lead_id: leadId, action: 'Charge Single Lead' };
 
-  return result;
+  // 1. Fetch Data
+  const user = await User.findById(userId);
+  if (!user) throw new ErrorHandler(404, 'User not found');
+
+  // Find lead by ID (or lead_id fallback)
+  let lead = await Lead.findOne({ _id: leadId }).populate('campaign_id');
+  if (!lead) {
+    lead = await Lead.findOne({ lead_id: leadId }).populate('campaign_id');
+  }
+  if (!lead) throw new ErrorHandler(404, 'Lead not found');
+
+  if (lead.payment_status === 'paid') {
+    return { success: true, message: 'Lead is already paid', alreadyPaid: true };
+  }
+
+  const campaign = lead.campaign_id;
+  if (!campaign) throw new ErrorHandler(400, 'Campaign not found for lead');
+
+  // 2. Process Payment (Unified Logic)
+  // Force 'payasyougo' logic to enable Split Payment (Refund -> Balance -> Card)
+  // regardless of campaign type, as requested for this manual route.
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const paymentResult = await processLeadTransaction({
+      user,
+      leadId: lead._id,
+      amount: lead.lead_cost,
+      paymentType: 'payasyougo', // Force split payment support
+      assignedBy: userId,
+      session,
+      descriptionPrefix: 'Single Lead Charge'
+    });
+
+    if (!paymentResult.success) {
+      await session.abortTransaction();
+      return { success: false, error: paymentResult.error, message: paymentResult.message };
+    }
+
+    // 3. Update Lead Status
+    lead.payment_status = 'paid';
+    lead.status = 'active';
+    lead.transaction_id = paymentResult.transactionId; // MongoDB ID from our new function
+    lead.payment_error_message = null;
+    await lead.save({ session });
+
+    // 4. Update User Stats (Pending Payment)
+    if (user.pending_payment && user.pending_payment.amount > 0) {
+      user.pending_payment.amount = Math.max(0, user.pending_payment.amount - lead.lead_cost);
+      if (user.pending_payment.count > 0) user.pending_payment.count -= 1;
+      await user.save({ session });
+    }
+
+    await session.commitTransaction();
+
+    // 5. Send Notifications (Async - outside transaction)
+    // We import BoberDoService here to avoid top-level call issues if any, or just use existing require
+    const BoberDoService = require('../../services/boberdoo/boberdoo.service');
+    process.nextTick(async () => {
+      try {
+        await BoberDoService.sendBoberdoLeadNotifications(lead, campaign, paymentResult);
+      } catch (err) {
+        billingLogger.error('Failed to send Boberdoo notifications for single lead charge', err, logMeta);
+      }
+    });
+
+    return {
+      success: true,
+      message: 'Lead charged successfully',
+      transactionId: paymentResult.transactionId,
+      newBalance: paymentResult.newBalance,
+      amountFromBalance: paymentResult.amountFromBalance,
+      amountFromCard: paymentResult.amountFromCard
+    };
+
+  } catch (error) {
+    await session.abortTransaction();
+    billingLogger.error('Single lead charge transaction error', error, logMeta);
+    throw new ErrorHandler(500, error.message || 'Payment processing failed');
+  } finally {
+    session.endSession();
+  }
 };
 
 
@@ -1499,6 +1854,52 @@ const checkAndSendLowBalanceAlerts = async ({ campaign, leadCost, remainingBalan
   }
 };
 
+const retryUserPendingPayments = async (userId) => {
+  billingLogger.info('Manual retry of pending payments initiated', { userId });
+
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new ErrorHandler(404, 'User not found');
+  }
+
+  // Check for pending amount
+  if (!user.pending_payment || user.pending_payment.amount <= 0) {
+    // Double check leads manually just in case
+    const pendingCount = await Lead.countDocuments({
+      user_id: userId,
+      payment_status: 'pending',
+      // We rely on processPendingPaymentRecovery to filter PayAsYouGo
+    });
+
+    if (pendingCount === 0) {
+      return { success: true, message: 'No pending payments to recover' };
+    }
+  }
+
+  // Find default card
+  const defaultCard = user.paymentMethods?.find(pm => pm.isDefault) || user.paymentMethods?.[0];
+
+  if (!defaultCard || !defaultCard.customerVaultId) {
+    throw new ErrorHandler(400, 'No valid payment method found. Please add a card first.');
+  }
+
+  // Trigger recovery with includeAll: true to catch Prepaid and PayAsYouGo
+  const result = await processPendingPaymentRecovery(user, defaultCard.customerVaultId, { includeAll: true });
+
+  if (!result.success) {
+    if (result.message === 'Duplicate') {
+      throw new ErrorHandler(400, 'Payment Gateway Warning: Duplicate transaction detected. You may have already paid or need to wait a few minutes before retrying the same amount.');
+    }
+    throw new ErrorHandler(400, result.message || 'Payment recovery failed');
+  }
+
+  return {
+    success: true,
+    message: 'Pending payments recovered successfully',
+    details: result
+  };
+};
+
 
 module.exports = {
   checkAndSendLowBalanceAlerts,
@@ -1523,4 +1924,6 @@ module.exports = {
 
   assignLeadPrepaid,
   assignLeadPayAsYouGo,
+  processPendingPaymentRecovery,
+  retryUserPendingPayments
 };

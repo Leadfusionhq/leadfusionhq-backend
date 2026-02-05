@@ -1026,7 +1026,8 @@ const processBoberdoLead = async (leadData) => {
 
     let billingResult;
 
-    if (campaign.payment_type === "prepaid" && leadCost > 0) {
+    // if (campaign.payment_type === "prepaid" && leadCost > 0) {
+    if (campaign.payment_type === "prepaid") {
       billingResult = await BillingServices.assignLeadPrepaid(
         campaign.user_id,
         lead_id,
@@ -1109,9 +1110,14 @@ const processBoberdoLead = async (leadData) => {
 
     if (isPaid) {
       process.nextTick(async () => {
-        sendBoberdoLeadNotifications(populatedLead, campaign, billingResult)
-          .then(() => console.log('Boberdo notifications sent successfully'))
-          .catch(err => console.error('Failed to send Boberdo lead notifications:', err));
+        // 1. Send Lead Assignments (User + Admin)
+        try {
+          console.log('⏳ Starting Boberdoo lead notifications...');
+          await sendBoberdoLeadNotifications(populatedLead, campaign, billingResult);
+          console.log('✅ Boberdoo lead notifications completed');
+        } catch (err) {
+          console.error('❌ Failed to send Boberdo lead notifications:', err);
+        }
 
         // Check for Low Balance
         try {
@@ -1123,6 +1129,37 @@ const processBoberdoLead = async (leadData) => {
           });
         } catch (err) {
           console.error('Error in low balance check logic (Boberdoo)', err);
+        }
+
+        try {
+          const ownerForReceipt = await User.findById(campaign.user_id).select('name email');
+
+          if (ownerForReceipt) {
+            await MAIL_HANDLER.sendLeadPaymentEmail({
+              to: ownerForReceipt.email,
+              userName: ownerForReceipt.name,
+              leadCost: leadCost,
+              leadId: populatedLead.lead_id,
+              leadName: `${populatedLead.first_name} ${populatedLead.last_name}`.trim(),
+              campaignName: campaign.name,
+              payment_type: campaign.payment_type,
+              full_address: populatedLead.address?.full_address || "N/A",
+              transactionId: billingResult.transactionId,
+              newBalance: billingResult.newBalance,
+              amountFromBalance: billingResult.amountFromBalance, // ✅ Pass split info
+              amountFromCard: billingResult.amountFromCard,       // ✅ Pass split info
+              leadData: {
+                first_name: populatedLead.first_name,
+                last_name: populatedLead.last_name,
+                phone_number: populatedLead.phone_number,
+                email: populatedLead.email,
+                address: populatedLead.address
+              }
+            });
+            console.log('✅ Boberdoo lead receipt email sent');
+          }
+        } catch (receiptErr) {
+          console.error('❌ Failed to send Boberdoo lead receipt email', receiptErr);
         }
       });
     } else {

@@ -148,15 +148,17 @@ const saveCard = wrapAsync(async (req, res) => {
     //     throw new ErrorHandler(400, 'You must accept the latest contract before saving payment information.');
     // }
 
+    const { makeDefault = true } = req.body;
     const cardData = { ...req.body, user_id, email };
 
     billingLogger.info('User attempting to save card', {
         userId: user_id,
-        cardLast4: req.body.ccnumber ? req.body.ccnumber.slice(-4) : 'N/A'
+        cardLast4: req.body.ccnumber ? req.body.ccnumber.slice(-4) : 'N/A',
+        makeDefault
     });
 
     try {
-        const data = await BillingServices.saveCard(cardData);
+        const data = await BillingServices.saveCard(cardData, makeDefault);
         billingLogger.info('Card details saved successfully', {
             userId: user_id,
             vaultId: data.customerVaultId
@@ -164,6 +166,11 @@ const saveCard = wrapAsync(async (req, res) => {
         return sendResponse(res, { data }, 'Your card details have been saved', 201);
     } catch (err) {
         billingLogger.error('Failed to save card', err, { userId: user_id });
+
+        if (err.statusCode) {
+            throw err;
+        }
+
         throw new ErrorHandler(500, 'Failed to save your card details. Please try again later.');
     }
 });
@@ -515,6 +522,31 @@ const chargeSingleLead = wrapAsync(async (req, res) => {
     }
 });
 
+const retryPendingPayments = wrapAsync(async (req, res) => {
+    const user_id = req.user._id;
+
+    billingLogger.info('User attempting manual payment retry', { userId: user_id });
+
+    try {
+        const result = await BillingServices.retryUserPendingPayments(user_id);
+
+        return sendResponse(
+            res,
+            { result },
+            result.message || 'Payment retry completed',
+            200
+        );
+    } catch (err) {
+        billingLogger.error('Failed to retry pending payments', err, { userId: user_id });
+
+        if (err.statusCode) {
+            throw err;
+        }
+
+        throw new ErrorHandler(500, 'Failed to retry payments. Please try again later.');
+    }
+});
+
 module.exports = {
     chargeSingleLead,
     getCurrentContract,
@@ -533,4 +565,5 @@ module.exports = {
     testAutoTopUp,
     getRevenueFromGateway,
     getReceipt,
+    retryPendingPayments
 };

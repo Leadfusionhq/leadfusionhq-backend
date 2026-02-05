@@ -384,6 +384,8 @@ const createLead = wrapAsync(async (req, res) => {
           full_address: result.address.full_address,
           transactionId: billingResult.transactionId,
           newBalance: billingResult.newBalance,
+          amountFromBalance: billingResult.amountFromBalance, // ✅ Pass split info
+          amountFromCard: billingResult.amountFromCard,       // ✅ Pass split info
           leadData: {
             first_name: result.first_name,
             last_name: result.last_name,
@@ -448,6 +450,7 @@ const createLead = wrapAsync(async (req, res) => {
             });
           }
         }
+        // ✅ ADMIN NOTIFICATION Logic (Explicitly Isolated)
         try {
           const EXCLUDED = new Set([
             'admin@gmail.com',
@@ -455,21 +458,9 @@ const createLead = wrapAsync(async (req, res) => {
             'admin1234@gmail.com',
           ]);
 
-          const adminUsers = await User.find({
-            role: { $in: ['ADMIN', 'SUPER_ADMIN'] },
-            isActive: { $ne: false }
-          }).select('email');
+          let adminEmails = [];
 
-          let adminEmails = (adminUsers || [])
-            .map(a => a.email)
-            .filter(Boolean)
-            .map(e => e.trim().toLowerCase())
-            .filter(e => !EXCLUDED.has(e));
-
-          console.log("ENV CHECK → ADMIN_NOTIFICATION_EMAILS =", process.env.ADMIN_NOTIFICATION_EMAILS);
-
-          console.log("Admin before override =", adminEmails);
-
+          // 1. Try ENV Override first (Priority)
           if (process.env.ADMIN_NOTIFICATION_EMAILS) {
             adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS
               .split(',')
@@ -477,7 +468,21 @@ const createLead = wrapAsync(async (req, res) => {
               .filter(Boolean);
           }
 
-          console.log("Admin AFTER override =", adminEmails);
+          // 2. If ENV is empty/missing, fall back to DB Admins
+          if (adminEmails.length === 0) {
+            const adminUsers = await User.find({
+              role: { $in: ['ADMIN', 'SUPER_ADMIN'] },
+              isActive: { $ne: false }
+            }).select('email');
+
+            adminEmails = (adminUsers || [])
+              .map(a => a.email)
+              .filter(Boolean)
+              .map(e => e.trim().toLowerCase());
+          }
+
+          // 3. Filter Excluded
+          adminEmails = adminEmails.filter(e => !EXCLUDED.has(e));
 
           if (adminEmails.length > 0) {
             const emailString = adminEmails.join(',');
@@ -490,22 +495,20 @@ const createLead = wrapAsync(async (req, res) => {
               assignedBy: req.user?.name || 'System',
               leadDetailsUrl: `${process.env.UI_LINK}/dashboard/leads/${result._id}`,
               campaignName: campaign.name,
-
               note: leadData.note ?? "",
-
               leadData: {
                 ...(result.toObject ? result.toObject() : result),
                 note: result.note ?? ""
               },
-
               realleadId: result._id,
             });
-
 
             leadLogger.info('Lead assignment admin email sent successfully', {
               ...logMeta,
               admin_count: adminEmails.length,
             });
+          } else {
+            leadLogger.warn('No admin emails found for lead assignment notification', logMeta);
           }
         } catch (err) {
           leadLogger.error('Failed to send lead assignment admin email', err, {
