@@ -1135,26 +1135,11 @@ const processBoberdoLead = async (leadData) => {
           const ownerForReceipt = await User.findById(campaign.user_id).select('name email');
 
           if (ownerForReceipt) {
-            await MAIL_HANDLER.sendLeadPaymentEmail({
-              to: ownerForReceipt.email,
-              userName: ownerForReceipt.name,
-              leadCost: leadCost,
-              leadId: populatedLead.lead_id,
-              leadName: `${populatedLead.first_name} ${populatedLead.last_name}`.trim(),
-              campaignName: campaign.name,
-              payment_type: campaign.payment_type,
-              full_address: populatedLead.address?.full_address || "N/A",
-              transactionId: billingResult.transactionId,
-              newBalance: billingResult.newBalance,
-              amountFromBalance: billingResult.amountFromBalance, // ✅ Pass split info
-              amountFromCard: billingResult.amountFromCard,       // ✅ Pass split info
-              leadData: {
-                first_name: populatedLead.first_name,
-                last_name: populatedLead.last_name,
-                phone_number: populatedLead.phone_number,
-                email: populatedLead.email,
-                address: populatedLead.address
-              }
+            await BillingServices.sendLeadPaymentReceipt({
+              user: ownerForReceipt,
+              lead: populatedLead,
+              campaign,
+              billingResult
             });
             console.log('✅ Boberdoo lead receipt email sent');
           }

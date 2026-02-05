@@ -1634,11 +1634,11 @@ const getRevenueFromNmi = async ({ start, end }) => {
 const chargeSingleLead = async (userId, leadId) => {
   const logMeta = { user_id: userId, lead_id: leadId, action: 'Charge Single Lead' };
 
-  // 1. Fetch Data
+
   const user = await User.findById(userId);
   if (!user) throw new ErrorHandler(404, 'User not found');
 
-  // Find lead by ID (or lead_id fallback)
+
   let lead = await Lead.findOne({ _id: leadId }).populate('campaign_id');
   if (!lead) {
     lead = await Lead.findOne({ lead_id: leadId }).populate('campaign_id');
@@ -1652,9 +1652,8 @@ const chargeSingleLead = async (userId, leadId) => {
   const campaign = lead.campaign_id;
   if (!campaign) throw new ErrorHandler(400, 'Campaign not found for lead');
 
-  // 2. Process Payment (Unified Logic)
-  // Force 'payasyougo' logic to enable Split Payment (Refund -> Balance -> Card)
-  // regardless of campaign type, as requested for this manual route.
+
+  //  'payasyougo' logic to enable Split Payment (Refund -> Balance -> Card)
   const session = await mongoose.startSession();
   session.startTransaction();
 
@@ -1663,7 +1662,7 @@ const chargeSingleLead = async (userId, leadId) => {
       user,
       leadId: lead._id,
       amount: lead.lead_cost,
-      paymentType: 'payasyougo', // Force split payment support
+      paymentType: 'payasyougo',
       assignedBy: userId,
       session,
       descriptionPrefix: 'Single Lead Charge'
@@ -1674,14 +1673,13 @@ const chargeSingleLead = async (userId, leadId) => {
       return { success: false, error: paymentResult.error, message: paymentResult.message };
     }
 
-    // 3. Update Lead Status
+
     lead.payment_status = 'paid';
     lead.status = 'active';
-    lead.transaction_id = paymentResult.transactionId; // MongoDB ID from our new function
+    lead.transaction_id = paymentResult.transactionId;
     lead.payment_error_message = null;
     await lead.save({ session });
 
-    // 4. Update User Stats (Pending Payment)
     if (user.pending_payment && user.pending_payment.amount > 0) {
       user.pending_payment.amount = Math.max(0, user.pending_payment.amount - lead.lead_cost);
       if (user.pending_payment.count > 0) user.pending_payment.count -= 1;
@@ -1690,7 +1688,7 @@ const chargeSingleLead = async (userId, leadId) => {
 
     await session.commitTransaction();
 
-    // 5. Send Notifications (Async - outside transaction)
+    // Send Notifications (Async - outside transaction)
     // We import BoberDoService here to avoid top-level call issues if any, or just use existing require
     const BoberDoService = require('../../services/boberdoo/boberdoo.service');
     process.nextTick(async () => {
@@ -1698,6 +1696,17 @@ const chargeSingleLead = async (userId, leadId) => {
         await BoberDoService.sendBoberdoLeadNotifications(lead, campaign, paymentResult);
       } catch (err) {
         billingLogger.error('Failed to send Boberdoo notifications for single lead charge', err, logMeta);
+      }
+
+      try {
+        await sendLeadPaymentReceipt({
+          user,
+          lead,
+          campaign,
+          billingResult: paymentResult
+        });
+      } catch (err) {
+        billingLogger.error('Failed to send lead payment receipt for single lead charge', err, logMeta);
       }
     });
 
@@ -1901,6 +1910,55 @@ const retryUserPendingPayments = async (userId) => {
 };
 
 
+async function sendLeadPaymentReceipt({
+  user,
+  lead,
+  campaign,
+  billingResult
+}) {
+  try {
+    const leadCost = lead.lead_cost || campaign.bid_price || 0;
+    const leadName = `${lead.first_name} ${lead.last_name}`.trim();
+    const full_address = lead.address?.full_address || "N/A";
+
+    await MAIL_HANDLER.sendLeadPaymentEmail({
+      to: user.email,
+      userName: user.name,
+      leadCost: leadCost,
+      leadId: lead.lead_id,
+      leadName: leadName,
+      campaignName: campaign.name,
+      payment_type: campaign.payment_type,
+      full_address: full_address,
+      transactionId: billingResult.transactionId,
+      newBalance: billingResult.newBalance,
+      amountFromBalance: billingResult.amountFromBalance,
+      amountFromCard: billingResult.amountFromCard,
+      leadData: {
+        first_name: lead.first_name,
+        last_name: lead.last_name,
+        phone_number: lead.phone_number,
+        email: lead.email,
+        address: lead.address
+      }
+    });
+
+    billingLogger.info('Lead payment receipt email sent', {
+      userId: user._id,
+      leadId: lead.lead_id,
+      transactionId: billingResult.transactionId
+    });
+
+    return { success: true };
+  } catch (err) {
+    billingLogger.error('Failed to send lead payment receipt email', err, {
+      userId: user._id,
+      leadId: lead.lead_id
+    });
+    return { success: false, error: err.message };
+  }
+}
+
 module.exports = {
   checkAndSendLowBalanceAlerts,
   chargeSingleLead,
@@ -1921,6 +1979,7 @@ module.exports = {
   addBalanceByAdmin,
   getRevenueFromNmi,
   handlePaymentFailure,
+  sendLeadPaymentReceipt, // ✅ Exported new function
 
   assignLeadPrepaid,
   assignLeadPayAsYouGo,
