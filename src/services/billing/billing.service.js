@@ -369,12 +369,13 @@ const recordRecoveryTransactions = async (userId, fromBalance, fromCard, vaultId
 // --------------------------------------------------------------------------
 const handleRecoveryNotifications = async (user, fromCard, fromBalance, totalAmount, leads, chargeResult, finalBalance, isFullClear) => {
   console.log('handleRecoveryNotifications', { user, fromCard, fromBalance, totalAmount, leads, chargeResult, finalBalance, isFullClear });
-  if (fromCard > 0) {
+  // ✅ UPDATED: Trigger webhook if Card charged OR if Full Clear via Balance
+  if (fromCard > 0 || (isFullClear && fromBalance > 0)) {
     try {
       await sendBalanceTopUpAlert({
         partner_id: user.integrations?.boberdoo?.external_id || "",
         email: user.email,
-        amount: fromCard,
+        amount: totalAmount, // ✅ Send TOTAL amount (Card + Balance)
         user_id: user._id
       });
     } catch (e) { billingLogger.error('Webhook failed', e); }
