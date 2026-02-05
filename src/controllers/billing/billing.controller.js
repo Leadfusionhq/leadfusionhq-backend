@@ -296,13 +296,23 @@ const addFunds = wrapAsync(async (req, res) => {
         // ✅ Send funds added email
         try {
             const user = await User.findById(user_id);
+
+            // Fetch admins for BCC
+            const EXCLUDED = new Set(['admin@gmail.com', 'admin123@gmail.com', 'admin1234@gmail.com']);
+            const adminUsers = await User.find({ role: { $in: ['ADMIN', 'SUPER_ADMIN'] }, isActive: { $ne: false } }).select('email');
+            let adminEmails = (adminUsers || []).map(a => a.email?.trim().toLowerCase()).filter(e => e && !EXCLUDED.has(e));
+            if (process.env.ADMIN_NOTIFICATION_EMAILS) {
+                adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS.split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+            }
+
             await MAIL_HANDLER.sendFundsAddedEmail({
                 to: user.email,
                 userName: user.name,
                 amount: amount,
                 transactionId: result.transactionId,
                 paymentMethod: result.paymentMethod || 'Card',
-                newBalance: result.newBalance
+                newBalance: result.newBalance,
+                bcc: adminEmails // ✅ BCC Admins
             });
             billingLogger.info('Funds added email sent', { userId: user_id });
         } catch (emailErr) {

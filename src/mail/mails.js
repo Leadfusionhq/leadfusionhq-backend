@@ -1511,7 +1511,8 @@ const sendFundsAddedEmail = async ({
   amount,
   transactionId,
   paymentMethod,
-  newBalance
+  newBalance,
+  bcc // ✅ Add BCC support
 }) => {
   const date = new Date().toLocaleString('en-US', {
     dateStyle: 'medium',
@@ -1520,6 +1521,7 @@ const sendFundsAddedEmail = async ({
 
   return sendTransactionEmail({
     to,
+    bcc, // ✅ Pass BCC
     userName,
     transactionType: 'Manual Recharge',
     amount: parseFloat(amount),
@@ -1600,7 +1602,8 @@ const sendLeadPaymentEmail = async ({
   newBalance,
   amountFromBalance = 0,
   amountFromCard = 0,
-  leadData = {}
+  leadData = {},
+  bcc // ✅ Add BCC support
 }) => {
   const date = new Date().toLocaleString('en-US', {
     dateStyle: 'medium',
@@ -1751,10 +1754,12 @@ const sendLeadPaymentEmail = async ({
 
   return sendTransactionEmail({
     to: to, // ✅ Send TO the user only
-    bcc: bccRecipients.length > 0 ? bccRecipients : undefined, // ✅ BCC the admins
+    bcc: bcc, // ✅ BCC the admins correctly
     userName,
-    transactionType: 'Lead Assignment',
-    amount: -parseFloat(leadCost),
+    transactionType: payment_type === 'payasyougo'
+      ? 'Pay-As-You-Go Lead Payment'
+      : (payment_type === 'prepaid' ? 'Prepaid Lead Assignment' : 'Lead Assignment'),
+    amount: parseFloat(leadCost),
     transactionId,
     date,
     newBalance,
