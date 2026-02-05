@@ -1722,13 +1722,22 @@ const sendLeadPaymentEmail = async ({
   `;
 
   // ✅ Include ADMIN emails in the receipt via BCC (so User doesn't see them)
+  // const EXCLUDED = new Set([
+  //   'admin@gmail.com',
+  //   'admin123@gmail.com',
+  //   'admin1234@gmail.com'
+  // ]);
+
+  // ✅ Define usage exclusions locally to prevent ReferenceError
   const EXCLUDED = new Set([
     'admin@gmail.com',
     'admin123@gmail.com',
-    'admin1234@gmail.com'
+    'admin1234@gmail.com',
   ]);
 
   let bccRecipients = [];
+
+  console.log('DEBUG: ADMIN_NOTIFICATION_EMAILS env:', process.env.ADMIN_NOTIFICATION_EMAILS);
 
   // 1. Try ENV Override first (Priority)
   if (process.env.ADMIN_NOTIFICATION_EMAILS) {
@@ -1737,6 +1746,7 @@ const sendLeadPaymentEmail = async ({
       .map(e => e.trim().toLowerCase())
       .filter(e => e && !EXCLUDED.has(e));
 
+    console.log('DEBUG: Parsed admin emails:', adminEmails);
     bccRecipients.push(...adminEmails);
   }
 
