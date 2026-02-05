@@ -1110,9 +1110,14 @@ const processBoberdoLead = async (leadData) => {
 
     if (isPaid) {
       process.nextTick(async () => {
-        sendBoberdoLeadNotifications(populatedLead, campaign, billingResult)
-          .then(() => console.log('Boberdo notifications sent successfully'))
-          .catch(err => console.error('Failed to send Boberdo lead notifications:', err));
+        // 1. Send Lead Assignments (User + Admin)
+        try {
+          console.log('⏳ Starting Boberdoo lead notifications...');
+          await sendBoberdoLeadNotifications(populatedLead, campaign, billingResult);
+          console.log('✅ Boberdoo lead notifications completed');
+        } catch (err) {
+          console.error('❌ Failed to send Boberdo lead notifications:', err);
+        }
 
         // Check for Low Balance
         try {
