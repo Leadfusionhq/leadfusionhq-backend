@@ -6,6 +6,7 @@ const { ErrorHandler } = require('../../utils/error-handler');
 const Lead = require('../../models/lead.model.js');
 const CONSTANT_ENUM = require('../../helper/constant-enums.js');
 const { randomNumberGenerate, isEmpty } = require('../../utils/utils');
+const ReceiptService = require('../../services/billing/receipt.service');
 const { getPaginationParams, extractFilters } = require('../../utils/pagination');
 const generateUniqueLeadId = require('../../utils/idGenerator');
 const { cleanupTempFile } = require('../../middleware/csv-upload');
@@ -373,9 +374,9 @@ const createLead = wrapAsync(async (req, res) => {
       const campaignOwner = await User.findById(campaign.user_id);
 
       try {
-        await BillingServices.sendLeadPaymentReceipt({
+        await ReceiptService.sendLeadPaymentReceipt({
           user: campaignOwner,
-          lead: result,
+          lead: result, // result is the lead
           campaign,
           billingResult
         });
