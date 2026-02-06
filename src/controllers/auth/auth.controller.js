@@ -139,24 +139,14 @@ const verifyEmail = wrapAsync(async (req, res) => {
   })();
 
   try {
-    const EXCLUDED = new Set([
-      'admin@gmail.com',
-      'admin123@gmail.com',
-      'admin1234@gmail.com',
-    ]);
-
-    const adminUsers = await User.find({
-      role: { $in: ['ADMIN', 'SUPER_ADMIN'] },
-      isActive: { $ne: false },
-    }).select('_id email name role');
-
-    let adminEmails = (adminUsers || [])
-      .map(a => a.email)
-      .filter(Boolean)
-      .map(e => e.trim().toLowerCase())
-      .filter(e => !EXCLUDED.has(e));
-
-    adminEmails = [...new Set(adminEmails)];
+    //  UPDATE: Use ADMIN_NOTIFICATION_EMAILS env var instead of DB lookup
+    let adminEmails = [];
+    if (process.env.ADMIN_NOTIFICATION_EMAILS) {
+      adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS
+        .split(',')
+        .map(e => e.trim().toLowerCase())
+        .filter(Boolean);
+    }
 
     if (adminEmails.length) {
       const registrationDate = user.createdAt
@@ -198,11 +188,11 @@ const verifyEmail = wrapAsync(async (req, res) => {
         envelope: info?.envelope
       });
     } else {
-      console.warn('⚠️ No valid admin emails found after exclusions. Skipping admin notification.');
-      logger.warn('No valid admin emails found after exclusions. Skipping admin notification.', { userId: user._id });
+      console.warn(' No ADMIN_NOTIFICATION_EMAILS configured. Skipping admin notification.');
+      logger.warn('No ADMIN_NOTIFICATION_EMAILS configured. Skipping admin notification.', { userId: user._id });
     }
   } catch (err) {
-    console.error('❌ Admin notification failed:', err);
+    console.error(' Admin notification failed:', err);
     logger.error('Admin notification failed', err, { userId: user._id });
   }
 

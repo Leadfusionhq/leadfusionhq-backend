@@ -6,6 +6,7 @@ const { ErrorHandler } = require('../../utils/error-handler');
 const Lead = require('../../models/lead.model.js');
 const CONSTANT_ENUM = require('../../helper/constant-enums.js');
 const { randomNumberGenerate, isEmpty } = require('../../utils/utils');
+const ReceiptService = require('../../services/billing/receipt.service');
 const { getPaginationParams, extractFilters } = require('../../utils/pagination');
 const generateUniqueLeadId = require('../../utils/idGenerator');
 const { cleanupTempFile } = require('../../middleware/csv-upload');
@@ -373,26 +374,11 @@ const createLead = wrapAsync(async (req, res) => {
       const campaignOwner = await User.findById(campaign.user_id);
 
       try {
-        await MAIL_HANDLER.sendLeadPaymentEmail({
-          to: campaignOwner.email,
-          userName: campaignOwner.name,
-          leadCost: leadCost,
-          leadId: result.lead_id,
-          leadName: `${result.first_name} ${result.last_name}`.trim(),
-          campaignName: campaign.name,
-          payment_type: campaign.payment_type,
-          full_address: result.address.full_address,
-          transactionId: billingResult.transactionId,
-          newBalance: billingResult.newBalance,
-          amountFromBalance: billingResult.amountFromBalance, // ✅ Pass split info
-          amountFromCard: billingResult.amountFromCard,       // ✅ Pass split info
-          leadData: {
-            first_name: result.first_name,
-            last_name: result.last_name,
-            phone_number: result.phone_number,
-            email: result.email,
-            address: result.address
-          }
+        await ReceiptService.sendLeadPaymentReceipt({
+          user: campaignOwner,
+          lead: result, // result is the lead
+          campaign,
+          billingResult
         });
 
         leadLogger.info('Lead payment email sent successfully', {
