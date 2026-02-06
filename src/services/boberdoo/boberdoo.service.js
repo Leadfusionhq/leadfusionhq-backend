@@ -1113,42 +1113,11 @@ const processBoberdoLead = async (leadData) => {
       // ✅ Parallelize all post-payment notifications & wait for them (Reliability Fix)
       console.log('⏳ Starting Boberdoo lead notifications (Parallel Execution)...');
 
-      const notificationPromises = [];
+      // Consolidated Notification Flow
+      await sendBoberdoLeadNotifications(populatedLead, campaign, billingResult, leadCost)
+        .then(() => console.log('✅ Boberdoo lead notifications completed'))
+        .catch(err => console.error('❌ Failed to run Boberdoo notifications:', err));
 
-      // 1. Send Lead Assignments (User + Admin + SMS)
-      notificationPromises.push(
-        sendBoberdoLeadNotifications(populatedLead, campaign, billingResult)
-          .then(() => console.log('✅ Boberdoo lead notifications completed'))
-          .catch(err => console.error('❌ Failed to send Boberdo lead notifications:', err))
-      );
-
-      // 2. Check for Low Balance
-      notificationPromises.push(
-        BillingServices.checkAndSendLowBalanceAlerts({
-          campaign,
-          leadCost,
-          remainingBalance: billingResult.newBalance,
-          logger: leadLogger
-        }).catch(err => console.error('Error in low balance check logic (Boberdoo)', err))
-      );
-
-      // 3. Send Payment Receipt
-      const ownerForReceipt = await User.findById(campaign.user_id).select('name email');
-      if (ownerForReceipt) {
-        notificationPromises.push(
-          ReceiptService.sendLeadPaymentReceipt({
-            user: ownerForReceipt,
-            lead: populatedLead,
-            campaign,
-            billingResult
-          })
-            .then(() => console.log('✅ Boberdoo lead receipt email sent'))
-            .catch(err => console.error('❌ Failed to send Boberdoo lead receipt email', err))
-        );
-      }
-
-      // 🚀 AWAIT ALL NOTIFICATIONS so process doesn't exit early
-      await Promise.allSettled(notificationPromises);
       console.log('🏁 All Boberdoo post-processing tasks finished.');
 
     } else {
@@ -1172,7 +1141,7 @@ const processBoberdoLead = async (leadData) => {
   }
 };
 
-const sendBoberdoLeadNotifications = async (lead, campaign, billingResult) => {
+const sendBoberdoLeadNotifications = async (lead, campaign, billingResult, leadCost = 0) => {
   const logMeta = {
     campaign_id: campaign?._id,
     campaign_name: campaign?.name,
@@ -1313,6 +1282,38 @@ View Lead: ${process.env.UI_LINK}/dashboard/leads/${lead._id}`;
         }
       })());
     }
+    // 4. Low Balance Check
+    tasks.push((async () => {
+      try {
+        await BillingServices.checkAndSendLowBalanceAlerts({
+          campaign,
+          leadCost,
+          remainingBalance: billingResult?.newBalance,
+          logger: leadLogger
+        });
+      } catch (err) {
+        leadLogger.error('Error in low balance check logic (Boberdoo)', err, { ...logMeta, error: err.message });
+      }
+    })());
+
+    // 5. Send Payment Receipt
+    tasks.push((async () => {
+      try {
+        // Re-fetch owner just to be safe or reuse campaignOwner if it has email/name
+        // campaignOwner is already fetched at the start of this function
+        if (campaignOwner) {
+          await ReceiptService.sendLeadPaymentReceipt({
+            user: campaignOwner,
+            lead,
+            campaign,
+            billingResult
+          });
+          leadLogger.info('Boberdoo lead receipt email sent', logMeta);
+        }
+      } catch (receiptErr) {
+        leadLogger.error('Failed to send Boberdoo lead receipt email', receiptErr, { ...logMeta, error: receiptErr.message });
+      }
+    })());
 
     // Await all notification tasks in parallel
     await Promise.allSettled(tasks);
@@ -1326,7 +1327,6 @@ View Lead: ${process.env.UI_LINK}/dashboard/leads/${lead._id}`;
     });
   }
 };
-
 
 module.exports = {
   syncUserToBoberdooById,
