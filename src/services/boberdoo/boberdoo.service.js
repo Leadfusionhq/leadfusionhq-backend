@@ -1171,7 +1171,7 @@ const sendBoberdoLeadNotifications = async (lead, campaign, billingResult, leadC
 
     // 1. Email to User
     if (campaign?.delivery?.method?.includes('email') && campaign?.delivery?.email?.addresses) {
-      tasks.push((async () => {
+      tasks.push(async () => {
         try {
           await MAIL_HANDLER.sendLeadAssignEmail({
             to: campaign.delivery.email.addresses,
@@ -1199,11 +1199,11 @@ const sendBoberdoLeadNotifications = async (lead, campaign, billingResult, leadC
             stack: emailErr.stack
           });
         }
-      })());
+      });
     }
 
     // 2. Email to Admin
-    tasks.push((async () => {
+    tasks.push(async () => {
       try {
         const EXCLUDED = new Set([
           'admin@gmail.com',
@@ -1260,11 +1260,62 @@ const sendBoberdoLeadNotifications = async (lead, campaign, billingResult, leadC
           stack: err.stack
         });
       }
-    })());
+    });
 
+    tasks.push(async () => {
+      try {
+        // Additional validation before sending receipt
+        if (!campaignOwner.email) {
+          leadLogger.error('Cannot send receipt - campaign owner has no email', {
+            ...logMeta,
+            userId: campaign.user_id
+          });
+          return;
+        }
+
+        // Log what we're passing to the receipt service
+        leadLogger.info('Attempting to send Boberdoo payment receipt', {
+          ...logMeta,
+          userEmail: campaignOwner.email,
+          userName: campaignOwner.name || campaignOwner.fullName,
+          hasLead: !!lead,
+          hasCampaign: !!campaign,
+          hasBillingResult: !!billingResult,
+          billingResultKeys: billingResult ? Object.keys(billingResult) : []
+        });
+
+        await ReceiptService.sendLeadPaymentReceipt({
+          user: {
+            _id: campaignOwner._id,
+            email: campaignOwner.email,
+            name: campaignOwner.name || campaignOwner.fullName || 'User',
+            // Include any other fields ReceiptService might need
+          },
+          lead: lead.toObject ? lead.toObject() : lead,
+          campaign: campaign.toObject ? campaign.toObject() : campaign,
+          billingResult: billingResult || {}
+        });
+
+        leadLogger.info('✅ Boberdoo lead receipt email sent successfully', {
+          ...logMeta,
+          recipientEmail: campaignOwner.email
+        });
+      } catch (receiptErr) {
+        leadLogger.error('❌ CRITICAL: Failed to send Boberdoo lead receipt email', receiptErr, {
+          ...logMeta,
+          error: receiptErr.message,
+          stack: receiptErr.stack,
+          userEmail: campaignOwner?.email,
+          userId: campaign?.user_id
+        });
+
+        // Optional: You might want to throw here to ensure it's tracked
+        // throw receiptErr;
+      }
+    });
     // 3. SMS delivery
     if (campaign?.delivery?.method?.includes('phone') && campaign?.delivery?.phone?.numbers) {
-      tasks.push((async () => {
+      tasks.push(async () => {
         try {
           const fullName = `${lead.first_name || ''} ${lead.last_name || ''}`.trim();
           const phoneNumber = lead.phone_number || lead.phone || '';
@@ -1318,11 +1369,11 @@ View Lead: ${process.env.UI_LINK}/dashboard/leads/${lead._id}`;
             stack: err.stack
           });
         }
-      })());
+      });
     }
 
     // 4. Low Balance Check
-    tasks.push((async () => {
+    tasks.push(async () => {
       try {
         await BillingServices.checkAndSendLowBalanceAlerts({
           campaign,
@@ -1337,76 +1388,33 @@ View Lead: ${process.env.UI_LINK}/dashboard/leads/${lead._id}`;
           stack: err.stack
         });
       }
-    })());
-
-    // 5. Send Payment Receipt - CRITICAL FIX
-    tasks.push((async () => {
-      try {
-        // Additional validation before sending receipt
-        if (!campaignOwner.email) {
-          leadLogger.error('Cannot send receipt - campaign owner has no email', {
-            ...logMeta,
-            userId: campaign.user_id
-          });
-          return;
-        }
-
-        // Log what we're passing to the receipt service
-        leadLogger.info('Attempting to send Boberdoo payment receipt', {
-          ...logMeta,
-          userEmail: campaignOwner.email,
-          userName: campaignOwner.name || campaignOwner.fullName,
-          hasLead: !!lead,
-          hasCampaign: !!campaign,
-          hasBillingResult: !!billingResult,
-          billingResultKeys: billingResult ? Object.keys(billingResult) : []
-        });
-
-        await ReceiptService.sendLeadPaymentReceipt({
-          user: {
-            _id: campaignOwner._id,
-            email: campaignOwner.email,
-            name: campaignOwner.name || campaignOwner.fullName || 'User',
-            // Include any other fields ReceiptService might need
-          },
-          lead: lead.toObject ? lead.toObject() : lead,
-          campaign: campaign.toObject ? campaign.toObject() : campaign,
-          billingResult: billingResult || {}
-        });
-
-        leadLogger.info('✅ Boberdoo lead receipt email sent successfully', {
-          ...logMeta,
-          recipientEmail: campaignOwner.email
-        });
-      } catch (receiptErr) {
-        leadLogger.error('❌ CRITICAL: Failed to send Boberdoo lead receipt email', receiptErr, {
-          ...logMeta,
-          error: receiptErr.message,
-          stack: receiptErr.stack,
-          userEmail: campaignOwner?.email,
-          userId: campaign?.user_id
-        });
-
-        // Optional: You might want to throw here to ensure it's tracked
-        // throw receiptErr;
-      }
-    })());
-
-    // Wait for all tasks and log individual results
-    const results = await Promise.allSettled(tasks);
-
-    // Log any rejections
-    results.forEach((result, index) => {
-      if (result.status === 'rejected') {
-        leadLogger.error(`Notification task ${index} failed`, result.reason, {
-          ...logMeta,
-          taskIndex: index,
-          error: result.reason?.message
-        });
-      }
     });
 
-    leadLogger.info('Completed sending Boberdo notifications', {
+    // 5. Send Payment Receipt - CRITICAL FIX
+
+
+    // Execute tasks SEQUENTIALLY with delay to prevent Rate Limiting (Resend 2 req/s)
+    const results = [];
+    for (const [index, task] of tasks.entries()) {
+      try {
+        // Enforce 1000ms delay between tasks to avoid hitting rate limits
+        if (index > 0) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+
+        await task();
+        results.push({ status: 'fulfilled' });
+      } catch (err) {
+        results.push({ status: 'rejected', reason: err });
+        leadLogger.error(`Notification task ${index} failed`, err, {
+          ...logMeta,
+          taskIndex: index,
+          error: err.message
+        });
+      }
+    }
+
+    leadLogger.info('Completed sending Boberdo notifications (Sequential)', {
       ...logMeta,
       totalTasks: tasks.length,
       successful: results.filter(r => r.status === 'fulfilled').length,
