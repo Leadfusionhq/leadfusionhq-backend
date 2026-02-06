@@ -1764,17 +1764,17 @@ const chargeSingleLead = async (userId, leadId) => {
     (async () => {
       billingLogger.info('DEBUG: Starting async notifications for single lead charge', logMeta);
 
-      // 1. Send Receipt
-      try {
-        await ReceiptService.sendLeadPaymentReceipt({
-          user,
-          lead,
-          campaign,
-          billingResult: paymentResult
-        });
-      } catch (err) {
-        billingLogger.error('Failed to send lead payment receipt for single lead charge', err, logMeta);
-      }
+      // 1. Send Receipt - REMOVED (Handled by BoberDoService to avoid duplicates)
+      // try {
+      //   await ReceiptService.sendLeadPaymentReceipt({
+      //     user,
+      //     lead,
+      //     campaign,
+      //     billingResult: paymentResult
+      //   });
+      // } catch (err) {
+      //   billingLogger.error('Failed to send lead payment receipt for single lead charge', err, logMeta);
+      // }
 
       // 2. Send Boberdo Notifications
       try {
