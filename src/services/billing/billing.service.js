@@ -564,45 +564,109 @@ const addFunds = async (userId, amount, vaultId = null) => {
     billingLogger.info('Balance top-up webhook sent', { userId, amount });
 
 
+    // ---------------------------------------
+    // 🔹 AUTO-RECOVERY: Attempt to clear pending debt
+    // ---------------------------------------
+    let recoveryResult = { success: false };
+    const oldPendingAmount = user.pending_payment?.amount || 0;
+
+    if (oldPendingAmount > 0) {
+      try {
+        console.log(`💰 Attempting auto-recovery for user ${user._id} after top-up...`);
+        // Pass the user and the vault ID we just used (or let it pick default)
+        recoveryResult = await processPendingPaymentRecovery(user, customerVaultIdToUse, { includeAll: true });
+        console.log('✅ Auto-recovery result:', recoveryResult);
+      } catch (recoveryErr) {
+        console.error('❌ Auto-recovery failed inside addFunds:', recoveryErr);
+        billingLogger.error('Auto-recovery failed inside addFunds', recoveryErr, { userId });
+      }
+    }
 
     // ---------------------------------------
-    // 🔹 Prepare Admin Emails (Exclude Specific Admins)
+    // 🔹 Re-fetch User State for Email Conditions
     // ---------------------------------------
-    const EXCLUDED = new Set([
-      'admin@gmail.com',
-      'admin123@gmail.com',
-      'admin1234@gmail.com',
-    ]);
-
-    const adminUsers = await User.find({
-      role: { $in: ['ADMIN', 'SUPER_ADMIN'] },
-      isActive: { $ne: false },
-    }).select('email name');
-
-    const adminEmails = (adminUsers || [])
-      .map(a => a.email?.trim().toLowerCase())
-      .filter(e => e && !EXCLUDED.has(e));
-
+    // We need fresh data to see if debt was cleared and what the final balance is
+    const updatedUser = await User.findById(userId);
+    const finalBalance = updatedUser.balance || 0;
+    const finalPendingAmount = updatedUser.pending_payment?.amount || 0;
 
     // ---------------------------------------
-    // 🔹 Send USER Email (Lead Service Resumed)
+    // 🔹 CONDITIONAL "SERVICE RESUMED" EMAIL
     // ---------------------------------------
-    await MAIL_HANDLER.sendCampaignResumedEmail({
-      to: user.email,
-      userName: user.name,
-      email: user.email,
-      partnerId: user.integrations?.boberdoo?.external_id || ""
+    // Condition:
+    // 1. WAS PAUSED? -> Old Balance <= 0 OR Old Pending > 0
+    // 2. IS NOW ACTIVE? -> New Balance > 0 AND New Pending == 0
+
+    // You can adjust this threshold (e.g., 5 or 10) if you have a minimum buffer
+    const LOW_BALANCE_THRESHOLD = 0;
+
+    const wasPaused = (oldBalance <= LOW_BALANCE_THRESHOLD) || (oldPendingAmount > 0);
+    const isNowHealthy = (finalBalance > LOW_BALANCE_THRESHOLD) && (finalPendingAmount === 0);
+
+    console.log('[Email Logic] Service Resumed Check:', {
+      oldBalance,
+      oldPendingAmount,
+      finalBalance,
+      finalPendingAmount,
+      wasPaused,
+      isNowHealthy
     });
 
-    // ---------------------------------------
-    // 🔹 Send ADMIN Email (Lead Service Resumed)
-    // ---------------------------------------
-    await MAIL_HANDLER.sendCampaignResumedAdminEmail({
-      to: adminEmails,
-      userName: user.name,
-      userEmail: user.email,
-      partnerId: user.integrations?.boberdoo?.external_id || ""
-    });
+    if (wasPaused && isNowHealthy) {
+
+      console.log('🚀 Sending Service Resumed Emails...');
+
+      // ---------------------------------------
+      // 🔹 Prepare Admin Emails (Exclude Specific Admins)
+      // ---------------------------------------
+      const EXCLUDED = new Set([
+        'admin@gmail.com',
+        'admin123@gmail.com',
+        'admin1234@gmail.com',
+      ]);
+
+      const adminUsers = await User.find({
+        role: { $in: ['ADMIN', 'SUPER_ADMIN'] },
+        isActive: { $ne: false },
+      }).select('email name');
+
+      // ✅ Check ENV for overrides, otherwise use DB
+      let adminEmails = [];
+      if (process.env.ADMIN_NOTIFICATION_EMAILS) {
+        adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS
+          .split(',')
+          .map(e => e.trim().toLowerCase())
+          .filter(Boolean);
+      } else {
+        adminEmails = (adminUsers || [])
+          .map(a => a.email?.trim().toLowerCase())
+          .filter(e => e && !EXCLUDED.has(e));
+      }
+
+      // ---------------------------------------
+      // 🔹 Send USER Email (Lead Service Resumed)
+      // ---------------------------------------
+      await MAIL_HANDLER.sendCampaignResumedEmail({
+        to: user.email,
+        userName: user.name,
+        email: user.email,
+        partnerId: user.integrations?.boberdoo?.external_id || ""
+      });
+
+      // ---------------------------------------
+      // 🔹 Send ADMIN Email (Lead Service Resumed)
+      // ---------------------------------------
+      if (adminEmails.length > 0) {
+        await MAIL_HANDLER.sendCampaignResumedAdminEmail({
+          to: adminEmails,
+          userName: user.name,
+          userEmail: user.email,
+          partnerId: user.integrations?.boberdoo?.external_id || ""
+        });
+      }
+    } else {
+      console.log('ℹ️ Skipping "Service Resumed" email (User was not paused or is not yet fully healthy)');
+    }
 
 
   } catch (webhookErr) {
