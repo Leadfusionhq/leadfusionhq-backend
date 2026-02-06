@@ -408,11 +408,14 @@ const handleRecoveryNotifications = async (user, fromCard, fromBalance, totalAmo
       });
 
       if (user.phoneNumber) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
         await sendSms({ to: user.phoneNumber, message: `LeadFusion Alert: Recovered $${totalAmount.toFixed(2)} for ${leads.length} leads. Service resumed.` });
       }
 
       // Admin Email (Simplified logic)
       if (process.env.ADMIN_NOTIFICATION_EMAILS) {
+        // Enforce delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
         const admins = process.env.ADMIN_NOTIFICATION_EMAILS.split(',').map(e => e.trim()).filter(Boolean);
         if (admins.length) {
           await MAIL_HANDLER.sendPendingLeadsPaymentSuccessAdminEmail({
@@ -1069,6 +1072,8 @@ const handlePaymentFailure = async ({
 
     // ✅ 5. Send failure email to ADMINS
     try {
+      // Enforce delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
       const EXCLUDED = new Set(["admin@gmail.com", "admin123@gmail.com", "admin1234@gmail.com"]);
 
       const adminUsers = await User.find({
@@ -1709,6 +1714,8 @@ const chargeSingleLead = async (userId, leadId) => {
 
       // 2. Send Boberdo Notifications
       try {
+        // Enforce delay to prevent Rate Limiting
+        await new Promise(resolve => setTimeout(resolve, 1000));
         await BoberDoService.sendBoberdoLeadNotifications(lead, campaign, paymentResult);
       } catch (err) {
         billingLogger.error('Failed to send Boberdoo notifications for single lead charge', err, logMeta);
