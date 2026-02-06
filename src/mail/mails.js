@@ -1235,7 +1235,39 @@ const sendTransactionEmail = async ({
     payload.bcc = bcc;
   }
 
-  return resend.emails.send(payload);
+  // 3) Send via Resend and handle errors explicitly
+  try {
+    const { data, error } = await resend.emails.send(payload);
+
+    if (error) {
+      console.error('❌ Resend API Error in sendTransactionEmail:', error);
+      throw new Error(`Resend Transaction Email Failed: ${error.message}`);
+    }
+
+    console.log('✅ Transaction receipt sent:', data?.id);
+    return data;
+  } catch (err) {
+    console.error('❌ Fatal error sending transaction receipt:', err.message);
+
+    // 4) Fallback: Retry without attachment if that was the cause
+    if (payload.attachments && payload.attachments.length > 0) {
+      console.warn('⚠️ Retrying transaction email without PDF attachment...');
+      delete payload.attachments;
+      try {
+        const { data: retryData, error: retryError } = await resend.emails.send(payload);
+        if (retryError) {
+          throw new Error(`Retry failed: ${retryError.message}`);
+        }
+        console.log('✅ Transaction receipt sent (without PDF) after retry:', retryData?.id);
+        return retryData;
+      } catch (retryErr) {
+        console.error('❌ Failed to send transaction receipt even without PDF:', retryErr.message);
+        throw err; // Throw original error or retry error? Throw original to preserve context, or new one?
+      }
+    }
+
+    throw err;
+  }
 };
 
 async function sendCampaignCreatedEmailtoN8N(campaign) {

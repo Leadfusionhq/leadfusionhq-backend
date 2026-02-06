@@ -1151,10 +1151,20 @@ const sendBoberdoLeadNotifications = async (lead, campaign, billingResult, leadC
   };
 
   try {
-    const campaignOwner = await User.findById(campaign.user_id);
+    // CRITICAL: Fetch user with all required fields
+    const campaignOwner = await User.findById(campaign.user_id).select('+email +name +fullName');
+
     if (!campaignOwner) {
-      leadLogger.warn('Campaign owner not found while sending notifications', logMeta);
+      leadLogger.error('Campaign owner not found - cannot send notifications', logMeta);
       return;
+    }
+
+    // Validate owner has email
+    if (!campaignOwner.email) {
+      leadLogger.error('Campaign owner missing email address', {
+        ...logMeta,
+        userId: campaign.user_id
+      });
     }
 
     const tasks = [];
@@ -1165,7 +1175,7 @@ const sendBoberdoLeadNotifications = async (lead, campaign, billingResult, leadC
         try {
           await MAIL_HANDLER.sendLeadAssignEmail({
             to: campaign.delivery.email.addresses,
-            name: campaignOwner.name || 'Campaign User',
+            name: campaignOwner.name || campaignOwner.fullName || 'Campaign User',
             leadName: lead.lead_id,
             assignedBy: 'Boberdo Integration',
             leadDetailsUrl: `${process.env.UI_LINK}/dashboard/leads/${lead._id}`,
@@ -1178,9 +1188,16 @@ const sendBoberdoLeadNotifications = async (lead, campaign, billingResult, leadC
             realleadId: lead._id,
             subject: `Lead Fusion - New Lead`,
           });
-          leadLogger.info('Boberdo lead assignment email sent successfully', { ...logMeta, email_to: campaign.delivery.email.addresses });
+          leadLogger.info('Boberdo lead assignment email sent successfully', {
+            ...logMeta,
+            email_to: campaign.delivery.email.addresses
+          });
         } catch (emailErr) {
-          leadLogger.error('Failed to send Boberdo lead assignment email', emailErr, { ...logMeta, error: emailErr.message });
+          leadLogger.error('Failed to send Boberdo lead assignment email', emailErr, {
+            ...logMeta,
+            error: emailErr.message,
+            stack: emailErr.stack
+          });
         }
       })());
     }
@@ -1195,7 +1212,6 @@ const sendBoberdoLeadNotifications = async (lead, campaign, billingResult, leadC
         ]);
 
         let adminEmails = [];
-        // override with env emails if present
         if (process.env.ADMIN_NOTIFICATION_EMAILS) {
           adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS
             .split(',')
@@ -1232,10 +1248,17 @@ const sendBoberdoLeadNotifications = async (lead, campaign, billingResult, leadC
             },
             realleadId: lead._id,
           });
-          leadLogger.info('Boberdoo lead assignment admin email sent successfully', { ...logMeta, admin_count: adminEmails.length });
+          leadLogger.info('Boberdoo lead assignment admin email sent successfully', {
+            ...logMeta,
+            admin_count: adminEmails.length
+          });
         }
       } catch (err) {
-        leadLogger.error('Failed to send Boberdoo lead assignment admin email', err, { ...logMeta, error: err.message });
+        leadLogger.error('Failed to send Boberdoo lead assignment admin email', err, {
+          ...logMeta,
+          error: err.message,
+          stack: err.stack
+        });
       }
     })());
 
@@ -1264,7 +1287,10 @@ Notes: ${notes}
 
 View Lead: ${process.env.UI_LINK}/dashboard/leads/${lead._id}`;
 
-          leadLogger.info('Attempting to send Boberdo lead assignment SMS', { ...logMeta, to_numbers: campaign.delivery.phone.numbers });
+          leadLogger.info('Attempting to send Boberdo lead assignment SMS', {
+            ...logMeta,
+            to_numbers: campaign.delivery.phone.numbers
+          });
 
           const smsResult = await SmsServices.sendSms({
             to: campaign.delivery.phone.numbers,
@@ -1273,15 +1299,28 @@ View Lead: ${process.env.UI_LINK}/dashboard/leads/${lead._id}`;
           });
 
           if (smsResult.success) {
-            leadLogger.info('Boberdo lead assignment SMS sent successfully', { ...logMeta, sent_to: smsResult.sentTo.join(', '), total_sent: smsResult.successful });
+            leadLogger.info('Boberdo lead assignment SMS sent successfully', {
+              ...logMeta,
+              sent_to: smsResult.sentTo.join(', '),
+              total_sent: smsResult.successful
+            });
           } else {
-            leadLogger.warn('Boberdo SMS failed', { ...logMeta, failed_count: smsResult.failed, error: smsResult.results?.map(r => r.error?.message).join('; ') });
+            leadLogger.warn('Boberdo SMS failed', {
+              ...logMeta,
+              failed_count: smsResult.failed,
+              error: smsResult.results?.map(r => r.error?.message).join('; ')
+            });
           }
         } catch (err) {
-          leadLogger.error('Fatal error during Boberdo SMS sending', err, { ...logMeta, error: err.message });
+          leadLogger.error('Fatal error during Boberdo SMS sending', err, {
+            ...logMeta,
+            error: err.message,
+            stack: err.stack
+          });
         }
       })());
     }
+
     // 4. Low Balance Check
     tasks.push((async () => {
       try {
@@ -1292,32 +1331,87 @@ View Lead: ${process.env.UI_LINK}/dashboard/leads/${lead._id}`;
           logger: leadLogger
         });
       } catch (err) {
-        leadLogger.error('Error in low balance check logic (Boberdoo)', err, { ...logMeta, error: err.message });
+        leadLogger.error('Error in low balance check logic (Boberdoo)', err, {
+          ...logMeta,
+          error: err.message,
+          stack: err.stack
+        });
       }
     })());
 
-    // 5. Send Payment Receipt
+    // 5. Send Payment Receipt - CRITICAL FIX
     tasks.push((async () => {
       try {
-        // Re-fetch owner just to be safe or reuse campaignOwner if it has email/name
-        // campaignOwner is already fetched at the start of this function
-        if (campaignOwner) {
-          await ReceiptService.sendLeadPaymentReceipt({
-            user: campaignOwner,
-            lead,
-            campaign,
-            billingResult
+        // Additional validation before sending receipt
+        if (!campaignOwner.email) {
+          leadLogger.error('Cannot send receipt - campaign owner has no email', {
+            ...logMeta,
+            userId: campaign.user_id
           });
-          leadLogger.info('Boberdoo lead receipt email sent', logMeta);
+          return;
         }
+
+        // Log what we're passing to the receipt service
+        leadLogger.info('Attempting to send Boberdoo payment receipt', {
+          ...logMeta,
+          userEmail: campaignOwner.email,
+          userName: campaignOwner.name || campaignOwner.fullName,
+          hasLead: !!lead,
+          hasCampaign: !!campaign,
+          hasBillingResult: !!billingResult,
+          billingResultKeys: billingResult ? Object.keys(billingResult) : []
+        });
+
+        await ReceiptService.sendLeadPaymentReceipt({
+          user: {
+            _id: campaignOwner._id,
+            email: campaignOwner.email,
+            name: campaignOwner.name || campaignOwner.fullName || 'User',
+            // Include any other fields ReceiptService might need
+          },
+          lead: lead.toObject ? lead.toObject() : lead,
+          campaign: campaign.toObject ? campaign.toObject() : campaign,
+          billingResult: billingResult || {}
+        });
+
+        leadLogger.info('✅ Boberdoo lead receipt email sent successfully', {
+          ...logMeta,
+          recipientEmail: campaignOwner.email
+        });
       } catch (receiptErr) {
-        leadLogger.error('Failed to send Boberdoo lead receipt email', receiptErr, { ...logMeta, error: receiptErr.message });
+        leadLogger.error('❌ CRITICAL: Failed to send Boberdoo lead receipt email', receiptErr, {
+          ...logMeta,
+          error: receiptErr.message,
+          stack: receiptErr.stack,
+          userEmail: campaignOwner?.email,
+          userId: campaign?.user_id
+        });
+
+        // Optional: You might want to throw here to ensure it's tracked
+        // throw receiptErr;
       }
     })());
 
-    // Await all notification tasks in parallel
-    await Promise.allSettled(tasks);
-    leadLogger.info('Completed sending Boberdo notifications', logMeta);
+    // Wait for all tasks and log individual results
+    const results = await Promise.allSettled(tasks);
+
+    // Log any rejections
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        leadLogger.error(`Notification task ${index} failed`, result.reason, {
+          ...logMeta,
+          taskIndex: index,
+          error: result.reason?.message
+        });
+      }
+    });
+
+    leadLogger.info('Completed sending Boberdo notifications', {
+      ...logMeta,
+      totalTasks: tasks.length,
+      successful: results.filter(r => r.status === 'fulfilled').length,
+      failed: results.filter(r => r.status === 'rejected').length
+    });
 
   } catch (error) {
     leadLogger.error('Error in sendBoberdoLeadNotifications', error, {
