@@ -150,6 +150,9 @@ const CampaignGeography: React.FC<GeographyProps> = ({
               placeholder="#####|#####|#####..."
               rows={3}
               disabled={isLocked}
+              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                setFieldValue("geography.coverage.partial.zip_codes", e.target.value.replace(/\s/g, ""));
+              }}
             />
           </div>
         </>
