@@ -39,6 +39,10 @@ const transactionSchema = new mongoose.Schema({
     brand: String,
     customerVaultId: String
   },
+  responseCode: {
+    type: String,
+    trim: true
+  },
   note: {
     type: String,
     trim: true,

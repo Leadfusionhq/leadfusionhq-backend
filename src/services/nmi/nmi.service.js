@@ -14,6 +14,43 @@ const formatForNmi = (dayjsObj) => {
   return dayjsObj.format('YYYYMMDDHHmmss');
 };
 
+const NMI_RESPONSE_CODES = {
+  '100': 'Transaction was approved.',
+  '200': 'Transaction was declined by processor.',
+  '201': 'Do not honor.',
+  '202': 'Insufficient funds.',
+  '203': 'Over limit.',
+  '204': 'Transaction not allowed.',
+  '220': 'Incorrect payment information.',
+  '221': 'No such card issuer.',
+  '222': 'No card number on file with issuer.',
+  '223': 'Expired card.',
+  '224': 'Invalid expiration date.',
+  '225': 'Invalid card security code.',
+  '226': 'Invalid PIN.',
+  '240': 'Call issuer for further information.',
+  '250': 'Pick up card.',
+  '251': 'Lost card.',
+  '252': 'Stolen card.',
+  '253': 'Fraudulent card.',
+  '260': 'Declined with further instructions available.',
+  '261': 'Declined-Stop all recurring payments.',
+  '262': 'Declined-Stop this recurring program.',
+  '263': 'Declined-Update cardholder data available.',
+  '264': 'Declined-Retry in a few days.',
+  '300': 'Transaction was rejected by gateway.',
+  '400': 'Transaction error returned by processor.',
+  '410': 'Invalid merchant configuration.',
+  '411': 'Merchant account is inactive.',
+  '420': 'Communication error.',
+  '421': 'Communication error with issuer.',
+  '430': 'Duplicate transaction at processor.',
+  '440': 'Processor format error.',
+  '441': 'Invalid transaction information.',
+  '460': 'Processor feature not available.',
+  '461': 'Unsupported card type.'
+};
+
 const parseXmlResponse = (xmlString) => {
   const parser = new XMLParser({
     ignoreAttributes: false,
@@ -425,17 +462,28 @@ const chargeCustomerVault = async (customerVaultId, amount, description = '') =>
     const responseMatch = responseText.match(/response=(\d+)/);
     const responseCode = responseMatch ? responseMatch[1] : null;
 
+    // ✅ Parse specific NMI response code (e.g. 100, 200, 300)
+    const specificResponseCodeMatch = responseText.match(/response_code=(\d+)/);
+    const specificResponseCode = specificResponseCodeMatch ? specificResponseCodeMatch[1] : null;
+
     const transactionIdMatch = responseText.match(/transactionid=([^&\s]+)/);
     const transactionId = transactionIdMatch ? transactionIdMatch[1] : null;
 
     const responseTextMatch = responseText.match(/responsetext=([^&\s]+)/);
-    const responseMessage = responseTextMatch ? decodeURIComponent(responseTextMatch[1].replace(/\+/g, ' ')) : '';
+    let responseMessage = responseTextMatch ? decodeURIComponent(responseTextMatch[1].replace(/\+/g, ' ')) : '';
+
+    // ✅ Use friendly message for declines/errors if available
+    if (specificResponseCode && NMI_RESPONSE_CODES[specificResponseCode]) {
+      // Append specific detail to generic message, or replace it if generic is vague
+      responseMessage = NMI_RESPONSE_CODES[specificResponseCode];
+    }
 
     const success = responseCode === '1';
 
     const logData = {
       success,
       responseCode,
+      specificResponseCode, // Log this for debugging
       transactionId,
       message: responseMessage,
     };
@@ -452,7 +500,8 @@ const chargeCustomerVault = async (customerVaultId, amount, description = '') =>
       success,
       transactionId,
       responseCode,
-      message: responseMessage,
+      specificResponseCode, // Return for storage
+      message: responseMessage, // Now contains friendly message
       rawResponse: responseText,
       paymentMethod: `${cardType} •••• ${last4}`, // ✅ Formatted display
       cardType: cardType, // ✅ Card brand

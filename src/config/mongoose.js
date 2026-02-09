@@ -3,7 +3,7 @@ const config = require('./config');
 const cluster = require('cluster');
 
 const {
-    server: { mongoHost, mongoPort, db, poolSize,MONGODB_URI }
+    server: { mongoHost, mongoPort, db, poolSize, MONGODB_URI }
 } = config;
 
 const mongoUrl = MONGODB_URI || `mongodb://${mongoHost}:${mongoPort}/${db}?maxPoolSize=${poolSize}`;
@@ -12,7 +12,7 @@ const mongoUrl = MONGODB_URI || `mongodb://${mongoHost}:${mongoPort}/${db}?maxPo
 exports.connect = () => {
     mongoose.set('strictQuery', true);
     mongoose
-        .connect(mongoUrl)
+        .connect(mongoUrl, { family: 4 })
         .then(() => {
             if (cluster.isMaster) console.log('Successfully connected to mongo database');
         })

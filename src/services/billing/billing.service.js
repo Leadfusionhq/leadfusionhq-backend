@@ -360,6 +360,7 @@ const recordRecoveryTransactions = async (userId, fromBalance, fromCard, vaultId
       paymentMethod: 'CARD',
       transactionId: chargeResult.transactionId,
       paymentMethodDetails: { customerVaultId: vaultId },
+      responseCode: chargeResult.specificResponseCode, // ✅ Store specific NMI code
       balanceAfter: finalBalance
     }).save();
   }
@@ -528,16 +529,18 @@ const addFunds = async (userId, amount, vaultId = null) => {
       amount,
       vaultId: customerVaultIdToUse,
       responseCode: chargeResult.responseCode,
+      specificResponseCode: chargeResult.specificResponseCode, // ✅ Log specific code
       message: chargeResult.message
     });
 
     console.log(`Error received in billing service: ${chargeResult.message}`);
 
-    // Handle specific decline cases
+    // Handle specific decline cases - now using friendly messages from NMI service
     if (chargeResult.responseCode === '2') {
-      throw new ErrorHandler(400, `Payment declined: ${chargeResult.message}. Please use a different payment method.`);
+      // chargeResult.message will now be "Insufficient funds" etc. if mapped
+      throw new ErrorHandler(400, `Payment declined: ${chargeResult.message}`);
     } else if (chargeResult.responseCode === '3') {
-      throw new ErrorHandler(400, 'Payment error. Please contact your bank or use a different card.');
+      throw new ErrorHandler(400, `Payment error: ${chargeResult.message}`);
     }
 
     throw new ErrorHandler(400, 'Payment failed: ' + chargeResult.message);
@@ -695,11 +698,10 @@ const addFunds = async (userId, amount, vaultId = null) => {
       transactionId: chargeResult.transactionId,
       balanceAfter: newBalance,
       // Store payment method details for reference
-      paymentMethodDetails: {
-        lastFour: defaultPaymentMethod.cardLastFour,
-        brand: defaultPaymentMethod.brand,
-        customerVaultId: customerVaultIdToUse
-      }
+      lastFour: defaultPaymentMethod.cardLastFour,
+      brand: defaultPaymentMethod.brand,
+      customerVaultId: customerVaultIdToUse,
+      responseCode: chargeResult.specificResponseCode // ✅ Store specific NMI code
     });
     await transaction.save();
 
@@ -797,6 +799,7 @@ const assignLead = async (userId, leadId, leadCost, assignedBy) => {
       description: `Lead assigned: ${leadId} (Auto-charged)`,
       paymentMethod: 'CARD',
       transactionId: chargeResult.transactionId,
+      responseCode: chargeResult.specificResponseCode, // ✅ Store specific NMI code
       leadId,
       assignedBy,
       balanceAfter: user.balance
