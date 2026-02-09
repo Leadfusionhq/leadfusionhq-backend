@@ -1103,9 +1103,9 @@ const sendTransactionEmail = async ({
         </td>
         <td valign="top" align="right" style="padding:0; margin:0; vertical-align:top; width:50%;">
           <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse; margin:0;">
-            <tr><td align="right" style="font-size:12px; color:#555;">Invoice No</td></tr>
+            <tr><td align="right" style="font-size:12px; color:#555;">Transaction Id</td></tr>
             <tr><td align="right" style="font-size:12px; color:#111; font-weight:bold;">${transactionId}</td></tr>
-            <tr><td align="right" style="font-size:12px; color:#555; padding-top:8px;">Invoice Date</td></tr>
+            <tr><td align="right" style="font-size:12px; color:#555; padding-top:8px;">Date</td></tr>
             <tr><td align="right" style="font-size:12px; color:#111; font-weight:bold;">${displayDate}</td></tr>
           </table>
         </td>

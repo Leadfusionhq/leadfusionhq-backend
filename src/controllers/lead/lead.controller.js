@@ -95,7 +95,7 @@ const { formatFullAddress } = require('../../utils/address.utile.js');
 //           campaignName: campaign.name,
 //           payment_type: campaign.payment_type,
 //           full_address: result.address.full_address,
-//           transactionId: billingResult.transactionId,
+//           transactionId: billingResult.gatewayTransactionId || billingResult.transactionId,
 //           newBalance: billingResult.newBalance,
 //           leadData: {
 //             first_name: result.first_name,
@@ -326,7 +326,7 @@ const createLead = wrapAsync(async (req, res) => {
       status: isPaid ? 'active' : 'payment_pending',
       payment_status: isPaid ? 'paid' : 'pending',
       lead_cost: leadCost,
-      transaction_id: isPaid ? billingResult.transactionId : null,
+      transaction_id: isPaid ? (billingResult.gatewayTransactionId || billingResult.transactionId) : null,
       original_cost: leadCost,
       payment_error_message: isPaid ? null : billingResult.message
     };

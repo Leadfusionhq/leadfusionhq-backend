@@ -239,7 +239,7 @@ const testAutoTopUp = wrapAsync(async (req, res) => {
                     to: user.email,
                     userName: user.name,
                     amount: result.topUpAmount,
-                    transactionId: result.topUpTransactionId,
+                    transactionId: result.paymentTransactionId || result.transactionId,
                     triggerReason: `Balance below threshold after lead deduction`,
                     newBalance: result.newBalance,
                     threshold: result.threshold || 50
@@ -300,7 +300,7 @@ const addFunds = wrapAsync(async (req, res) => {
                 to: user.email,
                 userName: user.name,
                 amount: amount,
-                transactionId: result.transactionId,
+                transactionId: result.nmiTransactionId || result.transactionId,
                 paymentMethod: result.paymentMethod || 'Card',
                 newBalance: result.newBalance
             });
