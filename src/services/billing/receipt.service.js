@@ -27,7 +27,7 @@ async function sendLeadPaymentReceipt({
             campaignName: campaign.name,
             payment_type: campaign.payment_type,
             full_address: full_address,
-            transactionId: billingResult.transactionId,
+            transactionId: billingResult.gatewayTransactionId || billingResult.transactionId,
             newBalance: billingResult.newBalance,
             amountFromBalance: billingResult.amountFromBalance,
             amountFromCard: billingResult.amountFromCard,
