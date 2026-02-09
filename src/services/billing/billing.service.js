@@ -287,6 +287,50 @@ const processPendingPaymentRecovery = async (userParam, vaultId, options = {}) =
     chargeResult = await chargeCustomerVault(vaultId, amountFromCard, `Recovery: ${leadsToRecover.length} leads`);
     if (!chargeResult.success) {
       billingLogger.warn('Recovery charge failed', { userId: user._id, message: chargeResult.message });
+
+      // 🛑 Send Failure Emails (User + Admin)
+      try {
+        const cardUsed = user.paymentMethods?.find(pm => pm.customerVaultId === vaultId);
+        const cardLast4 = cardUsed ? cardUsed.cardLastFour : 'N/A';
+        const leadIdLabel = `Batch Recovery (${leadsToRecover.length} leads)`;
+
+        // 1. User Email
+        await MAIL_HANDLER.sendFailedLeadPaymentEmail({
+          to: user.email,
+          userName: user.name || user.fullName || 'User',
+          leadId: leadIdLabel,
+          amount: amountFromCard,
+          cardLast4: cardLast4,
+          errorMessage: chargeResult.message
+        });
+
+        // 2. Admin Email
+        const EXCLUDED = new Set(["admin@gmail.com", "admin123@gmail.com", "admin1234@gmail.com"]);
+        let adminEmails = [];
+
+        // Try ENV first
+        if (process.env.ADMIN_NOTIFICATION_EMAILS) {
+          adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS
+            .split(',')
+            .map(e => e.trim().toLowerCase())
+            .filter(Boolean);
+        }
+
+        if (adminEmails.length > 0) {
+          const emailString = adminEmails.join(',');
+          await MAIL_HANDLER.sendFailedLeadPaymentAdminEmail({
+            to: emailString,
+            userEmail: user.email,
+            userName: user.name || "",
+            leadId: leadIdLabel,
+            amount: amountFromCard,
+            cardLast4: cardLast4,
+            errorMessage: chargeResult.message
+          });
+        }
+      } catch (emailErr) {
+        billingLogger.error('Failed to send recovery failure emails', emailErr);
+      }
       return { success: false, message: chargeResult.message };
     }
   }
