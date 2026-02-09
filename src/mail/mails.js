@@ -2275,7 +2275,7 @@ const sendCampaignResumedAdminEmail = async ({ to, userName, userEmail, partnerI
 
 const sendFailedLeadPaymentEmail = async ({ to, userName, leadId, amount, cardLast4, errorMessage }) => {
   const html = createEmailTemplate({
-    title: '❌ Lead Payment Failed',
+    title: 'Lead Payment Failed',
     greeting: `Hello ${userName},`,
     mainText: `
       <p>Your Pay-As-You-Go payment for a new lead has failed.</p>
@@ -2293,7 +2293,7 @@ const sendFailedLeadPaymentEmail = async ({ to, userName, leadId, amount, cardLa
   return resend.emails.send({
     from: FROM_EMAIL,
     to,
-    subject: "❌ Lead Payment Failed",
+    subject: "Lead Payment Failed",
     html
   });
 };
