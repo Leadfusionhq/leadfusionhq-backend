@@ -783,8 +783,8 @@ export default function LeadTable() {
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${activeTab === tab.id
-                  ? 'bg-black text-white'
-                  : 'bg-white text-gray-600 border border-gray-200'
+                ? 'bg-black text-white'
+                : 'bg-white text-gray-600 border border-gray-200'
                 }`}
             >
               {tab.label}
@@ -1017,12 +1017,14 @@ export default function LeadTable() {
   );
 }
 
-// --- Action Menu Component ---
 const ActionMenu = ({ row, onView, onReturn, onPay, canReturn, canPay }: { row: Lead, onView: () => void, onReturn: () => void, onPay: () => void, canReturn: boolean, canPay: boolean }) => {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => setAnchorEl(e.currentTarget);
   const handleClose = () => setAnchorEl(null);
+
+  // Determine if return is technically possible but blocked by payment
+  const isReturnBlockedByPayment = canReturn && canPay;
 
   return (
     <>
@@ -1058,9 +1060,19 @@ const ActionMenu = ({ row, onView, onReturn, onPay, canReturn, canPay }: { row: 
         )}
 
         {canReturn && (
-          <MenuItem onClick={() => { onReturn(); handleClose(); }} disableRipple className="text-sm font-medium text-rose-600 gap-2 hover:bg-rose-50 py-2">
-            <RotateCcw size={16} className="text-rose-500" /> Return Lead
-          </MenuItem>
+          isReturnBlockedByPayment ? (
+            <Tooltip title="Start payment to enable return" placement="left" arrow>
+              <div>
+                <MenuItem disabled className="text-sm font-medium text-gray-400 gap-2 py-2 opacity-60">
+                  <RotateCcw size={16} /> Return Lead
+                </MenuItem>
+              </div>
+            </Tooltip>
+          ) : (
+            <MenuItem onClick={() => { onReturn(); handleClose(); }} disableRipple className="text-sm font-medium text-rose-600 gap-2 hover:bg-rose-50 py-2">
+              <RotateCcw size={16} className="text-rose-500" /> Return Lead
+            </MenuItem>
+          )
         )}
       </Menu>
     </>
