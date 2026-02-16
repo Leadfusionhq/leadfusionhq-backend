@@ -1,4 +1,5 @@
 const { User } = require('../models/user.model');
+const Lead = require('../models/lead.model');
 const { ErrorHandler } = require('../utils/error-handler');
 const OTP = require('../models/otp.model');
 const CONSTANT_ENUM = require('../helper/constant-enums');
@@ -148,15 +149,54 @@ const getAllUsersService = async (page, limit, filter = {}, search = "") => {
 
   const skip = (page - 1) * limit;
 
-  const data = await User.find(query)
+  // 1. Fetch Users (Plain JS objects)
+  const users = await User.find(query)
     .limit(limit)
     .skip(skip)
     .lean();
 
   const total = await User.countDocuments(query);
 
+  // 2. Extract User IDs
+  const userIds = users.map(u => u._id);
+
+  // 3. Single Aggregation to get Pending Balances for these users only
+  const pendingBalances = await Lead.aggregate([
+    {
+      $match: {
+        user_id: { $in: userIds },
+        payment_status: 'pending' // Only count pending payments
+      }
+    },
+    {
+      $group: {
+        _id: "$user_id",
+        totalPending: { $sum: "$lead_cost" },
+        count: { $sum: 1 }
+      }
+    }
+  ]);
+
+  // 4. Map balances back to users in memory
+  // Create a lookup map for faster access
+  const balanceMap = {};
+  pendingBalances.forEach(b => {
+    balanceMap[b._id.toString()] = b;
+  });
+
+  const usersWithBalance = users.map(user => {
+    const balanceInfo = balanceMap[user._id.toString()];
+    return {
+      ...user,
+      pending_payment_calculated: {
+        amount: balanceInfo ? balanceInfo.totalPending : 0,
+        count: balanceInfo ? balanceInfo.count : 0
+      }
+    };
+  });
+
   return {
-    data,
+    data: usersWithBalance,
     total,
     page,
     limit,
