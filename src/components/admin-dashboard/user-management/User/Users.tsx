@@ -79,6 +79,10 @@ type User = {
     };
   };
   paymentMethods?: PaymentMethod[];
+  pending_payment_calculated?: {
+    amount: number;
+    count: number;
+  };
 };
 
 type ApiResponse = {
@@ -598,6 +602,25 @@ export default function UserTable() {
           ${(row.original.balance ?? 0).toFixed(2)}
         </span>
       ),
+    },
+    {
+      id: "pending_payment",
+      header: "Pending Payment",
+      cell: ({ row }) => {
+        const pending = row.original.pending_payment_calculated;
+        if (!pending || pending.count === 0) return <span className="text-gray-400 text-xs">-</span>;
+
+        return (
+          <div className="flex flex-col">
+            <span className="text-sm font-semibold text-rose-600">
+              ${pending.amount.toFixed(2)}
+            </span>
+            <span className="text-xs text-rose-500 font-medium">
+              {pending.count} {pending.count === 1 ? 'Lead' : 'Leads'}
+            </span>
+          </div>
+        );
+      },
     },
     {
       id: "actions",
