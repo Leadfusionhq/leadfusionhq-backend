@@ -109,6 +109,15 @@ const getRevenueFromGateway = wrapAsync(async (req, res) => {
     }, 'Revenue fetched successfully');
 });
 
+const getAllSystemTransactions = wrapAsync(async (req, res) => {
+    try {
+        const transactions = await BillingServices.getAllSystemTransactions(50);
+        return sendResponse(res, { transactions }, 'System transactions retrieved');
+    } catch (error) {
+        throw new ErrorHandler(500, 'Failed to fetch system transactions');
+    }
+});
+
 
 const acceptContract = wrapAsync(async (req, res) => {
     const user_id = req.user._id;
@@ -383,6 +392,53 @@ const getTransactions = wrapAsync(async (req, res) => {
     }
 });
 
+const getUsersTransactions = wrapAsync(async (req, res) => {
+    // const { page, limit } = getPaginationParams(req.query); // Not needed for "get all"
+    const filters = extractFilters(req.query, ['type', 'status', 'dateFrom', 'dateTo']);
+
+    // Handle nested params structure if present (e.g., from axios params serializer issue)
+    let userId = req.query.userId || req.query['params[userId]'];
+
+    // If query string parser handled it differently
+    if (!userId && req.query.params && typeof req.query.params === 'object') {
+        userId = req.query.params.userId;
+    }
+
+    // Fallback to logged in user if still not provided
+    if (!userId) {
+        userId = req.user?._id;
+    }
+
+    if (userId) {
+        userId = userId.toString().trim();
+    }
+
+    console.log('DEBUG: getUsersTransactions resolved userId:', userId);
+
+    if (!userId) {
+        throw new ErrorHandler(400, 'User ID is required.');
+    }
+
+    try {
+        const transactions = await BillingServices.getAllUsersTransactions(userId, filters);
+
+        return sendResponse(res, {
+            transactions,
+            count: transactions.length
+        }, 'All user transactions retrieved successfully');
+
+    } catch (err) {
+        console.error(`Failed to get all transactions:`, err.message);
+
+        // Check if it's a known error or a database error
+        if (err.message.includes('Failed to retrieve all user transactions')) {
+            throw new ErrorHandler(500, 'Failed to retrieve transactions. Please try again later.');
+        } else {
+            throw new ErrorHandler(400, 'Invalid request parameters.');
+        }
+    }
+});
+
 
 // Update the toggleAutoTopUp function:
 const toggleAutoTopUp = wrapAsync(async (req, res) => {
@@ -565,5 +621,7 @@ module.exports = {
     testAutoTopUp,
     getRevenueFromGateway,
     getReceipt,
-    retryPendingPayments
+    retryPendingPayments,
+    getUsersTransactions,
+    getAllSystemTransactions
 };

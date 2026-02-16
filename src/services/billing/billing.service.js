@@ -1364,6 +1364,61 @@ const getUserTransactions = async (userId, page = 1, limit = 20, filters = {}) =
   }
 };
 
+const getAllUsersTransactions = async (userId, filters = {}) => {
+  const query = { userId: new mongoose.Types.ObjectId(userId) };
+
+  console.log('DEBUG: getAllUsersTransactions Service - Query:', JSON.stringify(query));
+
+  // Apply filters
+  if (filters.type) query.type = filters.type;
+  if (filters.status) query.status = filters.status;
+
+  // Date range filter
+  if (filters.dateFrom || filters.dateTo) {
+    query.createdAt = {};
+    if (filters.dateFrom) {
+      query.createdAt.$gte = new Date(filters.dateFrom);
+      // If only dateFrom is provided, set time to start of day
+      if (!filters.dateTo) {
+        query.createdAt.$lte = new Date(new Date(filters.dateFrom).setHours(23, 59, 59, 999));
+      }
+    }
+    if (filters.dateTo) {
+      query.createdAt.$lte = new Date(new Date(filters.dateTo).setHours(23, 59, 59, 999));
+      // If only dateTo is provided, set time to start of day for lower bound
+      if (!filters.dateFrom) {
+        query.createdAt.$gte = new Date(new Date(filters.dateTo).setHours(0, 0, 0, 0));
+      }
+    }
+  }
+
+  try {
+    const transactions = await Transaction.find(query)
+      .sort({ createdAt: -1 })
+      .populate('userId', 'name email') // Populate basic user info as requested
+      .lean();
+
+    console.log(`DEBUG: getAllUsersTransactions Service - Found ${transactions.length} records`);
+    return transactions;
+  } catch (error) {
+    console.error('Error fetching all user transactions:', error);
+    throw new Error('Failed to retrieve all user transactions');
+  }
+};
+
+const getAllSystemTransactions = async (limit = 10) => {
+  try {
+    const transactions = await Transaction.find({})
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+    return transactions;
+  } catch (error) {
+    console.error('Error fetching all system transactions:', error);
+    throw new Error('Failed to retrieve system transactions');
+  }
+};
+
 // Rename toggleAutoTopUp to updatePaymentMode:
 const updatePaymentMode = async (userId, paymentModeData) => {
   const user = await User.findById(userId);
@@ -2046,6 +2101,8 @@ module.exports = {
   manualCharge,
   getUserBalance,
   getUserTransactions,
+  getAllUsersTransactions,
+  getAllSystemTransactions,
   updatePaymentMode,
   deleteUserCard,
   testLeadDeduction,
