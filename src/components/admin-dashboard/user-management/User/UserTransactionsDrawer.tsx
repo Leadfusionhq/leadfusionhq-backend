@@ -197,10 +197,10 @@ export default function UserTransactionsDrawer({
                                                             label={tx.type.replace(/_/g, ' ')}
                                                             size="small"
                                                             className={`uppercase text-[10px] font-bold tracking-wide rounded-lg border-0 ${isCredit
-                                                                    ? 'bg-emerald-50 text-emerald-700'
-                                                                    : tx.type === 'LEAD_ASSIGNMENT'
-                                                                        ? 'bg-blue-50 text-blue-700'
-                                                                        : 'bg-gray-100 text-gray-600'
+                                                                ? 'bg-emerald-50 text-emerald-700'
+                                                                : tx.type === 'LEAD_ASSIGNMENT'
+                                                                    ? 'bg-blue-50 text-blue-700'
+                                                                    : 'bg-gray-100 text-gray-600'
                                                                 }`}
                                                         />
                                                     </TableCell>
