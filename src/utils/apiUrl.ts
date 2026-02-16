@@ -257,6 +257,7 @@ export const BILLING_API = {
   SET_DEFAULT_CARD: `${BILLING_API_BASE}/cards/default`,
   DELETE_CARD: `${BILLING_API_BASE}/cards`,
   TRANSACTIONS: `${BILLING_API_BASE}/transactions`,
+  USERS_TRANSACTIONS: `${BILLING_API_BASE}/users-transactions`,
   AUTO_TOPUP: `${BILLING_API_BASE}/auto-topup/toggle`,
   TEST_AUTO_TOPUP: `${BILLING_API_BASE}/test-auto-topup`,
   GET_BALANCE: `${BILLING_API_BASE}/balance`,
