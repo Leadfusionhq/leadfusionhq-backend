@@ -24,6 +24,7 @@ const API = {
   CHARGE_USER: '/charge-user',
   BALANCE: '/balance',
   TRANSACTIONS: '/transactions',
+  USERS_TRANSACTIONS: '/users-transactions',
   AUTO_TOP_UP: '/auto-topup/toggle',
   GET_CONTRACT: '/contract/current',
   CONTRACT_STATUS: '/contract/status',
@@ -145,6 +146,11 @@ billingRouter.get(
   billingController.getTransactions
 );
 
+billingRouter.get(
+  API.USERS_TRANSACTIONS,
+  billingController.getUsersTransactions
+);
+
 billingRouter.post(
   API.AUTO_TOP_UP,
   celebrate(BillingSchema.toggleAutoTopUp),
@@ -155,6 +161,11 @@ billingRouter.get(
   // checkAuth,
   // authorizedRoles([CONSTANT_ENUM.USER_ROLE.ADMIN]),
   billingController.getRevenueFromGateway
+);
+
+billingRouter.get(
+  '/all-sys-transactions',
+  billingController.getAllSystemTransactions
 );
 
 
