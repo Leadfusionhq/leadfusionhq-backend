@@ -45,6 +45,7 @@ import { toast } from 'react-toastify';
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 import { Menu, MenuItem, IconButton, Tooltip, Popover, List, ListItem, ListItemIcon, ListItemText, Typography, Divider, Chip } from "@mui/material";
 import useDebounce from '@/hooks/useDebounce';
+import UserTransactionsDrawer from './UserTransactionsDrawer';
 
 // --- Types ---
 type PaymentMethod = {
@@ -299,6 +300,8 @@ export default function UserTable() {
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [transactionDrawerOpen, setTransactionDrawerOpen] = useState(false);
+  const [transactionUser, setTransactionUser] = useState<User | null>(null);
 
   const [pagination, setPagination] = useState({
     pageIndex: 0,
@@ -612,6 +615,10 @@ export default function UserTable() {
             onSyncBoberdoo={() => handleSyncBoberdoo(user)}
             onToggleStatus={() => handleToggleUser(user)}
             onSendWebhook={() => handleSendTopUpWebhook(user)}
+            onViewTransactions={() => {
+              setTransactionUser(user);
+              setTransactionDrawerOpen(true);
+            }}
           />
         )
       }
@@ -1014,6 +1021,12 @@ export default function UserTable() {
         onConfirm={confirmDeleteUser}
         onCancel={() => setConfirmOpen(false)}
       />
+      <UserTransactionsDrawer
+        open={transactionDrawerOpen}
+        onClose={() => setTransactionDrawerOpen(false)}
+        userId={transactionUser?._id || null}
+        userName={transactionUser?.name || ''}
+      />
     </div>
   );
 }
@@ -1109,7 +1122,8 @@ const ActionMenu = ({
   onResendVerification,
   onSyncBoberdoo,
   onToggleStatus,
-  onSendWebhook
+  onSendWebhook,
+  onViewTransactions
 }: {
   user: User;
   onEdit: () => void;
@@ -1120,6 +1134,7 @@ const ActionMenu = ({
   onSyncBoberdoo: () => void;
   onToggleStatus: () => void;
   onSendWebhook: () => void;
+  onViewTransactions: () => void;
 }) => {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
@@ -1195,6 +1210,10 @@ const ActionMenu = ({
         {/* <MenuItem onClick={() => { onDelete(); handleClose(); }} disableRipple className="text-sm font-medium text-red-600 gap-2">
           <Trash2 size={16} /> Delete User
         </MenuItem> */}
+
+        <MenuItem onClick={() => { onViewTransactions(); handleClose(); }} disableRipple className="text-sm font-medium text-gray-700 gap-2">
+          <History size={16} /> View Transactions
+        </MenuItem>
       </Menu>
     </>
   );
