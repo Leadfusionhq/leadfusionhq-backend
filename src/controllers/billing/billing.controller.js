@@ -603,6 +603,36 @@ const retryPendingPayments = wrapAsync(async (req, res) => {
     }
 });
 
+const adminRetryPendingPayments = wrapAsync(async (req, res) => {
+    const { userId } = req.body;
+    const adminId = req.user._id;
+
+    billingLogger.info('Admin attempting retry of pending payments', { adminId, targetUserId: userId });
+
+    if (!userId) {
+        throw new ErrorHandler(400, 'User ID is required');
+    }
+
+    try {
+        const result = await BillingServices.retryUserPendingPayments(userId);
+
+        return sendResponse(
+            res,
+            { result },
+            result.message || 'Payment retry completed successfully',
+            200
+        );
+    } catch (err) {
+        billingLogger.error('Failed to retry pending payments (Admin initiated)', err, { adminId, targetUserId: userId });
+
+        if (err.statusCode) {
+            throw err;
+        }
+
+        throw new ErrorHandler(500, 'Failed to retry payments. Please try again later.');
+    }
+});
+
 module.exports = {
     chargeSingleLead,
     getCurrentContract,
@@ -622,6 +652,7 @@ module.exports = {
     getRevenueFromGateway,
     getReceipt,
     retryPendingPayments,
+    adminRetryPendingPayments,
     getUsersTransactions,
     getAllSystemTransactions
 };

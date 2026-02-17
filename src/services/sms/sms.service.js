@@ -119,8 +119,14 @@ const listSentSms = async (opts = {}) => {
   }
 
   try {
-    const response = await smsService.listSentSms(opts);
-    return { success: true, data: response };
+    // Clean up undefined/null values from opts
+    const cleanOpts = Object.fromEntries(
+      Object.entries(opts).filter(([_, v]) => v != null && v !== '')
+    );
+
+    console.log('[Notifyre] Listing sent SMS with opts:', cleanOpts);
+    const response = await smsService.listSentSms(cleanOpts);
+    return { success: true, data: response.payload || response };
   } catch (err) {
     console.error('[Notifyre] listSentSms error', err);
     return {
