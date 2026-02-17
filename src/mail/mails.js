@@ -2341,7 +2341,8 @@ const sendPendingLeadsPaymentSuccessEmail = async ({
   totalAmount,
   newBalance,
   paymentMethod,
-  cardLast4
+  cardLast4,
+  amountBreakdown // { balance: 0, card: 0 }
 }) => {
   // Build leads table rows
   const leadsTableRows = chargedLeads.map((lead, index) => `
@@ -2400,6 +2401,16 @@ const sendPendingLeadsPaymentSuccessEmail = async ({
         <td style="border: 1px solid #e0e0e0; padding: 12px;"><strong>Payment Method</strong></td>
         <td style="border: 1px solid #e0e0e0; padding: 12px;">${paymentMethod === 'CARD' ? `Card **** ${cardLast4}` : paymentMethod === 'MIXED' ? 'Balance + Card' : 'Account Balance'}</td>
       </tr>
+      ${amountBreakdown?.balance > 0 ? `
+      <tr>
+        <td style="border: 1px solid #e0e0e0; padding: 12px;"><strong>Paid from Wallet</strong></td>
+        <td style="border: 1px solid #e0e0e0; padding: 12px;">$${amountBreakdown.balance.toFixed(2)}</td>
+      </tr>` : ''}
+      ${amountBreakdown?.card > 0 ? `
+      <tr>
+        <td style="border: 1px solid #e0e0e0; padding: 12px;"><strong>Paid from Card</strong></td>
+        <td style="border: 1px solid #e0e0e0; padding: 12px;">$${amountBreakdown.card.toFixed(2)}</td>
+      </tr>` : ''}
       <tr>
         <td style="border: 1px solid #e0e0e0; padding: 12px;"><strong>Remaining Balance</strong></td>
         <td style="border: 1px solid #e0e0e0; padding: 12px;">$${newBalance?.toFixed(2) || '0.00'}</td>
@@ -2458,7 +2469,8 @@ const sendPendingLeadsPaymentSuccessAdminEmail = async ({
   totalAmount,
   newBalance,
   paymentMethod,
-  cardLast4
+  cardLast4,
+  amountBreakdown // { balance: 0, card: 0 }
 }) => {
   const recipients = Array.isArray(to) ? to : [to];
 
@@ -2532,6 +2544,16 @@ const sendPendingLeadsPaymentSuccessAdminEmail = async ({
         <td style="border: 1px solid #e0e0e0; padding: 12px;"><strong>Payment Method</strong></td>
         <td style="border: 1px solid #e0e0e0; padding: 12px;">${paymentMethod === 'CARD' ? `Card **** ${cardLast4}` : paymentMethod === 'MIXED' ? 'Balance + Card' : 'Account Balance'}</td>
       </tr>
+      ${amountBreakdown?.balance > 0 ? `
+      <tr>
+        <td style="border: 1px solid #e0e0e0; padding: 12px;"><strong>Paid from Wallet</strong></td>
+        <td style="border: 1px solid #e0e0e0; padding: 12px;">$${amountBreakdown.balance.toFixed(2)}</td>
+      </tr>` : ''}
+      ${amountBreakdown?.card > 0 ? `
+      <tr>
+        <td style="border: 1px solid #e0e0e0; padding: 12px;"><strong>Paid from Card</strong></td>
+        <td style="border: 1px solid #e0e0e0; padding: 12px;">$${amountBreakdown.card.toFixed(2)}</td>
+      </tr>` : ''}
       <tr>
         <td style="border: 1px solid #e0e0e0; padding: 12px;"><strong>User's Remaining Balance</strong></td>
         <td style="border: 1px solid #e0e0e0; padding: 12px;">$${newBalance?.toFixed(2) || '0.00'}</td>
