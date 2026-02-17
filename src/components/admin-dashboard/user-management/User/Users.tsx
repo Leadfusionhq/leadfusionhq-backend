@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, useMemo } from "react";
-import { API_URL } from '@/utils/apiUrl';
+import { API_URL, BILLING_API } from '@/utils/apiUrl';
 import axiosWrapper from '@/utils/api';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/redux/store';
@@ -39,7 +39,8 @@ import {
   AlertCircle,
   Users as UsersIcon,
   UserPlus,
-  UserCheck
+  UserCheck,
+  Banknote
 } from "lucide-react";
 import { toast } from 'react-toastify';
 import ConfirmDialog from "@/components/common/ConfirmDialog";
@@ -492,6 +493,25 @@ export default function UserTable() {
     }
   };
 
+  const handlePayPending = async (row: User) => {
+    const toastId = toast.loading(`Retrying payment for ${row.name}...`);
+    try {
+      const response = await axiosWrapper("post", BILLING_API.ADMIN_RETRY_PENDING_PAYMENTS, { userId: row._id }, token ?? undefined) as any;
+      if (response?.error) throw new Error(response.error);
+
+      toast.update(toastId, { render: response?.message || "Payment retry initiated successfully", type: "success", isLoading: false, autoClose: 3000 });
+      fetchUsers(pagination.pageIndex + 1, pagination.pageSize, globalFilter, statusFilter);
+    } catch (err: any) {
+      let errorMessage = 'Failed to retry payment';
+      if (err?.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err?.message) {
+        errorMessage = err.message;
+      }
+      toast.update(toastId, { render: errorMessage, type: "error", isLoading: false, autoClose: 5000 });
+    }
+  };
+
 
   // --- Table Setup ---
 
@@ -638,6 +658,7 @@ export default function UserTable() {
             onSyncBoberdoo={() => handleSyncBoberdoo(user)}
             onToggleStatus={() => handleToggleUser(user)}
             onSendWebhook={() => handleSendTopUpWebhook(user)}
+            onPayPending={() => handlePayPending(user)}
             onViewTransactions={() => {
               setTransactionUser(user);
               setTransactionDrawerOpen(true);
@@ -1146,7 +1167,8 @@ const ActionMenu = ({
   onSyncBoberdoo,
   onToggleStatus,
   onSendWebhook,
-  onViewTransactions
+  onViewTransactions,
+  onPayPending
 }: {
   user: User;
   onEdit: () => void;
@@ -1157,6 +1179,7 @@ const ActionMenu = ({
   onSyncBoberdoo: () => void;
   onToggleStatus: () => void;
   onSendWebhook: () => void;
+  onPayPending: () => void;
   onViewTransactions: () => void;
 }) => {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -1233,6 +1256,13 @@ const ActionMenu = ({
         {/* <MenuItem onClick={() => { onDelete(); handleClose(); }} disableRipple className="text-sm font-medium text-red-600 gap-2">
           <Trash2 size={16} /> Delete User
         </MenuItem> */}
+
+        <MenuItem onClick={() => { onPayPending(); handleClose(); }} disableRipple
+          className={`text-sm font-medium gap-2 ${user?.pending_payment_calculated?.amount && user.pending_payment_calculated.amount > 0 ? 'text-rose-600' : 'text-gray-400 opacity-50 pointer-events-none'}`}
+          disabled={!user?.pending_payment_calculated?.amount || user.pending_payment_calculated.amount <= 0}
+        >
+          <Banknote size={16} /> Pay Pending Leads
+        </MenuItem>
 
         <MenuItem onClick={() => { onViewTransactions(); handleClose(); }} disableRipple className="text-sm font-medium text-gray-700 gap-2">
           <History size={16} /> View Transactions
