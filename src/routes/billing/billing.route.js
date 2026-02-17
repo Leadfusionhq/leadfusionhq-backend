@@ -204,4 +204,16 @@ billingRouter.post(
   billingController.retryPendingPayments
 );
 
+billingRouter.post(
+  '/admin/retry-pending-payments',
+  checkAuth,
+  authorizedRoles([CONSTANT_ENUM.USER_ROLE.ADMIN]),
+  celebrate({
+    [Segments.BODY]: Joi.object().keys({
+      userId: Joi.string().required().trim()
+    })
+  }),
+  billingController.adminRetryPendingPayments
+);
+
 module.exports = billingRouter;
