@@ -448,7 +448,11 @@ const handleRecoveryNotifications = async (user, fromCard, fromBalance, totalAmo
         totalAmount,
         newBalance: finalBalance,
         paymentMethod: paymentMethodStr,
-        cardLast4
+        cardLast4,
+        amountBreakdown: {
+          balance: fromBalance,
+          card: fromCard
+        }
       });
 
       if (user.phoneNumber) {
@@ -470,7 +474,11 @@ const handleRecoveryNotifications = async (user, fromCard, fromBalance, totalAmo
             totalAmount,
             newBalance: finalBalance,
             paymentMethod: paymentMethodStr,
-            cardLast4
+            cardLast4,
+            amountBreakdown: {
+              balance: fromBalance,
+              card: fromCard
+            }
           });
         }
       }
