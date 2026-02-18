@@ -428,7 +428,7 @@ const handleRecoveryNotifications = async (user, fromCard, fromBalance, totalAmo
 
   if (isFullClear) {
     try {
-      const paymentMethodStr = (fromCard > 0 && fromBalance > 0) ? 'SPLIT (Balance + Card)' : (fromCard > 0 ? 'CARD' : 'BALANCE');
+      const paymentMethodStr = (fromCard > 0 && fromBalance > 0) ? 'MIXED' : (fromCard > 0 ? 'CARD' : 'BALANCE');
       const cardLast4 = fromCard > 0 ? (chargeResult?.last4 || 'N/A') : 'N/A';
 
       const chargedLeads = leads.map(l => ({
