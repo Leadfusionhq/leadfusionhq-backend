@@ -28,6 +28,7 @@ import {
     Eye,
     Undo2,
     Users,
+    User,
     MapPin,
     Calendar,
     CreditCard,
@@ -82,6 +83,11 @@ type Lead = {
     return_reason?: string;
     return_comments?: string;
     return_attempts?: number;
+    user_id?: {
+        _id: string;
+        name: string;
+        email: string;
+    } | string;
 };
 
 type ApiResponse = {
@@ -240,6 +246,16 @@ const MobileLeadCard = ({ lead, onDelete, onReturn }: { lead: Lead, onDelete: ()
                     {new Date(lead.createdAt).toLocaleDateString()}
                 </span>
             </div>
+
+            {/* User Info */}
+            {typeof lead.user_id === 'object' && lead.user_id && (
+                <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-3 pb-3 border-b border-gray-50">
+                    <div className="w-4 h-4 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[9px] font-bold shrink-0 border border-indigo-200">
+                        {lead.user_id.name?.charAt(0)?.toUpperCase() || '?'}
+                    </div>
+                    <span className="truncate">{lead.user_id.name}</span>
+                </div>
+            )}
 
             {/* Status Row */}
             <div className="flex items-center gap-2 flex-wrap">
@@ -406,26 +422,47 @@ export default function AllLeadsTable({ defaultPaymentStatus, defaultReturnStatu
         {
             accessorKey: "lead_id",
             header: "Lead Info",
-            cell: ({ row }) => (
-                <div className="flex flex-col">
-                    <span className="text-sm font-semibold text-gray-900">{row.original.lead_id}</span>
-                    <div className="flex items-center gap-2 mt-0.5">
-                        <div className="flex items-center text-xs text-gray-500 gap-1">
-                            <Calendar size={12} />
-                            {new Date(row.original.createdAt).toLocaleDateString()}
-                        </div>
-                        {row.original.note && (
-                            <Tooltip title={row.original.note} arrow placement="top">
-                                <div className="group flex items-center gap-1 cursor-help bg-yellow-50 px-1.5 py-0.5 rounded border border-yellow-100 transition-colors hover:bg-yellow-100">
-                                    <FileText size={10} className="text-yellow-600" />
-                                    <span className="text-[10px] font-medium text-yellow-700">Note</span>
+            cell: ({ row }) => {
+                const user = typeof row.original.user_id === 'object' ? row.original.user_id : null;
+                return (
+                    <div className="flex items-start gap-2.5">
+                        {user && (
+                            <Tooltip
+                                title={
+                                    <div style={{ padding: '4px 0' }}>
+                                        <div style={{ fontWeight: 600, fontSize: '13px' }}>{user.name}</div>
+                                        <div style={{ fontSize: '11px', opacity: 0.8, marginTop: '2px' }}>{user.email}</div>
+                                    </div>
+                                }
+                                arrow
+                                placement="top"
+                            >
+                                <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[11px] font-bold cursor-help shrink-0 mt-0.5 border border-indigo-200 hover:bg-indigo-200 transition-colors">
+                                    {user.name?.charAt(0)?.toUpperCase() || <User size={12} />}
                                 </div>
                             </Tooltip>
                         )}
+                        <div className="flex flex-col min-w-0">
+                            <span className="text-sm font-semibold text-gray-900">{row.original.lead_id}</span>
+                            <div className="flex items-center gap-2 mt-0.5">
+                                <div className="flex items-center text-xs text-gray-500 gap-1">
+                                    <Calendar size={12} />
+                                    {new Date(row.original.createdAt).toLocaleDateString()}
+                                </div>
+                                {row.original.note && (
+                                    <Tooltip title={row.original.note} arrow placement="top">
+                                        <div className="group flex items-center gap-1 cursor-help bg-yellow-50 px-1.5 py-0.5 rounded border border-yellow-100 transition-colors hover:bg-yellow-100">
+                                            <FileText size={10} className="text-yellow-600" />
+                                            <span className="text-[10px] font-medium text-yellow-700">Note</span>
+                                        </div>
+                                    </Tooltip>
+                                )}
+                            </div>
+                        </div>
                     </div>
-                </div>
-            ),
-            size: 140
+                );
+            },
+            size: 160
         },
         {
             id: "contact",
