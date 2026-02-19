@@ -36,6 +36,7 @@ import {
   Undo2,
   Info,
   Users,
+  User,
   CheckCircle2,
   XCircle,
   AlertCircle,
@@ -81,6 +82,11 @@ type ReturnLead = {
   updatedAt: string;
   returned_at?: string;
   max_return_attempts?: number;
+  user_id?: {
+    _id: string;
+    name: string;
+    email: string;
+  } | string;
 };
 
 type ApiResponse = {
@@ -161,6 +167,16 @@ const MobileReturnCard = ({ lead, onApprove, onReject, onViewDetails }: {
           onViewDetails={onViewDetails}
         />
       </div>
+
+      {/* User Info */}
+      {typeof lead.user_id === 'object' && lead.user_id && (
+        <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-3">
+          <div className="w-4 h-4 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[9px] font-bold shrink-0 border border-indigo-200">
+            {lead.user_id.name?.charAt(0)?.toUpperCase() || '?'}
+          </div>
+          <span className="truncate">{lead.user_id.name}</span>
+        </div>
+      )}
 
       {/* Campaign & Date */}
       <div className="flex items-center justify-between text-xs text-gray-500 mb-3 pb-3 border-b border-gray-50">
@@ -308,15 +324,36 @@ export default function ReturnLeadsTable({ defaultStatus = "", isAllLeads = fals
     {
       accessorKey: "lead_id",
       header: "Lead Info",
-      cell: ({ row }) => (
-        <div className="flex flex-col">
-          <span className="text-sm font-semibold text-gray-900">{row.original.lead_id}</span>
-          <div className="flex items-center text-xs text-gray-500 mt-0.5 gap-1">
-            <span className="truncate max-w-[120px]">{typeof row.original.campaign_id === 'object' ? row.original.campaign_id.name : ''}</span>
+      cell: ({ row }) => {
+        const user = typeof row.original.user_id === 'object' ? row.original.user_id : null;
+        return (
+          <div className="flex items-start gap-2.5">
+            {user && (
+              <Tooltip
+                title={
+                  <div style={{ padding: '4px 0' }}>
+                    <div style={{ fontWeight: 600, fontSize: '13px' }}>{user.name}</div>
+                    <div style={{ fontSize: '11px', opacity: 0.8, marginTop: '2px' }}>{user.email}</div>
+                  </div>
+                }
+                arrow
+                placement="top"
+              >
+                <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[11px] font-bold cursor-help shrink-0 mt-0.5 border border-indigo-200 hover:bg-indigo-200 transition-colors">
+                  {user.name?.charAt(0)?.toUpperCase() || <User size={12} />}
+                </div>
+              </Tooltip>
+            )}
+            <div className="flex flex-col min-w-0">
+              <span className="text-sm font-semibold text-gray-900">{row.original.lead_id}</span>
+              <div className="flex items-center text-xs text-gray-500 mt-0.5 gap-1">
+                <span className="truncate max-w-[120px]">{typeof row.original.campaign_id === 'object' ? row.original.campaign_id.name : ''}</span>
+              </div>
+            </div>
           </div>
-        </div>
-      ),
-      size: 140
+        );
+      },
+      size: 160
     },
     {
       accessorKey: "first_name",
