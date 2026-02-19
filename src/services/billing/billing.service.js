@@ -2094,7 +2094,300 @@ const retryUserPendingPayments = async (userId) => {
   };
 };
 
+// --------------------------------------------------------------------------
+// Cron-Based Automated Payment Retry
+// --------------------------------------------------------------------------
 
+/**
+ * Calculate the next retry delay based on retry count (tiered backoff)
+ * Retry 1-2: 12 hours
+ * Retry 3:   24 hours
+ * Retry 4+:  48 hours
+ */
+const getRetryDelayHours = (retryCount) => {
+  if (retryCount <= 2) return 12;
+  if (retryCount === 3) return 24;
+  return 48;
+};
+
+const MAX_RETRY_COUNT = 7;
+const MAX_USERS_PER_RUN = 5;
+const DELAY_BETWEEN_USERS_MS = 3000;
+
+/**
+ * Automated cron retry for all users with pending payments.
+ * Called by the cron job — NOT by any HTTP route.
+ * 
+ * Safety rails:
+ * - Overlap guard (isRunning flag)
+ * - Max 5 users per run
+ * - 3s delay between users (NMI rate limit)
+ * - Max 7 retries per user before abandoning
+ * - Tiered exponential backoff
+ * - Per-user error isolation
+ */
+let _cronRetryIsRunning = false;
+
+const cronRetryPendingPayments = async () => {
+  if (_cronRetryIsRunning) {
+    billingLogger.warn('[CRON_RETRY] Skipping — previous run still in progress');
+    return { skipped: true, reason: 'Previous run still in progress' };
+  }
+
+  _cronRetryIsRunning = true;
+  const runStartedAt = new Date();
+  const results = { processed: 0, succeeded: 0, failed: 0, skipped: 0, abandoned: 0, errors: [] };
+
+  try {
+    billingLogger.info('[CRON_RETRY] Starting automated payment retry run', { startedAt: runStartedAt });
+
+    // 1. Find eligible users
+    const now = new Date();
+    const eligibleUsers = await User.find({
+      role: 'USER',
+      payment_error: true,
+      'pending_payment.amount': { $gt: 0 },
+      $or: [
+        { 'retry_metadata.next_retry_at': { $lte: now } },
+        { 'retry_metadata.next_retry_at': null }
+      ],
+      $and: [
+        {
+          $or: [
+            { 'retry_metadata.status': { $in: ['active', 'retrying'] } },
+            { 'retry_metadata.status': { $exists: false } }
+          ]
+        }
+      ]
+    })
+      .sort({ 'retry_metadata.next_retry_at': 1 }) // Oldest first
+      .limit(MAX_USERS_PER_RUN)
+      .select('_id name email paymentMethods pending_payment payment_error retry_metadata balance');
+
+    if (eligibleUsers.length === 0) {
+      billingLogger.info('[CRON_RETRY] No eligible users found. Exiting.');
+      return { ...results, message: 'No eligible users' };
+    }
+
+    billingLogger.info(`[CRON_RETRY] Found ${eligibleUsers.length} eligible users`, {
+      userIds: eligibleUsers.map(u => u._id)
+    });
+
+    // 2. Process each user sequentially
+    for (let i = 0; i < eligibleUsers.length; i++) {
+      const user = eligibleUsers[i];
+      const userLogMeta = {
+        userId: user._id,
+        email: user.email,
+        retryCount: user.retry_metadata?.retry_count || 0,
+        pendingAmount: user.pending_payment?.amount || 0
+      };
+
+      try {
+        // 2a. Check retry limit
+        const currentRetryCount = user.retry_metadata?.retry_count || 0;
+        if (currentRetryCount >= MAX_RETRY_COUNT) {
+          billingLogger.warn('[CRON_RETRY] User exceeded max retries — marking abandoned', userLogMeta);
+
+          await User.updateOne({ _id: user._id }, {
+            $set: {
+              'retry_metadata.status': 'abandoned',
+              'retry_metadata.last_retry_error': `Exceeded max retries (${MAX_RETRY_COUNT})`
+            }
+          });
+
+          // Send admin alert for abandoned
+          try {
+            let adminEmails = [];
+            if (process.env.ADMIN_NOTIFICATION_EMAILS) {
+              adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS
+                .split(',')
+                .map(e => e.trim().toLowerCase())
+                .filter(Boolean);
+            }
+            if (adminEmails.length > 0) {
+              await MAIL_HANDLER.sendFailedLeadPaymentAdminEmail({
+                to: adminEmails.join(','),
+                userEmail: user.email,
+                userName: user.name || '',
+                leadId: `ABANDONED: ${user.pending_payment?.count || 0} pending leads`,
+                amount: user.pending_payment?.amount || 0,
+                cardLast4: 'N/A',
+                errorMessage: `Auto-retry abandoned after ${MAX_RETRY_COUNT} attempts. Manual intervention required.`
+              });
+            }
+          } catch (emailErr) {
+            billingLogger.error('[CRON_RETRY] Failed to send abandoned notification email', emailErr);
+          }
+
+          results.abandoned++;
+          results.skipped++;
+          continue;
+        }
+
+        // 2b. Check card exists
+        const defaultCard = user.paymentMethods?.find(pm => pm.isDefault) || user.paymentMethods?.[0];
+        if (!defaultCard || !defaultCard.customerVaultId) {
+          billingLogger.warn('[CRON_RETRY] User has no valid card — skipping', userLogMeta);
+
+          await User.updateOne({ _id: user._id }, {
+            $set: {
+              'retry_metadata.last_retry_error': 'No valid payment method on file',
+              'retry_metadata.last_retry_at': now
+            }
+          });
+
+          // Email user to add a card (only once — on first skip)
+          if (currentRetryCount === 0) {
+            try {
+              await MAIL_HANDLER.sendFailedLeadPaymentEmail({
+                to: user.email,
+                userName: user.name || 'User',
+                leadId: `${user.pending_payment?.count || 0} pending leads`,
+                amount: user.pending_payment?.amount || 0,
+                cardLast4: 'None',
+                errorMessage: 'No payment method on file. Please add a card to complete your pending payments.'
+              });
+            } catch (emailErr) {
+              billingLogger.error('[CRON_RETRY] Failed to send no-card email', emailErr);
+            }
+          }
+
+          results.skipped++;
+          continue;
+        }
+
+        // 2c. Mark as retrying
+        await User.updateOne({ _id: user._id }, {
+          $set: { 'retry_metadata.status': 'retrying' }
+        });
+
+        // 2d. Execute retry using existing logic
+        billingLogger.info('[CRON_RETRY] Attempting payment retry', userLogMeta);
+
+        const retryResult = await retryUserPendingPayments(user._id);
+        results.processed++;
+
+        if (retryResult.success && retryResult.message !== 'No pending payments to recover') {
+          // ✅ SUCCESS
+          billingLogger.info('[CRON_RETRY] ✅ Payment retry succeeded', { ...userLogMeta, result: retryResult });
+
+          await User.updateOne({ _id: user._id }, {
+            $set: {
+              'retry_metadata.retry_count': 0,
+              'retry_metadata.last_retry_at': now,
+              'retry_metadata.next_retry_at': null,
+              'retry_metadata.last_retry_error': null,
+              'retry_metadata.status': 'resolved'
+            }
+          });
+
+          results.succeeded++;
+        } else if (retryResult.message === 'No pending payments to recover') {
+          // Already resolved (maybe user paid manually between cron runs)
+          billingLogger.info('[CRON_RETRY] No pending payments remaining — clearing error state', userLogMeta);
+
+          await User.updateOne({ _id: user._id }, {
+            $set: {
+              payment_error: false,
+              last_payment_error_message: null,
+              'retry_metadata.retry_count': 0,
+              'retry_metadata.last_retry_at': now,
+              'retry_metadata.next_retry_at': null,
+              'retry_metadata.last_retry_error': null,
+              'retry_metadata.status': 'resolved'
+            }
+          });
+
+          results.skipped++;
+        }
+
+      } catch (err) {
+        // ❌ FAILURE for this user — increment retry count, set backoff
+        const newRetryCount = (user.retry_metadata?.retry_count || 0) + 1;
+        const delayHours = getRetryDelayHours(newRetryCount);
+        const nextRetryAt = new Date(Date.now() + delayHours * 60 * 60 * 1000);
+
+        billingLogger.error('[CRON_RETRY] ❌ Payment retry failed', err, {
+          ...userLogMeta,
+          newRetryCount,
+          nextRetryAt,
+          error: err.message
+        });
+
+        await User.updateOne({ _id: user._id }, {
+          $set: {
+            'retry_metadata.retry_count': newRetryCount,
+            'retry_metadata.last_retry_at': now,
+            'retry_metadata.next_retry_at': nextRetryAt,
+            'retry_metadata.last_retry_error': err.message || 'Unknown error',
+            'retry_metadata.status': newRetryCount >= MAX_RETRY_COUNT ? 'abandoned' : 'retrying'
+          }
+        });
+
+        results.failed++;
+        results.errors.push({ userId: user._id, error: err.message });
+
+        // Tiered notifications
+        try {
+          // After 2nd failure: email user
+          if (newRetryCount >= 2) {
+            await MAIL_HANDLER.sendFailedLeadPaymentEmail({
+              to: user.email,
+              userName: user.name || 'User',
+              leadId: `${user.pending_payment?.count || 0} pending leads`,
+              amount: user.pending_payment?.amount || 0,
+              cardLast4: user.paymentMethods?.[0]?.cardLastFour || 'N/A',
+              errorMessage: `Auto-retry failed (attempt ${newRetryCount}/${MAX_RETRY_COUNT}). Please update your payment method or retry manually.`
+            });
+          }
+
+          // After 3rd failure: also email admin
+          if (newRetryCount >= 3) {
+            let adminEmails = [];
+            if (process.env.ADMIN_NOTIFICATION_EMAILS) {
+              adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS
+                .split(',')
+                .map(e => e.trim().toLowerCase())
+                .filter(Boolean);
+            }
+            if (adminEmails.length > 0) {
+              await MAIL_HANDLER.sendFailedLeadPaymentAdminEmail({
+                to: adminEmails.join(','),
+                userEmail: user.email,
+                userName: user.name || '',
+                leadId: `${user.pending_payment?.count || 0} pending leads`,
+                amount: user.pending_payment?.amount || 0,
+                cardLast4: user.paymentMethods?.[0]?.cardLastFour || 'N/A',
+                errorMessage: `Auto-retry failed (attempt ${newRetryCount}/${MAX_RETRY_COUNT}). ${err.message}`
+              });
+            }
+          }
+        } catch (notifErr) {
+          billingLogger.error('[CRON_RETRY] Failed to send failure notification', notifErr);
+        }
+      }
+
+      // 2e. Rate limit delay between users
+      if (i < eligibleUsers.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_USERS_MS));
+      }
+    }
+
+    billingLogger.info('[CRON_RETRY] Run completed', {
+      duration: `${Date.now() - runStartedAt.getTime()}ms`,
+      ...results
+    });
+
+    return results;
+
+  } catch (err) {
+    billingLogger.error('[CRON_RETRY] Fatal error in cron run', err);
+    return { ...results, fatalError: err.message };
+  } finally {
+    _cronRetryIsRunning = false;
+  }
+};
 
 
 module.exports = {
@@ -2124,5 +2417,6 @@ module.exports = {
   assignLeadPrepaid,
   assignLeadPayAsYouGo,
   processPendingPaymentRecovery,
-  retryUserPendingPayments
+  retryUserPendingPayments,
+  cronRetryPendingPayments
 };

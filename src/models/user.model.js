@@ -345,9 +345,27 @@ const regularUserSchema = new mongoose.Schema({
   last_payment_error_message: {
     type: String,
     default: null
+  },
+  // ✅ Retry metadata for automated cron-based payment recovery
+  retry_metadata: {
+    retry_count: { type: Number, default: 0 },
+    last_retry_at: { type: Date, default: null },
+    next_retry_at: { type: Date, default: null },
+    last_retry_error: { type: String, default: null },
+    status: {
+      type: String,
+      enum: ['active', 'retrying', 'abandoned', 'resolved'],
+      default: 'active'
+    }
   }
 
+});
 
+// Index for cron job: efficiently find users needing payment retry
+regularUserSchema.index({
+  'payment_error': 1,
+  'pending_payment.amount': 1,
+  'retry_metadata.next_retry_at': 1
 });
 
 const RegularUser = User.discriminator(CONSTANT_ENUM.USER_ROLE.USER, regularUserSchema);

@@ -135,6 +135,13 @@ app.use((err, req, res, next) => {
 
 // Initialize Socket.IO by passing the HTTP server
 initSocket(server);
+
+// ✅ Register Cron Jobs
+const startAutoRejectReturnLeadCron = require('./src/jobs/autoRejectReturnLead');
+const startRetryPendingPaymentsCron = require('./src/jobs/retryPendingPayments');
+startAutoRejectReturnLeadCron();
+startRetryPendingPaymentsCron();
+
 /**   Server start */
 const PORT = process.env.PORT || 8080;
 // app.listen(PORT, () => {
