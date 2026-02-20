@@ -226,7 +226,7 @@ router.post('/send-test-low-balance-mail', async (req, res) => {
   }
 });
 
-router.post('/send-test-failed-lead-payment-mail', async (req, res) => {
+router.get('/send-test-failed-lead-payment-mail', async (req, res) => {
   try {
     const {
       to,
@@ -235,7 +235,7 @@ router.post('/send-test-failed-lead-payment-mail', async (req, res) => {
       amount,
       cardLast4,
       errorMessage
-    } = req.body;
+    } = req.query;
 
     if (!to) {
       return res.status(400).json({ message: "Recipient email is required" });
@@ -243,11 +243,11 @@ router.post('/send-test-failed-lead-payment-mail', async (req, res) => {
 
     const response = await MAIL_HANDLER.sendFailedLeadPaymentEmail({
       to,
-      userName: userName || "Test User",
+      userName: userName || "jason gerber",
       leadId: leadId || "LEAD-TEST-001",
       amount: amount || 10,
       cardLast4: cardLast4 || "4242",
-      errorMessage: errorMessage || "Test payment failure"
+      errorMessage: errorMessage || "Pick"
     });
 
     res.status(200).json({
@@ -670,7 +670,7 @@ router.post("/resend-verification-email", async (req, res) => {
 
     // Find user
     const user = await User.findById(userId);
-    
+
     if (!user) {
       return res.status(404).json({
         message: "User not found"

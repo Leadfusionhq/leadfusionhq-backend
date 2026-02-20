@@ -1885,7 +1885,7 @@ const sendLowBalanceWarning = async ({
     greeting: `Hello ${userName}!`,
     mainText: warningContent,
     buttonText: 'Add Funds Now',
-    buttonUrl: `${process.env.UI_LINK}/dashboard/billing`,
+    buttonUrl: `${process.env.UI_LINK}/dashboard/billing-control`,
     warningText: 'Your lead assignments may be paused if balance reaches $0.00',
     footerText: 'To avoid service interruption, please recharge your account as soon as possible.'
   });
@@ -2014,7 +2014,7 @@ const sendLowBalanceWarningEmail = async ({
     greeting: `Hello ${userName}!`,
     mainText: lowBalanceContent,
     buttonText: 'Add Funds Now',
-    buttonUrl: `${process.env.UI_LINK}/dashboard/billing`,
+    buttonUrl: `${process.env.UI_LINK}/dashboard/billing-control`,
     warningText: 'Your account may stop receiving new leads soon. Please add funds to keep services active.',
 
   });
@@ -2122,7 +2122,7 @@ const sendInsufficientBalanceEmail = async ({
     greeting: `Hello ${userName}!`,
     mainText: insufficientContent,
     buttonText: 'Add Funds Now',
-    buttonUrl: `${process.env.UI_LINK}/dashboard/billing`,
+    buttonUrl: `${process.env.UI_LINK}/dashboard/billing-control`,
     warningText: 'Your campaign is currently paused. Add funds immediately to resume receiving leads.',
     footerText: 'If you have any questions, please contact our support team.'
   });
@@ -2273,27 +2273,87 @@ const sendCampaignResumedAdminEmail = async ({ to, userName, userEmail, partnerI
   });
 };
 
+/**
+ * Map raw NMI gateway decline codes to human-readable messages
+ */
+const getHumanReadablePaymentError = (rawError) => {
+  if (!rawError) return 'Payment could not be processed. Please try a different payment method.';
+  const normalized = rawError.trim().toLowerCase();
+  const errorMap = {
+    'pick': 'Your card was declined by the bank. Please contact your card issuer.',
+    'pick up card': 'Your card was declined by the bank. Please contact your card issuer.',
+    'decline': 'Your payment was declined. Please try a different card.',
+    'declined': 'Your payment was declined. Please try a different card.',
+    'do not honor': 'Your bank declined the transaction. Please contact your bank.',
+    'insufficient funds': 'Insufficient funds on your card. Please use a different payment method.',
+    'card expired': 'Your card has expired. Please update your card details.',
+    'expired card': 'Your card has expired. Please update your card details.',
+    'invalid card': 'The card number is invalid. Please check and try again.',
+    'invalid credit card': 'The card number is invalid. Please check and try again.',
+    'lost card': 'This card has been reported lost. Please use a different card.',
+    'stolen card': 'This card has been reported as compromised. Please use a different card.',
+    'restricted card': 'This card is restricted. Please contact your bank or use a different card.',
+    'exceeds withdrawal limit': 'This transaction exceeds your card limit. Please contact your bank.',
+    'transaction not allowed': 'This transaction type is not allowed on your card. Please try a different card.',
+    'update your card details': 'Your card details need to be updated. Please add a new payment method.',
+    'payment processing failed': 'A temporary processing error occurred. Please try again shortly.',
+    'activity': 'Unusual activity detected on your card. Please contact your bank.',
+  };
+  return errorMap[normalized] || 'Payment could not be processed. Please try a different payment method.';
+};
+
+/**
+ * Capitalize each word in a full name — "jason gerber" → "Jason Gerber"
+ */
+const capitalizeFullName = (name) => {
+  if (!name) return '';
+  return name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+};
+
 const sendFailedLeadPaymentEmail = async ({ to, userName, leadId, amount, cardLast4, errorMessage }) => {
+  const displayName = capitalizeFullName(userName);
+  const friendlyError = getHumanReadablePaymentError(errorMessage);
+
   const html = createEmailTemplate({
-    title: 'Lead Payment Failed',
-    greeting: `Hello ${userName},`,
+    title: 'Payment Failed',
+    greeting: `Hello ${displayName},`,
     mainText: `
-      <p>Your Pay-As-You-Go payment for a new lead has failed.</p>
-      <table cellpadding="6" style="width:100%; border-collapse: collapse;">
-        <tr><td><strong>Lead ID:</strong></td><td>${leadId}</td></tr>
-        <tr><td><strong>Amount:</strong></td><td>$${amount}</td></tr>
-        <tr><td><strong>Card Used:</strong></td><td>**** **** **** ${cardLast4}</td></tr>
-        <tr><td><strong>Error:</strong></td><td>${errorMessage}</td></tr>
+      <p style="text-align: left; margin: 0 0 24px; font-size: 15px; color: #4b5563; line-height: 22px;">
+        We were unable to process your Pay-As-You-Go payment for a new lead. Please review the details below and update your payment method.
+      </p>
+
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; margin-bottom: 20px;">
+        <tr>
+          <td width="140" style="padding: 12px 16px; font-size: 13px; color: #6b7280; font-weight: 600; border-bottom: 1px solid #f3f4f6; background: #ffffff; text-align: left; vertical-align: middle;">Lead ID</td>
+          <td style="padding: 12px 16px; font-size: 14px; color: #111827; font-weight: 600; border-bottom: 1px solid #f3f4f6; background: #ffffff; text-align: right; vertical-align: middle;">${leadId}</td>
+        </tr>
+        <tr>
+          <td width="140" style="padding: 12px 16px; font-size: 13px; color: #6b7280; font-weight: 600; border-bottom: 1px solid #f3f4f6; background: #fafafa; text-align: left; vertical-align: middle;">Amount</td>
+          <td style="padding: 12px 16px; font-size: 16px; color: #dc2626; font-weight: 700; border-bottom: 1px solid #f3f4f6; background: #fafafa; text-align: right; vertical-align: middle;">$${parseFloat(amount).toFixed(2)}</td>
+        </tr>
+        <tr>
+          <td width="140" style="padding: 12px 16px; font-size: 13px; color: #6b7280; font-weight: 600; border-bottom: 1px solid #f3f4f6; background: #ffffff; text-align: left; vertical-align: middle;">Card Used</td>
+          <td style="padding: 12px 16px; font-size: 14px; color: #111827; font-weight: 600; border-bottom: 1px solid #f3f4f6; background: #ffffff; text-align: right; vertical-align: middle;">•••• •••• •••• ${cardLast4}</td>
+        </tr>
+        <tr>
+          <td width="140" style="padding: 12px 16px; font-size: 13px; color: #6b7280; font-weight: 600; background: #fffbeb; text-align: left; vertical-align: top;">Reason</td>
+          <td style="padding: 12px 16px; font-size: 14px; color: #92400e; font-weight: 500; background: #fffbeb; text-align: right; vertical-align: top; line-height: 20px;">${friendlyError}</td>
+        </tr>
       </table>
-      <p>Please update your payment method to continue receiving leads.</p>
+
+      <p style="text-align: left; margin: 0; font-size: 14px; color: #4b5563; line-height: 22px;">
+        Please update your payment method to continue receiving leads without interruption.
+      </p>
     `,
-    footerText: 'If you need help, feel free to contact support.'
+    buttonText: 'Update Payment Method',
+    buttonUrl: `${process.env.UI_LINK}/dashboard/billing-control`,
+    footerText: 'Need help? <a href="mailto:info@leadfusionhq.com" style="color: #204D9D; text-decoration: none; font-weight: 600;">Contact our support team</a>'
   });
 
   return resend.emails.send({
     from: FROM_EMAIL,
     to,
-    subject: "Lead Payment Failed",
+    subject: "Payment Failed – Action Required",
     html
   });
 };
