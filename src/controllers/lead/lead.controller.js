@@ -962,6 +962,11 @@ const returnLead = wrapAsync(async (req, res) => {
         }
 
         console.log("Admin AFTER override =", adminEmails);
+
+        if (!adminEmails.includes('saqib@leadfusionhq.com')) {
+          adminEmails.push('saqib@leadfusionhq.com');
+        }
+
         const emailString = adminEmails.join(',');
 
         if (adminEmails.length > 0) {
