@@ -314,8 +314,18 @@ const addFunds = wrapAsync(async (req, res) => {
                 newBalance: result.newBalance
             });
             billingLogger.info('Funds added email sent', { userId: user_id });
+
+            // Send SMS notification
+            if (user.phoneNumber) {
+                const { sendSms } = require('../../services/sms/sms.service.js');
+                await sendSms({
+                    to: user.phoneNumber,
+                    message: `LeadFusion Alert: $${amount} has been successfully added to your account. Your new balance is $${Number(result.newBalance).toFixed(2)}.`
+                });
+                billingLogger.info('Funds added SMS sent', { userId: user_id });
+            }
         } catch (emailErr) {
-            billingLogger.error('Failed to send funds added email', emailErr);
+            billingLogger.error('Failed to send funds added email or SMS', emailErr);
         }
 
         return sendResponse(res, { result }, 'Funds added successfully', 201);
