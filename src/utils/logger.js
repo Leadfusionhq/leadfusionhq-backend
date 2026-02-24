@@ -31,7 +31,7 @@ const consoleLog = (level, message, data = {}) => {
 const billingLogger = {
     info: (message, data = {}) => {
         consoleLog('INFO', `[BILLING] ${message}`, data);
-        
+
         saveToDatabase({
             level: 'INFO',
             message,
@@ -44,7 +44,7 @@ const billingLogger = {
     },
     error: (message, error = null, data = {}) => {
         consoleLog('ERROR', `[BILLING] ${message}`, { ...data, error: error?.message });
-        
+
         saveToDatabase({
             level: 'ERROR',
             message,
@@ -57,7 +57,7 @@ const billingLogger = {
     },
     warn: (message, data = {}) => {
         consoleLog('WARN', `[BILLING] ${message}`, data);
-        
+
         saveToDatabase({
             level: 'WARN',
             message,
@@ -70,7 +70,7 @@ const billingLogger = {
     },
     debug: (message, data = {}) => {
         consoleLog('DEBUG', `[BILLING] ${message}`, data);
-        
+
         saveToDatabase({
             level: 'DEBUG',
             message,
@@ -87,7 +87,7 @@ const billingLogger = {
 const leadLogger = {
     info: (message, data = {}) => {
         consoleLog('INFO', `[LEAD] ${message}`, data);
-        
+
         saveToDatabase({
             level: 'INFO',
             message,
@@ -100,7 +100,7 @@ const leadLogger = {
     },
     error: (message, error = null, data = {}) => {
         consoleLog('ERROR', `[LEAD] ${message}`, { ...data, error: error?.message });
-        
+
         saveToDatabase({
             level: 'ERROR',
             message,
@@ -113,7 +113,7 @@ const leadLogger = {
     },
     warn: (message, data = {}) => {
         consoleLog('WARN', `[LEAD] ${message}`, data);
-        
+
         saveToDatabase({
             level: 'WARN',
             message,
@@ -126,7 +126,7 @@ const leadLogger = {
     },
     debug: (message, data = {}) => {
         consoleLog('DEBUG', `[LEAD] ${message}`, data);
-        
+
         saveToDatabase({
             level: 'DEBUG',
             message,
@@ -143,7 +143,7 @@ const leadLogger = {
 const logger = {
     info: (message, data = {}) => {
         consoleLog('INFO', message, data);
-        
+
         saveToDatabase({
             level: 'INFO',
             message,
@@ -156,7 +156,7 @@ const logger = {
     },
     error: (message, error = null, data = {}) => {
         consoleLog('ERROR', message, { ...data, error: error?.message });
-        
+
         saveToDatabase({
             level: 'ERROR',
             message,
@@ -169,7 +169,7 @@ const logger = {
     },
     warn: (message, data = {}) => {
         consoleLog('WARN', message, data);
-        
+
         saveToDatabase({
             level: 'WARN',
             message,
@@ -182,7 +182,7 @@ const logger = {
     },
     debug: (message, data = {}) => {
         consoleLog('DEBUG', message, data);
-        
+
         saveToDatabase({
             level: 'DEBUG',
             message,

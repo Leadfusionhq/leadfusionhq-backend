@@ -1,5 +1,5 @@
 function mapUserRoleToN8nRole(role) {
-  switch(role) {
+  switch (role) {
     case 'Admin':
       return 'global:admin';
     case 'User':
