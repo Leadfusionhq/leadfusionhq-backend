@@ -59,8 +59,7 @@ const sendSms = async (smsData) => {
       toE164 = toE164US(raw);
       const reqPayload = {
         body: String(message).trim(),
-        // from: from || process.env.SMS_SENDER_ID || '', // Must be your purchased SMS-enabled number or Sender ID in Notifyre
-        from: process.env.SMS_SENDER_ID || from || '+18563908470',
+        from: process.env.SMS_SENDER_ID || from || '+12157026445',
         recipients: [{ type: RecipientType.SmsNumber, value: toE164 }],
         scheduledDate: null,
         addUnsubscribeLink: false,
