@@ -1346,7 +1346,7 @@ View Lead: ${process.env.UI_LINK}/dashboard/leads/${lead._id}`;
           const smsResult = await SmsServices.sendSms({
             to: campaign.delivery.phone.numbers,
             message: smsMessage,
-            from: process.env.SMS_SENDER_ID || '+18563908470',
+            from: process.env.SMS_SENDER_ID || '+12157026445',
           });
 
           if (smsResult.success) {
