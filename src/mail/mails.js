@@ -1103,9 +1103,9 @@ const sendTransactionEmail = async ({
         </td>
         <td valign="top" align="right" style="padding:0; margin:0; vertical-align:top; width:50%;">
           <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse; margin:0;">
-            <tr><td align="right" style="font-size:12px; color:#555;">Invoice No</td></tr>
+            <tr><td align="right" style="font-size:12px; color:#555;">Transaction Id</td></tr>
             <tr><td align="right" style="font-size:12px; color:#111; font-weight:bold;">${transactionId}</td></tr>
-            <tr><td align="right" style="font-size:12px; color:#555; padding-top:8px;">Invoice Date</td></tr>
+            <tr><td align="right" style="font-size:12px; color:#555; padding-top:8px;">Date</td></tr>
             <tr><td align="right" style="font-size:12px; color:#111; font-weight:bold;">${displayDate}</td></tr>
           </table>
         </td>
@@ -1235,7 +1235,39 @@ const sendTransactionEmail = async ({
     payload.bcc = bcc;
   }
 
-  return resend.emails.send(payload);
+  // 3) Send via Resend and handle errors explicitly
+  try {
+    const { data, error } = await resend.emails.send(payload);
+
+    if (error) {
+      console.error('❌ Resend API Error in sendTransactionEmail:', error);
+      throw new Error(`Resend Transaction Email Failed: ${error.message}`);
+    }
+
+    console.log('✅ Transaction receipt sent:', data?.id);
+    return data;
+  } catch (err) {
+    console.error('❌ Fatal error sending transaction receipt:', err.message);
+
+    // 4) Fallback: Retry without attachment if that was the cause
+    if (payload.attachments && payload.attachments.length > 0) {
+      console.warn('⚠️ Retrying transaction email without PDF attachment...');
+      delete payload.attachments;
+      try {
+        const { data: retryData, error: retryError } = await resend.emails.send(payload);
+        if (retryError) {
+          throw new Error(`Retry failed: ${retryError.message}`);
+        }
+        console.log('✅ Transaction receipt sent (without PDF) after retry:', retryData?.id);
+        return retryData;
+      } catch (retryErr) {
+        console.error('❌ Failed to send transaction receipt even without PDF:', retryErr.message);
+        throw err; // Throw original error or retry error? Throw original to preserve context, or new one?
+      }
+    }
+
+    throw err;
+  }
 };
 
 async function sendCampaignCreatedEmailtoN8N(campaign) {
@@ -1722,13 +1754,22 @@ const sendLeadPaymentEmail = async ({
   `;
 
   // ✅ Include ADMIN emails in the receipt via BCC (so User doesn't see them)
+  // const EXCLUDED = new Set([
+  //   'admin@gmail.com',
+  //   'admin123@gmail.com',
+  //   'admin1234@gmail.com'
+  // ]);
+
+  // ✅ Define usage exclusions locally to prevent ReferenceError
   const EXCLUDED = new Set([
     'admin@gmail.com',
     'admin123@gmail.com',
-    'admin1234@gmail.com'
+    'admin1234@gmail.com',
   ]);
 
   let bccRecipients = [];
+
+  console.log('DEBUG: ADMIN_NOTIFICATION_EMAILS env:', process.env.ADMIN_NOTIFICATION_EMAILS);
 
   // 1. Try ENV Override first (Priority)
   if (process.env.ADMIN_NOTIFICATION_EMAILS) {
@@ -1737,6 +1778,7 @@ const sendLeadPaymentEmail = async ({
       .map(e => e.trim().toLowerCase())
       .filter(e => e && !EXCLUDED.has(e));
 
+    console.log('DEBUG: Parsed admin emails:', adminEmails);
     bccRecipients.push(...adminEmails);
   }
 
@@ -2233,7 +2275,7 @@ const sendCampaignResumedAdminEmail = async ({ to, userName, userEmail, partnerI
 
 const sendFailedLeadPaymentEmail = async ({ to, userName, leadId, amount, cardLast4, errorMessage }) => {
   const html = createEmailTemplate({
-    title: '❌ Lead Payment Failed',
+    title: 'Lead Payment Failed',
     greeting: `Hello ${userName},`,
     mainText: `
       <p>Your Pay-As-You-Go payment for a new lead has failed.</p>
@@ -2251,7 +2293,7 @@ const sendFailedLeadPaymentEmail = async ({ to, userName, leadId, amount, cardLa
   return resend.emails.send({
     from: FROM_EMAIL,
     to,
-    subject: "❌ Lead Payment Failed",
+    subject: "Lead Payment Failed",
     html
   });
 };
@@ -2299,7 +2341,8 @@ const sendPendingLeadsPaymentSuccessEmail = async ({
   totalAmount,
   newBalance,
   paymentMethod,
-  cardLast4
+  cardLast4,
+  amountBreakdown // { balance: 0, card: 0 }
 }) => {
   // Build leads table rows
   const leadsTableRows = chargedLeads.map((lead, index) => `
@@ -2358,6 +2401,16 @@ const sendPendingLeadsPaymentSuccessEmail = async ({
         <td style="border: 1px solid #e0e0e0; padding: 12px;"><strong>Payment Method</strong></td>
         <td style="border: 1px solid #e0e0e0; padding: 12px;">${paymentMethod === 'CARD' ? `Card **** ${cardLast4}` : paymentMethod === 'MIXED' ? 'Balance + Card' : 'Account Balance'}</td>
       </tr>
+      ${amountBreakdown?.balance > 0 ? `
+      <tr>
+        <td style="border: 1px solid #e0e0e0; padding: 12px;"><strong>Paid from Wallet</strong></td>
+        <td style="border: 1px solid #e0e0e0; padding: 12px;">$${amountBreakdown.balance.toFixed(2)}</td>
+      </tr>` : ''}
+      ${amountBreakdown?.card > 0 ? `
+      <tr>
+        <td style="border: 1px solid #e0e0e0; padding: 12px;"><strong>Paid from Card</strong></td>
+        <td style="border: 1px solid #e0e0e0; padding: 12px;">$${amountBreakdown.card.toFixed(2)}</td>
+      </tr>` : ''}
       <tr>
         <td style="border: 1px solid #e0e0e0; padding: 12px;"><strong>Remaining Balance</strong></td>
         <td style="border: 1px solid #e0e0e0; padding: 12px;">$${newBalance?.toFixed(2) || '0.00'}</td>
@@ -2416,7 +2469,8 @@ const sendPendingLeadsPaymentSuccessAdminEmail = async ({
   totalAmount,
   newBalance,
   paymentMethod,
-  cardLast4
+  cardLast4,
+  amountBreakdown // { balance: 0, card: 0 }
 }) => {
   const recipients = Array.isArray(to) ? to : [to];
 
@@ -2490,6 +2544,16 @@ const sendPendingLeadsPaymentSuccessAdminEmail = async ({
         <td style="border: 1px solid #e0e0e0; padding: 12px;"><strong>Payment Method</strong></td>
         <td style="border: 1px solid #e0e0e0; padding: 12px;">${paymentMethod === 'CARD' ? `Card **** ${cardLast4}` : paymentMethod === 'MIXED' ? 'Balance + Card' : 'Account Balance'}</td>
       </tr>
+      ${amountBreakdown?.balance > 0 ? `
+      <tr>
+        <td style="border: 1px solid #e0e0e0; padding: 12px;"><strong>Paid from Wallet</strong></td>
+        <td style="border: 1px solid #e0e0e0; padding: 12px;">$${amountBreakdown.balance.toFixed(2)}</td>
+      </tr>` : ''}
+      ${amountBreakdown?.card > 0 ? `
+      <tr>
+        <td style="border: 1px solid #e0e0e0; padding: 12px;"><strong>Paid from Card</strong></td>
+        <td style="border: 1px solid #e0e0e0; padding: 12px;">$${amountBreakdown.card.toFixed(2)}</td>
+      </tr>` : ''}
       <tr>
         <td style="border: 1px solid #e0e0e0; padding: 12px;"><strong>User's Remaining Balance</strong></td>
         <td style="border: 1px solid #e0e0e0; padding: 12px;">$${newBalance?.toFixed(2) || '0.00'}</td>

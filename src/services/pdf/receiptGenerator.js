@@ -12,7 +12,7 @@ const axios = require('axios');
  * - Mobile mode (A5 stacked) supported with `mobile: true`
  * - Footer is STICKY at absolute bottom (divider + single thanks line only)
  */
-const generateTransactionReceipt = async({
+const generateTransactionReceipt = async ({
   transactionId,
   userName,
   userEmail,
@@ -37,7 +37,7 @@ const generateTransactionReceipt = async({
   // mobile-friendly layout (A5 stacked)
   mobile = false
 }) => {
-  return new Promise(async(resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     try {
       const doc = new PDFDocument({
         size: mobile ? 'A5' : 'A4',
@@ -116,7 +116,7 @@ const generateTransactionReceipt = async({
           if (fs.existsSync(def)) { doc.image(def, contentLeft, logoY, { height: logoH }); drew = true; }
         }
         if (!drew) doc.circle(contentLeft + 18, logoY + logoH / 2, mobile ? 11 : 14).fill('#000000');
-      } catch (_) {}
+      } catch (_) { }
 
       // Company text (white) — address REMOVED from header
       const leftX = contentLeft + (mobile ? 36 : 50) + (mobile ? 10 : 12);
@@ -124,7 +124,7 @@ const generateTransactionReceipt = async({
       const companyBlockW = doc.page.width - leftX - rightPadding - (mobile ? 110 : 150);
 
       doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(mobile ? 15 : 19)
-         .text(companyName, leftX, mobile ? 16 : 20, { width: companyBlockW });
+        .text(companyName, leftX, mobile ? 16 : 20, { width: companyBlockW });
 
       doc.font('Helvetica').fontSize(mobile ? 8 : 9);
       const contactLine = `${companyWebsite} • ${companyEmail} • ${companyPhone}`;
@@ -135,19 +135,19 @@ const generateTransactionReceipt = async({
 
       // RECEIPT label (right)
       doc.font('Helvetica-Bold').fontSize(mobile ? 15 : 19).fillColor('#FFFFFF')
-         .text('RECEIPT', doc.page.width - rightPadding - (mobile ? 110 : 150), mobile ? 24 : 30, {
-           width: mobile ? 110 : 150, align: 'right'
-         });
+        .text('RECEIPT', doc.page.width - rightPadding - (mobile ? 110 : 150), mobile ? 24 : 30, {
+          width: mobile ? 110 : 150, align: 'right'
+        });
 
       // Move below header
       doc.y = headerH + (mobile ? 8 : 10);
       reserveBottomForFooter();
 
-      // Invoice No (right)
+      // Transaction Id (right)
       doc.fillColor(colors.dim).font('Helvetica').fontSize(mobile ? 8 : 9)
-         .text('Invoice No:', contentRight - (mobile ? 140 : 180), doc.y, { width: mobile ? 140 : 180, align: 'right' });
+        .text('Transaction Id:', contentRight - (mobile ? 140 : 180), doc.y, { width: mobile ? 140 : 180, align: 'right' });
       doc.fillColor(colors.text).font('Helvetica-Bold').fontSize(mobile ? 9 : 10)
-         .text(transactionId, contentRight - (mobile ? 140 : 180), doc.y + (mobile ? 10 : 11), { width: mobile ? 140 : 180, align: 'right' });
+        .text(transactionId, contentRight - (mobile ? 140 : 180), doc.y + (mobile ? 10 : 11), { width: mobile ? 140 : 180, align: 'right' });
 
       // Divider
       doc.moveDown(mobile ? 0.5 : 1);
@@ -158,18 +158,18 @@ const generateTransactionReceipt = async({
       const blockTop = doc.y + (mobile ? 6 : 8);
       // Billed To
       doc.fillColor(colors.dim).font('Helvetica').fontSize(mobile ? 8 : 9)
-         .text('Billed To', contentLeft, blockTop);
+        .text('Billed To', contentLeft, blockTop);
       doc.fillColor(colors.text).font('Helvetica-Bold').fontSize(mobile ? 10 : 11)
-         .text(userName || 'Customer', contentLeft, blockTop + (mobile ? 11 : 13));
+        .text(userName || 'Customer', contentLeft, blockTop + (mobile ? 11 : 13));
       doc.fillColor(colors.dim).font('Helvetica').fontSize(mobile ? 8 : 9)
-         .text(userEmail || '', contentLeft, blockTop + (mobile ? 21 : 25));
+        .text(userEmail || '', contentLeft, blockTop + (mobile ? 21 : 25));
 
       // Invoice Date (right)
       const rightW = mobile ? 120 : 150;
       doc.fillColor(colors.dim).font('Helvetica').fontSize(mobile ? 8 : 9)
-         .text('Invoice Date', contentRight - rightW, blockTop, { width: rightW, align: 'right' });
+        .text('Date', contentRight - rightW, blockTop, { width: rightW, align: 'right' });
       doc.fillColor(colors.text).font('Helvetica-Bold').fontSize(mobile ? 9 : 10)
-         .text(displayDate, contentRight - rightW, blockTop + (mobile ? 11 : 13), { width: rightW, align: 'right' });
+        .text(displayDate, contentRight - rightW, blockTop + (mobile ? 11 : 13), { width: rightW, align: 'right' });
 
       doc.y = blockTop + (mobile ? 36 : 42);
       reserveBottomForFooter();
@@ -306,7 +306,7 @@ const generateTransactionReceipt = async({
       const yFooter = footerTopAbs;
       doc.strokeColor(colors.grid).lineWidth(1).moveTo(contentLeft, yFooter).lineTo(contentRight, yFooter).stroke();
       doc.fillColor(colors.text).font('Helvetica-Bold').fontSize(mobile ? 9.5 : 10)
-         .text('Thank you for your business!', contentLeft, yFooter + 6, { width: contentRight - contentLeft, align: 'center' });
+        .text('Thank you for your business!', contentLeft, yFooter + 6, { width: contentRight - contentLeft, align: 'center' });
 
       doc.end();
     } catch (err) {

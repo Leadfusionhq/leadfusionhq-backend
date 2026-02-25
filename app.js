@@ -53,7 +53,8 @@ app.get('/my-type', (req, res) => {
       db: config.server.db,
       port: config.server.port,
       backendLink: config.server.backendLink,
-      route: config.server.route
+      route: config.server.route,
+      smsSenderNumber: config.server.smsSenderId,
     }
   });
 

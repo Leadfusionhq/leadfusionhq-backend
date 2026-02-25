@@ -1,6 +1,7 @@
 // services/sms/SmsServices.js
 const { NotifyreAPI, RecipientType } = require('notifyre-nodejs-sdk');
 const { ErrorHandler } = require('../../utils/error-handler');
+const { logger } = require('../../utils/logger');
 
 const rawKey = process.env.NOTIFYRE_API_KEY || '';
 const API_KEY = rawKey.trim().replace(/^Bearer\s+/i, ''); // avoid "Bearer Bearer ..." issues
@@ -59,7 +60,7 @@ const sendSms = async (smsData) => {
       toE164 = toE164US(raw);
       const reqPayload = {
         body: String(message).trim(),
-        from: from || '', // must be your purchased SMS-enabled number in Notifyre
+        from: process.env.SMS_SENDER_ID || from || '+12157026445',
         recipients: [{ type: RecipientType.SmsNumber, value: toE164 }],
         scheduledDate: null,
         addUnsubscribeLink: false,
@@ -68,7 +69,7 @@ const sendSms = async (smsData) => {
         campaignName: 'leadfusion-sms',
       };
 
-      console.log('[Notifyre] Sending SMS request:', {
+      logger.info('[Notifyre] Sending SMS request:', {
         from: reqPayload.from,
         to: toE164,
         bodyPreview: reqPayload.body.slice(0, 160),
@@ -119,8 +120,14 @@ const listSentSms = async (opts = {}) => {
   }
 
   try {
-    const response = await smsService.listSentSms(opts);
-    return { success: true, data: response };
+    // Clean up undefined/null values from opts
+    const cleanOpts = Object.fromEntries(
+      Object.entries(opts).filter(([_, v]) => v != null && v !== '')
+    );
+
+    console.log('[Notifyre] Listing sent SMS with opts:', cleanOpts);
+    const response = await smsService.listSentSms(cleanOpts);
+    return { success: true, data: response.payload || response };
   } catch (err) {
     console.error('[Notifyre] listSentSms error', err);
     return {

@@ -27,7 +27,11 @@ const env = cleanEnv(process.env, {
     // Redis
     REDIS_HOST: str({ default: '127.0.0.1', desc: 'Redis Host' }),
     REDIS_PORT: port({ default: 6379, desc: 'Redis Port' }),
-    REDIS_PASSWORD: str({ default: '', desc: 'Redis Password (optional)' })
+    REDIS_PASSWORD: str({ default: '', desc: 'Redis Password (optional)' }),
+
+
+    SMS_SENDER_ID: str({ default: '', desc: 'SMS sernder Number (optional)' }),
+
 });
 
 const config = {
@@ -49,7 +53,8 @@ const config = {
         // Redis
         redisHost: env.REDIS_HOST,
         redisPort: env.REDIS_PORT,
-        redisPassword: env.REDIS_PASSWORD
+        redisPassword: env.REDIS_PASSWORD,
+        smsSenderId: env.SMS_SENDER_ID,
     }
 };
 

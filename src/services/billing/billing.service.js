@@ -16,6 +16,7 @@ const MAIL_HANDLER = require('../../mail/mails');
 const formatForNmi = (d) => dayjs(d).format('MM/DD/YYYY');
 const { sendToN8nWebhook, sendLowBalanceAlert } = require('../../services/n8n/webhookService.js');
 const { sendSms } = require('../../services/sms/sms.service');
+const ReceiptService = require('./receipt.service');
 
 // Contract management
 const getCurrentContract = async () => {
@@ -286,6 +287,50 @@ const processPendingPaymentRecovery = async (userParam, vaultId, options = {}) =
     chargeResult = await chargeCustomerVault(vaultId, amountFromCard, `Recovery: ${leadsToRecover.length} leads`);
     if (!chargeResult.success) {
       billingLogger.warn('Recovery charge failed', { userId: user._id, message: chargeResult.message });
+
+      // 🛑 Send Failure Emails (User + Admin)
+      try {
+        const cardUsed = user.paymentMethods?.find(pm => pm.customerVaultId === vaultId);
+        const cardLast4 = cardUsed ? cardUsed.cardLastFour : 'N/A';
+        const leadIdLabel = `Batch Recovery (${leadsToRecover.length} leads)`;
+
+        // 1. User Email
+        await MAIL_HANDLER.sendFailedLeadPaymentEmail({
+          to: user.email,
+          userName: user.name || user.fullName || 'User',
+          leadId: leadIdLabel,
+          amount: amountFromCard,
+          cardLast4: cardLast4,
+          errorMessage: chargeResult.message
+        });
+
+        // 2. Admin Email
+        const EXCLUDED = new Set(["admin@gmail.com", "admin123@gmail.com", "admin1234@gmail.com"]);
+        let adminEmails = [];
+
+        // Try ENV first
+        if (process.env.ADMIN_NOTIFICATION_EMAILS) {
+          adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS
+            .split(',')
+            .map(e => e.trim().toLowerCase())
+            .filter(Boolean);
+        }
+
+        if (adminEmails.length > 0) {
+          const emailString = adminEmails.join(',');
+          await MAIL_HANDLER.sendFailedLeadPaymentAdminEmail({
+            to: emailString,
+            userEmail: user.email,
+            userName: user.name || "",
+            leadId: leadIdLabel,
+            amount: amountFromCard,
+            cardLast4: cardLast4,
+            errorMessage: chargeResult.message
+          });
+        }
+      } catch (emailErr) {
+        billingLogger.error('Failed to send recovery failure emails', emailErr);
+      }
       return { success: false, message: chargeResult.message };
     }
   }
@@ -403,15 +448,22 @@ const handleRecoveryNotifications = async (user, fromCard, fromBalance, totalAmo
         totalAmount,
         newBalance: finalBalance,
         paymentMethod: paymentMethodStr,
-        cardLast4
+        cardLast4,
+        amountBreakdown: {
+          balance: fromBalance,
+          card: fromCard
+        }
       });
 
       if (user.phoneNumber) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
         await sendSms({ to: user.phoneNumber, message: `LeadFusion Alert: Recovered $${totalAmount.toFixed(2)} for ${leads.length} leads. Service resumed.` });
       }
 
       // Admin Email (Simplified logic)
       if (process.env.ADMIN_NOTIFICATION_EMAILS) {
+        // Enforce delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
         const admins = process.env.ADMIN_NOTIFICATION_EMAILS.split(',').map(e => e.trim()).filter(Boolean);
         if (admins.length) {
           await MAIL_HANDLER.sendPendingLeadsPaymentSuccessAdminEmail({
@@ -422,7 +474,11 @@ const handleRecoveryNotifications = async (user, fromCard, fromBalance, totalAmo
             totalAmount,
             newBalance: finalBalance,
             paymentMethod: paymentMethodStr,
-            cardLast4
+            cardLast4,
+            amountBreakdown: {
+              balance: fromBalance,
+              card: fromCard
+            }
           });
         }
       }
@@ -560,45 +616,109 @@ const addFunds = async (userId, amount, vaultId = null) => {
     billingLogger.info('Balance top-up webhook sent', { userId, amount });
 
 
+    // ---------------------------------------
+    // 🔹 AUTO-RECOVERY: Attempt to clear pending debt
+    // ---------------------------------------
+    let recoveryResult = { success: false };
+    const oldPendingAmount = user.pending_payment?.amount || 0;
+
+    if (oldPendingAmount > 0) {
+      try {
+        console.log(`💰 Attempting auto-recovery for user ${user._id} after top-up...`);
+        // Pass the user and the vault ID we just used (or let it pick default)
+        recoveryResult = await processPendingPaymentRecovery(user, customerVaultIdToUse, { includeAll: true });
+        console.log('✅ Auto-recovery result:', recoveryResult);
+      } catch (recoveryErr) {
+        console.error('❌ Auto-recovery failed inside addFunds:', recoveryErr);
+        billingLogger.error('Auto-recovery failed inside addFunds', recoveryErr, { userId });
+      }
+    }
 
     // ---------------------------------------
-    // 🔹 Prepare Admin Emails (Exclude Specific Admins)
+    // 🔹 Re-fetch User State for Email Conditions
     // ---------------------------------------
-    const EXCLUDED = new Set([
-      'admin@gmail.com',
-      'admin123@gmail.com',
-      'admin1234@gmail.com',
-    ]);
-
-    const adminUsers = await User.find({
-      role: { $in: ['ADMIN', 'SUPER_ADMIN'] },
-      isActive: { $ne: false },
-    }).select('email name');
-
-    const adminEmails = (adminUsers || [])
-      .map(a => a.email?.trim().toLowerCase())
-      .filter(e => e && !EXCLUDED.has(e));
-
+    // We need fresh data to see if debt was cleared and what the final balance is
+    const updatedUser = await User.findById(userId);
+    const finalBalance = updatedUser.balance || 0;
+    const finalPendingAmount = updatedUser.pending_payment?.amount || 0;
 
     // ---------------------------------------
-    // 🔹 Send USER Email (Lead Service Resumed)
+    // 🔹 CONDITIONAL "SERVICE RESUMED" EMAIL
     // ---------------------------------------
-    await MAIL_HANDLER.sendCampaignResumedEmail({
-      to: user.email,
-      userName: user.name,
-      email: user.email,
-      partnerId: user.integrations?.boberdoo?.external_id || ""
+    // Condition:
+    // 1. WAS PAUSED? -> Old Balance <= 0 OR Old Pending > 0
+    // 2. IS NOW ACTIVE? -> New Balance > 0 AND New Pending == 0
+
+    // You can adjust this threshold (e.g., 5 or 10) if you have a minimum buffer
+    const LOW_BALANCE_THRESHOLD = 0;
+
+    const wasPaused = (oldBalance <= LOW_BALANCE_THRESHOLD) || (oldPendingAmount > 0);
+    const isNowHealthy = (finalBalance > LOW_BALANCE_THRESHOLD) && (finalPendingAmount === 0);
+
+    console.log('[Email Logic] Service Resumed Check:', {
+      oldBalance,
+      oldPendingAmount,
+      finalBalance,
+      finalPendingAmount,
+      wasPaused,
+      isNowHealthy
     });
 
-    // ---------------------------------------
-    // 🔹 Send ADMIN Email (Lead Service Resumed)
-    // ---------------------------------------
-    await MAIL_HANDLER.sendCampaignResumedAdminEmail({
-      to: adminEmails,
-      userName: user.name,
-      userEmail: user.email,
-      partnerId: user.integrations?.boberdoo?.external_id || ""
-    });
+    if (wasPaused && isNowHealthy) {
+
+      console.log('🚀 Sending Service Resumed Emails...');
+
+      // ---------------------------------------
+      // 🔹 Prepare Admin Emails (Exclude Specific Admins)
+      // ---------------------------------------
+      const EXCLUDED = new Set([
+        'admin@gmail.com',
+        'admin123@gmail.com',
+        'admin1234@gmail.com',
+      ]);
+
+      const adminUsers = await User.find({
+        role: { $in: ['ADMIN', 'SUPER_ADMIN'] },
+        isActive: { $ne: false },
+      }).select('email name');
+
+      // ✅ Check ENV for overrides, otherwise use DB
+      let adminEmails = [];
+      if (process.env.ADMIN_NOTIFICATION_EMAILS) {
+        adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS
+          .split(',')
+          .map(e => e.trim().toLowerCase())
+          .filter(Boolean);
+      } else {
+        adminEmails = (adminUsers || [])
+          .map(a => a.email?.trim().toLowerCase())
+          .filter(e => e && !EXCLUDED.has(e));
+      }
+
+      // ---------------------------------------
+      // 🔹 Send USER Email (Lead Service Resumed)
+      // ---------------------------------------
+      await MAIL_HANDLER.sendCampaignResumedEmail({
+        to: user.email,
+        userName: user.name,
+        email: user.email,
+        partnerId: user.integrations?.boberdoo?.external_id || ""
+      });
+
+      // ---------------------------------------
+      // 🔹 Send ADMIN Email (Lead Service Resumed)
+      // ---------------------------------------
+      if (adminEmails.length > 0) {
+        await MAIL_HANDLER.sendCampaignResumedAdminEmail({
+          to: adminEmails,
+          userName: user.name,
+          userEmail: user.email,
+          partnerId: user.integrations?.boberdoo?.external_id || ""
+        });
+      }
+    } else {
+      console.log('ℹ️ Skipping "Service Resumed" email (User was not paused or is not yet fully healthy)');
+    }
 
 
   } catch (webhookErr) {
@@ -1068,6 +1188,8 @@ const handlePaymentFailure = async ({
 
     // ✅ 5. Send failure email to ADMINS
     try {
+      // Enforce delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
       const EXCLUDED = new Set(["admin@gmail.com", "admin123@gmail.com", "admin1234@gmail.com"]);
 
       const adminUsers = await User.find({
@@ -1247,6 +1369,61 @@ const getUserTransactions = async (userId, page = 1, limit = 20, filters = {}) =
   } catch (error) {
     console.error('Error fetching transactions:', error);
     throw new Error('Failed to retrieve transactions');
+  }
+};
+
+const getAllUsersTransactions = async (userId, filters = {}) => {
+  const query = { userId: new mongoose.Types.ObjectId(userId) };
+
+  console.log('DEBUG: getAllUsersTransactions Service - Query:', JSON.stringify(query));
+
+  // Apply filters
+  if (filters.type) query.type = filters.type;
+  if (filters.status) query.status = filters.status;
+
+  // Date range filter
+  if (filters.dateFrom || filters.dateTo) {
+    query.createdAt = {};
+    if (filters.dateFrom) {
+      query.createdAt.$gte = new Date(filters.dateFrom);
+      // If only dateFrom is provided, set time to start of day
+      if (!filters.dateTo) {
+        query.createdAt.$lte = new Date(new Date(filters.dateFrom).setHours(23, 59, 59, 999));
+      }
+    }
+    if (filters.dateTo) {
+      query.createdAt.$lte = new Date(new Date(filters.dateTo).setHours(23, 59, 59, 999));
+      // If only dateTo is provided, set time to start of day for lower bound
+      if (!filters.dateFrom) {
+        query.createdAt.$gte = new Date(new Date(filters.dateTo).setHours(0, 0, 0, 0));
+      }
+    }
+  }
+
+  try {
+    const transactions = await Transaction.find(query)
+      .sort({ createdAt: -1 })
+      .populate('userId', 'name email') // Populate basic user info as requested
+      .lean();
+
+    console.log(`DEBUG: getAllUsersTransactions Service - Found ${transactions.length} records`);
+    return transactions;
+  } catch (error) {
+    console.error('Error fetching all user transactions:', error);
+    throw new Error('Failed to retrieve all user transactions');
+  }
+};
+
+const getAllSystemTransactions = async (limit = 10) => {
+  try {
+    const transactions = await Transaction.find({})
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+    return transactions;
+  } catch (error) {
+    console.error('Error fetching all system transactions:', error);
+    throw new Error('Failed to retrieve system transactions');
   }
 };
 
@@ -1634,11 +1811,11 @@ const getRevenueFromNmi = async ({ start, end }) => {
 const chargeSingleLead = async (userId, leadId) => {
   const logMeta = { user_id: userId, lead_id: leadId, action: 'Charge Single Lead' };
 
-  // 1. Fetch Data
+
   const user = await User.findById(userId);
   if (!user) throw new ErrorHandler(404, 'User not found');
 
-  // Find lead by ID (or lead_id fallback)
+
   let lead = await Lead.findOne({ _id: leadId }).populate('campaign_id');
   if (!lead) {
     lead = await Lead.findOne({ lead_id: leadId }).populate('campaign_id');
@@ -1652,9 +1829,8 @@ const chargeSingleLead = async (userId, leadId) => {
   const campaign = lead.campaign_id;
   if (!campaign) throw new ErrorHandler(400, 'Campaign not found for lead');
 
-  // 2. Process Payment (Unified Logic)
-  // Force 'payasyougo' logic to enable Split Payment (Refund -> Balance -> Card)
-  // regardless of campaign type, as requested for this manual route.
+
+  //  'payasyougo' logic to enable Split Payment (Refund -> Balance -> Card)
   const session = await mongoose.startSession();
   session.startTransaction();
 
@@ -1663,7 +1839,7 @@ const chargeSingleLead = async (userId, leadId) => {
       user,
       leadId: lead._id,
       amount: lead.lead_cost,
-      paymentType: 'payasyougo', // Force split payment support
+      paymentType: 'payasyougo',
       assignedBy: userId,
       session,
       descriptionPrefix: 'Single Lead Charge'
@@ -1674,14 +1850,13 @@ const chargeSingleLead = async (userId, leadId) => {
       return { success: false, error: paymentResult.error, message: paymentResult.message };
     }
 
-    // 3. Update Lead Status
+
     lead.payment_status = 'paid';
     lead.status = 'active';
-    lead.transaction_id = paymentResult.transactionId; // MongoDB ID from our new function
+    lead.transaction_id = paymentResult.transactionId;
     lead.payment_error_message = null;
     await lead.save({ session });
 
-    // 4. Update User Stats (Pending Payment)
     if (user.pending_payment && user.pending_payment.amount > 0) {
       user.pending_payment.amount = Math.max(0, user.pending_payment.amount - lead.lead_cost);
       if (user.pending_payment.count > 0) user.pending_payment.count -= 1;
@@ -1690,16 +1865,35 @@ const chargeSingleLead = async (userId, leadId) => {
 
     await session.commitTransaction();
 
-    // 5. Send Notifications (Async - outside transaction)
-    // We import BoberDoService here to avoid top-level call issues if any, or just use existing require
+    // Send Notifications (Async - fire and forget)
     const BoberDoService = require('../../services/boberdoo/boberdoo.service');
-    process.nextTick(async () => {
+
+    (async () => {
+      billingLogger.info('DEBUG: Starting async notifications for single lead charge', logMeta);
+
+      // 1. Send Receipt - REMOVED (Handled by BoberDoService to avoid duplicates)
+      // try {
+      //   await ReceiptService.sendLeadPaymentReceipt({
+      //     user,
+      //     lead,
+      //     campaign,
+      //     billingResult: paymentResult
+      //   });
+      // } catch (err) {
+      //   billingLogger.error('Failed to send lead payment receipt for single lead charge', err, logMeta);
+      // }
+
+      // 2. Send Boberdo Notifications
       try {
+        // Enforce delay to prevent Rate Limiting
+        await new Promise(resolve => setTimeout(resolve, 1000));
         await BoberDoService.sendBoberdoLeadNotifications(lead, campaign, paymentResult);
       } catch (err) {
         billingLogger.error('Failed to send Boberdoo notifications for single lead charge', err, logMeta);
       }
-    });
+
+      billingLogger.info('DEBUG: Finished async notifications for single lead charge', logMeta);
+    })();
 
     return {
       success: true,
@@ -1901,6 +2095,8 @@ const retryUserPendingPayments = async (userId) => {
 };
 
 
+
+
 module.exports = {
   checkAndSendLowBalanceAlerts,
   chargeSingleLead,
@@ -1913,6 +2109,8 @@ module.exports = {
   manualCharge,
   getUserBalance,
   getUserTransactions,
+  getAllUsersTransactions,
+  getAllSystemTransactions,
   updatePaymentMode,
   deleteUserCard,
   testLeadDeduction,
@@ -1921,6 +2119,7 @@ module.exports = {
   addBalanceByAdmin,
   getRevenueFromNmi,
   handlePaymentFailure,
+  // sendLeadPaymentReceipt, // ✅ Removed to avoid circular dependency
 
   assignLeadPrepaid,
   assignLeadPayAsYouGo,
