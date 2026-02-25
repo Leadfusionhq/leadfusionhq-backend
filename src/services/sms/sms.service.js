@@ -1,6 +1,7 @@
 // services/sms/SmsServices.js
 const { NotifyreAPI, RecipientType } = require('notifyre-nodejs-sdk');
 const { ErrorHandler } = require('../../utils/error-handler');
+const { logger } = require('../../utils/logger');
 
 const rawKey = process.env.NOTIFYRE_API_KEY || '';
 const API_KEY = rawKey.trim().replace(/^Bearer\s+/i, ''); // avoid "Bearer Bearer ..." issues
@@ -68,7 +69,7 @@ const sendSms = async (smsData) => {
         campaignName: 'leadfusion-sms',
       };
 
-      console.log('[Notifyre] Sending SMS request:', {
+      logger.info('[Notifyre] Sending SMS request:', {
         from: reqPayload.from,
         to: toE164,
         bodyPreview: reqPayload.body.slice(0, 160),
