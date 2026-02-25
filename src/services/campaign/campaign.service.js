@@ -152,7 +152,7 @@ const _handlePostCampaignCreationTasks = async (populatedCampaign) => {
       const smsResult = await SmsServices.sendSms({
         to: user.phoneNumber,
         message: smsMessage,
-        from: process.env.SMS_SENDER_ID || '+18563908470',
+        from: process.env.SMS_SENDER_ID || '+12157026445',
       });
 
       if (smsResult.success) {
