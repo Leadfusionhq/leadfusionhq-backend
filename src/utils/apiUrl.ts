@@ -69,6 +69,10 @@ export const API_URL = {
   RESEND_VERIFICATION_EMAIL: `${TEST_API_BASE}/resend-verification-email`,
 
 
+  // trigger by admin dashboard :
+
+  TRIGGER_LOW_BALANCE_ALERT_BY_ADMIN: `${ADMIN_API_BASE}/:userId/low-balance-alert`,
+  TRIGGER_TOP_UP_ALERT_BY_ADMIN: `${ADMIN_API_BASE}/:userId/top-up-alert`,
 };
 
 /** ::::::::::::::::::FAQ ROUTES :::::::::::::::::: */
@@ -269,6 +273,9 @@ export const BILLING_API = {
   RETRY_PENDING_PAYMENTS: `${BILLING_API_BASE}/retry-pending-payments`,
 
   ADMIN_RETRY_PENDING_PAYMENTS: `${BILLING_API_BASE}/admin/retry-pending-payments`,
+
+
+
 
 };
 

@@ -44,7 +44,7 @@ import {
 } from "lucide-react";
 import { toast } from 'react-toastify';
 import ConfirmDialog from "@/components/common/ConfirmDialog";
-import { Menu, MenuItem, IconButton, Tooltip, Popover, List, ListItem, ListItemIcon, ListItemText, Typography, Divider, Chip } from "@mui/material";
+import { Menu, MenuItem, IconButton, Tooltip, Popover, List, ListItem, ListItemIcon, ListItemText, Typography, Divider, Chip, Dialog, DialogTitle, DialogContent, DialogActions, Button, RadioGroup, FormControlLabel, Radio, FormControl } from "@mui/material";
 import useDebounce from '@/hooks/useDebounce';
 import UserTransactionsDrawer from './UserTransactionsDrawer';
 
@@ -308,6 +308,10 @@ export default function UserTable() {
   const [transactionDrawerOpen, setTransactionDrawerOpen] = useState(false);
   const [transactionUser, setTransactionUser] = useState<User | null>(null);
 
+  const [triggerAlertOpen, setTriggerAlertOpen] = useState(false);
+  const [alertUser, setAlertUser] = useState<User | null>(null);
+  const [alertType, setAlertType] = useState<'lowBalance' | 'topUp'>('lowBalance');
+
   const [pagination, setPagination] = useState({
     pageIndex: 0,
     pageSize: 10,
@@ -512,6 +516,22 @@ export default function UserTable() {
     }
   };
 
+  const handleTriggerAlert = async () => {
+    if (!alertUser) return;
+    const toastId = toast.loading(`Triggering ${alertType === 'lowBalance' ? 'Low Balance' : 'Top Up'} Alert for ${alertUser.name}...`);
+    try {
+      const endpoint = alertType === 'lowBalance' ? API_URL.TRIGGER_LOW_BALANCE_ALERT_BY_ADMIN : API_URL.TRIGGER_TOP_UP_ALERT_BY_ADMIN;
+      const url = endpoint.replace(':userId', alertUser._id);
+      const response = await axiosWrapper('post', url, {}, token ?? undefined) as any;
+      if (response?.error) throw new Error(response.error);
+
+      toast.update(toastId, { render: response?.message || "Alert triggered successfully", type: "success", isLoading: false, autoClose: 3000 });
+      setTriggerAlertOpen(false);
+    } catch (err: any) {
+      toast.update(toastId, { render: err?.message || "Failed to trigger alert", type: "error", isLoading: false, autoClose: 5000 });
+    }
+  };
+
 
   // --- Table Setup ---
 
@@ -662,6 +682,10 @@ export default function UserTable() {
             onViewTransactions={() => {
               setTransactionUser(user);
               setTransactionDrawerOpen(true);
+            }}
+            onTriggerAlerts={() => {
+              setAlertUser(user);
+              setTriggerAlertOpen(true);
             }}
           />
         )
@@ -1071,6 +1095,29 @@ export default function UserTable() {
         userId={transactionUser?._id || null}
         userName={transactionUser?.name || ''}
       />
+
+      <Dialog open={triggerAlertOpen} onClose={() => setTriggerAlertOpen(false)} maxWidth="sm" fullWidth disablePortal={false} sx={{ zIndex: 9999 }}>
+        <DialogTitle>Trigger Alert for {alertUser?.name}</DialogTitle>
+        <DialogContent dividers>
+          <FormControl component="fieldset" className="mt-2">
+            <RadioGroup
+              value={alertType}
+              onChange={(e) => setAlertType(e.target.value as 'lowBalance' | 'topUp')}
+            >
+              <FormControlLabel value="lowBalance" control={<Radio sx={{ color: '#000', '&.Mui-checked': { color: '#000' } }} />} label="Low Balance Alert (Stop Campaigns)" />
+              <FormControlLabel value="topUp" control={<Radio sx={{ color: '#000', '&.Mui-checked': { color: '#000' } }} />} label="Top-Up Alert (Resume Campaigns)" />
+            </RadioGroup>
+          </FormControl>
+        </DialogContent>
+        <DialogActions className="p-4">
+          <Button onClick={() => setTriggerAlertOpen(false)} color="inherit" className="text-gray-600">
+            Cancel
+          </Button>
+          <Button onClick={handleTriggerAlert} variant="contained" sx={{ bgcolor: 'black', color: 'white', '&:hover': { bgcolor: '#333' } }} className="px-6 rounded-lg">
+            Trigger
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 }
@@ -1168,7 +1215,8 @@ const ActionMenu = ({
   onToggleStatus,
   onSendWebhook,
   onViewTransactions,
-  onPayPending
+  onPayPending,
+  onTriggerAlerts
 }: {
   user: User;
   onEdit: () => void;
@@ -1181,6 +1229,7 @@ const ActionMenu = ({
   onSendWebhook: () => void;
   onPayPending: () => void;
   onViewTransactions: () => void;
+  onTriggerAlerts: () => void;
 }) => {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
@@ -1262,6 +1311,10 @@ const ActionMenu = ({
           disabled={!user?.pending_payment_calculated?.amount || user.pending_payment_calculated.amount <= 0}
         >
           <Banknote size={16} /> Pay Pending Leads
+        </MenuItem>
+
+        <MenuItem onClick={(e) => { e.stopPropagation(); onTriggerAlerts(); handleClose(); }} disableRipple className="text-sm font-medium text-gray-700 gap-2">
+          <AlertCircle size={16} /> Trigger Alerts
         </MenuItem>
 
         <MenuItem onClick={() => { onViewTransactions(); handleClose(); }} disableRipple className="text-sm font-medium text-gray-700 gap-2">
