@@ -69,7 +69,7 @@ export const API_URL = {
   RESEND_VERIFICATION_EMAIL: `${TEST_API_BASE}/resend-verification-email`,
 
 
-  // trigger by admin dashboard :
+  // trigger by admin dashboard :   as
 
   TRIGGER_LOW_BALANCE_ALERT_BY_ADMIN: `${ADMIN_API_BASE}/:userId/low-balance-alert`,
   TRIGGER_TOP_UP_ALERT_BY_ADMIN: `${ADMIN_API_BASE}/:userId/top-up-alert`,
