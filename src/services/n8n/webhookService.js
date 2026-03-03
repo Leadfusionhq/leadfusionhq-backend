@@ -142,6 +142,8 @@ const sendLowBalanceAlert = async ({ campaign_name, filter_set_id, partner_id, e
   try {
     const LOW_BALANCE_API = "https://n8n.srv997679.hstgr.cloud/webhook/low_balance";
 
+    billingLogger.info(`[sendLowBalanceAlert] Triggering alert for campaign: ${campaign_name}`, { campaign_name, partner_id, email });
+
 
     const payload = {
       campaign_name,
@@ -151,7 +153,7 @@ const sendLowBalanceAlert = async ({ campaign_name, filter_set_id, partner_id, e
       triggered_at: new Date().toISOString()
     };
 
-    console.log("📤 Sending LOW BALANCE alert:", payload);
+    billingLogger.info("📤 Sending LOW BALANCE alert:", payload);
 
     const resp = await axios.post(LOW_BALANCE_API, payload, {
       headers: {
@@ -160,7 +162,7 @@ const sendLowBalanceAlert = async ({ campaign_name, filter_set_id, partner_id, e
       },
       timeout: 10000,
     });
-    console.log("✅ Low Balance API Response:", resp.status);
+    billingLogger.info("✅ Low Balance API Response:", resp.status);
     // ✅ STORE THE STOPPED CAMPAIGN INFO ON USER - DIRECT SAVE METHOD
     if (user_id && filter_set_id) {
       try {
@@ -168,7 +170,7 @@ const sendLowBalanceAlert = async ({ campaign_name, filter_set_id, partner_id, e
         const userToUpdate = await User.findById(user_id);
 
         if (!userToUpdate) {
-          console.error("❌ User not found for stopped_campaigns update:", user_id);
+          billingLogger.error("❌ User not found for stopped_campaigns update:", { user_id });
           return { success: true }; // Webhook was successful, just DB update failed
         }
 
@@ -195,22 +197,21 @@ const sendLowBalanceAlert = async ({ campaign_name, filter_set_id, partner_id, e
           // Save directly
           await userToUpdate.save();
 
-          console.log("✅ Stored stopped campaign info for user:", user_id);
-          console.log("📋 stopped_campaigns now:", userToUpdate.stopped_campaigns);
+          billingLogger.info("✅ Stored stopped campaign info for user:", { user_id });
+          billingLogger.info("📋 stopped_campaigns now:", { stopped_campaigns: userToUpdate.stopped_campaigns });
         } else {
-          console.log("ℹ️ Campaign already stopped, skipping:", filter_set_id);
+          billingLogger.info("ℹ️ Campaign already stopped, skipping:", { filter_set_id });
         }
 
       } catch (dbErr) {
-        console.error("❌ Failed to store stopped campaign info:", dbErr.message);
-        console.error("❌ Stack:", dbErr.stack);
+        billingLogger.error("❌ Failed to store stopped campaign info:", { error: dbErr.message, stack: dbErr.stack });
       }
     }
 
 
     return { success: true };
   } catch (error) {
-    console.error("❌ Error sending low balance alert:", error.response?.data || error.message);
+    billingLogger.error("❌ Error sending low balance alert:", { error: error.response?.data || error.message });
     return { success: false, error: error.message };
   }
 };

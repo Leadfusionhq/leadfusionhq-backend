@@ -11,6 +11,8 @@ const { addBalanceByAdmin } = require('../services/billing/billing.service')
 const MAIL_HANDLER = require('../mail/mails');
 const fs = require("fs");
 const path = require("path");
+const { sendLowBalanceAlert, sendBalanceTopUpAlert } = require('../services/n8n/webhookService');
+const Campaign = require('../models/campaign.model');
 
 // const getAllAdmins = wrapAsync(async (req, res) => {
 //   const data = await UserServices.getAllAdminsService();
@@ -121,6 +123,68 @@ const addUserBalance = wrapAsync(async (req, res) => {
 
 });
 
+const triggerLowBalanceAlert = wrapAsync(async (req, res) => {
+  const { userId } = req.params;
+
+  const user = await UserServices.getUserByID(userId);
+  if (!user) {
+    throw new ErrorHandler(404, 'User not found');
+  }
+
+  const campaigns = await Campaign.find({ user_id: userId });
+
+  if (campaigns.length === 0) {
+    return sendResponse(res, { stoppedCount: 0 }, 'No campaigns found to stop.', 200);
+  }
+
+  let stoppedCount = 0;
+  for (const campaign of campaigns) {
+    try {
+      await sendLowBalanceAlert({
+        campaign_name: campaign.name,
+        filter_set_id: campaign.boberdoo_filter_set_id,
+        partner_id: user.integrations?.boberdoo?.external_id || "",
+        email: user.email,
+        user_id: user._id,
+        campaign_id: campaign._id
+      });
+      stoppedCount++;
+      console.log(`Successfully triggered low balance alert for campaign: ${campaign.name}`);
+    } catch (error) {
+      console.error(`Failed to trigger low balance alert for campaign: ${campaign.name}`, error);
+    }
+  }
+
+  sendResponse(res, { stoppedCount }, `Successfully stopped ${stoppedCount} campaigns.`, 200);
+});
+
+const triggerTopUpAlert = wrapAsync(async (req, res) => {
+  const { userId } = req.params;
+  const { amount = 0 } = req.body;
+
+  const user = await UserServices.getUserByID(userId);
+  if (!user) {
+    throw new ErrorHandler(404, 'User not found');
+  }
+
+  try {
+    const result = await sendBalanceTopUpAlert({
+      partner_id: user.integrations?.boberdoo?.external_id || "",
+      email: user.email,
+      amount: amount,
+      user_id: user._id
+    });
+
+    if (result.success) {
+      sendResponse(res, result, 'Successfully triggered top up alert and resumed campaigns.', 200);
+    } else {
+      throw new ErrorHandler(400, result.message || 'Failed to trigger top up alert.');
+    }
+  } catch (error) {
+    console.error('Error triggering top up alert:', error);
+    throw new ErrorHandler(500, 'An error occurred while triggering top up alert');
+  }
+});
 
 module.exports = {
   getAllAdmins,
@@ -130,4 +194,6 @@ module.exports = {
   deleteAdmin,
   uploadAvatarAdmin,
   addUserBalance,
+  triggerLowBalanceAlert,
+  triggerTopUpAlert,
 };

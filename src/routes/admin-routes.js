@@ -16,6 +16,8 @@ const API = {
     DELETE_ADMIN_BY_ID: '/:adminId',
     UPLOAD_AVATAR: "/:adminId/avatar",
     ADD_BALANCE: "/:userId/addBalance",
+    TRIGGER_LOW_BALANCE_ALERT: "/:userId/low-balance-alert",
+    TRIGGER_TOP_UP_ALERT: "/:userId/top-up-alert",
 };
 
 
@@ -32,6 +34,9 @@ userRouter.get(API.GET_ALL_ADMINS, AdminController.getAllAdmins);
 userRouter.post(API.ADD_ADMIN, celebrate(AdminSchema.createAdminByAdmin), AdminController.addAdmin);
 
 userRouter.post(API.ADD_BALANCE, celebrate(AdminSchema.userBalanceByAdmin), AdminController.addUserBalance);
+
+userRouter.post(API.TRIGGER_LOW_BALANCE_ALERT, AdminController.triggerLowBalanceAlert);
+userRouter.post(API.TRIGGER_TOP_UP_ALERT, AdminController.triggerTopUpAlert);
 
 userRouter.get(API.GET_ADMIN_BY_ID, AdminController.getAdminById);
 
