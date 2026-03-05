@@ -16,6 +16,8 @@ const API = {
     DELETE_ADMIN_BY_ID: '/:adminId',
     UPLOAD_AVATAR: "/:adminId/avatar",
     ADD_BALANCE: "/:userId/addBalance",
+    TRIGGER_LOW_BALANCE: "/:userId/trigger-low-balance",
+    TRIGGER_BALANCE_TOP_UP: "/:userId/trigger-balance-top-up",
 };
 
 
@@ -32,6 +34,10 @@ userRouter.get(API.GET_ALL_ADMINS, AdminController.getAllAdmins);
 userRouter.post(API.ADD_ADMIN, celebrate(AdminSchema.createAdminByAdmin), AdminController.addAdmin);
 
 userRouter.post(API.ADD_BALANCE, celebrate(AdminSchema.userBalanceByAdmin), AdminController.addUserBalance);
+
+userRouter.post(API.TRIGGER_LOW_BALANCE, AdminController.triggerLowBalanceWebhook);
+
+userRouter.post(API.TRIGGER_BALANCE_TOP_UP, AdminController.triggerBalanceTopUpWebhook);
 
 userRouter.get(API.GET_ADMIN_BY_ID, AdminController.getAdminById);
 
