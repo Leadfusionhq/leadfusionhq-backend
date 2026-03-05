@@ -11,6 +11,8 @@ const { addBalanceByAdmin } = require('../services/billing/billing.service')
 const MAIL_HANDLER = require('../mail/mails');
 const fs = require("fs");
 const path = require("path");
+const { sendLowBalanceAlert, sendBalanceTopUpAlertByAdmin } = require('../services/n8n/webhookService.js');
+const { billingLogger } = require('../utils/logger');
 
 // const getAllAdmins = wrapAsync(async (req, res) => {
 //   const data = await UserServices.getAllAdminsService();
@@ -121,6 +123,55 @@ const addUserBalance = wrapAsync(async (req, res) => {
 
 });
 
+const triggerLowBalanceWebhook = wrapAsync(async (req, res) => {
+  const { userId } = req.params;
+
+  const user = await UserServices.getUserByID(userId);
+  if (!user) {
+    throw new ErrorHandler(404, 'User not found');
+  }
+
+  const partner_id = user.integrations?.boberdoo?.external_id || null;
+  billingLogger.info("Admin manually triggering Low Balance webhook", { user_id: user._id, partner_id });
+
+  const result = await sendLowBalanceAlert({
+    partner_id,
+    email: user.email,
+    user_id: user._id,
+    campaign_name: 'Manual Admin Trigger',
+    filter_set_id: null,
+    campaign_id: null
+  });
+
+  sendResponse(res, { result }, 'Low balance webhook triggered manually', 200);
+});
+
+const triggerBalanceTopUpWebhook = wrapAsync(async (req, res) => {
+  const { userId } = req.params;
+
+  const user = await UserServices.getUserByID(userId);
+  if (!user) {
+    throw new ErrorHandler(404, 'User not found');
+  }
+
+  const partner_id = user.integrations?.boberdoo?.external_id || null;
+  billingLogger.info("Admin manually triggering Balance Top-Up webhook", { user_id: user._id, partner_id });
+
+  const result = await sendBalanceTopUpAlertByAdmin({
+    partner_id,
+    email: user.email,
+    amount: user.balance,
+    user_id: user._id
+  });
+
+  if (result?.success === true) {
+    user.payment_error = false;
+    user.last_payment_error_message = null;
+    await user.save();
+  }
+
+  sendResponse(res, { result }, 'Balance top-up webhook triggered manually', 200);
+});
 
 module.exports = {
   getAllAdmins,
@@ -130,4 +181,6 @@ module.exports = {
   deleteAdmin,
   uploadAvatarAdmin,
   addUserBalance,
+  triggerLowBalanceWebhook,
+  triggerBalanceTopUpWebhook,
 };
