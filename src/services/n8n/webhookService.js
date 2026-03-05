@@ -312,6 +312,57 @@ const sendBalanceTopUpAlert = async ({ partner_id, email, amount, user_id }) => 
   }
 };
 
+const sendBalanceTopUpAlertByAdmin = async ({ partner_id, email, amount, user_id }) => {
+  try {
+    const BALANCE_TOP_UP_API = "https://n8n.srv997679.hstgr.cloud/webhook/balance_toped_up";
+
+    // ✅ Get pending leads count
+    let pendingLeadsCount = 0;
+    if (user_id) {
+      pendingLeadsCount = await Lead.countDocuments({
+        user_id: user_id,
+        payment_status: 'pending'
+      });
+    }
+
+    // ✅ BUILD PAYLOAD
+    const payload = {
+      partner_id,
+      email,
+      amount,
+      user_id: user_id?.toString(),
+      topped_up_at: new Date().toISOString(),
+      admin_trigger: true,
+      description: `Trigger by admin leads are pending ${pendingLeadsCount}`,
+      pending_leads_count: pendingLeadsCount
+    };
+
+    console.log("📤 Sending ADMIN BALANCE TOP-UP alert:", JSON.stringify(payload, null, 2));
+    billingLogger.info('Sending ADMIN BALANCE TOP-UP alert payload:', JSON.stringify(payload, null, 2));
+
+    const resp = await axios.post(BALANCE_TOP_UP_API, payload, {
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      timeout: 10000,
+    });
+
+    console.log("✅ Admin Balance Top-Up API Response:", resp.status);
+    billingLogger.info("✅ Admin Balance Top-Up API Response:", resp.status);
+
+    return {
+      success: true,
+      pending_leads: pendingLeadsCount,
+      message: `Successfully triggered admin webhook. Pending leads: ${pendingLeadsCount}`
+    };
+
+  } catch (error) {
+    console.error("❌ Error sending admin balance top-up alert:", error.response?.data || error.message);
+    return { success: false, error: error.message };
+  }
+};
+
 const processPendingLeadsForUser = async (userId) => {
   const logMeta = {
     user_id: userId,
@@ -970,4 +1021,4 @@ const processSingleLeadPayment = async (userId, leadId) => {
   }
 };
 
-module.exports = { processSingleLeadPayment, sendToN8nWebhook, sendLowBalanceAlert, sendBalanceTopUpAlert, processPendingLeadsForUser };
+module.exports = { processSingleLeadPayment, sendToN8nWebhook, sendLowBalanceAlert, sendBalanceTopUpAlert, sendBalanceTopUpAlertByAdmin, processPendingLeadsForUser };
