@@ -2600,6 +2600,74 @@ const sendPendingLeadsPaymentSuccessAdminEmail = async ({
 
 
 
+const sendCampaignGeographyUpdateEmail = async ({
+  campaignName,
+  campaignId,
+  userEmail,
+  oldGeography,
+  newGeography,
+  updatedByText
+}) => {
+  const adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS
+    ? process.env.ADMIN_NOTIFICATION_EMAILS.split(',').map(e => e.trim())
+    : [];
+
+  // Combine process.env emails and the hardcoded saqib@leadfusionhq.com
+  const recipients = [...new Set([...adminEmails, 'saqib@leadfusionhq.com'])];
+
+  // Professional center content
+  const mainText = `
+    <div style="font-family: Arial, sans-serif; font-size: 14px; color: #333; text-align: left;">
+      <p style="margin-bottom: 20px;">The geography (address or zip code) for the campaign below has been updated.</p>
+      
+      <table cellpadding="0" cellspacing="0" border="0" style="width: 100%; margin-bottom: 20px; border-collapse: collapse;">
+        <tr>
+          <td style="padding: 5px 10px 5px 0; width: 120px;"><strong>Campaign Name:</strong></td>
+          <td style="padding: 5px 0;">${campaignName}</td>
+        </tr>
+        <tr>
+          <td style="padding: 5px 10px 5px 0;"><strong>Campaign ID:</strong></td>
+          <td style="padding: 5px 0;">${campaignId}</td>
+        </tr>
+        <tr>
+          <td style="padding: 5px 10px 5px 0;"><strong>User Email:</strong></td>
+          <td style="padding: 5px 0;">${userEmail}</td>
+        </tr>
+        <tr>
+          <td style="padding: 5px 10px 5px 0;"><strong>Updated By:</strong></td>
+          <td style="padding: 5px 0;">${updatedByText}</td>
+        </tr>
+      </table>
+
+      <table cellpadding="12" cellspacing="0" border="1" style="width: 100%; border-collapse: collapse; border: 1px solid #e0e0e0; border-radius: 4px;">
+        <tr style="background-color: #f8f9fa;">
+          <th style="width: 50%; text-align: left; color: #555;">Previous Geography</th>
+          <th style="width: 50%; text-align: left; color: #555;">New Geography</th>
+        </tr>
+        <tr>
+          <td style="vertical-align: top; line-height: 1.5;">${oldGeography}</td>
+          <td style="vertical-align: top; line-height: 1.5;">${newGeography}</td>
+        </tr>
+      </table>
+    </div>
+  `;
+
+  const html = createEmailTemplate({
+    title: 'Campaign Geography Updated',
+    greeting: 'Hello Admin,',
+    mainText: mainText,
+  });
+
+  if (recipients.length > 0) {
+    return resend.emails.send({
+      from: FROM_EMAIL,
+      to: recipients,
+      subject: `Campaign Geography Updated - ${campaignName}`,
+      html,
+    });
+  }
+};
+
 module.exports = {
   createEmailTemplate,
   sendVerificationEmail,
@@ -2631,5 +2699,6 @@ module.exports = {
   sendPendingLeadsPaymentSuccessEmail,
   sendPendingLeadsPaymentSuccessAdminEmail,
   sendCampaignCreatedEmailToAdmin,
-  sendCampaignCreatedEmailToUser
+  sendCampaignCreatedEmailToUser,
+  sendCampaignGeographyUpdateEmail
 };
