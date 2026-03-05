@@ -178,6 +178,30 @@ const _handlePostCampaignCreationTasks = async (populatedCampaign) => {
   }
 };
 
+const formatGeographyForEmail = (campaign) => {
+  const geo = campaign.geography;
+  if (!geo || !geo.coverage) return 'N/A';
+
+  const type = geo.coverage.type || 'FULL_STATE';
+  const states = Array.isArray(geo.state)
+    ? geo.state.map(s => s?.name || s?.abbreviation || s).join(', ')
+    : 'N/A';
+
+  if (type === 'FULL_STATE') {
+    return `<strong>Type:</strong> FULL_STATE<br/><strong>State(s):</strong> ${states || 'None'}`;
+  } else {
+    const partial = geo.coverage.partial || {};
+    const zips = Array.isArray(partial.zip_codes) && partial.zip_codes.length > 0
+      ? partial.zip_codes.join(', ')
+      : 'None';
+    const counties = Array.isArray(partial.countyDetails) && partial.countyDetails.length > 0
+      ? partial.countyDetails.map(c => c?.name).join(', ')
+      : 'None';
+
+    return `<strong>Type:</strong> PARTIAL<br/><strong>State(s):</strong> ${states || 'None'}<br/><strong>Zip Codes:</strong> ${zips}<br/><strong>Counties:</strong> ${counties}`;
+  }
+};
+
 const updateCampaign = async (campaignId, userId, role, updateData) => {
   try {
     // 1. Fix: Only validate if geography is actually being updated
@@ -188,8 +212,18 @@ const updateCampaign = async (campaignId, userId, role, updateData) => {
     const filter = { _id: campaignId };
     if (role !== CONSTANT_ENUM.USER_ROLE.ADMIN) filter.user_id = userId;
 
+    // Fetch old campaign to compare geography
+    let oldCampaign = await Campaign.findOne(filter)
+      .populate('geography.state', 'name abbreviation')
+      .lean();
+
+    if (!oldCampaign) {
+      throw new ErrorHandler(404, 'Campaign not found or access denied');
+    }
+    oldCampaign = await _enrichCampaignDetails(oldCampaign);
+
     let updatedCampaign = await Campaign.findOneAndUpdate(filter, updateData, { new: true, runValidators: true })
-      .populate('user_id', 'integrations.boberdoo.external_id name email')
+      .populate('user_id', 'integrations.boberdoo.external_id name email firstName lastName fullName')
       .populate('geography.state', 'name abbreviation')
       .lean();
 
@@ -204,10 +238,57 @@ const updateCampaign = async (campaignId, userId, role, updateData) => {
     // 3. Fix: Final enrichment handles PARTIAL coverage details (must happen after last DB update)
     updatedCampaign = await _enrichCampaignDetails(updatedCampaign);
 
-    // 4. Background notifications
+    // Background notifications
     _handlePostCampaignUpdateTasks(updatedCampaign).catch(err => {
       campaignLogger.error('Post-update tasks background error', err, { campaign_id: campaignId });
     });
+
+    // Handle geography email notification if geography was updated
+    console.log("=== GEOGRAPHY UPDATE CHECK ===");
+    console.log("updateData keys:", Object.keys(updateData));
+
+    const hasGeographyUpdate = Object.keys(updateData).some(key => key.startsWith('geography')) || updateData.geography;
+    console.log("hasGeographyUpdate:", hasGeographyUpdate);
+
+    if (hasGeographyUpdate) {
+      const oldGeoString = JSON.stringify(oldCampaign.geography || {});
+      const newGeoString = JSON.stringify(updatedCampaign.geography || {});
+
+      console.log("oldGeoString:", oldGeoString);
+      console.log("newGeoString:", newGeoString);
+
+      if (oldGeoString !== newGeoString) {
+        campaignLogger.info('Geography update detected, sending email notification', { campaign_id: campaignId });
+        console.log("Geography changed! Preparing email...");
+
+        const oldGeoText = formatGeographyForEmail(oldCampaign);
+        const newGeoText = formatGeographyForEmail(updatedCampaign);
+        const userObj = updatedCampaign.user_id || {};
+        const userName = userObj.fullName || userObj.name || userObj.firstName || 'User';
+        const userEmail = userObj.email || 'N/A';
+        const updatedByText = role === CONSTANT_ENUM.USER_ROLE.ADMIN ? 'Admin' : userName;
+
+        console.log("Calling sendCampaignGeographyUpdateEmail...");
+        MAIL_HANDLER.sendCampaignGeographyUpdateEmail({
+          campaignName: updatedCampaign.name,
+          campaignId: updatedCampaign.campaign_id || updatedCampaign._id,
+          userEmail: userEmail,
+          oldGeography: oldGeoText,
+          newGeography: newGeoText,
+          updatedByText: updatedByText
+        }).then(() => {
+          console.log("sendCampaignGeographyUpdateEmail Promise resolved successfully.");
+        }).catch(err => {
+          console.error("sendCampaignGeographyUpdateEmail Promise rejected:", err);
+          campaignLogger.error('Failed to send geography update email', err, { campaign_id: campaignId });
+        });
+      } else {
+        console.log("Geography strings are identical. No email sent.");
+      }
+    } else {
+      console.log("No geography keys found in updateData.");
+    }
+    console.log("=== END GEOGRAPHY UPDATE CHECK ===");
 
     return updatedCampaign;
   } catch (error) {
