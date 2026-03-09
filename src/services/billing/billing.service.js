@@ -1229,13 +1229,36 @@ const handlePaymentFailure = async ({
       logger.error?.("Admin failed-payment email failed", emailErr);
     }
 
-    logger.info?.('✅ Payment failure handling completed', { user_id: owner._id });
+    // 6. Send failure SMS
+    try {
+      let phoneToSend = null;
+      if (campaign?.delivery?.phone?.numbers) {
+        phoneToSend = campaign.delivery.phone.numbers;
+      } else if (owner.phoneNumber) {
+        phoneToSend = owner.phoneNumber;
+      }
+
+      if (phoneToSend) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        await sendSms({
+          to: phoneToSend,
+          message: `LeadFusion Alert: Payment failed for lead. Amount: $${leadCost}. Please update your payment method to avoid service interruption.`
+        });
+        logger.info?.('Failure SMS sent');
+      } else {
+        logger.info?.('No phone number available for failure SMS');
+      }
+    } catch (smsErr) {
+      logger.error?.("Failure SMS failed", smsErr);
+    }
+
+    logger.info?.('Payment failure handling completed', { user_id: owner._id });
 
     return { success: true };
 
   } catch (err) {
-    logger.error?.('❌ Error handling payment failure', err);
-    console.error('❌ Payment failure handling error:', err);
+    logger.error?.('Error handling payment failure', err);
+    console.error('Payment failure handling error:', err);
     return { success: false, error: err.message };
   }
 };

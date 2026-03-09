@@ -13,6 +13,7 @@ const fs = require("fs");
 const path = require("path");
 const { sendLowBalanceAlert, sendBalanceTopUpAlertByAdmin } = require('../services/n8n/webhookService.js');
 const { billingLogger } = require('../utils/logger');
+const Campaign = require('../models/campaign.model');
 
 // const getAllAdmins = wrapAsync(async (req, res) => {
 //   const data = await UserServices.getAllAdminsService();
@@ -131,6 +132,15 @@ const triggerLowBalanceWebhook = wrapAsync(async (req, res) => {
     throw new ErrorHandler(404, 'User not found');
   }
 
+  // Fetch all campaigns for the user to get all associated filter set IDs
+  const campaigns = await Campaign.find({
+    user_id: user._id,
+    boberdoo_filter_set_id: { $exists: true, $ne: null }
+  });
+  // Get unique filter set IDs
+  const filterSetIds = [...new Set(campaigns.map(c => c.boberdoo_filter_set_id))].filter(Boolean);
+  const filter_set_id_value = filterSetIds.length > 0 ? filterSetIds.join(',') : null;
+
   const partner_id = user.integrations?.boberdoo?.external_id || null;
   billingLogger.info("Admin manually triggering Low Balance webhook", { user_id: user._id, partner_id });
 
@@ -139,7 +149,7 @@ const triggerLowBalanceWebhook = wrapAsync(async (req, res) => {
     email: user.email,
     user_id: user._id,
     campaign_name: 'Manual Admin Trigger',
-    filter_set_id: null,
+    filter_set_id: filter_set_id_value,
     campaign_id: null
   });
 
