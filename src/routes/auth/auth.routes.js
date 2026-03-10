@@ -18,7 +18,7 @@ const API = {
 
     // SEND_VERIFICATION_EMAIL: '/resend-verification-link',
 
-    
+
 };
 
 authRouter.post(
@@ -40,27 +40,27 @@ authRouter.get(
 );
 
 authRouter.put(
-    API.SEND_OTP_ON_EMAIL, 
-    celebrate(AuthSchema.sendOTPonEmail), 
+    API.SEND_OTP_ON_EMAIL,
+    celebrate(AuthSchema.sendOTPonEmail),
     authController.sendOtpOnEmail
 );
 
 
 authRouter.put(
-    API.VERIFY_OTP, 
-    celebrate(AuthSchema.verifyOTP), 
+    API.VERIFY_OTP,
+    celebrate(AuthSchema.verifyOTP),
     authController.verifyOTP
 );
 
 authRouter.put(
-    API.RESET_PASSWORD, 
-    celebrate(AuthSchema.resetPassword), 
+    API.RESET_PASSWORD,
+    celebrate(AuthSchema.resetPassword),
     authController.resetPassword
 );
 
 authRouter.put(
-    API.SEND_VERIFICATION_EMAIL, 
-    celebrate(AuthSchema.sendVerificationEmail), 
+    API.SEND_VERIFICATION_EMAIL,
+    celebrate(AuthSchema.sendVerificationEmail),
     authController.sendVerificationEmail
 );
 

@@ -14,6 +14,7 @@ const path = require("path");
 const { sendLowBalanceAlert, sendBalanceTopUpAlertByAdmin } = require('../services/n8n/webhookService.js');
 const { billingLogger } = require('../utils/logger');
 const Campaign = require('../models/campaign.model');
+const Log = require('../models/Log');
 
 // const getAllAdmins = wrapAsync(async (req, res) => {
 //   const data = await UserServices.getAllAdminsService();
@@ -183,6 +184,56 @@ const triggerBalanceTopUpWebhook = wrapAsync(async (req, res) => {
   sendResponse(res, { result }, 'Balance top-up webhook triggered manually', 200);
 });
 
+const getUserLogs = wrapAsync(async (req, res) => {
+  const { userId } = req.params;
+  const { page, limit } = getPaginationParams(req.query);
+  const search = req.query.search || '';
+
+  const query = {
+    $or: [
+      { userId: userId },
+      { 'metadata.userId': userId },
+      { 'metadata.user_id': userId }
+    ]
+  };
+
+  if (search) {
+    query.$and = [
+      {
+        $or: [
+          { message: { $regex: search, $options: 'i' } },
+          { level: { $regex: search, $options: 'i' } },
+          { logType: { $regex: search, $options: 'i' } },
+          { module: { $regex: search, $options: 'i' } }
+        ]
+      }
+    ];
+  }
+
+  const skip = (page - 1) * limit;
+
+  const data = await Log.find(query)
+    .sort({ timestamp: -1 })
+    .skip(skip)
+    .limit(limit)
+    .lean();
+
+  const totalLogs = await Log.countDocuments(query);
+  const totalPages = Math.ceil(totalLogs / limit);
+
+  const result = {
+    data,
+    pagination: {
+      page,
+      limit,
+      total: totalLogs,
+      pages: totalPages,
+    }
+  };
+
+  sendResponse(res, result, 'User logs fetched successfully.', 200);
+});
+
 module.exports = {
   getAllAdmins,
   addAdmin,
@@ -193,4 +244,5 @@ module.exports = {
   addUserBalance,
   triggerLowBalanceWebhook,
   triggerBalanceTopUpWebhook,
+  getUserLogs,
 };
