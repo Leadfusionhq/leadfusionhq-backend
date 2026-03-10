@@ -18,6 +18,7 @@ const API = {
     ADD_BALANCE: "/:userId/addBalance",
     TRIGGER_LOW_BALANCE: "/:userId/trigger-low-balance",
     TRIGGER_BALANCE_TOP_UP: "/:userId/trigger-balance-top-up",
+    GET_USER_LOGS: "/:userId/logs",
 };
 
 
@@ -40,6 +41,8 @@ userRouter.post(API.TRIGGER_LOW_BALANCE, AdminController.triggerLowBalanceWebhoo
 userRouter.post(API.TRIGGER_BALANCE_TOP_UP, AdminController.triggerBalanceTopUpWebhook);
 
 userRouter.get(API.GET_ADMIN_BY_ID, AdminController.getAdminById);
+
+userRouter.get(API.GET_USER_LOGS, celebrate(AdminSchema.getUserLogs), AdminController.getUserLogs);
 
 userRouter.put(API.UPDATE_ADMIN, AdminController.updateAdmin);
 
