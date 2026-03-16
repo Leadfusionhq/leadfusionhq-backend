@@ -324,6 +324,49 @@ const addFunds = wrapAsync(async (req, res) => {
                 });
                 billingLogger.info('Funds added SMS sent', { userId: user_id });
             }
+
+            // ✅ Send admin notification
+            try {
+                // Determine admin emails
+                const EXCLUDED = new Set([
+                    'admin@gmail.com',
+                    'admin123@gmail.com',
+                    'admin1234@gmail.com',
+                ]);
+
+                let adminEmails = [];
+
+                if (process.env.ADMIN_NOTIFICATION_EMAILS) {
+                    adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS
+                        .split(',')
+                        .map(e => e.trim().toLowerCase())
+                        .filter(Boolean);
+                } else {
+                    const adminUsers = await User.find({
+                        role: { $in: ['ADMIN', 'SUPER_ADMIN'] },
+                        isActive: { $ne: false },
+                    }).select('email name');
+
+                    adminEmails = (adminUsers || [])
+                        .map(a => a.email?.trim().toLowerCase())
+                        .filter(e => e && !EXCLUDED.has(e));
+                }
+
+                if (adminEmails.length > 0) {
+                    await MAIL_HANDLER.sendFundsAddedAdminEmail({
+                        to: adminEmails,
+                        userName: user.name,
+                        userEmail: user.email,
+                        amount: amount,
+                        transactionId: result.nmiTransactionId || result.transactionId,
+                        paymentMethod: result.paymentMethod || 'Card',
+                        newBalance: result.newBalance
+                    });
+                    billingLogger.info('Funds added admin email sent', { userId: user_id, adminCount: adminEmails.length });
+                }
+            } catch (adminEmailErr) {
+                billingLogger.error('Failed to send funds added admin email', adminEmailErr);
+            }
         } catch (emailErr) {
             billingLogger.error('Failed to send funds added email or SMS', emailErr);
         }
