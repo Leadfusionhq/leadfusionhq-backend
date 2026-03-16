@@ -1564,6 +1564,97 @@ const sendFundsAddedEmail = async ({
 };
 
 /**
+ * Send Funds Added Email to Admins
+ */
+const sendFundsAddedAdminEmail = async ({
+  to,
+  userName,
+  userEmail,
+  amount,
+  transactionId,
+  paymentMethod,
+  newBalance
+}) => {
+  const recipients = Array.isArray(to) ? to : [to];
+
+  const date = new Date().toLocaleString('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  });
+
+  const table = `
+        <div style="background-color: #ffffff; padding: 15px 25px; border-radius: 8px; border: 1px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0,0,0,0.05); text-align: left;">
+            <table cellpadding="0" cellspacing="0" border="0" style="width: 100%; font-family: 'Inter', Arial, sans-serif; font-size: 14px; line-height: 1.5; text-align: left; color: #111827;">
+                <tr>
+                    <td style="padding: 10px 0; border-bottom: 1px solid #f3f4f6; width: 40%; text-align: left; vertical-align: top;">
+                        <span style="font-weight: 600; color: #4b5563; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">User</span>
+                    </td>
+                    <td style="padding: 10px 0; border-bottom: 1px solid #f3f4f6; width: 60%; text-align: right; font-weight: 500; color: #111827; vertical-align: top;">
+                        ${userName} <br/><span style="color: #6b7280; font-size: 13px; font-weight: 400;">${userEmail}</span>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px 0; border-bottom: 1px solid #f3f4f6; text-align: left;">
+                        <span style="font-weight: 600; color: #4b5563; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Amount Added</span>
+                    </td>
+                    <td style="padding: 10px 0; border-bottom: 1px solid #f3f4f6; text-align: right; font-weight: 700; color: #059669; font-size: 16px;">
+                        $${parseFloat(amount).toFixed(2)}
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px 0; border-bottom: 1px solid #f3f4f6; text-align: left;">
+                        <span style="font-weight: 600; color: #4b5563; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Payment Method</span>
+                    </td>
+                    <td style="padding: 10px 0; border-bottom: 1px solid #f3f4f6; text-align: right; font-weight: 500; color: #111827;">
+                        ${paymentMethod || 'Card'}
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px 0; border-bottom: 1px solid #f3f4f6; text-align: left;">
+                        <span style="font-weight: 600; color: #4b5563; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">New Balance</span>
+                    </td>
+                    <td style="padding: 10px 0; border-bottom: 1px solid #f3f4f6; text-align: right; font-weight: 600; color: #111827; font-size: 15px;">
+                        $${parseFloat(newBalance).toFixed(2)}
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px 0; border-bottom: 1px solid #f3f4f6; text-align: left;">
+                        <span style="font-weight: 600; color: #4b5563; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Transaction ID</span>
+                    </td>
+                    <td style="padding: 10px 0; border-bottom: 1px solid #f3f4f6; text-align: right; font-family: monospace; font-size: 13px; color: #374151;">
+                        ${transactionId}
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px 0; text-align: left;">
+                        <span style="font-weight: 600; color: #4b5563; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Date</span>
+                    </td>
+                    <td style="padding: 10px 0; text-align: right; color: #374151; font-size: 13.5px;">
+                        ${date}
+                    </td>
+                </tr>
+            </table>
+        </div>
+    `;
+
+  const html = createEmailTemplate({
+    title: 'Manual Top-Up Successful',
+    mainText: `
+            <p style="color: #111827; font-size: 15px; margin-bottom: 24px; text-align: center;">A user has successfully added funds to their account. Below are the transaction details:</p>
+            <div style="text-align: left;">${table}</div>
+        `,
+    footerText: ''
+  });
+
+  return resend.emails.send({
+    from: FROM_EMAIL,
+    to: recipients,
+    subject: `Funds Added: $${parseFloat(amount).toFixed(2)} by ${userName}`,
+    html
+  });
+};
+
+/**
  * Send Auto Top-Up Email
  */
 const sendAutoTopUpEmail = async ({
@@ -2696,6 +2787,7 @@ module.exports = {
   sendLowBalanceWarningEmail,
   sendFailedLeadPaymentEmail,
   sendFailedLeadPaymentAdminEmail,
+  sendFundsAddedAdminEmail,
   sendPendingLeadsPaymentSuccessEmail,
   sendPendingLeadsPaymentSuccessAdminEmail,
   sendCampaignCreatedEmailToAdmin,
