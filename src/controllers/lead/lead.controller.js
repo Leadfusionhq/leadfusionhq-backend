@@ -582,6 +582,7 @@ View Lead: ${process.env.UI_LINK}/dashboard/leads/${result._id}`;
           leadCost,
           campaign,
           billingResult,
+          leadData: result,
           logger: leadLogger
         });
       })();

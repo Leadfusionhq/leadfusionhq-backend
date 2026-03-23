@@ -1106,6 +1106,7 @@ const handlePaymentFailure = async ({
   leadCost,
   campaign,
   billingResult,
+  leadData = null,
   logger = console
 }) => {
   try {
@@ -1179,7 +1180,9 @@ const handlePaymentFailure = async ({
         leadId: leadId,
         amount: leadCost,
         cardLast4: billingResult.cardLast4 || "N/A",
-        errorMessage: billingResult.message
+        errorMessage: billingResult.message,
+        leadData,
+        campaignName: campaign?.name || "N/A"
       });
       logger.info?.('User failure email sent');
     } catch (emailErr) {
@@ -1222,7 +1225,9 @@ const handlePaymentFailure = async ({
         leadId: leadId,
         amount: leadCost,
         cardLast4: billingResult.cardLast4 || "N/A",
-        errorMessage: billingResult.message
+        errorMessage: billingResult.message,
+        leadData,
+        campaignName: campaign?.name || "N/A"
       });
       logger.info?.('Admin failure email sent');
     } catch (emailErr) {
@@ -1239,10 +1244,24 @@ const handlePaymentFailure = async ({
       }
 
       if (phoneToSend) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        let smsMessage = `LF Alert: Payment failed.\n`;
+        smsMessage += `Lead ID: ${leadId} | Amt: $${leadCost}\n`;
+        smsMessage += `Campaign: ${campaign?.name || 'N/A'}\n`;
+
+        if (leadData) {
+          const leadName = `${leadData.first_name || ''} ${leadData.last_name || ''}`.trim();
+          const leadPhone = leadData.phone_number || leadData.phone || 'N/A';
+          const zipCode = leadData.address?.zip_code || leadData.address?.zip || 'N/A';
+          
+          smsMessage += `Lead: ${leadName} | Ph: ${leadPhone}\n`;
+          smsMessage += `Zip: ${zipCode}\n`;
+        }
+
+        smsMessage += `\nPlease update payment method to resume leads.`;
+
         await sendSms({
           to: phoneToSend,
-          message: `LeadFusion Alert: Payment failed for lead. Amount: $${leadCost}. Please update your payment method to avoid service interruption.`
+          message: smsMessage
         });
         logger.info?.('Failure SMS sent');
       } else {
