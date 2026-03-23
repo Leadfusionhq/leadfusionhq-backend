@@ -1128,6 +1128,7 @@ const processBoberdoLead = async (leadData) => {
         leadCost,
         campaign,
         billingResult,
+        leadData: populatedLead,
         logger: billingLogger
       });
     }
