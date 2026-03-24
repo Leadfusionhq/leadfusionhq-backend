@@ -16,6 +16,7 @@ const MAIL_HANDLER = require('../../mail/mails');
 const formatForNmi = (d) => dayjs(d).format('MM/DD/YYYY');
 const { sendToN8nWebhook, sendLowBalanceAlert } = require('../../services/n8n/webhookService.js');
 const { sendSms } = require('../../services/sms/sms.service');
+const { formatFullAddress } = require('../../utils/address.utile');
 const ReceiptService = require('./receipt.service');
 
 // Contract management
@@ -1244,26 +1245,50 @@ const handlePaymentFailure = async ({
       }
 
       if (phoneToSend) {
-        let smsMessage = `LF Alert: Payment failed.\n`;
-        smsMessage += `Lead ID: ${leadId} | Amt: $${leadCost}\n`;
-        smsMessage += `Campaign: ${campaign?.name || 'N/A'}\n`;
-
-        if (leadData) {
-          const leadName = `${leadData.first_name || ''} ${leadData.last_name || ''}`.trim();
-          const leadPhone = leadData.phone_number || leadData.phone || 'N/A';
-          const zipCode = leadData.address?.zip_code || leadData.address?.zip || 'N/A';
-          
-          smsMessage += `Lead: ${leadName} | Ph: ${leadPhone}\n`;
-          smsMessage += `Zip: ${zipCode}\n`;
-        }
-
-        smsMessage += `\nPlease update payment method to resume leads.`;
+        // SMS 1: Payment Alert
+        let paymentSms = `LeadFusion Alert: Payment failed.\n\n`;
+        paymentSms += `Lead ID: ${leadId} | Amount: $${leadCost}\n`;
+        paymentSms += `Campaign: ${campaign?.name || 'N/A'}\n\n`;
+        paymentSms += `Please update payment method to resume leads.`;
 
         await sendSms({
           to: phoneToSend,
-          message: smsMessage
+          message: paymentSms
         });
-        logger.info?.('Failure SMS sent');
+
+        // SMS 2: Lead Details (if leadData exists) - Header is "New Lead Assigned" as requested
+        if (leadData) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+
+          const fullName = `${leadData.first_name || ''} ${leadData.last_name || ''}`.trim();
+          const phoneNumber = leadData.phone_number || leadData.phone || 'N/A';
+          const email = leadData.email || 'N/A';
+          const address = formatFullAddress(leadData.address);
+          const campaignName = campaign?.name || 'N/A';
+          
+          const MAX_NOTE_LENGTH = 100;
+          let notes = leadData.note || 'No notes provided';
+          if (notes.length > MAX_NOTE_LENGTH) notes = notes.substring(0, MAX_NOTE_LENGTH) + '...';
+
+          const detailSms = `New Lead Assigned
+
+Name: ${fullName}
+Phone: ${phoneNumber}
+Email: ${email}
+Address: ${address}
+Lead ID: ${leadId}
+Campaign: ${campaignName}
+Notes: ${notes}
+
+View Lead: ${process.env.UI_LINK}/dashboard/leads/${leadData._id}`;
+
+          await sendSms({
+            to: phoneToSend,
+            message: detailSms
+          });
+        }
+
+        logger.info?.('Failure SMS(s) sent');
       } else {
         logger.info?.('No phone number available for failure SMS');
       }
