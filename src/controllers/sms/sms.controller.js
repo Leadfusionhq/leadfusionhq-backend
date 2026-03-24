@@ -27,22 +27,29 @@ const listSentSms = wrapAsync(async (req, res) => {
   } = req.query;
 
   const opts = {
-    limit: limit ? parseInt(limit) : 100,
-    skip: skip ? parseInt(skip) : 0,
-    fromDate: fromDate ? Number(fromDate) : null,
-    toDate: toDate ? Number(toDate) : null,
-    toNumber,
-    fromNumber,
-    type,
-    sort,
-    search
+    Limit: limit ? parseInt(limit) : 100,
+    Skip: skip ? parseInt(skip) : 0,
+    FromDate: fromDate ? Number(fromDate) : null,
+    ToDate: toDate ? Number(toDate) : null,
+    ToNumber: toNumber,
+    FromNumber: fromNumber,
+    Type: type,
+    Sort: sort || 'desc',
+    Search: search
   };
 
   const result = await smsService.listSentSms(opts);
   sendResponse(res, result, "Sent SMS list fetched successfully", 200);
 });
 
+const getSMSStatus = wrapAsync(async (req, res) => {
+  const { messageId } = req.params;
+  const result = await smsService.getSmsStatus(messageId);
+  sendResponse(res, result, "SMS status fetched successfully", 200);
+});
+
 module.exports = {
   sendSMS,
   listSentSms,
+  getSMSStatus,
 };
