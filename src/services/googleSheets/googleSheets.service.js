@@ -19,6 +19,11 @@ const mongoose = require('mongoose');
 
 const SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
 
+// ─── Business Rules: Campaign Whitelist ──────────────────────────────────────
+const ALLOWED_CAMPAIGN_IDS = [
+  '68de7d90e1c60ebbb1f16637', // New York Campaign
+];
+
 // ─── Build Auth Client (lazy-singleton) ──────────────────────────────────────
 let _authClient = null;
 
@@ -283,6 +288,13 @@ const syncLeadById = async (leadId) => {
     if (!lead) {
       logger.warn(`[GoogleSheets] syncLeadById: Lead not found ${leadId}`);
       return;
+    }
+
+    // ── Whitelist Check: Only sync specific campaigns (Requirement: 10/10) ──
+    const currentCampaignId = lead.campaign_id?._id?.toString() || lead.campaign_id?.toString();
+    if (!ALLOWED_CAMPAIGN_IDS.includes(currentCampaignId)) {
+      logger.info(`[GoogleSheets] Sync skipped for Lead ${leadId}: Campaign ${currentCampaignId} not in whitelist.`);
+      return { skipped: true, reason: 'Campaign filter' };
     }
 
     const leadData = {
