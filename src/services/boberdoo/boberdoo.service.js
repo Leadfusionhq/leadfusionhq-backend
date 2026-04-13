@@ -19,6 +19,7 @@ const API_UPDATE_KEY = (process.env.BOBERDOO_UPDATE_API_KEY || '').trim();
 const ReceiptService = require('../billing/receipt.service');
 const { sendToN8nWebhook, sendLowBalanceAlert } = require('../../services/n8n/webhookService.js');
 const { billingLogger } = require('../../utils/logger');
+const GoogleSheetsService = require('../googleSheets/googleSheets.service');
 const CREATE_ACTION = 'createNewPartner'; // fixed here
 
 const CAMPAIGN_API_URL = process.env.BOBERDOO_CAMPAIGN_API_URL;
@@ -1104,6 +1105,11 @@ const processBoberdoLead = async (leadData) => {
 
     await session.commitTransaction();
     session.endSession();
+
+    // ── Google Sheets: append lead (fire-and-forget) ──
+    setImmediate(() => {
+      GoogleSheetsService.syncLeadById(createdLead._id);
+    });
 
     const populatedLead = await Lead.findById(createdLead._id)
       .populate('campaign_id', 'name campaign_id')

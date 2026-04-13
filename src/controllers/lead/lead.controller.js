@@ -22,6 +22,7 @@ const { sendToN8nWebhook, sendLowBalanceAlert } = require('../../services/n8n/we
 const Campaign = require('../../models/campaign.model.js');
 const { leadLogger } = require('../../utils/logger');
 const { formatFullAddress } = require('../../utils/address.utile.js');
+const GoogleSheetsService = require('../../services/googleSheets/googleSheets.service');
 
 // const createLead = wrapAsync(async (req, res) => {
 //     const session = await mongoose.startSession();
@@ -342,6 +343,11 @@ const createLead = wrapAsync(async (req, res) => {
       payment_status: result.payment_status,
       campaign_name: result.campaign_id?.name,
       campaign_owner_id: result.campaign_id?.user_id,
+    });
+
+    // ── Google Sheets: append lead (fire-and-forget — never blocks the flow) ──
+    setImmediate(() => {
+      GoogleSheetsService.syncLeadById(result._id);
     });
 
     // If payment succeeded, do existing low balance check (for prepaid)
