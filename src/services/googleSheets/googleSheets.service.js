@@ -21,8 +21,8 @@ const SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
 
 // ─── Business Rules: Campaign Whitelist ──────────────────────────────────────
 const ALLOWED_CAMPAIGN_IDS = [
-  // '68de7d90e1c60ebbb1f16637', // New York Campaign
-  '6989b0071ea79c2c9bd51101',
+  '68de7d90e1c60ebbb1f16637', // New York Campaign
+  // '6989b0071ea79c2c9bd51101',
 ];
 
 // ─── Build Auth Client (lazy-singleton) ──────────────────────────────────────
