@@ -109,6 +109,15 @@ const getRevenueFromGateway = wrapAsync(async (req, res) => {
     }, 'Revenue fetched successfully');
 });
 
+const getAllSystemTransactions = wrapAsync(async (req, res) => {
+    try {
+        const transactions = await BillingServices.getAllSystemTransactions(50);
+        return sendResponse(res, { transactions }, 'System transactions retrieved');
+    } catch (error) {
+        throw new ErrorHandler(500, 'Failed to fetch system transactions');
+    }
+});
+
 
 const acceptContract = wrapAsync(async (req, res) => {
     const user_id = req.user._id;
@@ -239,7 +248,7 @@ const testAutoTopUp = wrapAsync(async (req, res) => {
                     to: user.email,
                     userName: user.name,
                     amount: result.topUpAmount,
-                    transactionId: result.topUpTransactionId,
+                    transactionId: result.paymentTransactionId || result.transactionId,
                     triggerReason: `Balance below threshold after lead deduction`,
                     newBalance: result.newBalance,
                     threshold: result.threshold || 50
@@ -300,13 +309,66 @@ const addFunds = wrapAsync(async (req, res) => {
                 to: user.email,
                 userName: user.name,
                 amount: amount,
-                transactionId: result.transactionId,
+                transactionId: result.nmiTransactionId || result.transactionId,
                 paymentMethod: result.paymentMethod || 'Card',
                 newBalance: result.newBalance
             });
             billingLogger.info('Funds added email sent', { userId: user_id });
+
+            // Send SMS notification
+            if (user.phoneNumber) {
+                const { sendSms } = require('../../services/sms/sms.service.js');
+                await sendSms({
+                    to: user.phoneNumber,
+                    message: `LeadFusion Alert: $${amount} has been successfully added to your account. Your new balance is $${Number(result.newBalance).toFixed(2)}.`
+                });
+                billingLogger.info('Funds added SMS sent', { userId: user_id });
+            }
+
+            // ✅ Send admin notification
+            try {
+                // Determine admin emails
+                const EXCLUDED = new Set([
+                    'admin@gmail.com',
+                    'admin123@gmail.com',
+                    'admin1234@gmail.com',
+                ]);
+
+                let adminEmails = [];
+
+                if (process.env.ADMIN_NOTIFICATION_EMAILS) {
+                    adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS
+                        .split(',')
+                        .map(e => e.trim().toLowerCase())
+                        .filter(Boolean);
+                } else {
+                    const adminUsers = await User.find({
+                        role: { $in: ['ADMIN', 'SUPER_ADMIN'] },
+                        isActive: { $ne: false },
+                    }).select('email name');
+
+                    adminEmails = (adminUsers || [])
+                        .map(a => a.email?.trim().toLowerCase())
+                        .filter(e => e && !EXCLUDED.has(e));
+                }
+
+                if (adminEmails.length > 0) {
+                    await MAIL_HANDLER.sendFundsAddedAdminEmail({
+                        to: adminEmails,
+                        userName: user.name,
+                        userEmail: user.email,
+                        amount: amount,
+                        transactionId: result.nmiTransactionId || result.transactionId,
+                        paymentMethod: result.paymentMethod || 'Card',
+                        newBalance: result.newBalance
+                    });
+                    billingLogger.info('Funds added admin email sent', { userId: user_id, adminCount: adminEmails.length });
+                }
+            } catch (adminEmailErr) {
+                billingLogger.error('Failed to send funds added admin email', adminEmailErr);
+            }
         } catch (emailErr) {
-            billingLogger.error('Failed to send funds added email', emailErr);
+            billingLogger.error('Failed to send funds added email or SMS', emailErr);
         }
 
         return sendResponse(res, { result }, 'Funds added successfully', 201);
@@ -376,6 +438,53 @@ const getTransactions = wrapAsync(async (req, res) => {
 
         // Check if it's a known error or a database error
         if (err.message.includes('Failed to retrieve transactions')) {
+            throw new ErrorHandler(500, 'Failed to retrieve transactions. Please try again later.');
+        } else {
+            throw new ErrorHandler(400, 'Invalid request parameters.');
+        }
+    }
+});
+
+const getUsersTransactions = wrapAsync(async (req, res) => {
+    // const { page, limit } = getPaginationParams(req.query); // Not needed for "get all"
+    const filters = extractFilters(req.query, ['type', 'status', 'dateFrom', 'dateTo']);
+
+    // Handle nested params structure if present (e.g., from axios params serializer issue)
+    let userId = req.query.userId || req.query['params[userId]'];
+
+    // If query string parser handled it differently
+    if (!userId && req.query.params && typeof req.query.params === 'object') {
+        userId = req.query.params.userId;
+    }
+
+    // Fallback to logged in user if still not provided
+    if (!userId) {
+        userId = req.user?._id;
+    }
+
+    if (userId) {
+        userId = userId.toString().trim();
+    }
+
+    console.log('DEBUG: getUsersTransactions resolved userId:', userId);
+
+    if (!userId) {
+        throw new ErrorHandler(400, 'User ID is required.');
+    }
+
+    try {
+        const transactions = await BillingServices.getAllUsersTransactions(userId, filters);
+
+        return sendResponse(res, {
+            transactions,
+            count: transactions.length
+        }, 'All user transactions retrieved successfully');
+
+    } catch (err) {
+        console.error(`Failed to get all transactions:`, err.message);
+
+        // Check if it's a known error or a database error
+        if (err.message.includes('Failed to retrieve all user transactions')) {
             throw new ErrorHandler(500, 'Failed to retrieve transactions. Please try again later.');
         } else {
             throw new ErrorHandler(400, 'Invalid request parameters.');
@@ -547,6 +656,36 @@ const retryPendingPayments = wrapAsync(async (req, res) => {
     }
 });
 
+const adminRetryPendingPayments = wrapAsync(async (req, res) => {
+    const { userId } = req.body;
+    const adminId = req.user._id;
+
+    billingLogger.info('Admin attempting retry of pending payments', { adminId, targetUserId: userId });
+
+    if (!userId) {
+        throw new ErrorHandler(400, 'User ID is required');
+    }
+
+    try {
+        const result = await BillingServices.retryUserPendingPayments(userId);
+
+        return sendResponse(
+            res,
+            { result },
+            result.message || 'Payment retry completed successfully',
+            200
+        );
+    } catch (err) {
+        billingLogger.error('Failed to retry pending payments (Admin initiated)', err, { adminId, targetUserId: userId });
+
+        if (err.statusCode) {
+            throw err;
+        }
+
+        throw new ErrorHandler(500, 'Failed to retry payments. Please try again later.');
+    }
+});
+
 module.exports = {
     chargeSingleLead,
     getCurrentContract,
@@ -565,5 +704,8 @@ module.exports = {
     testAutoTopUp,
     getRevenueFromGateway,
     getReceipt,
-    retryPendingPayments
+    retryPendingPayments,
+    adminRetryPendingPayments,
+    getUsersTransactions,
+    getAllSystemTransactions
 };

@@ -1,6 +1,7 @@
 // services/sms/SmsServices.js
 const { NotifyreAPI, RecipientType } = require('notifyre-nodejs-sdk');
 const { ErrorHandler } = require('../../utils/error-handler');
+const { logger } = require('../../utils/logger');
 
 const rawKey = process.env.NOTIFYRE_API_KEY || '';
 const API_KEY = rawKey.trim().replace(/^Bearer\s+/i, ''); // avoid "Bearer Bearer ..." issues
@@ -59,7 +60,7 @@ const sendSms = async (smsData) => {
       toE164 = toE164US(raw);
       const reqPayload = {
         body: String(message).trim(),
-        from: from || '', // must be your purchased SMS-enabled number in Notifyre
+        from: process.env.SMS_SENDER_ID || from || '+12157026445',
         recipients: [{ type: RecipientType.SmsNumber, value: toE164 }],
         scheduledDate: null,
         addUnsubscribeLink: false,
@@ -68,7 +69,7 @@ const sendSms = async (smsData) => {
         campaignName: 'leadfusion-sms',
       };
 
-      console.log('[Notifyre] Sending SMS request:', {
+      logger.info('[Notifyre] Sending SMS request:', {
         from: reqPayload.from,
         to: toE164,
         bodyPreview: reqPayload.body.slice(0, 160),
@@ -119,8 +120,14 @@ const listSentSms = async (opts = {}) => {
   }
 
   try {
-    const response = await smsService.listSentSms(opts);
-    return { success: true, data: response };
+    // Clean up undefined/null values from opts
+    const cleanOpts = Object.fromEntries(
+      Object.entries(opts).filter(([_, v]) => v != null && v !== '')
+    );
+
+    console.log('[Notifyre] Listing sent SMS with opts:', cleanOpts);
+    const response = await smsService.listSentSms(cleanOpts);
+    return { success: true, data: response.payload || response };
   } catch (err) {
     console.error('[Notifyre] listSentSms error', err);
     return {
@@ -131,4 +138,45 @@ const listSentSms = async (opts = {}) => {
   }
 };
 
-module.exports = { sendSms, listSentSms };
+const getSmsStatus = async (messageId) => {
+  if (!smsService) {
+    throw new Error('Notifyre SMS service not initialized');
+  }
+
+  try {
+    console.log('[Notifyre] Getting status for messageId:', messageId);
+    const response = await smsService.getSms(messageId);
+    const data = response.payload || response;
+
+    // Try to fetch the message body for the first recipient if available
+    if (data?.recipients?.length > 0) {
+      try {
+        const recipientId = data.recipients[0].id;
+        console.log('[Notifyre] Fetching body for recipientId:', recipientId);
+        const bodyResponse = await smsService.getSmsRecipientMessage({
+          messageID: messageId,
+          recipientID: recipientId
+        });
+        
+        // Add the body to the recipient or top level
+        const body = bodyResponse.payload?.body || bodyResponse.body || bodyResponse;
+        data.messageBody = body;
+        data.recipients[0].messageBody = body;
+      } catch (bodyErr) {
+        console.warn('[Notifyre] Failed to fetch message body:', bodyErr.message);
+        data.messageBodyError = bodyErr.message;
+      }
+    }
+
+    return { success: true, data };
+  } catch (err) {
+    console.error('[Notifyre] getSmsStatus error', err);
+    return {
+      success: false,
+      error: err?.message || 'Failed to get SMS status',
+      details: err,
+    };
+  }
+};
+
+module.exports = { sendSms, listSentSms, getSmsStatus };

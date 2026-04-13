@@ -1103,9 +1103,9 @@ const sendTransactionEmail = async ({
         </td>
         <td valign="top" align="right" style="padding:0; margin:0; vertical-align:top; width:50%;">
           <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse; margin:0;">
-            <tr><td align="right" style="font-size:12px; color:#555;">Invoice No</td></tr>
+            <tr><td align="right" style="font-size:12px; color:#555;">Transaction Id</td></tr>
             <tr><td align="right" style="font-size:12px; color:#111; font-weight:bold;">${transactionId}</td></tr>
-            <tr><td align="right" style="font-size:12px; color:#555; padding-top:8px;">Invoice Date</td></tr>
+            <tr><td align="right" style="font-size:12px; color:#555; padding-top:8px;">Date</td></tr>
             <tr><td align="right" style="font-size:12px; color:#111; font-weight:bold;">${displayDate}</td></tr>
           </table>
         </td>
@@ -1235,7 +1235,39 @@ const sendTransactionEmail = async ({
     payload.bcc = bcc;
   }
 
-  return resend.emails.send(payload);
+  // 3) Send via Resend and handle errors explicitly
+  try {
+    const { data, error } = await resend.emails.send(payload);
+
+    if (error) {
+      console.error('❌ Resend API Error in sendTransactionEmail:', error);
+      throw new Error(`Resend Transaction Email Failed: ${error.message}`);
+    }
+
+    console.log('✅ Transaction receipt sent:', data?.id);
+    return data;
+  } catch (err) {
+    console.error('❌ Fatal error sending transaction receipt:', err.message);
+
+    // 4) Fallback: Retry without attachment if that was the cause
+    if (payload.attachments && payload.attachments.length > 0) {
+      console.warn('⚠️ Retrying transaction email without PDF attachment...');
+      delete payload.attachments;
+      try {
+        const { data: retryData, error: retryError } = await resend.emails.send(payload);
+        if (retryError) {
+          throw new Error(`Retry failed: ${retryError.message}`);
+        }
+        console.log('✅ Transaction receipt sent (without PDF) after retry:', retryData?.id);
+        return retryData;
+      } catch (retryErr) {
+        console.error('❌ Failed to send transaction receipt even without PDF:', retryErr.message);
+        throw err; // Throw original error or retry error? Throw original to preserve context, or new one?
+      }
+    }
+
+    throw err;
+  }
 };
 
 async function sendCampaignCreatedEmailtoN8N(campaign) {
@@ -1532,6 +1564,97 @@ const sendFundsAddedEmail = async ({
 };
 
 /**
+ * Send Funds Added Email to Admins
+ */
+const sendFundsAddedAdminEmail = async ({
+  to,
+  userName,
+  userEmail,
+  amount,
+  transactionId,
+  paymentMethod,
+  newBalance
+}) => {
+  const recipients = Array.isArray(to) ? to : [to];
+
+  const date = new Date().toLocaleString('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  });
+
+  const table = `
+        <div style="background-color: #ffffff; padding: 15px 25px; border-radius: 8px; border: 1px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0,0,0,0.05); text-align: left;">
+            <table cellpadding="0" cellspacing="0" border="0" style="width: 100%; font-family: 'Inter', Arial, sans-serif; font-size: 14px; line-height: 1.5; text-align: left; color: #111827;">
+                <tr>
+                    <td style="padding: 10px 0; border-bottom: 1px solid #f3f4f6; width: 40%; text-align: left; vertical-align: top;">
+                        <span style="font-weight: 600; color: #4b5563; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">User</span>
+                    </td>
+                    <td style="padding: 10px 0; border-bottom: 1px solid #f3f4f6; width: 60%; text-align: right; font-weight: 500; color: #111827; vertical-align: top;">
+                        ${userName} <br/><span style="color: #6b7280; font-size: 13px; font-weight: 400;">${userEmail}</span>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px 0; border-bottom: 1px solid #f3f4f6; text-align: left;">
+                        <span style="font-weight: 600; color: #4b5563; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Amount Added</span>
+                    </td>
+                    <td style="padding: 10px 0; border-bottom: 1px solid #f3f4f6; text-align: right; font-weight: 700; color: #059669; font-size: 16px;">
+                        $${parseFloat(amount).toFixed(2)}
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px 0; border-bottom: 1px solid #f3f4f6; text-align: left;">
+                        <span style="font-weight: 600; color: #4b5563; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Payment Method</span>
+                    </td>
+                    <td style="padding: 10px 0; border-bottom: 1px solid #f3f4f6; text-align: right; font-weight: 500; color: #111827;">
+                        ${paymentMethod || 'Card'}
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px 0; border-bottom: 1px solid #f3f4f6; text-align: left;">
+                        <span style="font-weight: 600; color: #4b5563; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">New Balance</span>
+                    </td>
+                    <td style="padding: 10px 0; border-bottom: 1px solid #f3f4f6; text-align: right; font-weight: 600; color: #111827; font-size: 15px;">
+                        $${parseFloat(newBalance).toFixed(2)}
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px 0; border-bottom: 1px solid #f3f4f6; text-align: left;">
+                        <span style="font-weight: 600; color: #4b5563; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Transaction ID</span>
+                    </td>
+                    <td style="padding: 10px 0; border-bottom: 1px solid #f3f4f6; text-align: right; font-family: monospace; font-size: 13px; color: #374151;">
+                        ${transactionId}
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px 0; text-align: left;">
+                        <span style="font-weight: 600; color: #4b5563; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Date</span>
+                    </td>
+                    <td style="padding: 10px 0; text-align: right; color: #374151; font-size: 13.5px;">
+                        ${date}
+                    </td>
+                </tr>
+            </table>
+        </div>
+    `;
+
+  const html = createEmailTemplate({
+    title: 'Manual Top-Up Successful',
+    mainText: `
+            <p style="color: #111827; font-size: 15px; margin-bottom: 24px; text-align: center;">A user has successfully added funds to their account. Below are the transaction details:</p>
+            <div style="text-align: left;">${table}</div>
+        `,
+    footerText: ''
+  });
+
+  return resend.emails.send({
+    from: FROM_EMAIL,
+    to: recipients,
+    subject: `Funds Added: $${parseFloat(amount).toFixed(2)} by ${userName}`,
+    html
+  });
+};
+
+/**
  * Send Auto Top-Up Email
  */
 const sendAutoTopUpEmail = async ({
@@ -1722,13 +1845,22 @@ const sendLeadPaymentEmail = async ({
   `;
 
   // ✅ Include ADMIN emails in the receipt via BCC (so User doesn't see them)
+  // const EXCLUDED = new Set([
+  //   'admin@gmail.com',
+  //   'admin123@gmail.com',
+  //   'admin1234@gmail.com'
+  // ]);
+
+  // ✅ Define usage exclusions locally to prevent ReferenceError
   const EXCLUDED = new Set([
     'admin@gmail.com',
     'admin123@gmail.com',
-    'admin1234@gmail.com'
+    'admin1234@gmail.com',
   ]);
 
   let bccRecipients = [];
+
+  console.log('DEBUG: ADMIN_NOTIFICATION_EMAILS env:', process.env.ADMIN_NOTIFICATION_EMAILS);
 
   // 1. Try ENV Override first (Priority)
   if (process.env.ADMIN_NOTIFICATION_EMAILS) {
@@ -1737,6 +1869,7 @@ const sendLeadPaymentEmail = async ({
       .map(e => e.trim().toLowerCase())
       .filter(e => e && !EXCLUDED.has(e));
 
+    console.log('DEBUG: Parsed admin emails:', adminEmails);
     bccRecipients.push(...adminEmails);
   }
 
@@ -2231,19 +2364,28 @@ const sendCampaignResumedAdminEmail = async ({ to, userName, userEmail, partnerI
   });
 };
 
-const sendFailedLeadPaymentEmail = async ({ to, userName, leadId, amount, cardLast4, errorMessage }) => {
+const sendFailedLeadPaymentEmail = async ({ to, userName, leadId, amount, cardLast4, errorMessage, leadData = null, campaignName = "N/A" }) => {
   const html = createEmailTemplate({
-    title: '❌ Lead Payment Failed',
+    title: 'Lead Payment Failed',
     greeting: `Hello ${userName},`,
     mainText: `
-      <p>Your Pay-As-You-Go payment for a new lead has failed.</p>
-      <table cellpadding="6" style="width:100%; border-collapse: collapse;">
-        <tr><td><strong>Lead ID:</strong></td><td>${leadId}</td></tr>
-        <tr><td><strong>Amount:</strong></td><td>$${amount}</td></tr>
-        <tr><td><strong>Card Used:</strong></td><td>**** **** **** ${cardLast4}</td></tr>
-        <tr><td><strong>Error:</strong></td><td>${errorMessage}</td></tr>
-      </table>
-      <p>Please update your payment method to continue receiving leads.</p>
+      <div style="text-align: left; max-width: 400px; margin: 0 auto;">
+        <p style="margin-bottom: 20px;">Your Pay-As-You-Go payment for a new lead has failed.</p>
+        <table cellpadding="6" style="width:100%; border-collapse: collapse; text-align: left;">
+          <tr><td style="width: 130px; text-align: left; vertical-align: top;"><strong>Lead ID:</strong></td><td style="text-align: left; vertical-align: top;">${leadId}</td></tr>
+          <tr><td style="width: 130px; text-align: left; vertical-align: top;"><strong>Campaign:</strong></td><td style="text-align: left; vertical-align: top;">${campaignName}</td></tr>
+          ${leadData ? `
+            <tr><td style="width: 130px; text-align: left; vertical-align: top;"><strong>Lead Name:</strong></td><td style="text-align: left; vertical-align: top;">${(leadData.first_name || '') + ' ' + (leadData.last_name || '')}</td></tr>
+            <tr><td style="width: 130px; text-align: left; vertical-align: top;"><strong>Lead Phone:</strong></td><td style="text-align: left; vertical-align: top;">${leadData.phone_number || leadData.phone || 'N/A'}</td></tr>
+            <tr><td style="width: 130px; text-align: left; vertical-align: top;"><strong>Lead Email:</strong></td><td style="text-align: left; vertical-align: top; word-break: break-all;">${leadData.email || 'N/A'}</td></tr>
+            <tr><td style="width: 130px; text-align: left; vertical-align: top;"><strong>Lead Zip:</strong></td><td style="text-align: left; vertical-align: top;">${leadData.address?.zip_code || leadData.address?.zip || 'N/A'}</td></tr>
+          ` : ''}
+          <tr><td style="width: 130px; text-align: left; vertical-align: top;"><strong>Amount:</strong></td><td style="text-align: left; vertical-align: top;">$${amount}</td></tr>
+          <tr><td style="width: 130px; text-align: left; vertical-align: top;"><strong>Card Used:</strong></td><td style="text-align: left; vertical-align: top;">**** **** **** ${cardLast4}</td></tr>
+          <tr><td style="width: 130px; text-align: left; vertical-align: top;"><strong>Error:</strong></td><td style="text-align: left; vertical-align: top; color: #dc3545;">${errorMessage}</td></tr>
+        </table>
+        <p style="margin-top: 20px;">Please update your payment method to continue receiving leads.</p>
+      </div>
     `,
     footerText: 'If you need help, feel free to contact support.'
   });
@@ -2251,31 +2393,40 @@ const sendFailedLeadPaymentEmail = async ({ to, userName, leadId, amount, cardLa
   return resend.emails.send({
     from: FROM_EMAIL,
     to,
-    subject: "❌ Lead Payment Failed",
+    subject: "Lead Payment Failed",
     html
   });
 };
 
 
-const sendFailedLeadPaymentAdminEmail = async ({ to, userName, userEmail, leadId, amount, cardLast4, errorMessage }) => {
+const sendFailedLeadPaymentAdminEmail = async ({ to, userName, userEmail, leadId, amount, cardLast4, errorMessage, leadData = null, campaignName = "N/A" }) => {
   const recipients = Array.isArray(to) ? to : [to];
 
   const table = `
-    <table cellpadding="6" cellspacing="0" style="width:100%; border-collapse: collapse;">
-      <tr><td><strong>User Name</strong></td><td>${userName}</td></tr>
-      <tr><td><strong>User Email</strong></td><td>${userEmail}</td></tr>
-      <tr><td><strong>Lead ID</strong></td><td>${leadId}</td></tr>
-      <tr><td><strong>Amount</strong></td><td>$${amount}</td></tr>
-      <tr><td><strong>Card Used</strong></td><td>**** **** **** ${cardLast4}</td></tr>
-      <tr><td><strong>Error</strong></td><td>${errorMessage}</td></tr>
+    <table cellpadding="6" cellspacing="0" style="width:100%; border-collapse: collapse; text-align: left;">
+      <tr><td style="width: 130px; text-align: left; vertical-align: top;"><strong>User Name</strong></td><td style="text-align: left; vertical-align: top;">${userName}</td></tr>
+      <tr><td style="width: 130px; text-align: left; vertical-align: top;"><strong>User Email</strong></td><td style="text-align: left; vertical-align: top;">${userEmail}</td></tr>
+      <tr><td style="width: 130px; text-align: left; vertical-align: top;"><strong>Lead ID</strong></td><td style="text-align: left; vertical-align: top;">${leadId}</td></tr>
+      <tr><td style="width: 130px; text-align: left; vertical-align: top;"><strong>Campaign</strong></td><td style="text-align: left; vertical-align: top;">${campaignName}</td></tr>
+      ${leadData ? `
+        <tr><td style="width: 130px; text-align: left; vertical-align: top;"><strong>Lead Name</strong></td><td style="text-align: left; vertical-align: top;">${(leadData.first_name || '') + ' ' + (leadData.last_name || '')}</td></tr>
+        <tr><td style="width: 130px; text-align: left; vertical-align: top;"><strong>Lead Phone</strong></td><td style="text-align: left; vertical-align: top;">${leadData.phone_number || leadData.phone || 'N/A'}</td></tr>
+        <tr><td style="width: 130px; text-align: left; vertical-align: top;"><strong>Lead Email</strong></td><td style="text-align: left; vertical-align: top; word-break: break-all;">${leadData.email || 'N/A'}</td></tr>
+        <tr><td style="width: 130px; text-align: left; vertical-align: top;"><strong>Lead Zip</strong></td><td style="text-align: left; vertical-align: top;">${leadData.address?.zip_code || leadData.address?.zip || 'N/A'}</td></tr>
+      ` : ''}
+      <tr><td style="width: 130px; text-align: left; vertical-align: top;"><strong>Amount</strong></td><td style="text-align: left; vertical-align: top;">$${amount}</td></tr>
+      <tr><td style="width: 130px; text-align: left; vertical-align: top;"><strong>Card Used</strong></td><td style="text-align: left; vertical-align: top;">**** **** **** ${cardLast4}</td></tr>
+      <tr><td style="width: 130px; text-align: left; vertical-align: top;"><strong>Error</strong></td><td style="text-align: left; vertical-align: top; color: #dc3545;">${errorMessage}</td></tr>
     </table>
   `;
 
   const html = createEmailTemplate({
     title: 'Lead Payment Failed – User Attempted Card Charge',
     mainText: `
-      <p>A Pay-As-You-Go lead charge has failed for the following user:</p>
-      ${table}
+      <div style="text-align: left; max-width: 400px; margin: 0 auto;">
+        <p style="margin-bottom: 20px;">A Pay-As-You-Go lead charge has failed for the following user:</p>
+        ${table}
+      </div>
     `,
     footerText: ''
   });
@@ -2299,7 +2450,8 @@ const sendPendingLeadsPaymentSuccessEmail = async ({
   totalAmount,
   newBalance,
   paymentMethod,
-  cardLast4
+  cardLast4,
+  amountBreakdown // { balance: 0, card: 0 }
 }) => {
   // Build leads table rows
   const leadsTableRows = chargedLeads.map((lead, index) => `
@@ -2358,6 +2510,16 @@ const sendPendingLeadsPaymentSuccessEmail = async ({
         <td style="border: 1px solid #e0e0e0; padding: 12px;"><strong>Payment Method</strong></td>
         <td style="border: 1px solid #e0e0e0; padding: 12px;">${paymentMethod === 'CARD' ? `Card **** ${cardLast4}` : paymentMethod === 'MIXED' ? 'Balance + Card' : 'Account Balance'}</td>
       </tr>
+      ${amountBreakdown?.balance > 0 ? `
+      <tr>
+        <td style="border: 1px solid #e0e0e0; padding: 12px;"><strong>Paid from Wallet</strong></td>
+        <td style="border: 1px solid #e0e0e0; padding: 12px;">$${amountBreakdown.balance.toFixed(2)}</td>
+      </tr>` : ''}
+      ${amountBreakdown?.card > 0 ? `
+      <tr>
+        <td style="border: 1px solid #e0e0e0; padding: 12px;"><strong>Paid from Card</strong></td>
+        <td style="border: 1px solid #e0e0e0; padding: 12px;">$${amountBreakdown.card.toFixed(2)}</td>
+      </tr>` : ''}
       <tr>
         <td style="border: 1px solid #e0e0e0; padding: 12px;"><strong>Remaining Balance</strong></td>
         <td style="border: 1px solid #e0e0e0; padding: 12px;">$${newBalance?.toFixed(2) || '0.00'}</td>
@@ -2416,7 +2578,8 @@ const sendPendingLeadsPaymentSuccessAdminEmail = async ({
   totalAmount,
   newBalance,
   paymentMethod,
-  cardLast4
+  cardLast4,
+  amountBreakdown // { balance: 0, card: 0 }
 }) => {
   const recipients = Array.isArray(to) ? to : [to];
 
@@ -2490,6 +2653,16 @@ const sendPendingLeadsPaymentSuccessAdminEmail = async ({
         <td style="border: 1px solid #e0e0e0; padding: 12px;"><strong>Payment Method</strong></td>
         <td style="border: 1px solid #e0e0e0; padding: 12px;">${paymentMethod === 'CARD' ? `Card **** ${cardLast4}` : paymentMethod === 'MIXED' ? 'Balance + Card' : 'Account Balance'}</td>
       </tr>
+      ${amountBreakdown?.balance > 0 ? `
+      <tr>
+        <td style="border: 1px solid #e0e0e0; padding: 12px;"><strong>Paid from Wallet</strong></td>
+        <td style="border: 1px solid #e0e0e0; padding: 12px;">$${amountBreakdown.balance.toFixed(2)}</td>
+      </tr>` : ''}
+      ${amountBreakdown?.card > 0 ? `
+      <tr>
+        <td style="border: 1px solid #e0e0e0; padding: 12px;"><strong>Paid from Card</strong></td>
+        <td style="border: 1px solid #e0e0e0; padding: 12px;">$${amountBreakdown.card.toFixed(2)}</td>
+      </tr>` : ''}
       <tr>
         <td style="border: 1px solid #e0e0e0; padding: 12px;"><strong>User's Remaining Balance</strong></td>
         <td style="border: 1px solid #e0e0e0; padding: 12px;">$${newBalance?.toFixed(2) || '0.00'}</td>
@@ -2536,6 +2709,74 @@ const sendPendingLeadsPaymentSuccessAdminEmail = async ({
 
 
 
+const sendCampaignGeographyUpdateEmail = async ({
+  campaignName,
+  campaignId,
+  userEmail,
+  oldGeography,
+  newGeography,
+  updatedByText
+}) => {
+  const adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS
+    ? process.env.ADMIN_NOTIFICATION_EMAILS.split(',').map(e => e.trim())
+    : [];
+
+  // Combine process.env emails and the hardcoded saqib@leadfusionhq.com
+  const recipients = [...new Set([...adminEmails, 'saqib@leadfusionhq.com'])];
+
+  // Professional center content
+  const mainText = `
+    <div style="font-family: Arial, sans-serif; font-size: 14px; color: #333; text-align: left;">
+      <p style="margin-bottom: 20px;">The geography (address or zip code) for the campaign below has been updated.</p>
+      
+      <table cellpadding="0" cellspacing="0" border="0" style="width: 100%; margin-bottom: 20px; border-collapse: collapse;">
+        <tr>
+          <td style="padding: 5px 10px 5px 0; width: 120px;"><strong>Campaign Name:</strong></td>
+          <td style="padding: 5px 0;">${campaignName}</td>
+        </tr>
+        <tr>
+          <td style="padding: 5px 10px 5px 0;"><strong>Campaign ID:</strong></td>
+          <td style="padding: 5px 0;">${campaignId}</td>
+        </tr>
+        <tr>
+          <td style="padding: 5px 10px 5px 0;"><strong>User Email:</strong></td>
+          <td style="padding: 5px 0;">${userEmail}</td>
+        </tr>
+        <tr>
+          <td style="padding: 5px 10px 5px 0;"><strong>Updated By:</strong></td>
+          <td style="padding: 5px 0;">${updatedByText}</td>
+        </tr>
+      </table>
+
+      <table cellpadding="12" cellspacing="0" border="1" style="width: 100%; border-collapse: collapse; border: 1px solid #e0e0e0; border-radius: 4px;">
+        <tr style="background-color: #f8f9fa;">
+          <th style="width: 50%; text-align: left; color: #555;">Previous Geography</th>
+          <th style="width: 50%; text-align: left; color: #555;">New Geography</th>
+        </tr>
+        <tr>
+          <td style="vertical-align: top; line-height: 1.5;">${oldGeography}</td>
+          <td style="vertical-align: top; line-height: 1.5;">${newGeography}</td>
+        </tr>
+      </table>
+    </div>
+  `;
+
+  const html = createEmailTemplate({
+    title: 'Campaign Geography Updated',
+    greeting: 'Hello Admin,',
+    mainText: mainText,
+  });
+
+  if (recipients.length > 0) {
+    return resend.emails.send({
+      from: FROM_EMAIL,
+      to: recipients,
+      subject: `Campaign Geography Updated - ${campaignName}`,
+      html,
+    });
+  }
+};
+
 module.exports = {
   createEmailTemplate,
   sendVerificationEmail,
@@ -2564,8 +2805,10 @@ module.exports = {
   sendLowBalanceWarningEmail,
   sendFailedLeadPaymentEmail,
   sendFailedLeadPaymentAdminEmail,
+  sendFundsAddedAdminEmail,
   sendPendingLeadsPaymentSuccessEmail,
   sendPendingLeadsPaymentSuccessAdminEmail,
   sendCampaignCreatedEmailToAdmin,
-  sendCampaignCreatedEmailToUser
+  sendCampaignCreatedEmailToUser,
+  sendCampaignGeographyUpdateEmail
 };

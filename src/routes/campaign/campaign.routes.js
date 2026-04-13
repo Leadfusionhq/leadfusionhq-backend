@@ -9,13 +9,13 @@ const CONSTANT_ENUM = require('../../helper/constant-enums.js');
 
 const API = {
     CREATE_CAMPAIGN: '/',
-    CREATE_CAMPAIGN_BY_ADMIN:'/:userId/add',
-    GET_ALL_CAMPAIGNS:'/',
-    QUICK_SEARCH: '/quick-search',    
-    GET_CAMPAIGN:'/:campaignId',
-    UPDATE_CAMPAIGN:'/:campaignId',
-    SEARCH_CAMPAIGNS: '/search',   
-    DELETE_CAMPAIGN:'/:campaignId' 
+    CREATE_CAMPAIGN_BY_ADMIN: '/:userId/add',
+    GET_ALL_CAMPAIGNS: '/',
+    QUICK_SEARCH: '/quick-search',
+    GET_CAMPAIGN: '/:campaignId',
+    UPDATE_CAMPAIGN: '/:campaignId',
+    SEARCH_CAMPAIGNS: '/search',
+    DELETE_CAMPAIGN: '/:campaignId'
 };
 campaignRouter.use(
     checkAuth,
@@ -27,7 +27,7 @@ campaignRouter.use(
 );
 
 
-campaignRouter.get( API.GET_ALL_CAMPAIGNS, campaignController.getCampaigns);
+campaignRouter.get(API.GET_ALL_CAMPAIGNS, campaignController.getCampaigns);
 
 
 campaignRouter.get(
@@ -42,9 +42,9 @@ campaignRouter.get(
     campaignController.quickSearchCampaigns
 );
 
-campaignRouter.get( 
+campaignRouter.get(
     API.GET_CAMPAIGN,
-    celebrate(CampaignSchema.getCampaign), 
+    celebrate(CampaignSchema.getCampaign),
     campaignController.getCampaignById
 );
 
@@ -59,9 +59,9 @@ campaignRouter.post(
     campaignController.createCampaignByAdmin
 );
 
-campaignRouter.put( 
+campaignRouter.put(
     API.UPDATE_CAMPAIGN,
-    celebrate(CampaignSchema.updateCampaign), 
+    celebrate(CampaignSchema.updateCampaign),
     campaignController.updateCampaign
 );
 campaignRouter.delete(

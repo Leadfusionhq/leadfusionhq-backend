@@ -14,11 +14,42 @@ const sendSMS = wrapAsync(async (req, res) => {
 });
 
 const listSentSms = wrapAsync(async (req, res) => {
-  const result = await smsService.listSentSms();
-  sendResponse(res, result, "SMS sent List successfully Fetched", 200);
+  const {
+    limit,
+    skip,
+    fromDate,
+    toDate,
+    toNumber,
+    fromNumber,
+    type,
+    sort,
+    search
+  } = req.query;
+
+  const opts = {
+    Limit: limit ? parseInt(limit) : 100,
+    Skip: skip ? parseInt(skip) : 0,
+    FromDate: fromDate ? Number(fromDate) : null,
+    ToDate: toDate ? Number(toDate) : null,
+    ToNumber: toNumber,
+    FromNumber: fromNumber,
+    Type: type,
+    Sort: sort || 'desc',
+    Search: search
+  };
+
+  const result = await smsService.listSentSms(opts);
+  sendResponse(res, result, "Sent SMS list fetched successfully", 200);
+});
+
+const getSMSStatus = wrapAsync(async (req, res) => {
+  const { messageId } = req.params;
+  const result = await smsService.getSmsStatus(messageId);
+  sendResponse(res, result, "SMS status fetched successfully", 200);
 });
 
 module.exports = {
   sendSMS,
   listSentSms,
+  getSMSStatus,
 };
