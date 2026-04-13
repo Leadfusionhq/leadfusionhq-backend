@@ -36,6 +36,7 @@ const logsRoutes = require('./src/routes/logs/logs.routes');
 const smsRoutes = require('./src/routes/sms/sms.route');
 const boberDoRoutes = require('./src/routes/boberdo/boberdo.route');
 const boberdoAdminRoutes = require('./src/routes/boberdo/boberdo-admin.route');
+const googleSheetsRoutes = require('./src/routes/google-sheets/google-sheets.routes');
 
 
 app.use(cors());
@@ -105,6 +106,9 @@ app.use(`/${config.server.route}/sms`, smsRoutes);
 // Add these routes
 app.use(`/${config.server.route}/boberdo`, boberDoRoutes); // Public API for Boberdo
 app.use(`/${config.server.route}/admin/boberdo`, boberdoAdminRoutes); // Admin management
+
+// Google Sheets routes
+app.use(`/${config.server.route}/sheets`, googleSheetsRoutes);
 
 // Dashboard Routes
 const dashboardRoutes = require('./src/routes/dashboard.routes');
