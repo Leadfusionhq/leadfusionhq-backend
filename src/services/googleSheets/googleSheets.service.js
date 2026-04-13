@@ -85,6 +85,40 @@ const ensureSheetExists = async (sheetsApi, spreadsheetId, sheetName) => {
   }
 };
 
+/**
+ * Sanitizes a string for use as a Google Sheets tab name.
+ * Tab names cannot contain: / \ ? * : [ ] '
+ * and must be between 1 and 100 characters.
+ */
+const sanitizeSheetName = (name) => {
+  if (!name) return 'Unknown Campaign';
+  // Remove disallowed characters
+  let sanitized = name.replace(/[\/\\\?\* :\[\]']/g, ' ');
+  // Multiple spaces to single space
+  sanitized = sanitized.replace(/\s+/g, ' ').trim();
+  // Max 50 chars for safety
+  return sanitized.substring(0, 50) || 'Unnamed';
+};
+
+/**
+ * Checks if a Lead ID already exists in Col B of the given sheet.
+ */
+const isLeadInSheet = async (sheetsApi, spreadsheetId, sheetName, leadId) => {
+  try {
+    const response = await sheetsApi.spreadsheets.values.get({
+      spreadsheetId,
+      range: `${sheetName}!B:B`, // Lead ID column
+    });
+    const rows = response.data.values || [];
+    // Skip header and check for leadId
+    return rows.some((row) => row[0] === leadId);
+  } catch (err) {
+    // If sheet is empty or error reading, assume it doesn't exist
+    return false;
+  }
+};
+
+
 // ─── Append a single row ──────────────────────────────────────────────────────
 /**
  * Appends one row of values to the given sheet/tab.
@@ -198,49 +232,39 @@ const ensureHeaders = async (sheetName, headers, spreadsheetId) => {
  * @param {string} [spreadsheetId]
  */
 const LEAD_HEADERS = [
-  'Timestamp',
+  'Date',
   'Lead ID',
-  'First Name',
-  'Last Name',
-  'Email',
+  'Full Name',
   'Phone',
-  'Source / Campaign',
-  'Status',
-  'Payment Status',
-  'State',
-  'City',
-  'Zip Code',
-  'Lead Cost ($)',
-  'Lead URL',
+  'Full Address',
 ];
 
 const appendLead = async (leadData, sheetName = 'Leads', spreadsheetId) => {
   const ssId = spreadsheetId || process.env.SPREADSHEET_ID;
 
-  // Write headers if the sheet is brand new
+  // 1. Ensure sheet exists and has headers
   await ensureHeaders(sheetName, LEAD_HEADERS, ssId);
 
-  const fullName = [leadData.first_name, leadData.last_name].filter(Boolean).join(' ');
+  // 2. Duplicacy Check (Requirement: No duplicacy)
+  const sheetsApi = await getSheetsApi();
+  const exists = await isLeadInSheet(sheetsApi, ssId, sheetName, leadData.lead_id);
+  if (exists) {
+    logger.info(`[GoogleSheets] Lead ${leadData.lead_id} already exists in "${sheetName}". Skipping.`);
+    return { skipped: true, reason: 'Duplicate' };
+  }
 
   const row = [
-    new Date().toISOString(),                                    // Timestamp
-    leadData.lead_id || '',                                      // Lead ID
-    leadData.first_name || '',                                   // First Name
-    leadData.last_name || '',                                    // Last Name
-    leadData.email || '',                                        // Email
-    leadData.phone_number || leadData.phone || '',               // Phone
-    leadData.campaign_name || leadData.campaign_id || '',        // Source / Campaign
-    leadData.status || '',                                       // Status
-    leadData.payment_status || '',                               // Payment Status
-    leadData.address?.state || leadData.state || '',             // State
-    leadData.address?.city || leadData.city || '',               // City
-    leadData.address?.zip_code || leadData.zip_code || '',       // Zip Code
-    leadData.lead_cost != null ? String(leadData.lead_cost) : '',// Lead Cost
-    leadData.lead_url || '',                                     // Lead URL
+    new Date().toISOString(),                      // Date
+    leadData.lead_id || '',                        // Lead ID
+    leadData.full_name || '',                      // Full Name
+    leadData.phone_number || leadData.phone || '', // Phone
+    leadData.full_address || '',                   // Full Address
   ];
 
   return appendRow(sheetName, row, ssId);
 };
+
+
 
 /**
  * High-level: Fetches a lead by ID, populates it, and appends to Google Sheet.
@@ -263,21 +287,23 @@ const syncLeadById = async (leadId) => {
 
     const leadData = {
       lead_id: lead.lead_id,
-      first_name: lead.first_name,
-      last_name: lead.last_name,
-      email: lead.email || '',
+      full_name: [lead.first_name, lead.last_name].filter(Boolean).join(' '),
       phone_number: lead.phone_number || lead.phone || '',
+      full_address: lead.address?.full_address || '',
       campaign_name: lead.campaign_id?.name || 'N/A',
-      status: lead.status,
-      payment_status: lead.payment_status,
-      state: lead.address?.state?.abbreviation || lead.address?.state?.name || '',
-      city: lead.address?.city || '',
-      zip_code: lead.address?.zip_code || '',
-      lead_cost: lead.lead_cost,
-      lead_url: `${process.env.UI_LINK}/dashboard/leads/${lead._id}`,
     };
 
-    return await appendLead(leadData);
+
+    // ── Sync to Master Sheet ──
+    await appendLead(leadData, 'Leads');
+
+    // ── Sync to Campaign Specific Sheet ──
+    const campaignTabName = sanitizeSheetName(leadData.campaign_name);
+    if (campaignTabName && campaignTabName !== 'Leads') {
+      await appendLead(leadData, campaignTabName);
+    }
+
+    return { success: true };
   } catch (err) {
     logger.error(`[GoogleSheets] Failed to sync lead ${leadId} to Google Sheets`, err);
     // Don't re-throw if it's fire-and-forget, but logging is essential
