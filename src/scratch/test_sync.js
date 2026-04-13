@@ -5,7 +5,7 @@ require('../models/campaign.model');
 require('../models/state.model');
 const GoogleSheetsService = require('../services/googleSheets/googleSheets.service');
 
-const leadId = '69dc8cb6d7f5176caaa98826'; // From the user's error logs
+const leadId = '6989b0591ea79c2c9bd511e2'; // New lead from Testing Camp PAYG
 
 async function testSync() {
   try {
