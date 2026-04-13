@@ -253,10 +253,64 @@ const campaignLogger = {
 
 
 
+// Google Sheets Logger
+const sheetsLogger = {
+    info: (message, data = {}) => {
+        consoleLog('INFO', `[SHEETS] ${message}`, data);
+        saveToDatabase({
+            level: 'INFO',
+            message,
+            logType: 'combined',
+            module: 'SHEETS',
+            userId: data.user_id,
+            metadata: data,
+            rawLog: `[INFO] [SHEETS]: ${message}`
+        });
+    },
+    error: (message, error = null, data = {}) => {
+        consoleLog('ERROR', `[SHEETS] ${message}`, { ...data, error: error?.message });
+        saveToDatabase({
+            level: 'ERROR',
+            message,
+            logType: 'error',
+            module: 'SHEETS',
+            userId: data.user_id,
+            metadata: { ...data, error: error?.message, stack: error?.stack },
+            rawLog: `[ERROR] [SHEETS]: ${message}`
+        });
+    },
+    warn: (message, data = {}) => {
+        consoleLog('WARN', `[SHEETS] ${message}`, data);
+        saveToDatabase({
+            level: 'WARN',
+            message,
+            logType: 'combined',
+            module: 'SHEETS',
+            userId: data.user_id,
+            metadata: data,
+            rawLog: `[WARN] [SHEETS]: ${message}`
+        });
+    },
+    debug: (message, data = {}) => {
+        consoleLog('DEBUG', `[SHEETS] ${message}`, data);
+        saveToDatabase({
+            level: 'DEBUG',
+            message,
+            logType: 'combined',
+            module: 'SHEETS',
+            userId: data.user_id,
+            metadata: data,
+            rawLog: `[DEBUG] [SHEETS]: ${message}`
+        });
+    }
+};
+
+
 
 module.exports = {
     logger,
     billingLogger,
     leadLogger,
-    campaignLogger
+    campaignLogger,
+    sheetsLogger
 };
