@@ -37,6 +37,14 @@ leadRouter.get(
 );
 
 
+/*** new ******/
+leadRouter.post(
+    API.POST_LEADS, 
+    celebrate(LeadSchema.postLead),
+    leadController.postLead
+);
+
+
 // Apply authentication and authorization to all routes
 leadRouter.use(
     checkAuth,
@@ -125,12 +133,6 @@ leadRouter.delete(
     leadController.deleteLead
 );
 
-/*** new ******/
-leadRouter.post(
-    API.POST_LEADS, 
-    celebrate(LeadSchema.postLead),
-    leadController.postLead
-);
 
 
 
