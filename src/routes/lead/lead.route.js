@@ -25,7 +25,17 @@ const API = {
     GET_PROCESSING_STATUS: '/processing/:jobId',
     GET_PROCESSING_JOBS: '/processing-jobs',
     CANCEL_PROCESSING_JOB: '/processing/:jobId/cancel',
+
+    /*** new */
+    POST_LEADS:'/n8n/post-leads',
+    POST_LEADS_DETAILS:'/n8n/post-leads-details-doc'
 };
+
+leadRouter.get(
+    API.POST_LEADS_DETAILS, 
+    leadController.postLeadDetailsDoc
+);
+
 
 // Apply authentication and authorization to all routes
 leadRouter.use(
@@ -114,4 +124,14 @@ leadRouter.delete(
     API.DELETE_LEAD,  // '/:leadId'
     leadController.deleteLead
 );
+
+/*** new ******/
+leadRouter.post(
+    API.POST_LEADS, 
+    celebrate(LeadSchema.postLead),
+    leadController.postLead
+);
+
+
+
 module.exports = leadRouter;

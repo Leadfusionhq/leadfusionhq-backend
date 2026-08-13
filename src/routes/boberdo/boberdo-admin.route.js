@@ -14,7 +14,7 @@ boberdoAdminRouter.use(
 );
 
 // Create or get API key
-boberdoAdminRouter.post(
+boberdoAdminRouter.post( 
     '/api-key',
     celebrate({
         [Segments.BODY]: Joi.object({

@@ -18,7 +18,7 @@ const postLead = {
 
         
         // Address
-        address: Joi.object({
+        address: Joi.object({ 
             street: Joi.string().min(1).max(200).required(),
             city: Joi.string().min(1).max(100).required(),
             state_code: Joi.string().length(2).required(),
