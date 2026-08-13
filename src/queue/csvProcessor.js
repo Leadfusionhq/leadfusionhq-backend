@@ -9,6 +9,7 @@ const JobStatus = require('../models/jobStatus.model');
 const generateUniqueLeadId = require('../utils/idGenerator');
 const { resolveStateAbbreviation } = require('../utils/stateResolver');
 const NotificationServices = require('../services/notification/notification.service');
+const GoogleSheetsService = require('../services/googleSheets/googleSheets.service');
 
 const csvProcessingQueue = new Queue('csv-processing', {
   redis: {
@@ -168,8 +169,13 @@ csvProcessingQueue.process(async (job) => {
           }
         }
 
-        await Lead.create(leadData);
+        const createdLead = await Lead.create(leadData);
         results.processed++;
+
+        // ── Google Sheets: append lead (fire-and-forget) ──
+        setImmediate(() => {
+          GoogleSheetsService.syncLeadById(createdLead._id || createdLead[0]?._id);
+        });
 
         await JobStatus.findByIdAndUpdate(jobId, {
           progress: Math.round((results.processed / results.totalRows) * 100),

@@ -17,8 +17,6 @@ const API = {
     RESET_PASSWORD: '/reset-password',
 
     // SEND_VERIFICATION_EMAIL: '/resend-verification-link',
-
-
 };
 
 authRouter.post(

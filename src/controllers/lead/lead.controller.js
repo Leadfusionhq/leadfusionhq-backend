@@ -22,6 +22,7 @@ const { sendToN8nWebhook, sendLowBalanceAlert } = require('../../services/n8n/we
 const Campaign = require('../../models/campaign.model.js');
 const { leadLogger } = require('../../utils/logger');
 const { formatFullAddress } = require('../../utils/address.utile.js');
+const GoogleSheetsService = require('../../services/googleSheets/googleSheets.service');
 
 // const createLead = wrapAsync(async (req, res) => {
 //     const session = await mongoose.startSession();
@@ -342,6 +343,11 @@ const createLead = wrapAsync(async (req, res) => {
       payment_status: result.payment_status,
       campaign_name: result.campaign_id?.name,
       campaign_owner_id: result.campaign_id?.user_id,
+    });
+
+    // ── Google Sheets: append lead (fire-and-forget — never blocks the flow) ──
+    setImmediate(() => {
+      GoogleSheetsService.syncLeadById(result._id);
     });
 
     // If payment succeeded, do existing low balance check (for prepaid)
@@ -1011,7 +1017,7 @@ const returnLead = wrapAsync(async (req, res) => {
       stack: err.stack
     });
     throw err;
-  }
+  } 
 });
 
 // Delete lead (soft delete or hard delete based on role)
@@ -1420,6 +1426,163 @@ const exportLeads = wrapAsync(async (req, res) => {
   }
 });
 
+const postLead = wrapAsync(async (req, res) => {
+    const leadData = req.body;
+
+    // Process lead with Boberdoo filter_set_id
+    const result = await LeadServices.processN8nLead(leadData);
+
+    // // Update API key usage count
+    // await req.boberdoApiKey.updateOne({
+    //     $inc: { total_leads_received: 1 }
+    // });
+
+    // Send plain text message (exactly what Boberdoo expects)
+    res.status(201).send('Lead received successfully');
+});
+
+const postLeadDetailsDoc = wrapAsync(async (req, res) => {
+    const documentation = `
+LEAD POSTING API - N8N INTEGRATION
+==================================
+
+Endpoint:
+POST http://localhost:8080/api/leads/n8n/post-leads
+
+Authentication:
+Authorization: Bearer <TOKEN>
+
+Content-Type:
+application/json
+
+
+REQUIRED FIELDS
+---------------
+
+filter_set_id
+Type: string
+Required: Yes
+
+first_name
+Type: string
+Required: Yes
+
+last_name
+Type: string
+Required: Yes
+
+phone_number
+Type: string
+Required: Yes
+
+address
+Type: object
+Required: Yes
+
+address.street
+Type: string
+Required: Yes
+
+address.city
+Type: string
+Required: Yes
+
+address.state_code
+Type: string
+Required: Yes
+Format: 2 characters
+
+address.zip_code
+Type: string
+Required: Yes
+Format: 5-10 characters
+
+
+OPTIONAL FIELDS
+---------------
+
+middle_name
+Type: string
+Required: No
+
+suffix
+Type: string
+Required: No
+
+email
+Type: string
+Required: No
+
+age
+Type: number
+Required: No
+
+gender
+Type: string
+Required: No
+Allowed: M, F, Male, Female, Other
+
+note
+Type: string
+Required: No
+
+external_lead_id
+Type: string
+Required: No
+
+source_info
+Type: string
+Required: No
+
+
+EXAMPLE REQUEST
+---------------
+
+POST http://localhost:8080/api/leads/n8n/post-leads
+
+Headers:
+
+Content-Type: application/json
+Authorization: Bearer <TOKEN>
+
+
+Request Body:
+
+{
+    "filter_set_id": "1079",
+    "first_name": "John",
+    "last_name": "Doe",
+    "middle_name": "",
+    "suffix": "",
+    "phone_number": "9876543210",
+    "email": "john.doe@example.com",
+    "address": {
+        "street": "123 Main Street",
+        "city": "San Antonio",
+        "state_code": "TX",
+        "zip_code": "78205",
+        "full_address": "123 Main Street, San Antonio, TX 78205",
+        "coordinates": {
+            "lat": 29.4236272,
+            "lng": -98.4932715
+        },
+        "place_id": "ChIJ1234567890"
+    },
+    "age": 35,
+    "gender": "Male",
+    "note": "Testing.",
+    "external_lead_id": "LEAD-10001",
+    "source_info": "n8n"
+}
+`;
+
+    res
+        .status(200)
+        .type("text/plain")
+        .send(documentation);
+});
+
+
 module.exports = {
   createLead,
   getLeads,
@@ -1440,4 +1603,6 @@ module.exports = {
   getReturnLeads,
   rejectReturnLead,
   approveReturnLead,
+  postLead,
+  postLeadDetailsDoc
 };

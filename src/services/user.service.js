@@ -46,7 +46,6 @@ const updateUser = async (userId, updateData) => {
   return user;
 };
 
-
 const updateUserProfile = async (userId, updateData) => {
   const user = await User.findByIdAndUpdate(
     userId,
