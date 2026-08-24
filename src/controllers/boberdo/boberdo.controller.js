@@ -22,7 +22,6 @@ const postLead = wrapAsync(async (req, res) => {
         $inc: { total_leads_received: 1 }
     });
 
-
     // Send plain text message (exactly what Boberdoo expects)
     res.status(201).send('Lead received successfully');
 });
@@ -30,4 +29,4 @@ const postLead = wrapAsync(async (req, res) => {
 module.exports = {
     healthCheck,
     postLead
-};
+};    

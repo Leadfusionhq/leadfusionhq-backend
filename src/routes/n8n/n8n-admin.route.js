@@ -1,45 +1,45 @@
-// src/routes/admin/boberdo-admin.route.js
+// src/routes/n8n/n8n-admin.route.js
 const express = require('express');
-const boberdoAdminRouter = express.Router();
-const boberdoAdminController = require('../../controllers/boberdo/boberdo-admin.controller');
+const n8nAdminRouter = express.Router();
+const n8nAdminController = require('../../controllers/n8n/n8n-admin.controller');
 const { celebrate, Joi, Segments } = require('celebrate');
 const checkAuth = require('../../middleware/check-auth');
 const authorizedRoles = require('../../middleware/authorized-roles');
 const CONSTANT_ENUM = require('../../helper/constant-enums');
 
 // Admin only access
-boberdoAdminRouter.use(
+n8nAdminRouter.use(
     checkAuth,
     authorizedRoles([CONSTANT_ENUM.USER_ROLE.ADMIN])
 );
 
 // Create or get API key
-boberdoAdminRouter.post( 
+n8nAdminRouter.post( 
     '/api-key',
     celebrate({
         [Segments.BODY]: Joi.object({
             name: Joi.string().max(100).optional()
         })
     }),
-    boberdoAdminController.createApiKey
+    n8nAdminController.createApiKey
 );
 
 // Get current active API key
-boberdoAdminRouter.get(
+n8nAdminRouter.get(
     '/api-key',
-    boberdoAdminController.getApiKey
+    n8nAdminController.getApiKey
 );
 
 // Revoke current API key
-boberdoAdminRouter.delete(
+n8nAdminRouter.delete(
     '/api-key',
-    boberdoAdminController.revokeApiKey
+    n8nAdminController.revokeApiKey
 );
 
 // Get API key statistics
-boberdoAdminRouter.get(
+n8nAdminRouter.get(
     '/api-key/stats',
-    boberdoAdminController.getApiKeyStats
+    n8nAdminController.getApiKeyStats
 );
 
-module.exports = boberdoAdminRouter;
+module.exports = n8nAdminRouter;

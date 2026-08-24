@@ -1,129 +1,176 @@
-const axios = require('axios');
-const crypto = require('crypto');
-const { User } = require('../../models/user.model');
-const CONSTANT_ENUM = require('../../helper/constant-enums');
-const mongoose = require('mongoose');
-const Campaign = require('../../models/campaign.model');
-const { ErrorHandler } = require('../../utils/error-handler');
-const generateUniqueLeadId = require('../../utils/idGenerator');
-const State = require('../../models/state.model');
-const Lead = require('../../models/lead.model');
-const BillingServices = require('../billing/billing.service');
-const MAIL_HANDLER = require('../../mail/mails');
-const SmsServices = require('../../services/sms/sms.service');
-const { leadLogger, logger } = require('../../utils/logger');
+const axios = require("axios");
+const crypto = require("crypto");
+const { User } = require("../../models/user.model");
+const CONSTANT_ENUM = require("../../helper/constant-enums");
+const mongoose = require("mongoose");
+const Campaign = require("../../models/campaign.model");
+const { ErrorHandler } = require("../../utils/error-handler");
+const generateUniqueLeadId = require("../../utils/idGenerator");
+const State = require("../../models/state.model");
+const Lead = require("../../models/lead.model");
+const BillingServices = require("../billing/billing.service");
+const MAIL_HANDLER = require("../../mail/mails");
+const SmsServices = require("../../services/sms/sms.service");
+const { leadLogger, logger } = require("../../utils/logger");
 // Keep only URL and KEY from env (secrets)
-const API_URL = (process.env.BOBERDOO_API_URL || 'https://leadfusionhq.leadportal.com/apiJSON.php').trim();
-const API_KEY = (process.env.BOBERDOO_API_KEY || '').trim();
-const API_UPDATE_KEY = (process.env.BOBERDOO_UPDATE_API_KEY || '').trim();
-const ReceiptService = require('../billing/receipt.service');
-const { sendToN8nWebhook, sendLowBalanceAlert } = require('../../services/n8n/webhookService.js');
-const { billingLogger } = require('../../utils/logger');
-const GoogleSheetsService = require('../googleSheets/googleSheets.service');
-const CREATE_ACTION = 'createNewPartner'; // fixed here
+const API_URL = (
+  process.env.BOBERDOO_API_URL ||
+  "https://leadfusionhq.leadportal.com/apiJSON.php"
+).trim();
+const API_KEY = (process.env.BOBERDOO_API_KEY || "").trim();
+const API_UPDATE_KEY = (process.env.BOBERDOO_UPDATE_API_KEY || "").trim();
+const ReceiptService = require("../billing/receipt.service");
+const {
+  sendToN8nWebhook,
+  sendLowBalanceAlert,
+} = require("../../services/n8n/webhookService.js");
+const { billingLogger } = require("../../utils/logger");
+const GoogleSheetsService = require("../googleSheets/googleSheets.service");
+const CREATE_ACTION = "createNewPartner"; // fixed here
 
 const CAMPAIGN_API_URL = process.env.BOBERDOO_CAMPAIGN_API_URL;
 const CAMPAIGN_API_KEY = process.env.BOBERDOO_CAMPAIGN_API_KEY;
-const CREATE_CAMPAIGN_ACTION = 'insertUpdateFilterSet';
-const { formatFullAddress } = require('../../utils/address.utile.js');
-
+const CREATE_CAMPAIGN_ACTION = "insertUpdateFilterSet";
+const { formatFullAddress } = require("../../utils/address.utile.js");
 
 const TIMEOUT_MS = Number(process.env.BOBERDOO_TIMEOUT_MS || 15000);
 
 // Hardcoded valid defaults (no env needed for these)
 const DEFAULTS = {
-  address: '123 Main St.',
-  city: 'Albany',
-  state: 'NY',                  // 2-letter
-  country: 'United States',     // full name, per spec
-  zip: '12401',
-  companyName: 'Test Company',
-  firstName: 'Test',
-  lastName: 'User',
-  loginEmail: 'test.user@example.com',
-  leadEmail: 'lead@example.com',
-  phone: '5551234567',          // digits only
-  deliveryOption: 0,            // 0..4 (0 = HTML email)
-  status: 2,                    // 0..2 (2 = Active)
-  sendCreatePassword: 0,        // 0 = we provide Password
-  temporaryPassword: 0          // 0 = no forced change
+  address: "123 Main St.",
+  city: "Albany",
+  state: "NY", // 2-letter
+  country: "United States", // full name, per spec
+  zip: "12401",
+  companyName: "Test Company",
+  firstName: "Test",
+  lastName: "User",
+  loginEmail: "test.user@example.com",
+  leadEmail: "lead@example.com",
+  phone: "5551234567", // digits only
+  deliveryOption: 0, // 0..4 (0 = HTML email)
+  status: 2, // 0..2 (2 = Active)
+  sendCreatePassword: 0, // 0 = we provide Password
+  temporaryPassword: 0, // 0 = no forced change
 };
 
 function assertConfig() {
   if (!/^https?:\/\//.test(API_URL)) {
-    throw new Error('BOBERDOO_API_URL must be a full URL like https://leadfusionhq.leadportal.com/apiJSON.php');
+    throw new Error(
+      "BOBERDOO_API_URL must be a full URL like https://leadfusionhq.leadportal.com/apiJSON.php",
+    );
   }
   if (!API_KEY) {
-    throw new Error('BOBERDOO_API_KEY is required');
+    throw new Error("BOBERDOO_API_KEY is required");
   }
-  console.log('[boberdoo] Config:', { url: API_URL, key: mask(API_KEY), timeout: TIMEOUT_MS });
+  console.log("[boberdoo] Config:", {
+    url: API_URL,
+    key: mask(API_KEY),
+    timeout: TIMEOUT_MS,
+  });
 }
 assertConfig();
 
-function mask(str = '', visible = 4) {
-  if (!str) return '';
+function mask(str = "", visible = 4) {
+  if (!str) return "";
   const s = String(str);
-  return s.length <= visible ? '*'.repeat(s.length) : `${s.slice(0, visible)}***`;
+  return s.length <= visible
+    ? "*".repeat(s.length)
+    : `${s.slice(0, visible)}***`;
 }
 
-function isJsonEndpoint(url) { return /\/apiJSON\.php$/i.test(url); }
+function isJsonEndpoint(url) {
+  return /\/apiJSON\.php$/i.test(url);
+}
 
 function strongPassword(len = 12) {
-  return crypto.randomBytes(Math.ceil(len / 2))
-    .toString('base64')
-    .replace(/[^A-Za-z0-9]/g, 'A')
+  return crypto
+    .randomBytes(Math.ceil(len / 2))
+    .toString("base64")
+    .replace(/[^A-Za-z0-9]/g, "A")
     .slice(0, len);
 }
 
-function digitsOnly(str = '') { return String(str).replace(/\D+/g, ''); }
+function digitsOnly(str = "") {
+  return String(str).replace(/\D+/g, "");
+}
 
-function splitName(fullName = '') {
+function splitName(fullName = "") {
   const parts = String(fullName).trim().split(/\s+/);
   const first = parts.shift() || DEFAULTS.firstName;
-  const last = parts.join(' ') || DEFAULTS.lastName;
+  const last = parts.join(" ") || DEFAULTS.lastName;
   return { first, last };
 }
 
 function ensureExecUrl() {
   const u = new URL(API_URL);
-  if (u.pathname.endsWith('/new_api/index.php')) { u.pathname = '/new_api/api.php'; u.search = ''; }
+  if (u.pathname.endsWith("/new_api/index.php")) {
+    u.pathname = "/new_api/api.php";
+    u.search = "";
+  }
   return u.toString();
 }
 
-function preview(data) { return typeof data === 'string' ? data.slice(0, 300) : JSON.stringify(data).slice(0, 300); }
-function safeJson(str) { try { return JSON.parse(str); } catch { return { raw: str }; } }
+function preview(data) {
+  return typeof data === "string"
+    ? data.slice(0, 300)
+    : JSON.stringify(data).slice(0, 300);
+}
+function safeJson(str) {
+  try {
+    return JSON.parse(str);
+  } catch {
+    return { raw: str };
+  }
+}
 
 function extractExternalId(data) {
-  if (!data || typeof data !== 'object') return null;
+  if (!data || typeof data !== "object") return null;
   const c = [
-    data.partner_id, data.client_id, data.vendor_id, data.buyer_id, data.id,
-    data.Result?.partner_id, data.Result?.client_id, data.Result?.vendor_id, data.Result?.buyer_id, data.Result?.id,
-    data.response?.partner_id, data.response?.client_id, data.response?.id
+    data.partner_id,
+    data.client_id,
+    data.vendor_id,
+    data.buyer_id,
+    data.id,
+    data.Result?.partner_id,
+    data.Result?.client_id,
+    data.Result?.vendor_id,
+    data.Result?.buyer_id,
+    data.Result?.id,
+    data.response?.partner_id,
+    data.response?.client_id,
+    data.response?.id,
   ];
   return c.find(Boolean) || null;
 }
 
 function toErrorList(respData) {
   try {
-    const d = typeof respData === 'string' ? JSON.parse(respData) : respData;
+    const d = typeof respData === "string" ? JSON.parse(respData) : respData;
     const errs = d?.response?.errors?.error;
-    if (Array.isArray(errs)) return errs.map(e => String(e));
-    if (typeof errs === 'string') return [errs];
+    if (Array.isArray(errs)) return errs.map((e) => String(e));
+    if (typeof errs === "string") return [errs];
     return [];
-  } catch { return []; }
+  } catch {
+    return [];
+  }
 }
 
 // Build ALL required fields with hardcoded safe defaults
 function buildCreateFields(user) {
-  const { first, last } = splitName(user.name || '');
+  const { first, last } = splitName(user.name || "");
 
   // Country normalization per spec
   let country = user.country || DEFAULTS.country;
-  if (/^\s*US\s*$/i.test(country) || /^\s*U\.?S\.?A\.?$/i.test(country)) country = 'United States';
-  if (/^\s*CA\s*$/i.test(country)) country = 'Canada';
+  if (/^\s*US\s*$/i.test(country) || /^\s*U\.?S\.?A\.?$/i.test(country))
+    country = "United States";
+  if (/^\s*CA\s*$/i.test(country)) country = "Canada";
 
   // State must be 2-letter
-  const state = String(user.region || user.state || DEFAULTS.state).slice(0, 2).toUpperCase() || DEFAULTS.state;
+  const state =
+    String(user.region || user.state || DEFAULTS.state)
+      .slice(0, 2)
+      .toUpperCase() || DEFAULTS.state;
 
   // Numeric codes
   const deliveryOption = Number.isFinite(Number(user.deliveryOption))
@@ -142,12 +189,12 @@ function buildCreateFields(user) {
     // Required API fields
     Key: API_KEY,
     API_Action: CREATE_ACTION,
-    Format: 'json',
+    Format: "json",
 
     // Auth/Login requirements
     Login: login,
     Send_Create_Password: DEFAULTS.sendCreatePassword, // 0 -> must include Password
-    Temporary_Password: DEFAULTS.temporaryPassword,    // 0/1
+    Temporary_Password: DEFAULTS.temporaryPassword, // 0/1
 
     // Provide a strong password if not sending create password email
     Password: strongPassword(12),
@@ -160,21 +207,25 @@ function buildCreateFields(user) {
     // Required address info
     Address: user.address || DEFAULTS.address,
     City: user.city || DEFAULTS.city,
-    State: state,                      // 2-letter abbrev
-    Country: country,                  // "United States" or "Canada" or full string
+    State: state, // 2-letter abbrev
+    Country: country, // "United States" or "Canada" or full string
     Zip: user.zipCode || DEFAULTS.zip,
 
     // Required contact info
     Phone: digitsOnly(user.phoneNumber || DEFAULTS.phone),
 
     // Lead delivery
-    Lead_Email: user.leadEmail || user.company_contact_email || user.email || DEFAULTS.leadEmail,
-    Delivery_Option: deliveryOption,   // 0..4 numeric
+    Lead_Email:
+      user.leadEmail ||
+      user.company_contact_email ||
+      user.email ||
+      DEFAULTS.leadEmail,
+    Delivery_Option: deliveryOption, // 0..4 numeric
 
     // Status numeric 0..2
     Status: statusCode,
 
-    Credit_Limit: 'Unlimited',
+    Credit_Limit: "Unlimited",
 
     // Optional fields (uncomment if needed)
     // Test: 1,                       // fake-success if inputs are valid (doesn't create real record)
@@ -259,18 +310,21 @@ function buildCreateFields(user) {
 //   }
 // }
 
-
 async function updatePartnerStatusInBoberdoo(partnerId, status = 0) {
   const logMeta = {
     module: "Boberdoo",
     action: "Update Partner Status",
     partnerId,
-    status
+    status,
   };
 
   try {
     if (!partnerId) {
-      logger.error("Missing Partner ID for updatePartnerStatusInBoberdoo", null, logMeta);
+      logger.error(
+        "Missing Partner ID for updatePartnerStatusInBoberdoo",
+        null,
+        logMeta,
+      );
       return { success: false, error: "Missing Partner ID" };
     }
 
@@ -279,7 +333,7 @@ async function updatePartnerStatusInBoberdoo(partnerId, status = 0) {
       API_Action: "updatePartnerSettings",
       Format: "JSON",
       Partner_ID: partnerId,
-      Status: status
+      Status: status,
     };
 
     const url = "https://leadfusionhq.leadportal.com/new_api/api.php";
@@ -288,21 +342,21 @@ async function updatePartnerStatusInBoberdoo(partnerId, status = 0) {
     logger.info("Sending Partner Status Update to Boberdoo", {
       ...logMeta,
       url,
-      payload
+      payload,
     });
 
     const response = await axios.post(url, payload, {
       timeout: TIMEOUT_MS,
       headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
+        "Content-Type": "application/x-www-form-urlencoded",
       },
       transformRequest: [
-        data =>
+        (data) =>
           Object.entries(data)
             .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
-            .join("&")
+            .join("&"),
       ],
-      validateStatus: () => true
+      validateStatus: () => true,
     });
 
     // 🟣 Log raw response before parsing
@@ -310,17 +364,19 @@ async function updatePartnerStatusInBoberdoo(partnerId, status = 0) {
       ...logMeta,
       statusCode: response.status,
       headers: response.headers,
-      rawResponse: response.data
+      rawResponse: response.data,
     });
 
     let data =
-      typeof response.data === "string" ? safeJson(response.data) : response.data;
+      typeof response.data === "string"
+        ? safeJson(response.data)
+        : response.data;
 
     // 🟢 Success case
     if (data?.response?.result?.includes("successfully")) {
       logger.info("Partner status successfully updated in Boberdoo", {
         ...logMeta,
-        boberdooResponse: data
+        boberdooResponse: data,
       });
 
       return { success: true, data };
@@ -329,68 +385,88 @@ async function updatePartnerStatusInBoberdoo(partnerId, status = 0) {
     // 🔴 Failure case
     const errorList = toErrorList(data).join("; ");
 
-    logger.error(
-      "Failed to update partner status in Boberdoo",
-      null,
-      {
-        ...logMeta,
-        boberdooResponse: data,
-        error: errorList
-      }
-    );
+    logger.error("Failed to update partner status in Boberdoo", null, {
+      ...logMeta,
+      boberdooResponse: data,
+      error: errorList,
+    });
 
     return {
       success: false,
       error: errorList,
-      data
+      data,
     };
-
   } catch (err) {
     // 🔥 Log unexpected error
-    logger.error("Exception thrown in updatePartnerStatusInBoberdoo", err, logMeta);
+    logger.error(
+      "Exception thrown in updatePartnerStatusInBoberdoo",
+      err,
+      logMeta,
+    );
 
     return {
       success: false,
       error: err.message,
-      stack: err.stack
+      stack: err.stack,
     };
   }
 }
-
 
 // Basic validation to avoid trivial failures (but we fill defaults first)
 function validateFields(fields) {
   const missing = [];
   const req = [
-    'Key', 'API_Action', 'Login', 'Company_Name', 'First_Name', 'Last_Name',
-    'Address', 'City', 'Country', 'Zip', 'Phone', 'Lead_Email', 'Delivery_Option'
+    "Key",
+    "API_Action",
+    "Login",
+    "Company_Name",
+    "First_Name",
+    "Last_Name",
+    "Address",
+    "City",
+    "Country",
+    "Zip",
+    "Phone",
+    "Lead_Email",
+    "Delivery_Option",
   ];
-  const needsState = /^(United States|Canada)$/i.test(String(fields.Country).trim());
+  const needsState = /^(United States|Canada)$/i.test(
+    String(fields.Country).trim(),
+  );
 
   // Required elements present
-  req.forEach(k => { if (!String(fields[k] ?? '').trim()) missing.push(k); });
-  if (needsState && !String(fields.State || '').trim()) missing.push('State');
+  req.forEach((k) => {
+    if (!String(fields[k] ?? "").trim()) missing.push(k);
+  });
+  if (needsState && !String(fields.State || "").trim()) missing.push("State");
 
   // Password required when Send_Create_Password = 0
   if (Number(fields.Send_Create_Password) !== 1) {
-    if (!fields.Password || String(fields.Password).length < 6) missing.push('Password (>=6)');
+    if (!fields.Password || String(fields.Password).length < 6)
+      missing.push("Password (>=6)");
   }
 
   // Codes validity
-  if (!/^[0-4]$/.test(String(fields.Delivery_Option))) missing.push('Delivery_Option (0..4)');
-  if (!/^[0-2]$/.test(String(fields.Status))) missing.push('Status (0..2)');
+  if (!/^[0-4]$/.test(String(fields.Delivery_Option)))
+    missing.push("Delivery_Option (0..4)");
+  if (!/^[0-2]$/.test(String(fields.Status))) missing.push("Status (0..2)");
 
   // Email format
   const emailRe = /.+@.+\..+/;
-  if (fields.Login && !emailRe.test(fields.Login)) missing.push('Login (invalid email)');
-  if (fields.Lead_Email && !emailRe.test(fields.Lead_Email)) missing.push('Lead_Email (invalid email)');
+  if (fields.Login && !emailRe.test(fields.Login))
+    missing.push("Login (invalid email)");
+  if (fields.Lead_Email && !emailRe.test(fields.Lead_Email))
+    missing.push("Lead_Email (invalid email)");
 
   // Country exact names
-  if (/^\s*US\s*$/i.test(fields.Country)) missing.push('Country must be "United States" (exactly)');
-  if (/^\s*CA\s*$/i.test(fields.Country)) missing.push('Country must be "Canada" (exactly)');
+  if (/^\s*US\s*$/i.test(fields.Country))
+    missing.push('Country must be "United States" (exactly)');
+  if (/^\s*CA\s*$/i.test(fields.Country))
+    missing.push('Country must be "Canada" (exactly)');
 
   // State length
-  if (fields.State && String(fields.State).length !== 2) missing.push('State must be 2-letter code');
+  if (fields.State && String(fields.State).length !== 2)
+    missing.push("State must be 2-letter code");
 
   return missing;
 }
@@ -401,24 +477,31 @@ async function postApiAction(payload, execUrl) {
   let body;
 
   if (useJson) {
-    headers['Content-Type'] = 'application/json';
-    headers['Accept'] = 'application/json';
+    headers["Content-Type"] = "application/json";
+    headers["Accept"] = "application/json";
     body = JSON.stringify({ Request: payload });
   } else {
-    headers['Content-Type'] = 'application/x-www-form-urlencoded';
-    headers['Accept'] = 'application/json';
+    headers["Content-Type"] = "application/x-www-form-urlencoded";
+    headers["Accept"] = "application/json";
     const form = new URLSearchParams();
     Object.entries(payload).forEach(([k, v]) => form.append(k, String(v)));
     body = form.toString();
   }
 
-  console.log('[boberdoo] -> POST', execUrl);
-  console.log('[boberdoo] -> BODY preview:', preview(useJson ? { Request: payload } : payload));
+  console.log("[boberdoo] -> POST", execUrl);
+  console.log(
+    "[boberdoo] -> BODY preview:",
+    preview(useJson ? { Request: payload } : payload),
+  );
 
-  const resp = await axios.post(execUrl, body, { headers, timeout: TIMEOUT_MS, validateStatus: () => true });
+  const resp = await axios.post(execUrl, body, {
+    headers,
+    timeout: TIMEOUT_MS,
+    validateStatus: () => true,
+  });
 
-  const ct = String(resp.headers['content-type'] || '').toLowerCase();
-  console.log('[boberdoo] <- RESP', resp.status, ct, preview(resp.data));
+  const ct = String(resp.headers["content-type"] || "").toLowerCase();
+  console.log("[boberdoo] <- RESP", resp.status, ct, preview(resp.data));
   return resp;
 }
 
@@ -432,42 +515,58 @@ async function createPartner(user) {
     return {
       externalId: null,
       isJson: true,
-      raw: { response: { errors: { error: missing.map(m => `${m} is required/invalid`) } } },
-      normalizedError: `Missing/invalid: ${missing.join(', ')}`
+      raw: {
+        response: {
+          errors: { error: missing.map((m) => `${m} is required/invalid`) },
+        },
+      },
+      normalizedError: `Missing/invalid: ${missing.join(", ")}`,
     };
   }
 
   // Try with the default status 2. If the portal still says "Status value invalid",
   // try fallback numeric statuses 1 then 0.
-  const statuses = [fields.Status, 1, 0].filter((v, i, a) => a.indexOf(v) === i);
+  const statuses = [fields.Status, 1, 0].filter(
+    (v, i, a) => a.indexOf(v) === i,
+  );
   let last = null;
 
   for (const st of statuses) {
     const attempt = { ...fields, Status: st };
-    console.log('[boberdoo] Trying Status:', st);
+    console.log("[boberdoo] Trying Status:", st);
 
     const resp = await postApiAction(attempt, execUrl);
-    const ct = String(resp.headers['content-type'] || '').toLowerCase();
-    if (!ct.includes('application/json')) {
-      last = { externalId: null, isJson: false, raw: resp.data, normalizedError: 'Non-JSON response' };
+    const ct = String(resp.headers["content-type"] || "").toLowerCase();
+    if (!ct.includes("application/json")) {
+      last = {
+        externalId: null,
+        isJson: false,
+        raw: resp.data,
+        normalizedError: "Non-JSON response",
+      };
       continue;
     }
 
-    const data = typeof resp.data === 'string' ? safeJson(resp.data) : resp.data;
+    const data =
+      typeof resp.data === "string" ? safeJson(resp.data) : resp.data;
     const externalId = extractExternalId(data);
-    const errors = toErrorList(data).join('; ');
+    const errors = toErrorList(data).join("; ");
 
     if (externalId) {
-      return { externalId, isJson: true, raw: data, normalizedError: '' };
+      return { externalId, isJson: true, raw: data, normalizedError: "" };
     }
 
-    last = { externalId: null, isJson: true, raw: data, normalizedError: errors };
+    last = {
+      externalId: null,
+      isJson: true,
+      raw: data,
+      normalizedError: errors,
+    };
     // if error isn’t specifically about status, don’t keep trying statuses
-    if (!String(errors).toLowerCase().includes('status value invalid')) break;
+    if (!String(errors).toLowerCase().includes("status value invalid")) break;
   }
   return last;
 }
-
 
 async function updatePartnerInBoberdoo(user) {
   try {
@@ -478,7 +577,12 @@ async function updatePartnerInBoberdoo(user) {
     const partnerId = user.integrations.boberdoo.external_id;
     const { first, last } = splitName(user.name || "");
 
-    let state = (user.address?.state || user.region || user.state || "IL").toUpperCase();
+    let state = (
+      user.address?.state ||
+      user.region ||
+      user.state ||
+      "IL"
+    ).toUpperCase();
     if (state.length > 2) state = state.slice(0, 2);
 
     let country = user.country || "United States";
@@ -525,40 +629,48 @@ async function updatePartnerInBoberdoo(user) {
       params: params,
       timeout: TIMEOUT_MS,
       headers: {
-        "Accept": "application/json"
+        Accept: "application/json",
       },
-      validateStatus: () => true
+      validateStatus: () => true,
     });
 
-    console.log('[boberdoo] <- Update Response:', response.status);
-    console.log('[boberdoo] <- Response Headers:', response.headers['content-type']);
-    console.log('[boberdoo] <- Response Data:', preview(response.data));
+    console.log("[boberdoo] <- Update Response:", response.status);
+    console.log(
+      "[boberdoo] <- Response Headers:",
+      response.headers["content-type"],
+    );
+    console.log("[boberdoo] <- Response Data:", preview(response.data));
 
     let data;
-    const contentType = response.headers['content-type'] || '';
+    const contentType = response.headers["content-type"] || "";
 
-    if (contentType.includes('xml')) {
-      console.warn('⚠️ Received XML response instead of JSON - parsing error from XML');
+    if (contentType.includes("xml")) {
+      console.warn(
+        "⚠️ Received XML response instead of JSON - parsing error from XML",
+      );
       const errorMatch = response.data.match(/<error>(.*?)<\/error>/);
-      const errorMsg = errorMatch ? errorMatch[1] : 'Unknown error';
+      const errorMsg = errorMatch ? errorMatch[1] : "Unknown error";
 
       // ✅ Update DB with error
       await User.findByIdAndUpdate(user._id, {
         $set: {
-          'integrations.boberdoo.last_sync_at': new Date(),
-          'integrations.boberdoo.sync_status': 'FAILED',
-          'integrations.boberdoo.last_error': errorMsg
-        }
+          "integrations.boberdoo.last_sync_at": new Date(),
+          "integrations.boberdoo.sync_status": "FAILED",
+          "integrations.boberdoo.last_error": errorMsg,
+        },
       });
 
       return {
         success: false,
         error: errorMsg,
-        data: { raw: response.data }
+        data: { raw: response.data },
       };
     }
 
-    data = typeof response.data === "string" ? safeJson(response.data) : response.data;
+    data =
+      typeof response.data === "string"
+        ? safeJson(response.data)
+        : response.data;
 
     // ✅ Check for success in response
     if (data?.response?.result?.includes("successfully updated")) {
@@ -569,18 +681,18 @@ async function updatePartnerInBoberdoo(user) {
         user._id,
         {
           $set: {
-            'integrations.boberdoo.last_sync_at': new Date(),
-            'integrations.boberdoo.sync_status': 'SUCCESS',
-            'integrations.boberdoo.last_error': null
-          }
+            "integrations.boberdoo.last_sync_at": new Date(),
+            "integrations.boberdoo.sync_status": "SUCCESS",
+            "integrations.boberdoo.last_error": null,
+          },
         },
-        { new: true } // ✅ This returns the updated document!
+        { new: true }, // ✅ This returns the updated document!
       );
 
       return {
         success: true,
         data,
-        updatedUser // ✅ Return the fresh user data
+        updatedUser, // ✅ Return the fresh user data
       };
     }
 
@@ -592,86 +704,88 @@ async function updatePartnerInBoberdoo(user) {
 
     await User.findByIdAndUpdate(user._id, {
       $set: {
-        'integrations.boberdoo.last_sync_at': new Date(),
-        'integrations.boberdoo.sync_status': 'FAILED',
-        'integrations.boberdoo.last_error': errorMsg
-      }
+        "integrations.boberdoo.last_sync_at": new Date(),
+        "integrations.boberdoo.sync_status": "FAILED",
+        "integrations.boberdoo.last_error": errorMsg,
+      },
     });
 
     return { success: false, error: errorMsg, data };
-
   } catch (err) {
     console.error("❌ updatePartnerInBoberdoo failed:", err.message);
 
     await User.findByIdAndUpdate(user._id, {
       $set: {
-        'integrations.boberdoo.last_sync_at': new Date(),
-        'integrations.boberdoo.sync_status': 'FAILED',
-        'integrations.boberdoo.last_error': err.message
-      }
+        "integrations.boberdoo.last_sync_at": new Date(),
+        "integrations.boberdoo.sync_status": "FAILED",
+        "integrations.boberdoo.last_error": err.message,
+      },
     });
 
     return { success: false, error: err.message };
   }
 }
 
-
-
-
 async function syncUserToBoberdooById(userId) {
-  console.log('=== [boberdoo] SYNC TRIGGERED ===', { userId });
+  console.log("=== [boberdoo] SYNC TRIGGERED ===", { userId });
 
   const user = await User.findById(userId).lean();
-  if (!user) throw new Error('User not found');
-  if (user.role !== CONSTANT_ENUM.USER_ROLE.USER) return { skipped: true, reason: 'Not a regular user' };
-  console.log('[boberdoo] User:', { email: user.email, name: user.name });
+  if (!user) throw new Error("User not found");
+  if (user.role !== CONSTANT_ENUM.USER_ROLE.USER)
+    return { skipped: true, reason: "Not a regular user" };
+  console.log("[boberdoo] User:", { email: user.email, name: user.name });
 
   await User.findByIdAndUpdate(userId, {
     $set: {
-      'integrations.boberdoo.sync_status': 'PENDING',
-      'integrations.boberdoo.last_sync_at': new Date(),
-      'integrations.boberdoo.last_error': null
-    }
+      "integrations.boberdoo.sync_status": "PENDING",
+      "integrations.boberdoo.last_sync_at": new Date(),
+      "integrations.boberdoo.last_error": null,
+    },
   });
 
   try {
     const result = await createPartner(user);
-    console.log('[boberdoo] result:', { isJson: result.isJson, hasExternalId: Boolean(result.externalId), err: result.normalizedError });
+    console.log("[boberdoo] result:", {
+      isJson: result.isJson,
+      hasExternalId: Boolean(result.externalId),
+      err: result.normalizedError,
+    });
 
     if (result.externalId) {
       await User.findByIdAndUpdate(userId, {
         $set: {
-          'integrations.boberdoo.external_id': result.externalId,
-          'integrations.boberdoo.sync_status': 'SUCCESS',
-          'integrations.boberdoo.last_sync_at': new Date(),
-          'integrations.boberdoo.last_error': null
-        }
+          "integrations.boberdoo.external_id": result.externalId,
+          "integrations.boberdoo.sync_status": "SUCCESS",
+          "integrations.boberdoo.last_sync_at": new Date(),
+          "integrations.boberdoo.last_error": null,
+        },
       });
       return { success: true, externalId: result.externalId, data: result.raw };
     }
 
-    const errMsg = result.normalizedError || 'No external_id in JSON response';
+    const errMsg = result.normalizedError || "No external_id in JSON response";
     await User.findByIdAndUpdate(userId, {
       $set: {
-        'integrations.boberdoo.sync_status': 'FAILED',
-        'integrations.boberdoo.last_sync_at': new Date(),
-        'integrations.boberdoo.last_error': errMsg
-      }
+        "integrations.boberdoo.sync_status": "FAILED",
+        "integrations.boberdoo.last_sync_at": new Date(),
+        "integrations.boberdoo.last_error": errMsg,
+      },
     });
     return { success: false, error: errMsg, data: result.raw };
   } catch (err) {
-    const msg = err?.response?.data ? JSON.stringify(err.response.data) : err.message;
+    const msg = err?.response?.data
+      ? JSON.stringify(err.response.data)
+      : err.message;
     await User.findByIdAndUpdate(userId, {
       $set: {
-        'integrations.boberdoo.sync_status': 'FAILED',
-        'integrations.boberdoo.last_sync_at': new Date(),
-        'integrations.boberdoo.last_error': msg
-      }
+        "integrations.boberdoo.sync_status": "FAILED",
+        "integrations.boberdoo.last_sync_at": new Date(),
+        "integrations.boberdoo.last_error": msg,
+      },
     });
     return { success: false, error: msg };
   }
 }
-
 
 // Create or insert a campaign in Boberdoo
 
@@ -689,9 +803,9 @@ const DAY_MAPPING = {
 //  Convert DB-style → API-style (e.g., MONDAY → Monday)
 function convertDbDaysToApi(daysFromDb = []) {
   const reverseMap = Object.fromEntries(
-    Object.entries(DAY_MAPPING).map(([api, db]) => [db, api])
+    Object.entries(DAY_MAPPING).map(([api, db]) => [db, api]),
   );
-  return daysFromDb.map(day => reverseMap[day] || day);
+  return daysFromDb.map((day) => reverseMap[day] || day);
 }
 function getDeliveryType(leadType) {
   switch (leadType) {
@@ -708,7 +822,6 @@ function getDeliveryType(leadType) {
   }
 }
 
-
 //  Get state abbreviation or fallback
 function getStateAbbreviation(state) {
   if (!state) return "";
@@ -716,36 +829,39 @@ function getStateAbbreviation(state) {
   return state.abbreviation || state.value || state.code || state.name || "";
 }
 
-
 async function createCampaignInBoberdoo(campaignData, partnerId) {
   try {
-    const leadTypeId = CONSTANT_ENUM.BOBERDOO_LEAD_TYPE_MAP[campaignData.lead_type];
+    const leadTypeId =
+      CONSTANT_ENUM.BOBERDOO_LEAD_TYPE_MAP[campaignData.lead_type];
     if (!leadTypeId)
-      return { success: false, error: `Invalid lead type: ${campaignData.lead_type}` };
+      return {
+        success: false,
+        error: `Invalid lead type: ${campaignData.lead_type}`,
+      };
 
     const deliveryType = getDeliveryType(campaignData.lead_type);
 
-
     const stateList = Array.isArray(campaignData.geography?.state)
-      ? campaignData.geography.state.map(getStateAbbreviation).filter(Boolean).join(",")
+      ? campaignData.geography.state
+          .map(getStateAbbreviation)
+          .filter(Boolean)
+          .join(",")
       : getStateAbbreviation(campaignData.geography?.state);
 
     const coverageType = campaignData.geography.coverage?.type || "FULL_STATE";
     const zipMode = coverageType === "FULL_STATE" ? 0 : 1;
 
-    const activeDaysArray = campaignData.delivery?.schedule?.days
-      ?.filter(d => d.active)
-      ?.map(d => d.day.toUpperCase()) || [];
+    const activeDaysArray =
+      campaignData.delivery?.schedule?.days
+        ?.filter((d) => d.active)
+        ?.map((d) => d.day.toUpperCase()) || [];
     const activeDays = convertDbDaysToApi(activeDaysArray).join(",");
-
-
 
     const schedule = campaignData.delivery?.schedule || {};
     const scheduleStart = schedule.start_time || "09:00";
     const scheduleEnd = schedule.end_time || "17:00";
     const timezone = schedule.timezone || "America/New_York";
     const timeRange = `${scheduleStart}-${scheduleEnd}`;
-
 
     const zipCodes =
       coverageType === "PARTIAL"
@@ -768,7 +884,10 @@ async function createCampaignInBoberdoo(campaignData, partnerId) {
         Roof_Material: "0",
       };
     }
-    if (campaignData.lead_type === "GUTTERS" || campaignData.lead_type === "HVAC") {
+    if (
+      campaignData.lead_type === "GUTTERS" ||
+      campaignData.lead_type === "HVAC"
+    ) {
       extraLeadTypeFields = {
         Project_Type: "0",
         Homeowner: "0",
@@ -785,7 +904,7 @@ async function createCampaignInBoberdoo(campaignData, partnerId) {
       Filter_Set_Name: campaignData.name,
       Filter_Set_Price: campaignData.bid_price || 0,
       // Accepted_Sources: campaignData.accepted_sources?.join(",") || "properbusiness_solar,solarClosingSystem_solar",
-      Accepted_Sources: '',
+      Accepted_Sources: "",
       Match_Priority: campaignData.match_priority || 5,
       Hourly_Limit: campaignData.hourly_limit ?? 0,
       Daily_Limit: campaignData.daily_limit ?? 0,
@@ -811,40 +930,57 @@ async function createCampaignInBoberdoo(campaignData, partnerId) {
       validateStatus: () => true,
     });
 
-    const data = typeof response.data === "string" ? safeJson(response.data) : response.data;
+    const data =
+      typeof response.data === "string"
+        ? safeJson(response.data)
+        : response.data;
     if (data?.response?.status === "Success" && data?.response?.filter_set_ID) {
       return { success: true, filterSetId: data.response.filter_set_ID, data };
     }
 
     const errors = toErrorList(data).join("; ");
-    return { success: false, error: errors || "Failed to create campaign in Boberdoo", data };
-
+    return {
+      success: false,
+      error: errors || "Failed to create campaign in Boberdoo",
+      data,
+    };
   } catch (error) {
     console.error("[boberdoo] Campaign creation error:", error.message);
-    return { success: false, error: error.message || "Failed to create campaign in Boberdoo" };
+    return {
+      success: false,
+      error: error.message || "Failed to create campaign in Boberdoo",
+    };
   }
 }
 
-
 async function updateCampaignInBoberdoo(campaignData, filterSetId, partnerId) {
   try {
-    const leadTypeId = CONSTANT_ENUM.BOBERDOO_LEAD_TYPE_MAP[campaignData.lead_type];
-    if (!leadTypeId) return { success: false, error: `Invalid lead type: ${campaignData.lead_type}` };
-    if (!filterSetId) return { success: false, error: "Filter_Set_ID is required for update" };
+    const leadTypeId =
+      CONSTANT_ENUM.BOBERDOO_LEAD_TYPE_MAP[campaignData.lead_type];
+    if (!leadTypeId)
+      return {
+        success: false,
+        error: `Invalid lead type: ${campaignData.lead_type}`,
+      };
+    if (!filterSetId)
+      return { success: false, error: "Filter_Set_ID is required for update" };
 
     const deliveryType = getDeliveryType(campaignData.lead_type);
 
-
     const stateList = Array.isArray(campaignData.geography?.state)
-      ? campaignData.geography.state.map(getStateAbbreviation).filter(Boolean).join(",")
+      ? campaignData.geography.state
+          .map(getStateAbbreviation)
+          .filter(Boolean)
+          .join(",")
       : getStateAbbreviation(campaignData.geography?.state);
 
     const coverageType = campaignData.geography.coverage?.type || "FULL_STATE";
     const zipMode = coverageType === "FULL_STATE" ? 0 : 1;
 
-    const activeDaysArray = campaignData.delivery?.schedule?.days
-      ?.filter(d => d.active)
-      ?.map(d => d.day.toUpperCase()) || [];
+    const activeDaysArray =
+      campaignData.delivery?.schedule?.days
+        ?.filter((d) => d.active)
+        ?.map((d) => d.day.toUpperCase()) || [];
     const activeDays = convertDbDaysToApi(activeDaysArray).join(",");
 
     const schedule = campaignData.delivery?.schedule || {};
@@ -852,7 +988,6 @@ async function updateCampaignInBoberdoo(campaignData, filterSetId, partnerId) {
     const scheduleEnd = schedule.end_time || "17:00";
     const timezone = schedule.timezone || "America/New_York";
     const timeRange = `${scheduleStart}-${scheduleEnd}`; //  fixed syntax
-
 
     const zipCodes =
       coverageType === "PARTIAL"
@@ -875,7 +1010,10 @@ async function updateCampaignInBoberdoo(campaignData, filterSetId, partnerId) {
         Roof_Material: "0",
       };
     }
-    if (campaignData.lead_type === "GUTTERS" || campaignData.lead_type === "HVAC") {
+    if (
+      campaignData.lead_type === "GUTTERS" ||
+      campaignData.lead_type === "HVAC"
+    ) {
       extraLeadTypeFields = {
         Project_Type: "0",
         Homeowner: "0",
@@ -906,7 +1044,7 @@ async function updateCampaignInBoberdoo(campaignData, filterSetId, partnerId) {
       Zip_Mode: zipMode,
       Zip: zipCodes,
       Day_Of_Week_Accept_Leads: activeDays,
-      // Time_Of_Day_Accept_Leads: timeRange, // 
+      // Time_Of_Day_Accept_Leads: timeRange, //
       Timezone: timezone,
       ...extraLeadTypeFields,
     };
@@ -919,33 +1057,43 @@ async function updateCampaignInBoberdoo(campaignData, filterSetId, partnerId) {
       validateStatus: () => true,
     });
 
-    const data = typeof response.data === "string" ? safeJson(response.data) : response.data;
+    const data =
+      typeof response.data === "string"
+        ? safeJson(response.data)
+        : response.data;
 
     if (data?.response?.status === "Success") {
-      console.log(` Campaign ${campaignData._id || campaignData.campaign_id} updated successfully in Boberdoo`);
+      console.log(
+        ` Campaign ${campaignData._id || campaignData.campaign_id} updated successfully in Boberdoo`,
+      );
       return { success: true, filterSetId, data };
     }
 
     const errors = toErrorList(data).join("; ");
-    return { success: false, error: errors || "Failed to update campaign in Boberdoo", data };
-
+    return {
+      success: false,
+      error: errors || "Failed to update campaign in Boberdoo",
+      data,
+    };
   } catch (error) {
     console.error("[boberdoo] Campaign update error:", error.message);
-    return { success: false, error: error.message || "Failed to update campaign in Boberdoo" };
+    return {
+      success: false,
+      error: error.message || "Failed to update campaign in Boberdoo",
+    };
   }
 }
-
-
 
 /**
  * Disable campaign (Filter Set) in Boberdoo by setting Filter_Set_Status = 0
  */
 const deleteCampaignFromBoberdoo = async ({ filterSetId, leadTypeId }) => {
-
-
   if (!leadTypeId) {
     console.error(`❌ Invalid lead type: ${campaignData.lead_type}`);
-    return { success: false, error: `Invalid lead type: ${campaignData.lead_type}` };
+    return {
+      success: false,
+      error: `Invalid lead type: ${campaignData.lead_type}`,
+    };
   }
   try {
     if (!filterSetId) {
@@ -971,55 +1119,65 @@ const deleteCampaignFromBoberdoo = async ({ filterSetId, leadTypeId }) => {
       validateStatus: () => true,
     });
 
-    const data = typeof response.data === "string" ? safeJson(response.data) : response.data;
+    const data =
+      typeof response.data === "string"
+        ? safeJson(response.data)
+        : response.data;
 
     if (data?.response?.status === "Success") {
-      console.log(`✅ Boberdoo campaign disabled successfully (Filter_Set_ID: ${filterSetId})`);
+      console.log(
+        `✅ Boberdoo campaign disabled successfully (Filter_Set_ID: ${filterSetId})`,
+      );
       return { success: true, message: "Campaign disabled in Boberdoo", data };
     }
 
     console.error("❌ Failed to disable campaign in Boberdoo:", data);
     return { success: false, message: "Boberdoo disable failed", data };
-
   } catch (error) {
     console.error("❌ Error disabling campaign in Boberdoo:", error);
     return { success: false, message: error.message };
   }
 };
 
-
-
-
 const processBoberdoLead = async (leadData) => {
-  const session = await mongoose.startSession();
+  const session = await mongoose.startSession(); 
   session.startTransaction();
 
   try {
     const campaign = await Campaign.findOne({
-      boberdoo_filter_set_id: leadData.filter_set_id
+      boberdoo_filter_set_id: leadData.filter_set_id,
     });
 
     if (!campaign) {
-      throw new ErrorHandler(404, `Campaign not found for filter_set_id: ${leadData.filter_set_id}`);
+      throw new ErrorHandler(
+        404,
+        `Campaign not found for filter_set_id: ${leadData.filter_set_id}`,
+      );
     }
 
-    console.log(' Campaign found:', {
+    console.log(" Campaign found:", {
       internal_id: campaign._id,
       name: campaign.name,
-      filter_set_id: campaign.boberdoo_filter_set_id
+      filter_set_id: campaign.boberdoo_filter_set_id,
     });
 
-    const isActive = String(campaign.status).toUpperCase() === 'ACTIVE';
+    const isActive = String(campaign.status).toUpperCase() === "ACTIVE";
     if (!isActive) {
-      throw new ErrorHandler(400, `Campaign "${campaign.name}" is not active. Status: ${campaign.status}`);
+      throw new ErrorHandler(
+        400,
+        `Campaign "${campaign.name}" is not active. Status: ${campaign.status}`,
+      );
     }
 
     const state = await State.findOne({
-      abbreviation: leadData.address.state_code.toUpperCase()
+      abbreviation: leadData.address.state_code.toUpperCase(),
     });
 
     if (!state) {
-      throw new ErrorHandler(400, `Invalid state code: ${leadData.address.state_code}`);
+      throw new ErrorHandler(
+        400,
+        `Invalid state code: ${leadData.address.state_code}`,
+      );
     }
 
     const leadCost = campaign.bid_price || 0;
@@ -1035,7 +1193,7 @@ const processBoberdoLead = async (leadData) => {
         lead_id,
         leadCost,
         campaign.user_id,
-        session
+        session,
       );
     } else if (campaign.payment_type === "payasyougo") {
       billingResult = await BillingServices.assignLeadPayAsYouGo(
@@ -1044,14 +1202,16 @@ const processBoberdoLead = async (leadData) => {
         leadCost,
         campaign.user_id,
         session,
-        campaign
+        campaign,
       );
     } else {
       throw new ErrorHandler(400, "Invalid campaign payment type.");
     }
 
     const isPaid = billingResult.success;
-    console.log(`Payment result: ${isPaid ? 'SUCCESS' : 'FAILED'} - ${billingResult.message || ''}`);
+    console.log(
+      `Payment result: ${isPaid ? "SUCCESS" : "FAILED"} - ${billingResult.message || ""}`,
+    );
 
     const preparedLead = {
       lead_id,
@@ -1070,16 +1230,17 @@ const processBoberdoLead = async (leadData) => {
         city: leadData.address.city,
         state: state._id,
         zip_code: leadData.address.zip_code,
-        full_address: leadData.address.full_address ||
+        full_address:
+          leadData.address.full_address ||
           `${leadData.address.street}, ${leadData.address.city}, ${state.abbreviation} ${leadData.address.zip_code}`,
         coordinates: leadData.address.coordinates,
-        place_id: leadData.address.place_id
+        place_id: leadData.address.place_id,
       },
       note: leadData.note,
-      source: 'boberdo',
+      source: "boberdo",
 
-      status: isPaid ? 'active' : 'payment_pending',
-      payment_status: isPaid ? 'paid' : 'pending',
+      status: isPaid ? "active" : "payment_pending",
+      payment_status: isPaid ? "paid" : "pending",
       lead_cost: leadCost,
       transaction_id: isPaid ? billingResult.transactionId : null,
       original_cost: leadCost,
@@ -1089,18 +1250,18 @@ const processBoberdoLead = async (leadData) => {
         external_id: leadData.external_lead_id,
         filter_set_id: leadData.filter_set_id,
         source_campaign: leadData.source_info,
-        received_at: new Date()
-      }
+        received_at: new Date(),
+      },
     };
 
     const newLead = await Lead.create([preparedLead], { session });
     const createdLead = newLead[0];
 
-    console.log('Lead created:', {
+    console.log("Lead created:", {
       lead_id: createdLead.lead_id,
       internal_id: createdLead._id,
       status: createdLead.status,
-      payment_status: createdLead.payment_status
+      payment_status: createdLead.payment_status,
     });
 
     await session.commitTransaction();
@@ -1112,20 +1273,28 @@ const processBoberdoLead = async (leadData) => {
     });
 
     const populatedLead = await Lead.findById(createdLead._id)
-      .populate('campaign_id', 'name campaign_id')
-      .populate('address.state', 'name abbreviation');
+      .populate("campaign_id", "name campaign_id")
+      .populate("address.state", "name abbreviation");
 
     if (isPaid) {
       // ✅ Parallelize all post-payment notifications & wait for them (Reliability Fix)
-      console.log('⏳ Starting Boberdoo lead notifications (Parallel Execution)...');
+      console.log(
+        "⏳ Starting Boberdoo lead notifications (Parallel Execution)...",
+      );
 
       // Consolidated Notification Flow
-      await sendBoberdoLeadNotifications(populatedLead, campaign, billingResult, leadCost)
-        .then(() => console.log('✅ Boberdoo lead notifications completed'))
-        .catch(err => console.error('❌ Failed to run Boberdoo notifications:', err));
+      await sendBoberdoLeadNotifications(
+        populatedLead,
+        campaign,
+        billingResult,
+        leadCost,
+      )
+        .then(() => console.log("✅ Boberdoo lead notifications completed"))
+        .catch((err) =>
+          console.error("❌ Failed to run Boberdoo notifications:", err),
+        );
 
-      console.log('🏁 All Boberdoo post-processing tasks finished.');
-
+      console.log("🏁 All Boberdoo post-processing tasks finished.");
     } else {
       // Payment Failed Handling - also await this
       await BillingServices.handlePaymentFailure({
@@ -1135,12 +1304,11 @@ const processBoberdoLead = async (leadData) => {
         campaign,
         billingResult,
         leadData: populatedLead,
-        logger: billingLogger
+        logger: billingLogger,
       });
     }
 
     return populatedLead;
-
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
@@ -1148,63 +1316,81 @@ const processBoberdoLead = async (leadData) => {
   }
 };
 
-const sendBoberdoLeadNotifications = async (lead, campaign, billingResult, leadCost = 0) => {
+const sendBoberdoLeadNotifications = async (
+  lead,
+  campaign,
+  billingResult,
+  leadCost = 0,
+) => {
   const logMeta = {
     campaign_id: campaign?._id,
     campaign_name: campaign?.name,
     lead_id: lead?.lead_id,
     lead_internal_id: lead?._id,
-    action: 'Send Boberdo Lead Notifications',
+    action: "Send Boberdo Lead Notifications",
   };
 
   try {
     // CRITICAL: Fetch user with all required fields
-    const campaignOwner = await User.findById(campaign.user_id).select('+email +name +fullName');
+    const campaignOwner = await User.findById(campaign.user_id).select(
+      "+email +name +fullName",
+    );
 
     if (!campaignOwner) {
-      leadLogger.error('Campaign owner not found - cannot send notifications', logMeta);
+      leadLogger.error(
+        "Campaign owner not found - cannot send notifications",
+        logMeta,
+      );
       return;
     }
 
     // Validate owner has email
     if (!campaignOwner.email) {
-      leadLogger.error('Campaign owner missing email address', {
+      leadLogger.error("Campaign owner missing email address", {
         ...logMeta,
-        userId: campaign.user_id
+        userId: campaign.user_id,
       });
     }
 
     const tasks = [];
 
     // 1. Email to User
-    if (campaign?.delivery?.method?.includes('email') && campaign?.delivery?.email?.addresses) {
+    if (
+      campaign?.delivery?.method?.includes("email") &&
+      campaign?.delivery?.email?.addresses
+    ) {
       tasks.push(async () => {
         try {
           await MAIL_HANDLER.sendLeadAssignEmail({
             to: campaign.delivery.email.addresses,
-            name: campaignOwner.name || campaignOwner.fullName || 'Campaign User',
+            name:
+              campaignOwner.name || campaignOwner.fullName || "Campaign User",
             leadName: lead.lead_id,
-            assignedBy: 'Boberdo Integration',
+            assignedBy: "Boberdo Integration",
             leadDetailsUrl: `${process.env.UI_LINK}/dashboard/leads/${lead._id}`,
             campaignName: campaign.name,
             note: lead.note ?? "",
             leadData: {
               ...(lead.toObject ? lead.toObject() : lead),
-              note: lead.note ?? ""
+              note: lead.note ?? "",
             },
             realleadId: lead._id,
             subject: `Lead Fusion - New Lead`,
           });
-          leadLogger.info('Boberdo lead assignment email sent successfully', {
+          leadLogger.info("Boberdo lead assignment email sent successfully", {
             ...logMeta,
-            email_to: campaign.delivery.email.addresses
+            email_to: campaign.delivery.email.addresses,
           });
         } catch (emailErr) {
-          leadLogger.error('Failed to send Boberdo lead assignment email', emailErr, {
-            ...logMeta,
-            error: emailErr.message,
-            stack: emailErr.stack
-          });
+          leadLogger.error(
+            "Failed to send Boberdo lead assignment email",
+            emailErr,
+            {
+              ...logMeta,
+              error: emailErr.message,
+              stack: emailErr.stack,
+            },
+          );
         }
       });
     }
@@ -1213,59 +1399,65 @@ const sendBoberdoLeadNotifications = async (lead, campaign, billingResult, leadC
     tasks.push(async () => {
       try {
         const EXCLUDED = new Set([
-          'admin@gmail.com',
-          'admin123@gmail.com',
-          'admin1234@gmail.com',
+          "admin@gmail.com",
+          "admin123@gmail.com",
+          "admin1234@gmail.com",
         ]);
 
         let adminEmails = [];
         if (process.env.ADMIN_NOTIFICATION_EMAILS) {
-          adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS
-            .split(',')
-            .map(e => e.trim().toLowerCase())
+          adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS.split(",")
+            .map((e) => e.trim().toLowerCase())
             .filter(Boolean);
         } else {
           const adminUsers = await User.find({
-            role: { $in: ['ADMIN', 'SUPER_ADMIN'] },
-            isActive: { $ne: false }
-          }).select('email');
+            role: { $in: ["ADMIN", "SUPER_ADMIN"] },
+            isActive: { $ne: false },
+          }).select("email");
 
           adminEmails = (adminUsers || [])
-            .map(a => a.email)
+            .map((a) => a.email)
             .filter(Boolean)
-            .map(e => e.trim().toLowerCase())
-            .filter(e => !EXCLUDED.has(e));
+            .map((e) => e.trim().toLowerCase())
+            .filter((e) => !EXCLUDED.has(e));
         }
 
-        const emailString = adminEmails.join(',');
+        const emailString = adminEmails.join(",");
 
         if (adminEmails.length > 0) {
           await MAIL_HANDLER.sendLeadAssignAdminEmail({
             to: emailString,
-            userName: campaignOwner.name || campaignOwner.fullName || 'N/A',
+            userName: campaignOwner.name || campaignOwner.fullName || "N/A",
             userEmail: campaignOwner.email,
             leadName: lead.lead_id,
-            assignedBy: 'Boberdo Integration',
+            assignedBy: "Boberdo Integration",
             leadDetailsUrl: `${process.env.UI_LINK}/dashboard/leads/${lead._id}`,
             campaignName: campaign.name,
             note: lead.note ?? "",
             leadData: {
               ...(lead.toObject ? lead.toObject() : lead),
-              note: lead.note ?? ""
+              note: lead.note ?? "",
             },
             realleadId: lead._id,
           });
-          leadLogger.info('Boberdoo lead assignment admin email sent successfully', {
-            ...logMeta,
-            admin_count: adminEmails.length
-          });
+          leadLogger.info(
+            "Boberdoo lead assignment admin email sent successfully",
+            {
+              ...logMeta,
+              admin_count: adminEmails.length,
+            },
+          );
         }
       } catch (err) {
-        leadLogger.error('Failed to send Boberdoo lead assignment admin email', err, {
-          ...logMeta,
-          error: err.message,
-          stack: err.stack
-        });
+        leadLogger.error(
+          "Failed to send Boberdoo lead assignment admin email",
+          err,
+          {
+            ...logMeta,
+            error: err.message,
+            stack: err.stack,
+          },
+        );
       }
     });
 
@@ -1273,107 +1465,119 @@ const sendBoberdoLeadNotifications = async (lead, campaign, billingResult, leadC
       try {
         // Additional validation before sending receipt
         if (!campaignOwner.email) {
-          leadLogger.error('Cannot send receipt - campaign owner has no email', {
-            ...logMeta,
-            userId: campaign.user_id
-          });
+          leadLogger.error(
+            "Cannot send receipt - campaign owner has no email",
+            {
+              ...logMeta,
+              userId: campaign.user_id,
+            },
+          );
           return;
         }
 
         // Log what we're passing to the receipt service
-        leadLogger.info('Attempting to send Boberdoo payment receipt', {
+        leadLogger.info("Attempting to send Boberdoo payment receipt", {
           ...logMeta,
           userEmail: campaignOwner.email,
           userName: campaignOwner.name || campaignOwner.fullName,
           hasLead: !!lead,
           hasCampaign: !!campaign,
           hasBillingResult: !!billingResult,
-          billingResultKeys: billingResult ? Object.keys(billingResult) : []
+          billingResultKeys: billingResult ? Object.keys(billingResult) : [],
         });
 
         await ReceiptService.sendLeadPaymentReceipt({
           user: {
             _id: campaignOwner._id,
             email: campaignOwner.email,
-            name: campaignOwner.name || campaignOwner.fullName || 'User',
+            name: campaignOwner.name || campaignOwner.fullName || "User",
             // Include any other fields ReceiptService might need
           },
           lead: lead.toObject ? lead.toObject() : lead,
           campaign: campaign.toObject ? campaign.toObject() : campaign,
-          billingResult: billingResult || {}
+          billingResult: billingResult || {},
         });
 
-        leadLogger.info('✅ Boberdoo lead receipt email sent successfully', {
+        leadLogger.info("✅ Boberdoo lead receipt email sent successfully", {
           ...logMeta,
-          recipientEmail: campaignOwner.email
+          recipientEmail: campaignOwner.email,
         });
       } catch (receiptErr) {
-        leadLogger.error('❌ CRITICAL: Failed to send Boberdoo lead receipt email', receiptErr, {
-          ...logMeta,
-          error: receiptErr.message,
-          stack: receiptErr.stack,
-          userEmail: campaignOwner?.email,
-          userId: campaign?.user_id
-        });
+        leadLogger.error(
+          "❌ CRITICAL: Failed to send Boberdoo lead receipt email",
+          receiptErr,
+          {
+            ...logMeta,
+            error: receiptErr.message,
+            stack: receiptErr.stack,
+            userEmail: campaignOwner?.email,
+            userId: campaign?.user_id,
+          },
+        );
 
         // Optional: You might want to throw here to ensure it's tracked
         // throw receiptErr;
       }
     });
     // 3. SMS delivery
-    if (campaign?.delivery?.method?.includes('phone') && campaign?.delivery?.phone?.numbers) {
+    if (
+      campaign?.delivery?.method?.includes("phone") &&
+      campaign?.delivery?.phone?.numbers
+    ) {
       tasks.push(async () => {
         try {
-          const fullName = `${lead.first_name || ''} ${lead.last_name || ''}`.trim();
-          const phoneNumber = lead.phone_number || lead.phone || '';
-          const email = lead.email || '';
+          const fullName =
+            `${lead.first_name || ""} ${lead.last_name || ""}`.trim();
+          const phoneNumber = lead.phone_number || lead.phone || "";
+          const email = lead.email || "";
           const address = formatFullAddress(lead.address);
-          const campaignName = campaign?.name || 'N/A';
+          const campaignName = campaign?.name || "N/A";
           const MAX_NOTE_LENGTH = 100;
-          let notes = lead.note || 'No notes provided';
-          if (notes.length > MAX_NOTE_LENGTH) notes = notes.substring(0, MAX_NOTE_LENGTH) + '...';
+          let notes = lead.note || "No notes provided";
+          if (notes.length > MAX_NOTE_LENGTH)
+            notes = notes.substring(0, MAX_NOTE_LENGTH) + "...";
 
           const smsMessage = `New Lead Assigned
 
-Name: ${fullName}
-Phone: ${phoneNumber}
-Email: ${email}
-Address: ${address}
-Lead ID: ${lead.lead_id}
-Campaign: ${campaignName}
-Notes: ${notes}
+                        Name: ${fullName}
+                        Phone: ${phoneNumber}
+                        Email: ${email}
+                        Address: ${address}
+                        Lead ID: ${lead.lead_id}
+                        Campaign: ${campaignName}
+                        Notes: ${notes}
 
-View Lead: ${process.env.UI_LINK}/dashboard/leads/${lead._id}`;
+                        View Lead: ${process.env.UI_LINK}/dashboard/leads/${lead._id}`;
 
-          leadLogger.info('Attempting to send Boberdo lead assignment SMS', {
+          leadLogger.info("Attempting to send Boberdo lead assignment SMS", {
             ...logMeta,
-            to_numbers: campaign.delivery.phone.numbers
+            to_numbers: campaign.delivery.phone.numbers,
           });
 
           const smsResult = await SmsServices.sendSms({
             to: campaign.delivery.phone.numbers,
             message: smsMessage,
-            from: process.env.SMS_SENDER_ID || '+12157026445',
+            from: process.env.SMS_SENDER_ID || "+12157026445",
           });
 
           if (smsResult.success) {
-            leadLogger.info('Boberdo lead assignment SMS sent successfully', {
+            leadLogger.info("Boberdo lead assignment SMS sent successfully", {
               ...logMeta,
-              sent_to: smsResult.sentTo.join(', '),
-              total_sent: smsResult.successful
+              sent_to: smsResult.sentTo.join(", "),
+              total_sent: smsResult.successful,
             });
           } else {
-            leadLogger.warn('Boberdo SMS failed', {
+            leadLogger.warn("Boberdo SMS failed", {
               ...logMeta,
               failed_count: smsResult.failed,
-              error: smsResult.results?.map(r => r.error?.message).join('; ')
+              error: smsResult.results?.map((r) => r.error?.message).join("; "),
             });
           }
         } catch (err) {
-          leadLogger.error('Fatal error during Boberdo SMS sending', err, {
+          leadLogger.error("Fatal error during Boberdo SMS sending", err, {
             ...logMeta,
             error: err.message,
-            stack: err.stack
+            stack: err.stack,
           });
         }
       });
@@ -1386,19 +1590,18 @@ View Lead: ${process.env.UI_LINK}/dashboard/leads/${lead._id}`;
           campaign,
           leadCost,
           remainingBalance: billingResult?.newBalance,
-          logger: leadLogger
+          logger: leadLogger,
         });
       } catch (err) {
-        leadLogger.error('Error in low balance check logic (Boberdoo)', err, {
+        leadLogger.error("Error in low balance check logic (Boberdoo)", err, {
           ...logMeta,
           error: err.message,
-          stack: err.stack
+          stack: err.stack,
         });
       }
     });
 
     // 5. Send Payment Receipt - CRITICAL FIX
-
 
     // Execute tasks SEQUENTIALLY with delay to prevent Rate Limiting (Resend 2 req/s)
     const results = [];
@@ -1406,30 +1609,29 @@ View Lead: ${process.env.UI_LINK}/dashboard/leads/${lead._id}`;
       try {
         // Enforce 1000ms delay between tasks to avoid hitting rate limits
         if (index > 0) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise((resolve) => setTimeout(resolve, 1000));
         }
 
         await task();
-        results.push({ status: 'fulfilled' });
+        results.push({ status: "fulfilled" });
       } catch (err) {
-        results.push({ status: 'rejected', reason: err });
+        results.push({ status: "rejected", reason: err });
         leadLogger.error(`Notification task ${index} failed`, err, {
           ...logMeta,
           taskIndex: index,
-          error: err.message
+          error: err.message,
         });
       }
     }
 
-    leadLogger.info('Completed sending Boberdo notifications (Sequential)', {
+    leadLogger.info("Completed sending Boberdo notifications (Sequential)", {
       ...logMeta,
       totalTasks: tasks.length,
-      successful: results.filter(r => r.status === 'fulfilled').length,
-      failed: results.filter(r => r.status === 'rejected').length
+      successful: results.filter((r) => r.status === "fulfilled").length,
+      failed: results.filter((r) => r.status === "rejected").length,
     });
-
   } catch (error) {
-    leadLogger.error('Error in sendBoberdoLeadNotifications', error, {
+    leadLogger.error("Error in sendBoberdoLeadNotifications", error, {
       ...logMeta,
       error: error.message,
       stack: error.stack,

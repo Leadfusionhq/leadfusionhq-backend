@@ -36,6 +36,8 @@ const logsRoutes = require('./src/routes/logs/logs.routes');
 const smsRoutes = require('./src/routes/sms/sms.route');
 const boberDoRoutes = require('./src/routes/boberdo/boberdo.route');
 const boberdoAdminRoutes = require('./src/routes/boberdo/boberdo-admin.route');
+const n8nRoutes = require('./src/routes/n8n/n8n.route');
+const n8nAdminRoutes = require('./src/routes/n8n/n8n-admin.route');
 const googleSheetsRoutes = require('./src/routes/google-sheets/google-sheets.routes');
 
 
@@ -71,6 +73,7 @@ app.use(`/${config.server.route}/auth`, authRoutes);
 app.use(`/${config.server.route}/users`, userRoutes);
 app.use(`/${config.server.route}/admins`, adminRoutes);
 app.use(`/${config.server.route}/campaigns`, campaignRoutes);
+app.use(`/${config.server.route}/n8n`, n8nRoutes);
 app.use(`/${config.server.route}/leads`, leadRoutes);
 app.use(`/${config.server.route}/locations`, locationRoutes);
 app.use(`/${config.server.route}/notifications`, notificationRoutes);
@@ -106,6 +109,9 @@ app.use(`/${config.server.route}/sms`, smsRoutes);
 // Add these routes
 app.use(`/${config.server.route}/boberdo`, boberDoRoutes); // Public API for Boberdo
 app.use(`/${config.server.route}/admin/boberdo`, boberdoAdminRoutes); // Admin management
+
+// n8n routes
+app.use(`/${config.server.route}/admin/n8n`, n8nAdminRoutes); // Admin management for n8n
 
 // Google Sheets routes
 app.use(`/${config.server.route}/sheets`, googleSheetsRoutes);
