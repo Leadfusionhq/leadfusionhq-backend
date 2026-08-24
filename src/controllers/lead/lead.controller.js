@@ -1432,12 +1432,14 @@ const postLead = wrapAsync(async (req, res) => {
     // Process lead with Boberdoo filter_set_id
     const result = await LeadServices.processN8nLead(leadData);
 
-    // // Update API key usage count
-    // await req.boberdoApiKey.updateOne({
-    //     $inc: { total_leads_received: 1 }
-    // });
+    // Update API key usage count if authenticated via n8nApiKey
+    if (req.n8nApiKey) {
+        await req.n8nApiKey.updateOne({
+            $inc: { total_leads_received: 1 }
+        });
+    }
 
-    // Send plain text message (exactly what Boberdoo expects)
+    // Send plain text message
     res.status(201).send('Lead received successfully');
 });
 
