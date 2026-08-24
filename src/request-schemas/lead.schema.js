@@ -290,9 +290,15 @@ const postLead = {
         gender: Joi.string().valid('M', 'F', 'Male', 'Female', 'Other').allow('').optional(),
         note: Joi.string().max(1000).allow('').optional(),
         
-        // Boberdoo metadata
+        // Boberdoo / n8n metadata
         external_lead_id: Joi.string().max(100).optional(),
         source_info: Joi.string().max(200).optional(),
+
+        // Optional API key / token when passed in body instead of headers
+        api_key: Joi.string().optional(),
+        apiKey: Joi.string().optional(),
+        token: Joi.string().optional(),
+        n8n_api_key: Joi.string().optional(),
     }),
 };
 
