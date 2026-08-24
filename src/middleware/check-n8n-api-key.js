@@ -21,6 +21,16 @@ const checkN8nApiKey = async (req, res, next) => {
         if (!apiKey) {
             apiKey = req.headers['x-n8n-api-key'];
         }
+
+        // Fallback to request body
+        if (!apiKey && req.body) {
+            apiKey = req.body.api_key || req.body.apiKey || req.body.token || req.body.n8n_api_key;
+        }
+
+        // Fallback to query params
+        if (!apiKey && req.query) {
+            apiKey = req.query.api_key || req.query.apiKey || req.query.token;
+        }
         
         if (!apiKey) {
             throw new ErrorHandler(401, 'n8n API key required');
