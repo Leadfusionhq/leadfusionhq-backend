@@ -1539,15 +1539,15 @@ const sendBoberdoLeadNotifications = async (
 
           const smsMessage = `New Lead Assigned
 
-                        Name: ${fullName}
-                        Phone: ${phoneNumber}
-                        Email: ${email}
-                        Address: ${address}
-                        Lead ID: ${lead.lead_id}
-                        Campaign: ${campaignName}
-                        Notes: ${notes}
+Name: ${fullName}
+Phone: ${phoneNumber}
+Email: ${email}
+Address: ${address}
+Lead ID: ${lead.lead_id}
+Campaign: ${campaignName}
+Notes: ${notes}
 
-                        View Lead: ${process.env.UI_LINK}/dashboard/leads/${lead._id}`;
+View Lead: ${process.env.UI_LINK}/dashboard/leads/${lead._id}`;
 
           leadLogger.info("Attempting to send Boberdo lead assignment SMS", {
             ...logMeta,
