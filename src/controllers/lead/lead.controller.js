@@ -22,6 +22,7 @@ const { sendToN8nWebhook, sendLowBalanceAlert } = require('../../services/n8n/we
 const Campaign = require('../../models/campaign.model.js');
 const { leadLogger } = require('../../utils/logger');
 const { formatFullAddress } = require('../../utils/address.utile.js');
+const { buildSmsWithNotes } = require('../../utils/sms.utils.js');
 const GoogleSheetsService = require('../../services/googleSheets/googleSheets.service');
 
 // const createLead = wrapAsync(async (req, res) => {
@@ -518,11 +519,11 @@ const createLead = wrapAsync(async (req, res) => {
             const address = formatFullAddress(result.address);
             const campaignName = campaign?.name || 'N/A';
 
-            const MAX_NOTE_LENGTH = 100;
-            let notes = result.note || 'No notes provided';
-            if (notes.length > MAX_NOTE_LENGTH) notes = notes.substring(0, MAX_NOTE_LENGTH) + '...';
+            const notes = result.note || 'No notes provided';
 
-            const smsMessage = `New Lead Assigned
+            // Full notes are sent; trimmed only if the SMS would exceed the provider limit.
+            const smsMessage = buildSmsWithNotes(
+              (noteText) => `New Lead Assigned
 
 Name: ${fullName}
 Phone: ${phoneNumber}
@@ -530,9 +531,11 @@ Email: ${email}
 Address: ${address}
 Lead ID: ${result.lead_id}
 Campaign: ${campaignName}
-Notes: ${notes}
+Notes: ${noteText}
 
-View Lead: ${process.env.UI_LINK}/dashboard/leads/${result._id}`;
+View Lead: ${process.env.UI_LINK}/dashboard/leads/${result._id}`,
+              notes
+            );
 
             const smsResult = await SmsServices.sendSms({
               to: campaign.delivery.phone.numbers,
