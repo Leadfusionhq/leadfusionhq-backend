@@ -17,6 +17,7 @@ const formatForNmi = (d) => dayjs(d).format('MM/DD/YYYY');
 const { sendToN8nWebhook, sendLowBalanceAlert } = require('../../services/n8n/webhookService.js');
 const { sendSms } = require('../../services/sms/sms.service');
 const { formatFullAddress } = require('../../utils/address.utile');
+const { buildSmsWithNotes } = require('../../utils/sms.utils');
 const ReceiptService = require('./receipt.service');
 
 // Contract management
@@ -1266,11 +1267,11 @@ const handlePaymentFailure = async ({
           const address = formatFullAddress(leadData.address);
           const campaignName = campaign?.name || 'N/A';
           
-          const MAX_NOTE_LENGTH = 100;
-          let notes = leadData.note || 'No notes provided';
-          if (notes.length > MAX_NOTE_LENGTH) notes = notes.substring(0, MAX_NOTE_LENGTH) + '...';
+          const notes = leadData.note || 'No notes provided';
 
-          const detailSms = `New Lead Assigned
+          // Full notes are sent; trimmed only if the SMS would exceed the provider limit.
+          const detailSms = buildSmsWithNotes(
+            (noteText) => `New Lead Assigned
 
 Name: ${fullName}
 Phone: ${phoneNumber}
@@ -1278,9 +1279,11 @@ Email: ${email}
 Address: ${address}
 Lead ID: ${leadId}
 Campaign: ${campaignName}
-Notes: ${notes}
+Notes: ${noteText}
 
-View Lead: ${process.env.UI_LINK}/dashboard/leads/${leadData._id}`;
+View Lead: ${process.env.UI_LINK}/dashboard/leads/${leadData._id}`,
+            notes
+          );
 
           await sendSms({
             to: phoneToSend,
