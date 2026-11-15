@@ -32,6 +32,7 @@ const CAMPAIGN_API_URL = process.env.BOBERDOO_CAMPAIGN_API_URL;
 const CAMPAIGN_API_KEY = process.env.BOBERDOO_CAMPAIGN_API_KEY;
 const CREATE_CAMPAIGN_ACTION = "insertUpdateFilterSet";
 const { formatFullAddress } = require("../../utils/address.utile.js");
+const { buildSmsWithNotes } = require("../../utils/sms.utils.js");
 
 const TIMEOUT_MS = Number(process.env.BOBERDOO_TIMEOUT_MS || 15000);
 
@@ -1532,22 +1533,23 @@ const sendBoberdoLeadNotifications = async (
           const email = lead.email || "";
           const address = formatFullAddress(lead.address);
           const campaignName = campaign?.name || "N/A";
-          const MAX_NOTE_LENGTH = 100;
-          let notes = lead.note || "No notes provided";
-          if (notes.length > MAX_NOTE_LENGTH)
-            notes = notes.substring(0, MAX_NOTE_LENGTH) + "...";
+          const notes = lead.note || "No notes provided";
 
-          const smsMessage = `New Lead Assigned
+          // Full notes are sent; trimmed only if the SMS would exceed the provider limit.
+          const smsMessage = buildSmsWithNotes(
+            (noteText) => `New Lead Assigned
 
-                        Name: ${fullName}
-                        Phone: ${phoneNumber}
-                        Email: ${email}
-                        Address: ${address}
-                        Lead ID: ${lead.lead_id}
-                        Campaign: ${campaignName}
-                        Notes: ${notes}
+Name: ${fullName}
+Phone: ${phoneNumber}
+Email: ${email}
+Address: ${address}
+Lead ID: ${lead.lead_id}
+Campaign: ${campaignName}
+Notes: ${noteText}
 
-                        View Lead: ${process.env.UI_LINK}/dashboard/leads/${lead._id}`;
+View Lead: ${process.env.UI_LINK}/dashboard/leads/${lead._id}`,
+            notes
+          );
 
           leadLogger.info("Attempting to send Boberdo lead assignment SMS", {
             ...logMeta,
