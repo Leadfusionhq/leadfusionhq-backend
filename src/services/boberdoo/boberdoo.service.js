@@ -1322,7 +1322,10 @@ const sendBoberdoLeadNotifications = async (
   campaign,
   billingResult,
   leadCost = 0,
+  options = {},
 ) => {
+  // options.skipReceipt / options.skipLowBalanceCheck: used by bulk pending-payment
+  // recovery, which sends one summary payment email instead of a receipt per lead.
   const logMeta = {
     campaign_id: campaign?._id,
     campaign_name: campaign?.name,
@@ -1462,7 +1465,7 @@ const sendBoberdoLeadNotifications = async (
       }
     });
 
-    tasks.push(async () => {
+    if (!options.skipReceipt) tasks.push(async () => {
       try {
         // Additional validation before sending receipt
         if (!campaignOwner.email) {
@@ -1586,7 +1589,7 @@ View Lead: ${process.env.UI_LINK}/dashboard/leads/${lead._id}`,
     }
 
     // 4. Low Balance Check
-    tasks.push(async () => {
+    if (!options.skipLowBalanceCheck) tasks.push(async () => {
       try {
         await BillingServices.checkAndSendLowBalanceAlerts({
           campaign,
