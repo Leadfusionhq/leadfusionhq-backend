@@ -285,6 +285,11 @@ const processPendingPaymentRecovery = async (userParam, vaultId, options = {}) =
 
   // 4. Charge Card (If needed)
   let chargeResult = null;
+  if (amountFromCard > 0 && !vaultId) {
+    // Balance-only recovery (no card on file) and balance no longer covers it
+    billingLogger.warn('Recovery needs a card but none provided', { userId: user._id, amountFromCard });
+    return { success: false, message: 'Balance does not cover pending leads. Please add a card first.' };
+  }
   if (amountFromCard > 0) {
     chargeResult = await chargeCustomerVault(vaultId, amountFromCard, `Recovery: ${leadsToRecover.length} leads`);
     if (!chargeResult.success) {
@@ -2178,12 +2183,21 @@ const retryUserPendingPayments = async (userId) => {
   // Find default card
   const defaultCard = user.paymentMethods?.find(pm => pm.isDefault) || user.paymentMethods?.[0];
 
-  if (!defaultCard || !defaultCard.customerVaultId) {
-    throw new ErrorHandler(400, 'No valid payment method found. Please add a card first.');
+  let vaultId = defaultCard?.customerVaultId || null;
+
+  if (!vaultId) {
+    // No card: allow recovery from balance alone if it covers all pending leads
+    const pendingLeads = await Lead.find({ user_id: userId, payment_status: 'pending' }).select('lead_cost');
+    const pendingTotal = pendingLeads.reduce((sum, l) => sum + (l.lead_cost || 0), 0);
+
+    if ((user.balance || 0) < pendingTotal) {
+      throw new ErrorHandler(400, 'No valid payment method found. Please add a card first.');
+    }
+    billingLogger.info('No card on file - recovering pending leads from balance', { userId, balance: user.balance, pendingTotal });
   }
 
   // Trigger recovery with includeAll: true to catch Prepaid and PayAsYouGo
-  const result = await processPendingPaymentRecovery(user, defaultCard.customerVaultId, { includeAll: true });
+  const result = await processPendingPaymentRecovery(user, vaultId, { includeAll: true });
 
   if (!result.success) {
     if (result.message === 'Duplicate') {
