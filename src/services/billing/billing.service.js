@@ -377,7 +377,42 @@ const processPendingPaymentRecovery = async (userParam, vaultId, options = {}) =
   // 8. Notifications & Webhooks
   await handleRecoveryNotifications(user, amountFromCard, amountFromBalance, totalAmountToRecover, leadsToRecover, chargeResult, finalBalance, newPending === 0);
 
+  // 9. Deliver each recovered lead to the campaign's email/SMS recipients.
+  // These leads were held back (no delivery) while payment was pending.
+  deliverRecoveredLeads(leadsToRecover, user._id);
+
   return { success: true };
+};
+
+// --------------------------------------------------------------------------
+// Helper: Deliver recovered leads (fire and forget, same as chargeSingleLead)
+// --------------------------------------------------------------------------
+const deliverRecoveredLeads = (leads, userId) => {
+  const BoberDoService = require('../../services/boberdoo/boberdoo.service');
+
+  (async () => {
+    for (const lead of leads) {
+      const logMeta = { user_id: userId, lead_id: lead.lead_id, action: 'Deliver Recovered Lead' };
+      try {
+        if (!lead.campaign_id) {
+          billingLogger.warn('Recovered lead has no campaign - cannot deliver', logMeta);
+          continue;
+        }
+        // Enforce delay to prevent Rate Limiting
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        lead.payment_status = 'paid';
+        lead.status = 'active';
+        lead.payment_error_message = null;
+        await BoberDoService.sendBoberdoLeadNotifications(lead, lead.campaign_id, {}, 0, {
+          skipReceipt: true,
+          skipLowBalanceCheck: true
+        });
+        billingLogger.info('Recovered lead delivered', logMeta);
+      } catch (err) {
+        billingLogger.error('Failed to deliver recovered lead', err, logMeta);
+      }
+    }
+  })().catch(err => billingLogger.error('Recovered lead delivery loop failed', err, { user_id: userId }));
 };
 
 // --------------------------------------------------------------------------
